@@ -1,0 +1,19 @@
+# Ignore build artifacts
+bin/
+obj/
+release_server/
+release_client/
+*.exe
+*.dll
+*.o
+*.a
+*.so
+*.zip
+__pycache__/
+*.pyc
+
+# Ignore Colab/Jupyter garbage
+.ipynb_checkpoints/
+
+# Ignore local config
+.ssh/

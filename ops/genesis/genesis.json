@@ -1,0 +1,8 @@
+{
+    "genesis_time": "2026-01-20T00:00:00Z",
+    "chain_id": "skatechain-1",
+    "consensus_params": {
+        "pow": { "initial_difficulty": "0xFFFF..." },
+        "pol": { "min_approvals": 3, "slashing_penalty": 500000000 }
+    }
+}
