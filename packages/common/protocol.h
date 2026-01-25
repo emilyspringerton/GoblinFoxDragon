@@ -18,11 +18,11 @@ typedef struct {
 } WeaponStats;
 
 static const WeaponStats WPN_STATS[MAX_WEAPONS] = {
-    {WPN_KNIFE,   35, 20, 1, 0.0f,  0},
-    {WPN_MAGNUM,  45, 25, 1, 0.0f,  6},
-    {WPN_AR,      12, 6,  1, 0.04f, 30},
-    {WPN_SHOTGUN, 8,  50, 8, 0.15f, 8},
-    {WPN_SNIPER,  90, 70, 1, 0.0f,  5}
+    {WPN_KNIFE,   35, 20, 1, 0.0f,  0},   // Infinite
+    {WPN_MAGNUM,  45, 25, 1, 0.0f,  6},   // 6 Rounds
+    {WPN_AR,      12, 6,  1, 0.04f, 30},  // 30 Rounds
+    {WPN_SHOTGUN, 8,  50, 8, 0.15f, 8},   // 8 Shells
+    {WPN_SNIPER,  90, 70, 1, 0.0f,  5}    // 5 Rounds
 };
 
 typedef struct {
@@ -33,20 +33,25 @@ typedef struct {
 } Projectile;
 
 typedef struct {
-    // --- STATE (Observation) ---
     int id;
     int active;
-    int is_bot;     // NEW: Agent Flag
+    int is_bot;     // Agent Flag
+    
+    // Position & Physics
     float x, y, z;
     float vx, vy, vz;
     float yaw, pitch;
     int on_ground;
     
-    // --- ACTION SPACE (Inputs) ---
-    float in_fwd, in_strafe;
-    int in_jump, in_shoot, in_reload;
-
-    // --- COMBAT ---
+    // --- INPUTS (Action Space) ---
+    float in_fwd;
+    float in_strafe;
+    int in_jump;
+    int in_shoot;
+    int in_reload;
+    int crouching;  // <-- REQUIRED FIELD ADDED
+    
+    // --- COMBAT STATE ---
     int current_weapon;
     int ammo[MAX_WEAPONS];
     int reload_timer;
@@ -55,12 +60,12 @@ typedef struct {
     int jump_timer;
     
     int health;
-    float recoil_anim;
-    int hit_feedback;
     int kills;
+    int hit_feedback;
+    float recoil_anim;
     
-    // --- RL REWARD ---
-    float accumulated_reward; // +Reward for hits/kills, -Punishment for death
+    // --- ML REWARD ---
+    float accumulated_reward; 
 } PlayerState;
 
 typedef struct {
