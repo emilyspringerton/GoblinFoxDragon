@@ -18,40 +18,48 @@ typedef struct { float x, y, z, w, h, d; } Box;
 
 // MAP GEOMETRY
 static Box map_geo[] = {
-    // 0: Floor (Expanded to 300x300)
-    {0, -1, 0, 300, 2, 300},
+    // 0: Floor (Expanded to 900x300)
+    {0, -1, 0, 900, 2, 300},
     
-    // --- CLASSIC STRUCTURES ---
-    {15, 2.5, 15, 10, 5, 10},     // Red Box
-    {-15, 1.5, -15, 10, 3, 10},   // Blue Box
-    {-20, 4.0, 5, 6, 8, 6},       // Pillar
-    {0, 5.0, -35, 4, 10, 4},      // Sniper Perch (Moved back)
-    {10, 1.0, -10, 4, 2, 4},      // Step
+    // --- CENTRAL ZIGGURAT (The Hub) ---
+    {0, 2.0, 0, 20, 4, 20},       
+    {0, 5.0, 0, 10, 2, 10},       
+    {0, 8.0, 0, 4, 4, 4},
     
-    // --- NEW ZIGGURAT CENTER ---
-    {0, 2.0, 0, 20, 4, 20},       // Base Tier
-    {0, 5.0, 0, 10, 2, 10},       // Mid Tier
-    {0, 8.0, 0, 4, 4, 4},         // Top Spire
-    
-    // --- PARKOUR ELEMENTS ---
-    {-40, 3.0, 0, 10, 6, 2},      // West Wall Jump
-    {40, 3.0, 0, 10, 6, 2},       // East Wall Jump
-    {0, 6.0, -20, 2, 1, 20},      // Skybridge (Connecting Ziggurat to North)
-    
-    // --- PERIMETER COVER ---
-    {30, 2.0, 30, 4, 4, 4},       // NE Cover
-    {-30, 2.0, 30, 4, 4, 4},      // NW Cover
-    {30, 2.0, -30, 4, 4, 4},      // SE Cover
-    {-30, 2.0, -30, 4, 4, 4},     // SW Cover
+    // --- EAST CANYON (Positive X) ---
+    {200, 10, 80, 200, 20, 20},   // North Cliff Face
+    {200, 10, -80, 200, 20, 20},  // South Cliff Face
+    {350, 4, 0, 10, 8, 10},       // Outpost Block
+    {250, 2, 40, 4, 4, 4},        // Cover Rock
+    {150, 2, -40, 4, 4, 4},       // Cover Rock
 
-    // --- BOUNDARY WALLS (Expanded) ---
-    // Moved out to +/- 125
-    {0, 15, 125, 250, 30, 50},    // North Wall (Z+)
-    {0, 15, -125, 250, 30, 50},   // South Wall (Z-)
-    {125, 15, 0, 50, 30, 250},    // East Wall (X+)
-    {-125, 15, 0, 50, 30, 250}    // West Wall (X-)
+    // --- WEST CANYON (Negative X) ---
+    {-200, 10, 80, 200, 20, 20},  // North Cliff Face
+    {-200, 10, -80, 200, 20, 20}, // South Cliff Face
+    {-350, 4, 0, 10, 8, 10},      // Outpost Block
+    {-250, 2, -40, 4, 4, 4},      // Cover Rock
+    {-150, 2, 40, 4, 4, 4},       // Cover Rock
+
+    // --- PARKOUR BRIDGES ---
+    {0, 12, 0, 800, 1, 2},        // High Wire (crazy rail spanning map)
+
+    // --- CONTAINMENT WALLS (MASSIVE) ---
+    // Thickness 100, Height 50.
+    // Map is 900 wide (X: -450 to 450), 300 deep (Z: -150 to 150)
+    
+    // North Wall (Z+) - Center at 200 (150 boundary + 50 half-thickness)
+    {0, 25, 200, 1000, 50, 100},   
+    
+    // South Wall (Z-) - Center at -200
+    {0, 25, -200, 1000, 50, 100},  
+    
+    // East Wall (X+) - Center at 500 (450 boundary + 50 half-thickness)
+    {500, 25, 0, 100, 50, 500},   
+    
+    // West Wall (X-) - Center at -500
+    {-500, 25, 0, 100, 50, 500}
 };
-static int map_count = 19; // Updated count
+static int map_count = 17;
 
 float phys_rand_f() { return ((float)(rand()%1000)/500.0f) - 1.0f; }
 
@@ -102,10 +110,13 @@ void resolve_collision(PlayerState *p) {
                     p->y = b.y + b.h/2; p->vy = 0; p->on_ground = 1;
                 } else {
                     float dx = p->x - b.x; float dz = p->z - b.z;
-                    if (fabs(dx) > fabs(dz)) { 
-                        p->vx = 0; p->x = (dx > 0) ? b.x + b.w/2 + pw : b.x - b.w/2 - pw;
+                    // Push out to nearest side
+                    if (fabs(dx)/b.w > fabs(dz)/b.d) { 
+                        p->vx = 0; 
+                        p->x = (dx > 0) ? b.x + b.w/2 + pw : b.x - b.w/2 - pw;
                     } else { 
-                        p->vz = 0; p->z = (dz > 0) ? b.z + b.d/2 + pw : b.z - b.d/2 - pw;
+                        p->vz = 0; 
+                        p->z = (dz > 0) ? b.z + b.d/2 + pw : b.z - b.d/2 - pw;
                     }
                 }
             }
@@ -152,9 +163,9 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
                     if(targets[i].health <= 0) {
                         p->kills++;
                         targets[i].health = 100;
-                        // Respawn inside new bounds (+/- 100)
-                        targets[i].x = (rand()%100)-50; 
-                        targets[i].z = (rand()%100)-50; 
+                        // Respawn across full map length (+/- 400 X)
+                        targets[i].x = (rand()%800)-400; 
+                        targets[i].z = (rand()%200)-100; 
                         targets[i].y = 10;
                     }
                 }
