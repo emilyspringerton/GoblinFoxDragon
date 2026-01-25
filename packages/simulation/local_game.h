@@ -9,7 +9,7 @@
 
 #define JUMP_COOLDOWN 15
 
-ServerState local_state;
+ServerState local_state; // REQUIRED GLOBAL
 
 void local_init() {
     memset(&local_state, 0, sizeof(ServerState));
@@ -28,14 +28,14 @@ void local_init() {
 }
 
 void local_update(float fwd, float strafe, float yaw, float pitch, int shoot, int weapon, int jump, int crouch, int reload) {
-    local_state.server_tick++;
+    local_state.server_tick++; // REQUIRED FIELD USAGE
     PlayerState *p = &local_state.players[0];
 
     p->yaw = yaw;
     p->pitch = pitch;
     if (weapon != -1) p->current_weapon = weapon;
 
-    if (p->jump_timer > 0) p->jump_timer--;
+    if (p->jump_timer > 0) p->jump_timer--; // REQUIRED FIELD USAGE
 
     apply_friction(p);
 
@@ -71,15 +71,12 @@ void local_update(float fwd, float strafe, float yaw, float pitch, int shoot, in
     resolve_collision(p);
 
     if (p->recoil_anim > 0) p->recoil_anim -= 0.1f;
-    
-    // FIRE WEAPONS (Pass the whole player array so we can hit bots)
     update_weapons(p, local_state.players, shoot, reload);
 
-    // Bot Logic
+    // Bot AI
     for(int i=1; i<MAX_CLIENTS; i++) {
         PlayerState *bot = &local_state.players[i];
         if (!bot->active) continue;
-        // Dumb AI: Strafe left/right
         bot->vx = sinf(local_state.server_tick * 0.05f) * 0.2f;
         bot->vy -= GRAVITY;
         bot->x += bot->vx; bot->y += bot->vy;

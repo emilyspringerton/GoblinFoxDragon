@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include "protocol.h"
 
-// --- TURBO TUNING ---
 #define GRAVITY 0.025f
 #define JUMP_FORCE 0.55f
 #define MAX_SPEED 0.75f
@@ -12,7 +11,7 @@
 #define ACCEL 1.5f
 #define STOP_SPEED 0.1f
 #define MAX_AIR_SPEED 0.1f
-#define EYE_HEIGHT 4.0f
+#define EYE_HEIGHT 4.0f // REQUIRED CONSTANT
 
 typedef struct { float x, y, z, w, h, d; } Box;
 static Box map_geo[] = {
@@ -25,36 +24,18 @@ static Box map_geo[] = {
 };
 static int map_count = 6;
 
-// Helper for RNG
+// Helper
 float phys_rand_f() { return ((float)(rand()%1000)/500.0f) - 1.0f; }
 
-// Ray-Sphere Intersection
+// Hit Detection
 int check_hit(float ox, float oy, float oz, float dx, float dy, float dz, PlayerState *target) {
     if (!target->active) return 0;
-    
-    // Target Center (approx chest height)
-    float tx = target->x; 
-    float ty = target->y + 2.0f; 
-    float tz = target->z; 
-    
-    // Vector from Ray Origin to Sphere Center
-    float vx = tx - ox; 
-    float vy = ty - oy; 
-    float vz = tz - oz;
-    
-    // Project V onto D (Ray Direction)
+    float tx = target->x; float ty = target->y + 2.0f; float tz = target->z;
+    float vx = tx - ox; float vy = ty - oy; float vz = tz - oz;
     float t = vx*dx + vy*dy + vz*dz;
-    if (t < 0) return 0; // Behind shooter
-    
-    // Closest point on ray
-    float cx = ox + dx*t; 
-    float cy = oy + dy*t; 
-    float cz = oz + dz*t;
-    
-    // Distance squared
+    if (t < 0) return 0;
+    float cx = ox + dx*t; float cy = oy + dy*t; float cz = oz + dz*t;
     float dist_sq = (tx-cx)*(tx-cx) + (ty-cy)*(ty-cy) + (tz-cz)*(tz-cz);
-    
-    // Hit radius squared (2.5f ~ 1.5 units wide)
     return (dist_sq < 2.5f);
 }
 
@@ -105,8 +86,6 @@ void resolve_collision(PlayerState *p) {
     }
 }
 
-// Updated Weapon Logic with HIT DETECTION
-// Now accepts 'targets' array pointer
 void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload) {
     if (p->reload_timer > 0) p->reload_timer--;
     if (p->attack_cooldown > 0) p->attack_cooldown--;
@@ -124,36 +103,32 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
             p->attack_cooldown = WPN_STATS[w].rof;
             if (w != WPN_KNIFE) p->ammo[w]--;
             
-            // --- HITSCAN LOGIC ---
-            // Calculate Vector based on Yaw/Pitch
-            // Note: Yaw is inverted (-yaw) to match Visuals
+            // Hitscan
             float r = -p->yaw * 0.0174533f;
             float rp = p->pitch * 0.0174533f;
-            
             float dx = sinf(r) * cosf(rp);
             float dy = sinf(rp);
             float dz = -cosf(r) * cosf(rp);
             
-            // Iterate targets
-            for(int i=0; i<MAX_CLIENTS; i++) {
-                if (p == &targets[i]) continue; // Don't hit self
-                if (!targets[i].active) continue;
+            if (WPN_STATS[w].spr > 0) {
+                dx += phys_rand_f() * WPN_STATS[w].spr;
+                dy += phys_rand_f() * WPN_STATS[w].spr;
+                dz += phys_rand_f() * WPN_STATS[w].spr;
+            }
 
+            for(int i=1; i<MAX_CLIENTS; i++) {
                 if (check_hit(p->x, p->y + EYE_HEIGHT, p->z, dx, dy, dz, &targets[i])) {
                     targets[i].health -= WPN_STATS[w].dmg;
-                    p->hit_feedback = 2; // Signal UI hitmarker
-                    
-                    // Kill Logic
-                    if (targets[i].health <= 0) {
-                        p->kills++;
-                        targets[i].health = 100; // Respawn
-                        targets[i].x = 0; targets[i].y = 10; targets[i].z = 0; // Drop from sky
+                    p->hit_feedback = 2; 
+                    if(targets[i].health <= 0) {
+                        p->kills++; // REQUIRED FIELD USAGE
+                        targets[i].health = 100;
+                        targets[i].x=5; targets[i].y=0; targets[i].z=5;
                     }
                 }
             }
-
         } else {
-            p->attack_cooldown = 10; // Dry fire click
+            p->attack_cooldown = 10; 
         }
     }
 }

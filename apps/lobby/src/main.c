@@ -90,8 +90,6 @@ void draw_weapon_p(PlayerState *p) {
     glLoadIdentity();
     float kick = p->recoil_anim * 0.2f;
     float reload_dip = (p->reload_timer > 0) ? sinf(p->reload_timer * 0.2f) * 0.5f - 0.5f : 0.0f;
-    
-    // --- SWAY RESTORED ---
     float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
     float bob = sinf(SDL_GetTicks() * 0.015f) * speed * 0.15f; 
 
@@ -126,7 +124,7 @@ void draw_scene(PlayerState *render_p) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
 
-    float cam_h = render_p->crouching ? 2.5f : EYE_HEIGHT;
+    float cam_h = render_p->crouching ? 2.5f : EYE_HEIGHT; // REQUIRED CONSTANT
     glRotatef(-cam_pitch, 1, 0, 0);
     glRotatef(-cam_yaw, 0, 1, 0);
     glTranslatef(-render_p->x, -(render_p->y + cam_h), -render_p->z);
@@ -140,9 +138,7 @@ void draw_scene(PlayerState *render_p) {
         if(local_state.players[i].active) {
             glPushMatrix();
             glTranslatef(local_state.players[i].x, local_state.players[i].y, local_state.players[i].z);
-            if (local_state.players[i].health <= 0) glColor3f(0.5, 0, 0); // Dead color
-            else glColor3f(1, 0, 0); // Alive
-            
+            glColor3f(1, 0, 0); 
             glScalef(1, 4, 1);
             glBegin(GL_QUADS); 
             glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(-0.5,0.5,0.5);
@@ -157,7 +153,7 @@ void draw_scene(PlayerState *render_p) {
 
     draw_weapon_p(render_p);
     
-    // CROSSHAIR
+    // Crosshair
     glDisable(GL_DEPTH_TEST);
     glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
     glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
