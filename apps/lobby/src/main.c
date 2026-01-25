@@ -6,11 +6,13 @@
 #include "protocol.h"
 #include "physics.h"
 
-PlayerState p = {0, 10, 0, 0, 0, 0, 0, 0, 0, 1, 100, 0};
+// Init Player High in the air to avoid clipping on start
+PlayerState p = {0, 10.0f, 0, 0, 0, 0, 0, 0, 1, 100, 0};
 
 void draw_grid() {
     glBegin(GL_LINES);
-    glColor3f(0.5f, 0.0f, 1.0f); // Neon Purple
+    // Neon Cyan Grid
+    glColor3f(0.0f, 1.0f, 1.0f);
     for(int i=-100; i<=100; i+=5) {
         glVertex3f(i, 0, -100); glVertex3f(i, 0, 100);
         glVertex3f(-100, 0, i); glVertex3f(100, 0, i);
@@ -25,19 +27,19 @@ void draw_map() {
         glTranslatef(b.x, b.y, b.z);
         glScalef(b.w, b.h, b.d);
         
-        // Neon Box Style
+        // Solid Body
         glBegin(GL_QUADS);
-        glColor3f(0.1f, 0.1f, 0.1f); // Dark Body
-        glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(-0.5,0.5,0.5); // Front
-        glVertex3f(-0.5,0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5); // Top
-        glVertex3f(-0.5,-0.5,-0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5); // Back
-        glVertex3f(-0.5,-0.5,-0.5); glVertex3f(-0.5,-0.5,0.5); glVertex3f(-0.5,0.5,0.5); glVertex3f(-0.5,0.5,-0.5); // Left
-        glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(0.5,0.5,0.5); // Right
+        glColor3f(0.2f, 0.2f, 0.2f); 
+        glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(-0.5,0.5,0.5);
+        glVertex3f(-0.5,0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
+        glVertex3f(-0.5,-0.5,-0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
+        glVertex3f(-0.5,-0.5,-0.5); glVertex3f(-0.5,-0.5,0.5); glVertex3f(-0.5,0.5,0.5); glVertex3f(-0.5,0.5,-0.5);
+        glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(0.5,0.5,0.5);
         glEnd();
 
-        // Wireframe Edges
+        // Neon Edges
         glLineWidth(2.0f);
-        glColor3f(0.0f, 1.0f, 1.0f); // Cyan Edges
+        glColor3f(1.0f, 0.0f, 1.0f); // Magenta
         glBegin(GL_LINE_LOOP);
         glVertex3f(-0.5, 0.5, 0.5); glVertex3f(0.5, 0.5, 0.5); glVertex3f(0.5, 0.5, -0.5); glVertex3f(-0.5, 0.5, -0.5);
         glEnd();
@@ -46,17 +48,15 @@ void draw_map() {
     }
 }
 
-// WEAPON MODELS (FROM PHASE 85)
 void draw_weapon() {
     glPushMatrix();
     glLoadIdentity();
     
-    // Recoil Animation
     float kick = p.recoil_anim * 0.2f;
     glTranslatef(0.4f, -0.5f + kick, -1.2f + (kick * 0.5f));
     glRotatef(-p.recoil_anim * 10.0f, 1, 0, 0);
 
-    // Color/Shape Switch
+    // Phase 85 Weapon Colors
     switch(p.current_weapon) {
         case WPN_KNIFE:   glColor3f(0.8f, 0.8f, 0.8f); glScalef(0.1f, 0.1f, 0.5f); break;
         case WPN_MAGNUM:  glColor3f(0.6f, 0.6f, 0.6f); glScalef(0.15f, 0.2f, 0.4f); break;
@@ -65,7 +65,6 @@ void draw_weapon() {
         case WPN_SNIPER:  glColor3f(0.1f, 0.2f, 0.1f); glScalef(0.1f, 0.15f, 1.5f); break;
     }
 
-    // Draw Box Gun
     glBegin(GL_QUADS);
     glVertex3f(-1,1,1); glVertex3f(1,1,1); glVertex3f(1,1,-1); glVertex3f(-1,1,-1);
     glVertex3f(-1,-1,1); glVertex3f(1,-1,1); glVertex3f(1,1,1); glVertex3f(-1,1,1);
@@ -79,7 +78,7 @@ void draw_weapon() {
 
 int main(int argc, char* argv[]) {
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *win = SDL_CreateWindow("SHANKPIT // ARSENAL RESTORED", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
+    SDL_Window *win = SDL_CreateWindow("SHANKPIT // SYNTHESIS", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
     SDL_GL_CreateContext(win);
     SDL_SetRelativeMouseMode(SDL_TRUE);
     
@@ -112,7 +111,7 @@ int main(int argc, char* argv[]) {
             if(e.type == SDL_MOUSEBUTTONDOWN) p.recoil_anim = 1.0f;
         }
 
-        // --- PHYSICS STEP (Quake Style) ---
+        // --- PHYSICS UPDATE ---
         apply_friction(&p);
 
         const Uint8 *k = SDL_GetKeyboardState(NULL);
@@ -126,7 +125,6 @@ int main(int argc, char* argv[]) {
         if(k[SDL_SCANCODE_D]) { wish_x += right_x; wish_z += right_z; }
         if(k[SDL_SCANCODE_A]) { wish_x -= right_x; wish_z -= right_z; }
 
-        // Normalize wish vector
         float wish_len = sqrtf(wish_x*wish_x + wish_z*wish_z);
         if (wish_len > 0) { wish_x /= wish_len; wish_z /= wish_len; }
 
@@ -136,18 +134,18 @@ int main(int argc, char* argv[]) {
             accelerate(&p, wish_x, wish_z, target_speed, ACCEL);
             if (space_held) { p.vy = JUMP_FORCE; p.on_ground = 0; }
         } else {
-            accelerate(&p, wish_x, wish_z, target_speed * MAX_AIR_SPEED, AIR_ACCEL);
+            accelerate(&p, wish_x, wish_z, target_speed * MAX_AIR_SPEED, ACCEL);
         }
 
         p.vy -= GRAVITY;
         p.x += p.vx; p.z += p.vz; p.y += p.vy;
 
         resolve_collision(&p);
-
+        
         if (p.recoil_anim > 0) p.recoil_anim -= 0.1f;
 
-        // --- RENDER ---
-        glClearColor(0.05f, 0.05f, 0.1f, 1.0f);
+        // --- RENDER UPDATE ---
+        glClearColor(0.05f, 0.05f, 0.1f, 1.0f); // Dark Space Background
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glLoadIdentity();
 
