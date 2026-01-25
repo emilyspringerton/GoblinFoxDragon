@@ -105,34 +105,14 @@ void draw_weapon_p(PlayerState *p) {
     glTranslatef(0.4f, -0.5f + kick + reload_dip, -1.2f + (kick * 0.5f));
     glRotatef(-p->recoil_anim * 10.0f, 1, 0, 0);
     
-    // RESTORED WEAPON MODELS (Phase 176 Logic)
     switch(p->current_weapon) {
-        case WPN_KNIFE:   
-            glColor3f(0.8f, 0.8f, 0.8f); 
-            glScalef(0.1f, 0.1f, 0.5f); 
-            break;
-        case WPN_MAGNUM:  
-            glColor3f(0.6f, 0.6f, 0.6f); 
-            glScalef(0.15f, 0.2f, 0.4f); 
-            break;
-        case WPN_AR:      
-            glColor3f(0.2f, 0.2f, 0.2f); 
-            glScalef(0.15f, 0.2f, 1.0f); 
-            break;
-        case WPN_SHOTGUN: 
-            glColor3f(0.4f, 0.2f, 0.1f); 
-            glScalef(0.2f, 0.2f, 0.8f); 
-            break;
-        case WPN_SNIPER:  
-            glColor3f(0.1f, 0.1f, 0.1f); 
-            glScalef(0.1f, 0.15f, 1.5f); 
-            break;
-        default:
-            glScalef(0.1f, 0.1f, 0.1f);
-            break;
+        case WPN_KNIFE: glColor3f(0.8f,0.8f,0.8f); break;
+        case WPN_MAGNUM: glColor3f(0.6f,0.6f,0.6f); break;
+        case WPN_AR: glColor3f(0.2f,0.2f,0.2f); break;
+        case WPN_SHOTGUN: glColor3f(0.4f,0.2f,0.1f); break;
+        case WPN_SNIPER: glColor3f(0.1f,0.1f,0.1f); break;
     }
-
-    // Draw Box
+    glScalef(0.15f, 0.2f, 0.8f);
     glBegin(GL_QUADS); 
     glVertex3f(-1,1,1); glVertex3f(1,1,1); glVertex3f(1,1,-1); glVertex3f(-1,1,-1); 
     glVertex3f(-1,-1,1); glVertex3f(1,-1,1); glVertex3f(1,1,1); glVertex3f(-1,1,1); 
@@ -145,6 +125,9 @@ void draw_weapon_p(PlayerState *p) {
 
 void draw_scene(PlayerState *render_p) {
     glClearColor(0.05f, 0.05f, 0.1f, 1.0f);
+    
+    if (render_p->hit_feedback > 0) glClearColor(0.2f, 0.0f, 0.0f, 1.0f); // Feedback
+
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
 
@@ -156,6 +139,7 @@ void draw_scene(PlayerState *render_p) {
     draw_grid();
     draw_map();
     
+    // RENDER OTHER ENTITIES
     for(int i=1; i<MAX_CLIENTS; i++) {
         if(state.players[i].active) {
             draw_bot_model(&state.players[i]);
@@ -198,13 +182,11 @@ int main(int argc, char* argv[]) {
                     glMatrixMode(GL_MODELVIEW); glLoadIdentity();
                 }
                 if(e.type == SDL_MOUSEMOTION) {
-                    // MOUSE FIX: Inverted the input direction
-                    cam_yaw -= e.motion.xrel * 0.15f;
-                    
+                    cam_yaw += e.motion.xrel * 0.15f;
                     if(cam_yaw > 360) cam_yaw -= 360; 
                     if(cam_yaw < 0) cam_yaw += 360;
                     
-                    cam_pitch -= e.motion.yrel * 0.15f;
+                    cam_pitch += e.motion.yrel * 0.15f;
                     if(cam_pitch > 89) cam_pitch = 89; 
                     if(cam_pitch < -89) cam_pitch = -89;
                 }
@@ -217,6 +199,7 @@ int main(int argc, char* argv[]) {
             glLoadIdentity();
             glColor3f(1, 1, 0);
             glBegin(GL_LINES); 
+            // D
             glVertex2f(200, 300); glVertex2f(200, 400); glVertex2f(200, 400); glVertex2f(250, 350);
             glVertex2f(250, 350); glVertex2f(200, 300);
             glEnd();
@@ -235,7 +218,9 @@ int main(int argc, char* argv[]) {
             if(k[SDL_SCANCODE_4]) wpn=3; if(k[SDL_SCANCODE_5]) wpn=4;
 
             local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn, jump, crouch, reload);
-            draw_scene(&local_p);
+            
+            // LINKAGE FIX: Use state.players[0]
+            draw_scene(&state.players[0]);
         }
 
         SDL_GL_SwapWindow(win);
