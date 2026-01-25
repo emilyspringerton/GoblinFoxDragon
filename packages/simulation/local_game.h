@@ -7,10 +7,24 @@
 #include "../common/protocol.h"
 #include "../common/physics.h"
 
+#define MAX_PROJECTILES 64
+#define EYE_HEIGHT 6.0f
+
+typedef struct {
+    int active;
+    float x, y, z;
+    float vx, vy, vz;
+    int owner_id;
+    int dmg;
+    int life;
+} Projectile;
+
 ServerState state;
+Projectile projectiles[MAX_PROJECTILES];
 
 void local_init() {
     memset(&state, 0, sizeof(ServerState));
+    memset(projectiles, 0, sizeof(projectiles));
     
     // Player 0 (You)
     state.players[0].active = 1;
@@ -25,9 +39,40 @@ void local_init() {
     state.players[1].health = 100;
 }
 
-// PRECISION HIT CHECK
-// Calculates the shortest distance from the ray (ox,oy,oz -> dx,dy,dz) 
-// to the target center.
+// Spawn a physical bullet
+void fire_projectile(float x, float y, float z, float yaw, float pitch, float speed, float spread, int dmg, int owner) {
+    for(int i=0; i<MAX_PROJECTILES; i++) {
+        if (!projectiles[i].active) {
+            projectiles[i].active = 1;
+            projectiles[i].life = 100; // 1.5 seconds approx
+            projectiles[i].owner_id = owner;
+            projectiles[i].dmg = dmg;
+            projectiles[i].x = x; projectiles[i].y = y; projectiles[i].z = z;
+            
+            // Calc Velocity
+            float rad = -yaw * 0.0174533f;
+            float rp = pitch * 0.0174533f;
+            
+            // Add jitter
+            float spr_y = ((rand()%100)/100.0f - 0.5f) * spread;
+            float spr_p = ((rand()%100)/100.0f - 0.5f) * spread;
+            
+            rad += spr_y;
+            rp += spr_p;
+
+            float dx = sinf(rad) * cosf(rp);
+            float dy = sinf(rp);
+            float dz = -cosf(rad) * cosf(rp);
+            
+            projectiles[i].vx = dx * speed;
+            projectiles[i].vy = dy * speed;
+            projectiles[i].vz = dz * speed;
+            return;
+        }
+    }
+}
+
+// Raycast (Hitscan)
 int check_hit(float ox, float oy, float oz, float dx, float dy, float dz, int shooter_id) {
     float best_dist = 1000.0f;
     int best_hit = -1;
@@ -37,38 +82,70 @@ int check_hit(float ox, float oy, float oz, float dx, float dy, float dz, int sh
         
         PlayerState *t = &state.players[i];
         
-        // Vector from Origin to Target Center (Center approx at Y+2.0 for body mass)
-        float tx = t->x - ox; 
-        float ty = (t->y + 2.0f) - oy; 
-        float tz = t->z - oz;
+        // Target Center (Torso)
+        float tx = t->x; 
+        float ty = t->y + 3.0f; 
+        float tz = t->z;
 
-        // Project T onto Ray Direction (Dot Product)
-        // t_proj is the distance along the ray to the closest point
-        float t_proj = (tx*dx + ty*dy + tz*dz);
+        float ox_t = tx - ox; float oy_t = ty - oy; float oz_t = tz - oz;
+        float t_proj = (ox_t*dx + oy_t*dy + oz_t*dz);
         
-        if (t_proj < 0) continue; // Target is behind us
+        if (t_proj < 0) continue; 
 
-        // Coordinates of the closest point on the ray
-        float cx = dx * t_proj;
-        float cy = dy * t_proj;
-        float cz = dz * t_proj;
-
-        // Distance squared from closest point to target center
-        float dist_sq = (tx-cx)*(tx-cx) + (ty-cy)*(ty-cy) + (tz-cz)*(tz-cz);
+        float cx = dx * t_proj; float cy = dy * t_proj; float cz = dz * t_proj;
+        float dist_sq = (ox_t-cx)*(ox_t-cx) + (oy_t-cy)*(oy_t-cy) + (oz_t-cz)*(oz_t-cz);
         
-        // HITBOX RADIUS SQUARED
-        // 1.5 units wide radius = 2.25 sq distance
-        // This is much tighter than the previous cone check
-        if (dist_sq < 2.0f) {
-            // Check if this is the closest hit so far
-            float dist_to_player = sqrtf(tx*tx + ty*ty + tz*tz);
-            if (dist_to_player < best_dist) {
-                best_dist = dist_to_player;
-                best_hit = i;
-            }
+        // Hitbox Radius ~1.5 units
+        if (dist_sq < 2.25f) {
+            float d = sqrtf(ox_t*ox_t + oy_t*oy_t + oz_t*oz_t);
+            if (d < best_dist) { best_dist = d; best_hit = i; }
         }
     }
     return best_hit;
+}
+
+void damage_player(int id, int dmg, int shooter_id) {
+    if (state.players[id].active) {
+        state.players[id].health -= dmg;
+        if (shooter_id == 0) state.players[0].hit_feedback = 5; // Flash Red
+        
+        if (state.players[id].health <= 0) {
+            state.players[id].health = 100;
+            state.players[id].x = (rand()%40) - 20;
+            state.players[id].z = (rand()%40) - 20;
+            state.players[id].y = 5;
+        }
+    }
+}
+
+void update_projectiles() {
+    for(int i=0; i<MAX_PROJECTILES; i++) {
+        if (!projectiles[i].active) continue;
+        Projectile *p = &projectiles[i];
+        
+        p->x += p->vx; p->y += p->vy; p->z += p->vz;
+        p->life--;
+        
+        // Floor Collision
+        if (p->y < 0) { p->active = 0; continue; }
+        if (p->life <= 0) { p->active = 0; continue; }
+
+        // Player Collision (Simple Point Check)
+        for(int j=0; j<MAX_CLIENTS; j++) {
+            if (!state.players[j].active || j == p->owner_id) continue;
+            PlayerState *t = &state.players[j];
+            
+            float dx = p->x - t->x;
+            float dy = p->y - (t->y + 3.0f); // Center mass
+            float dz = p->z - t->z;
+            
+            if (dx*dx + dy*dy + dz*dz < 4.0f) { // 2.0 Radius Sphere
+                damage_player(j, p->dmg, p->owner_id);
+                p->active = 0;
+                break;
+            }
+        }
+    }
 }
 
 void update_combat(PlayerState *p, int id, int shoot, int reload) {
@@ -89,22 +166,28 @@ void update_combat(PlayerState *p, int id, int shoot, int reload) {
             p->attack_cooldown = WPN_STATS[w].rof;
             if (w != WPN_KNIFE) p->ammo[w]--;
 
-            // Ray Calculation
-            float rad = -p->yaw * 0.0174533f;
-            float rp = p->pitch * 0.0174533f;
-            float dx = sinf(rad) * cosf(rp);
-            float dy = sinf(rp);
-            float dz = -cosf(rad) * cosf(rp);
-
-            int hit = check_hit(p->x, p->y + 3.0f, p->z, dx, dy, dz, id);
-            if (hit != -1) {
-                p->hit_feedback = 10;
-                state.players[hit].health -= WPN_STATS[w].dmg;
-                if (state.players[hit].health <= 0) {
-                    state.players[hit].x = (rand()%20) - 10;
-                    state.players[hit].z = (rand()%20) - 10;
-                    state.players[hit].y = 10;
-                    state.players[hit].health = 100;
+            // WEAPON TYPE LOGIC
+            if (w == WPN_MAGNUM || w == WPN_SNIPER || w == WPN_KNIFE) {
+                // HITSCAN
+                float rad = -p->yaw * 0.0174533f;
+                float rp = p->pitch * 0.0174533f;
+                float dx = sinf(rad) * cosf(rp);
+                float dy = sinf(rp);
+                float dz = -cosf(rad) * cosf(rp);
+                
+                // AIM FIX: Shoot from EYE HEIGHT (Y+6.0)
+                int hit = check_hit(p->x, p->y + EYE_HEIGHT, p->z, dx, dy, dz, id);
+                if (hit != -1) damage_player(hit, WPN_STATS[w].dmg, id);
+            
+            } else {
+                // PROJECTILE (AR / Shotgun)
+                float speed = 2.0f; // Fast bullet
+                if (w == WPN_AR) {
+                    fire_projectile(p->x, p->y + EYE_HEIGHT, p->z, p->yaw, p->pitch, speed, 0.05f, WPN_STATS[w].dmg, id);
+                } else if (w == WPN_SHOTGUN) {
+                    for(int k=0; k<8; k++) {
+                        fire_projectile(p->x, p->y + EYE_HEIGHT, p->z, p->yaw, p->pitch, speed, 0.15f, WPN_STATS[w].dmg, id);
+                    }
                 }
             }
         }
@@ -113,6 +196,7 @@ void update_combat(PlayerState *p, int id, int shoot, int reload) {
 
 void local_update(float fwd, float strafe, float yaw, float pitch, int shoot, int weapon, int jump, int crouch, int reload) {
     state.tick++;
+    update_projectiles(); // Move bullets
 
     for (int i=0; i<MAX_CLIENTS; i++) {
         if (!state.players[i].active) continue;

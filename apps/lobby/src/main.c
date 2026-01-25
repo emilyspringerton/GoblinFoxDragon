@@ -24,15 +24,14 @@
 #include "../../../packages/common/physics.h"
 #include "../../../packages/simulation/local_game.h"
 
-// --- APP STATES ---
 #define STATE_LOBBY 0
 #define STATE_GAME_NET 1
 #define STATE_GAME_LOCAL 2
 int app_state = STATE_LOBBY;
 
-// --- GLOBALS ---
 float cam_yaw = 0.0f;
 float cam_pitch = 0.0f;
+int is_zoomed = 0;
 int sock = -1;
 
 void net_init() {
@@ -42,16 +41,12 @@ void net_init() {
     sock = socket(AF_INET, SOCK_DGRAM, 0);
 }
 
-// --- VISUALS ---
 void draw_char(float x, float y, float size, char c) {
     glPushMatrix(); glTranslatef(x, y, 0); glScalef(size, size, 1);
     glBegin(GL_LINES);
-    // Minimal Font
+    // Basic Font
     if(c=='A'){ glVertex2f(0,0); glVertex2f(0,2); glVertex2f(0,2); glVertex2f(1,2); glVertex2f(1,2); glVertex2f(1,0); glVertex2f(0,1); glVertex2f(1,1); }
     if(c=='D'){ glVertex2f(0,0); glVertex2f(0,2); glVertex2f(0,2); glVertex2f(1,1); glVertex2f(1,1); glVertex2f(0,0); }
-    if(c=='H'){ glVertex2f(0,0); glVertex2f(0,2); glVertex2f(1,0); glVertex2f(1,2); glVertex2f(0,1); glVertex2f(1,1); }
-    if(c=='P'){ glVertex2f(0,0); glVertex2f(0,2); glVertex2f(0,2); glVertex2f(1,2); glVertex2f(1,2); glVertex2f(1,1); glVertex2f(1,1); glVertex2f(0,1); }
-    if(c=='K'){ glVertex2f(0,0); glVertex2f(0,2); glVertex2f(1,2); glVertex2f(0,1); glVertex2f(0,1); glVertex2f(1,0); }
     if(c=='0'){ glVertex2f(0,0); glVertex2f(1,0); glVertex2f(1,0); glVertex2f(1,2); glVertex2f(1,2); glVertex2f(0,2); glVertex2f(0,2); glVertex2f(0,0); }
     if(c=='1'){ glVertex2f(0.5,0); glVertex2f(0.5,2); }
     if(c=='2'){ glVertex2f(0,2); glVertex2f(1,2); glVertex2f(1,2); glVertex2f(1,1); glVertex2f(1,1); glVertex2f(0,1); glVertex2f(0,1); glVertex2f(0,0); glVertex2f(0,0); glVertex2f(1,0); }
@@ -73,15 +68,24 @@ void draw_hud(PlayerState *p) {
     glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
     glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
     
-    // Crosshair
-    glLineWidth(2.0f);
-    glColor3f(0, 1, 0);
-    glBegin(GL_LINES); 
-    glVertex2f(640-10, 360); glVertex2f(640+10, 360); 
-    glVertex2f(640, 360-10); glVertex2f(640, 360+10); 
-    glEnd();
+    // Crosshair (Only if not zoomed)
+    if (!is_zoomed) {
+        glLineWidth(2.0f);
+        glColor3f(0, 1, 0);
+        glBegin(GL_LINES); 
+        glVertex2f(640-10, 360); glVertex2f(640+10, 360); 
+        glVertex2f(640, 360-10); glVertex2f(640, 360+10); 
+        glEnd();
+    } else {
+        // Sniper Scope
+        glLineWidth(4.0f);
+        glColor3f(0, 0, 0);
+        glBegin(GL_LINES);
+        glVertex2f(0, 360); glVertex2f(1280, 360);
+        glVertex2f(640, 0); glVertex2f(640, 720);
+        glEnd();
+    }
 
-    // Stats
     char buf[64];
     glColor3f(1, 0, 0);
     sprintf(buf, "HP %d", p->health);
@@ -90,8 +94,7 @@ void draw_hud(PlayerState *p) {
     glColor3f(1, 1, 0);
     int cur = p->ammo[p->current_weapon];
     int max = WPN_STATS[p->current_weapon].ammo_max;
-    if (p->current_weapon == WPN_KNIFE) sprintf(buf, "KNIFE");
-    else sprintf(buf, "%d/%d", cur, max);
+    sprintf(buf, "%d/%d", cur, max);
     draw_text(1000, 50, 30.0f, buf);
 
     if (p->reload_timer > 0) {
@@ -102,6 +105,16 @@ void draw_hud(PlayerState *p) {
     glEnable(GL_DEPTH_TEST);
     glMatrixMode(GL_PROJECTION); glPopMatrix(); 
     glMatrixMode(GL_MODELVIEW); glPopMatrix();
+}
+
+void draw_box_mesh() {
+    glBegin(GL_QUADS); 
+    glVertex3f(-1,1,1); glVertex3f(1,1,1); glVertex3f(1,1,-1); glVertex3f(-1,1,-1); 
+    glVertex3f(-1,-1,1); glVertex3f(1,-1,1); glVertex3f(1,1,1); glVertex3f(-1,1,1); 
+    glVertex3f(-1,-1,-1); glVertex3f(-1,1,-1); glVertex3f(1,1,-1); glVertex3f(1,-1,-1); 
+    glVertex3f(1,-1,-1); glVertex3f(1,1,-1); glVertex3f(1,1,1); glVertex3f(1,-1,1); 
+    glVertex3f(-1,-1,1); glVertex3f(-1,1,1); glVertex3f(-1,1,-1); glVertex3f(-1,-1,-1); 
+    glEnd();
 }
 
 void draw_grid() {
@@ -120,122 +133,79 @@ void draw_map() {
         glPushMatrix();
         glTranslatef(b.x, b.y, b.z);
         glScalef(b.w, b.h, b.d);
-        glBegin(GL_QUADS);
-        glColor3f(0.2f, 0.2f, 0.2f); 
-        glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(-0.5,0.5,0.5);
-        glVertex3f(-0.5,0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
-        glVertex3f(-0.5,-0.5,-0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
-        glVertex3f(-0.5,-0.5,-0.5); glVertex3f(-0.5,-0.5,0.5); glVertex3f(-0.5,0.5,0.5); glVertex3f(-0.5,0.5,-0.5);
-        glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(0.5,0.5,0.5);
-        glEnd();
-        glLineWidth(2.0f);
-        glColor3f(1.0f, 0.0f, 1.0f); 
+        glColor3f(0.2f, 0.2f, 0.2f); draw_box_mesh();
+        glLineWidth(2.0f); glColor3f(1.0f, 0.0f, 1.0f); 
         glBegin(GL_LINE_LOOP);
-        glVertex3f(-0.5, 0.5, 0.5); glVertex3f(0.5, 0.5, 0.5); glVertex3f(0.5, 0.5, -0.5); glVertex3f(-0.5, 0.5, -0.5);
+        glVertex3f(-1, 1, 1); glVertex3f(1, 1, 1); glVertex3f(1, 1, -1); glVertex3f(-1, 1, -1);
         glEnd();
         glPopMatrix();
     }
 }
 
-void draw_box_mesh() {
-    glBegin(GL_QUADS); 
-    glVertex3f(-1,1,1); glVertex3f(1,1,1); glVertex3f(1,1,-1); glVertex3f(-1,1,-1); 
-    glVertex3f(-1,-1,1); glVertex3f(1,-1,1); glVertex3f(1,1,1); glVertex3f(-1,1,1); 
-    glVertex3f(-1,-1,-1); glVertex3f(-1,1,-1); glVertex3f(1,1,-1); glVertex3f(1,-1,-1); 
-    glVertex3f(1,-1,-1); glVertex3f(1,1,-1); glVertex3f(1,1,1); glVertex3f(1,-1,1); 
-    glVertex3f(-1,-1,1); glVertex3f(-1,1,1); glVertex3f(-1,1,-1); glVertex3f(-1,-1,-1); 
-    glEnd();
-}
-
 void draw_weapon_p(PlayerState *p) {
+    if (is_zoomed) return; // Don't draw gun in scope
+
     glPushMatrix();
     glLoadIdentity();
-    
-    // Recoil + Bob
     float kick = p->recoil_anim * 0.2f;
     float reload_dip = (p->reload_timer > 0) ? sinf(p->reload_timer * 0.2f) * 0.5f - 0.5f : 0.0f;
     glTranslatef(0.4f, -0.5f + kick + reload_dip, -1.2f + (kick * 0.5f));
     glRotatef(-p->recoil_anim * 10.0f, 1, 0, 0);
     
-    // Base Color & Shape
     switch(p->current_weapon) {
-        case WPN_KNIFE:   
-            glColor3f(0.8f, 0.8f, 0.8f); 
-            glScalef(0.05f, 0.05f, 0.4f); // Thin blade
-            break;
-        case WPN_MAGNUM:  
-            glColor3f(0.6f, 0.6f, 0.6f); 
-            glScalef(0.1f, 0.15f, 0.4f); // Thick barrel
-            break;
-        case WPN_AR:      
-            glColor3f(0.2f, 0.2f, 0.2f); 
-            glScalef(0.12f, 0.15f, 0.8f); // Long body
-            break;
-        case WPN_SHOTGUN: 
-            glColor3f(0.4f, 0.2f, 0.1f); 
-            glScalef(0.15f, 0.15f, 0.6f); // Short & Fat
-            break;
-        case WPN_SNIPER:  
-            glColor3f(0.1f, 0.15f, 0.1f); 
-            glScalef(0.08f, 0.1f, 1.2f); // Very Long
-            break;
+        case WPN_KNIFE:   glColor3f(0.8f, 0.8f, 0.8f); glScalef(0.05f, 0.05f, 0.4f); break;
+        case WPN_MAGNUM:  glColor3f(0.6f, 0.6f, 0.6f); glScalef(0.1f, 0.15f, 0.4f); break;
+        case WPN_AR:      glColor3f(0.2f, 0.2f, 0.2f); glScalef(0.12f, 0.15f, 0.8f); break;
+        case WPN_SHOTGUN: glColor3f(0.4f, 0.2f, 0.1f); glScalef(0.15f, 0.15f, 0.6f); break;
+        case WPN_SNIPER:  glColor3f(0.1f, 0.15f, 0.1f); glScalef(0.08f, 0.1f, 1.2f); break;
     }
     draw_box_mesh();
-    
-    // EXTRA DETAILS (Scope/Mag)
-    if (p->current_weapon == WPN_SNIPER) {
-        // Scope
-        glPushMatrix();
-        glTranslatef(0, 1.2f, -0.2f);
-        glScalef(1.2f, 0.5f, 0.3f);
-        glColor3f(0, 0, 0);
-        draw_box_mesh();
-        glPopMatrix();
-    }
-    if (p->current_weapon == WPN_AR) {
-        // Mag
-        glPushMatrix();
-        glTranslatef(0, -1.0f, 0.2f);
-        glScalef(0.8f, 1.5f, 0.3f);
-        glColor3f(0.1f, 0.1f, 0.1f);
-        draw_box_mesh();
-        glPopMatrix();
-    }
-
     glPopMatrix();
 }
 
-void draw_bot_model(PlayerState *p) {
-    glPushMatrix();
-    glTranslatef(p->x, p->y, p->z);
-    glRotatef(p->yaw, 0, 1, 0); 
-    
-    // Hurt Flash
-    if (p->health < 100) glColor3f(1.0f, 0.0f, 0.0f);
-    else glColor3f(0.0f, 1.0f, 0.0f);
-
-    glScalef(1.0f, 4.0f, 1.0f);
-    draw_box_mesh();
-    glPopMatrix();
+void draw_projectiles() {
+    for(int i=0; i<MAX_PROJECTILES; i++) {
+        if (projectiles[i].active) {
+            glPushMatrix();
+            glTranslatef(projectiles[i].x, projectiles[i].y, projectiles[i].z);
+            glScalef(0.1f, 0.1f, 0.1f);
+            glColor3f(1.0f, 1.0f, 0.0f); // Yellow Tracer
+            draw_box_mesh();
+            glPopMatrix();
+        }
+    }
 }
 
 void draw_scene(PlayerState *render_p) {
+    // FIX: Clear Depth explicitly and set Depth Function
     glClearColor(0.05f, 0.05f, 0.1f, 1.0f);
     if (render_p->hit_feedback > 0) glClearColor(0.2f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS); 
+
     glLoadIdentity();
 
-    float cam_h = render_p->crouching ? 2.5f : 6.0f;
+    float cam_h = render_p->crouching ? 2.5f : EYE_HEIGHT;
     glRotatef(-cam_pitch, 1, 0, 0);
     glRotatef(-cam_yaw, 0, 1, 0);
     glTranslatef(-render_p->x, -(render_p->y + cam_h), -render_p->z);
 
     draw_grid();
     draw_map();
+    draw_projectiles();
     
+    // Draw Bots
     for(int i=1; i<MAX_CLIENTS; i++) {
         if(state.players[i].active) {
-            draw_bot_model(&state.players[i]);
+            glPushMatrix();
+            glTranslatef(state.players[i].x, state.players[i].y, state.players[i].z);
+            glRotatef(state.players[i].yaw, 0, 1, 0); 
+            if (state.players[i].health < 100) glColor3f(1.0f, 0.0f, 0.0f);
+            else glColor3f(0.0f, 1.0f, 0.0f);
+            glScalef(1.0f, 4.0f, 1.0f);
+            draw_box_mesh();
+            glPopMatrix();
         }
     }
 
@@ -255,35 +225,45 @@ int main(int argc, char* argv[]) {
         SDL_Event e;
         while(SDL_PollEvent(&e)) {
             if(e.type == SDL_QUIT) running = 0;
-            
             if (app_state == STATE_LOBBY) {
-                if(e.type == SDL_KEYDOWN) {
-                    if (e.key.keysym.sym == SDLK_d) {
-                        app_state = STATE_GAME_LOCAL;
-                        local_init(); 
-                        SDL_SetRelativeMouseMode(SDL_TRUE);
-                        glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
-                        glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
-                    }
+                if(e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_d) {
+                    app_state = STATE_GAME_LOCAL;
+                    local_init(); 
+                    SDL_SetRelativeMouseMode(SDL_TRUE);
+                    // Standard FOV
+                    glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
+                    glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
                 }
             } 
             else {
-                if(e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) {
-                    app_state = STATE_LOBBY;
-                    SDL_SetRelativeMouseMode(SDL_FALSE);
-                    glDisable(GL_DEPTH_TEST);
-                    glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
-                    glMatrixMode(GL_MODELVIEW); glLoadIdentity();
+                if(e.type == SDL_KEYDOWN) {
+                    if(e.key.keysym.sym == SDLK_ESCAPE) {
+                        app_state = STATE_LOBBY;
+                        SDL_SetRelativeMouseMode(SDL_FALSE);
+                        glDisable(GL_DEPTH_TEST);
+                        glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
+                        glMatrixMode(GL_MODELVIEW); glLoadIdentity();
+                    }
                 }
+                
+                // MOUSE INPUT
+                if(e.type == SDL_MOUSEBUTTONDOWN) {
+                    if(e.button.button == SDL_BUTTON_RIGHT && state.players[0].current_weapon == WPN_SNIPER) {
+                        is_zoomed = !is_zoomed;
+                        // ZOOM FOV CHANGE
+                        glMatrixMode(GL_PROJECTION); glLoadIdentity(); 
+                        gluPerspective(is_zoomed ? 20.0 : 75.0, 1280.0/720.0, 0.1, 1000.0);
+                        glMatrixMode(GL_MODELVIEW);
+                    }
+                }
+
                 if(e.type == SDL_MOUSEMOTION) {
-                    // MOUSE FIX: SUBTRACTION (Corrects inversion)
-                    cam_yaw -= e.motion.xrel * 0.15f;
-                    if(cam_yaw > 360) cam_yaw -= 360; 
-                    if(cam_yaw < 0) cam_yaw += 360;
-                    
-                    cam_pitch -= e.motion.yrel * 0.15f;
-                    if(cam_pitch > 89) cam_pitch = 89; 
-                    if(cam_pitch < -89) cam_pitch = -89;
+                    // Sensitivity Scale if Zoomed
+                    float sens = is_zoomed ? 0.05f : 0.15f;
+                    cam_yaw -= e.motion.xrel * sens;
+                    if(cam_yaw > 360) cam_yaw -= 360; if(cam_yaw < 0) cam_yaw += 360;
+                    cam_pitch -= e.motion.yrel * sens;
+                    if(cam_pitch > 89) cam_pitch = 89; if(cam_pitch < -89) cam_pitch = -89;
                 }
             }
         }
@@ -293,7 +273,6 @@ int main(int argc, char* argv[]) {
             glClear(GL_COLOR_BUFFER_BIT);
             glLoadIdentity();
             glColor3f(1, 1, 0);
-            // Draw 'D'
             glBegin(GL_LINES); 
             glVertex2f(600, 300); glVertex2f(600, 400); glVertex2f(600, 400); glVertex2f(650, 350);
             glVertex2f(650, 350); glVertex2f(600, 300);
