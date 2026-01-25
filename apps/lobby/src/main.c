@@ -79,7 +79,7 @@ void draw_map() {
 void draw_bot_model(PlayerState *p) {
     glPushMatrix();
     glTranslatef(p->x, p->y, p->z);
-    glRotatef(p->yaw, 0, 1, 0); // Visuals rotate +yaw
+    glRotatef(p->yaw, 0, 1, 0); 
     
     // Hurt Flash
     if (p->health < 100) glColor3f(1.0f, 0.0f, 0.0f);
@@ -105,14 +105,34 @@ void draw_weapon_p(PlayerState *p) {
     glTranslatef(0.4f, -0.5f + kick + reload_dip, -1.2f + (kick * 0.5f));
     glRotatef(-p->recoil_anim * 10.0f, 1, 0, 0);
     
+    // RESTORED WEAPON MODELS (Phase 176 Logic)
     switch(p->current_weapon) {
-        case WPN_KNIFE: glColor3f(0.8f,0.8f,0.8f); break;
-        case WPN_MAGNUM: glColor3f(0.6f,0.6f,0.6f); break;
-        case WPN_AR: glColor3f(0.2f,0.2f,0.2f); break;
-        case WPN_SHOTGUN: glColor3f(0.4f,0.2f,0.1f); break;
-        case WPN_SNIPER: glColor3f(0.1f,0.1f,0.1f); break;
+        case WPN_KNIFE:   
+            glColor3f(0.8f, 0.8f, 0.8f); 
+            glScalef(0.1f, 0.1f, 0.5f); 
+            break;
+        case WPN_MAGNUM:  
+            glColor3f(0.6f, 0.6f, 0.6f); 
+            glScalef(0.15f, 0.2f, 0.4f); 
+            break;
+        case WPN_AR:      
+            glColor3f(0.2f, 0.2f, 0.2f); 
+            glScalef(0.15f, 0.2f, 1.0f); 
+            break;
+        case WPN_SHOTGUN: 
+            glColor3f(0.4f, 0.2f, 0.1f); 
+            glScalef(0.2f, 0.2f, 0.8f); 
+            break;
+        case WPN_SNIPER:  
+            glColor3f(0.1f, 0.1f, 0.1f); 
+            glScalef(0.1f, 0.15f, 1.5f); 
+            break;
+        default:
+            glScalef(0.1f, 0.1f, 0.1f);
+            break;
     }
-    glScalef(0.15f, 0.2f, 0.8f);
+
+    // Draw Box
     glBegin(GL_QUADS); 
     glVertex3f(-1,1,1); glVertex3f(1,1,1); glVertex3f(1,1,-1); glVertex3f(-1,1,-1); 
     glVertex3f(-1,-1,1); glVertex3f(1,-1,1); glVertex3f(1,1,1); glVertex3f(-1,1,1); 
@@ -123,36 +143,31 @@ void draw_weapon_p(PlayerState *p) {
     glPopMatrix();
 }
 
-void draw_scene() {
-    PlayerState *me = &state.players[0];
-
+void draw_scene(PlayerState *render_p) {
     glClearColor(0.05f, 0.05f, 0.1f, 1.0f);
-    if (me->hit_feedback > 0) glClearColor(0.2f, 0.0f, 0.0f, 1.0f); // Hit flash
-
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
 
-    float cam_h = me->crouching ? 2.5f : 6.0f;
+    float cam_h = render_p->crouching ? 2.5f : 6.0f;
     glRotatef(-cam_pitch, 1, 0, 0);
     glRotatef(-cam_yaw, 0, 1, 0);
-    glTranslatef(-me->x, -(me->y + cam_h), -me->z);
+    glTranslatef(-render_p->x, -(render_p->y + cam_h), -render_p->z);
 
     draw_grid();
     draw_map();
     
-    // Draw Other Players
     for(int i=1; i<MAX_CLIENTS; i++) {
         if(state.players[i].active) {
             draw_bot_model(&state.players[i]);
         }
     }
 
-    draw_weapon_p(me);
+    draw_weapon_p(render_p);
 }
 
 int main(int argc, char* argv[]) {
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *win = SDL_CreateWindow("SHANKPIT // TARGET DUMMY", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
+    SDL_Window *win = SDL_CreateWindow("SHANKPIT HYBRID", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
     SDL_GL_CreateContext(win);
     net_init();
     local_init();
@@ -162,13 +177,16 @@ int main(int argc, char* argv[]) {
         SDL_Event e;
         while(SDL_PollEvent(&e)) {
             if(e.type == SDL_QUIT) running = 0;
+            
             if (app_state == STATE_LOBBY) {
-                if(e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_d) {
-                    app_state = STATE_GAME_LOCAL;
-                    local_init(); 
-                    SDL_SetRelativeMouseMode(SDL_TRUE);
-                    glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
-                    glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
+                if(e.type == SDL_KEYDOWN) {
+                    if (e.key.keysym.sym == SDLK_d) {
+                        app_state = STATE_GAME_LOCAL;
+                        local_init(); 
+                        SDL_SetRelativeMouseMode(SDL_TRUE);
+                        glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
+                        glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
+                    }
                 }
             } 
             else {
@@ -180,10 +198,15 @@ int main(int argc, char* argv[]) {
                     glMatrixMode(GL_MODELVIEW); glLoadIdentity();
                 }
                 if(e.type == SDL_MOUSEMOTION) {
-                    cam_yaw += e.motion.xrel * 0.15f;
-                    if(cam_yaw > 360) cam_yaw -= 360; if(cam_yaw < 0) cam_yaw += 360;
-                    cam_pitch += e.motion.yrel * 0.15f;
-                    if(cam_pitch > 89) cam_pitch = 89; if(cam_pitch < -89) cam_pitch = -89;
+                    // MOUSE FIX: Inverted the input direction
+                    cam_yaw -= e.motion.xrel * 0.15f;
+                    
+                    if(cam_yaw > 360) cam_yaw -= 360; 
+                    if(cam_yaw < 0) cam_yaw += 360;
+                    
+                    cam_pitch -= e.motion.yrel * 0.15f;
+                    if(cam_pitch > 89) cam_pitch = 89; 
+                    if(cam_pitch < -89) cam_pitch = -89;
                 }
             }
         }
@@ -194,7 +217,6 @@ int main(int argc, char* argv[]) {
             glLoadIdentity();
             glColor3f(1, 1, 0);
             glBegin(GL_LINES); 
-            // D
             glVertex2f(200, 300); glVertex2f(200, 400); glVertex2f(200, 400); glVertex2f(250, 350);
             glVertex2f(250, 350); glVertex2f(200, 300);
             glEnd();
@@ -213,7 +235,7 @@ int main(int argc, char* argv[]) {
             if(k[SDL_SCANCODE_4]) wpn=3; if(k[SDL_SCANCODE_5]) wpn=4;
 
             local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn, jump, crouch, reload);
-            draw_scene();
+            draw_scene(&local_p);
         }
 
         SDL_GL_SwapWindow(win);
