@@ -18,16 +18,22 @@ typedef struct { float x, y, z, w, h, d; } Box;
 
 // MAP GEOMETRY
 static Box map_geo[] = {
-    {0, -1, 0, 200, 2, 200},      // Floor
+    // 0: Floor
+    {0, -1, 0, 200, 2, 200},
+    
+    // 1-5: Internal Obstacles
     {15, 2.5, 15, 10, 5, 10},     // Red Box
     {-15, 1.5, -15, 10, 3, 10},   // Blue Box
     {-20, 4.0, 5, 6, 8, 6},       // Pillar
     {0, 5.0, -25, 4, 10, 4},      // Sniper Perch
     {10, 1.0, -10, 4, 2, 4},      // Step
-    {0, 10, 50, 100, 20, 2},      // North Wall
-    {0, 10, -50, 100, 20, 2},     // South Wall
-    {50, 10, 0, 2, 20, 100},      // East Wall
-    {-50, 10, 0, 2, 20, 100}      // West Wall
+    
+    // 6-9: BOUNDARY WALLS (REINFORCED)
+    // Thickness increased from 2 to 50. Centers shifted to keep inner face at +/- 50.
+    {0, 10, 75, 150, 20, 50},   // North Wall (Z+): Center 75, Depth 50 -> Inner Face at 50
+    {0, 10, -75, 150, 20, 50},  // South Wall (Z-): Center -75, Depth 50 -> Inner Face at -50
+    {75, 10, 0, 50, 20, 150},   // East Wall (X+): Center 75, Width 50 -> Inner Face at 50
+    {-75, 10, 0, 50, 20, 150}   // West Wall (X-): Center -75, Width 50 -> Inner Face at -50
 };
 static int map_count = 10;
 
@@ -126,10 +132,7 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
 
                 if (check_hit(p->x, p->y + EYE_HEIGHT, p->z, dx, dy, dz, &targets[i])) {
                     targets[i].health -= WPN_STATS[w].dmg;
-                    
-                    // --- HIT CONFIRMED ---
-                    p->hit_feedback = 10; // Flash for 10 frames
-                    
+                    p->hit_feedback = 10;
                     if(targets[i].health <= 0) {
                         p->kills++;
                         targets[i].health = 100;
