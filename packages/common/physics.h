@@ -21,42 +21,37 @@ static Box map_geo[] = {
     // 0: Floor (900x300)
     {0, -1, 0, 900, 2, 300},
     
-    // --- CENTRAL ZIGGURAT ---
+    // --- CENTRAL ZIGGURAT (Indices 1-3) ---
     {0, 2.0, 0, 20, 4, 20},       
     {0, 5.0, 0, 10, 2, 10},       
     {0, 8.0, 0, 4, 4, 4},
     
-    // --- EAST CANYON ---
+    // --- EAST CANYON (Indices 4-8) ---
     {200, 10, 80, 200, 20, 20},   
     {200, 10, -80, 200, 20, 20},  
     {350, 4, 0, 10, 8, 10},       
     {250, 2, 40, 4, 4, 4},        
     {150, 2, -40, 4, 4, 4},       
 
-    // --- WEST CANYON ---
+    // --- WEST CANYON (Indices 9-13) ---
     {-200, 10, 80, 200, 20, 20},  
     {-200, 10, -80, 200, 20, 20}, 
     {-350, 4, 0, 10, 8, 10},      
     {-250, 2, -40, 4, 4, 4},      
     {-150, 2, 40, 4, 4, 4},       
 
-    // --- PARKOUR BRIDGES ---
+    // --- PARKOUR BRIDGES (Index 14) ---
     {0, 12, 0, 800, 1, 2},        
 
-    // --- CONTAINMENT WALLS (INTERLOCKING) ---
-    // Floor is 300 Deep (Z: -150 to 150). Walls centered at +/- 200 with Depth 100.
-    // Inner Face at +/- 150.
-    // Length (X) extended to 1200 to cover corners.
-    {0, 25, 200, 1200, 50, 100},   // North Wall (Z+)
-    {0, 25, -200, 1200, 50, 100},  // South Wall (Z-)
-    
-    // Floor is 900 Wide (X: -450 to 450). Walls centered at +/- 550.
-    // Thickness 200. Inner Face at +/- 450.
-    // Length (Z) extended to 600 to intersect North/South walls.
-    {550, 25, 0, 200, 50, 600},    // East Wall (X+)
-    {-550, 25, 0, 200, 50, 600}    // West Wall (X-)
+    // --- CONTAINMENT WALLS (Indices 15-18) ---
+    {0, 25, 200, 1200, 50, 100},   // North Wall (Z+) - Index 15
+    {0, 25, -200, 1200, 50, 100},  // South Wall (Z-) - Index 16
+    {550, 25, 0, 200, 50, 600},    // East Wall (X+)  - Index 17 (Was skipped!)
+    {-550, 25, 0, 200, 50, 600}    // West Wall (X-)  - Index 18 (Was skipped!)
 };
-static int map_count = 17;
+
+// FIX: COUNT IS 19, NOT 17
+static int map_count = 19; 
 
 float phys_rand_f() { return ((float)(rand()%1000)/500.0f) - 1.0f; }
 
@@ -108,11 +103,6 @@ void resolve_collision(PlayerState *p) {
                 } else {
                     float dx = p->x - b.x; float dz = p->z - b.z;
                     // Push out to nearest side
-                    // Note: Since walls are huge, we check intersection depth
-                    float dist_x = (dx > 0) ? (b.x + b.w/2) - (p->x - pw) : (p->x + pw) - (b.x - b.w/2);
-                    float dist_z = (dz > 0) ? (b.z + b.d/2) - (p->z - pw) : (p->z + pw) - (b.z - b.d/2);
-                    
-                    // Simple heuristic: Push out axis with least penetration
                     if (fabs(dx)/b.w > fabs(dz)/b.d) { 
                         p->vx = 0; 
                         p->x = (dx > 0) ? b.x + b.w/2 + pw : b.x - b.w/2 - pw;
