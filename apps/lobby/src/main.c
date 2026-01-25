@@ -6,7 +6,7 @@
 #include "protocol.h"
 #include "physics.h"
 
-// Init Player High in the air to avoid clipping on start
+// Init Player High in the air
 PlayerState p = {0, 10.0f, 0, 0, 0, 0, 0, 0, 1, 100, 0};
 
 void draw_grid() {
@@ -78,7 +78,7 @@ void draw_weapon() {
 
 int main(int argc, char* argv[]) {
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *win = SDL_CreateWindow("SHANKPIT // SYNTHESIS", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
+    SDL_Window *win = SDL_CreateWindow("SHANKPIT // CONTROL FIX", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
     SDL_GL_CreateContext(win);
     SDL_SetRelativeMouseMode(SDL_TRUE);
     
@@ -106,6 +106,11 @@ int main(int argc, char* argv[]) {
             if(e.type == SDL_MOUSEMOTION) {
                 p.yaw += e.motion.xrel * 0.15f;
                 p.pitch += e.motion.yrel * 0.15f;
+                
+                // ANGLE NORMALIZATION (Phase 37 Fix)
+                if (p.yaw >= 360.0f) p.yaw -= 360.0f;
+                if (p.yaw < 0.0f) p.yaw += 360.0f;
+
                 if(p.pitch > 89.0f) p.pitch = 89.0f; if(p.pitch < -89.0f) p.pitch = -89.0f;
             }
             if(e.type == SDL_MOUSEBUTTONDOWN) p.recoil_anim = 1.0f;
@@ -115,11 +120,18 @@ int main(int argc, char* argv[]) {
         apply_friction(&p);
 
         const Uint8 *k = SDL_GetKeyboardState(NULL);
-        float rad = p.yaw * 0.0174533f;
+        
+        // VECTOR MATH FIX (Phase 37)
+        // Invert yaw to match OpenGL camera rotation
+        float rad = -p.yaw * 0.0174533f;
+        
+        // Calculate Forward and Right vectors manually
         float fwd_x = sinf(rad); float fwd_z = -cosf(rad);
         float right_x = cosf(rad); float right_z = sinf(rad);
         
         float wish_x = 0; float wish_z = 0;
+        
+        // Apply WASD using corrected vectors
         if(k[SDL_SCANCODE_W]) { wish_x += fwd_x; wish_z += fwd_z; }
         if(k[SDL_SCANCODE_S]) { wish_x -= fwd_x; wish_z -= fwd_z; }
         if(k[SDL_SCANCODE_D]) { wish_x += right_x; wish_z += right_z; }
@@ -140,18 +152,21 @@ int main(int argc, char* argv[]) {
         p.vy -= GRAVITY;
         p.x += p.vx; p.z += p.vz; p.y += p.vy;
 
+        // Fall Safety
+        if (p.pos.y < -50.0f) { p.pos.x = 0; p.pos.y = 10.0f; p.pos.z = 0; p.vx=0; p.vy=0; p.vz=0; }
+
         resolve_collision(&p);
         
         if (p.recoil_anim > 0) p.recoil_anim -= 0.1f;
 
         // --- RENDER UPDATE ---
-        glClearColor(0.05f, 0.05f, 0.1f, 1.0f); // Dark Space Background
+        glClearColor(0.05f, 0.05f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glLoadIdentity();
 
         float cam_h = p.crouching ? 2.5f : 6.0f;
         glRotatef(-p.pitch, 1, 0, 0);
-        glRotatef(-p.yaw, 0, 1, 0);
+        glRotatef(-p.yaw, 0, 1, 0); // Visuals match Math now
         glTranslatef(-p.x, -(p.y + cam_h), -p.z);
 
         draw_grid();
