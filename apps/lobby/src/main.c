@@ -208,7 +208,7 @@ void draw_scene(PlayerState *render_p) {
 
 int main(int argc, char* argv[]) {
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *win = SDL_CreateWindow("SHANKPIT [31 BOT MATCH]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
+    SDL_Window *win = SDL_CreateWindow("SHANKPIT [NEURAL S-MODE]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
     SDL_GL_CreateContext(win);
     net_init();
     
@@ -224,6 +224,7 @@ int main(int argc, char* argv[]) {
                 if(e.type == SDL_KEYDOWN) {
                     if (e.key.keysym.sym == SDLK_d) {
                         app_state = STATE_GAME_LOCAL;
+                        USE_NEURAL_NET = 0;
                         local_init_match(1);
                         SDL_SetRelativeMouseMode(SDL_TRUE);
                         glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
@@ -231,7 +232,17 @@ int main(int argc, char* argv[]) {
                     }
                     if (e.key.keysym.sym == SDLK_b) {
                         app_state = STATE_GAME_LOCAL;
-                        local_init_match(31); // <--- FIXED 31 BOTS
+                        USE_NEURAL_NET = 0; 
+                        local_init_match(31); 
+                        SDL_SetRelativeMouseMode(SDL_TRUE);
+                        glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
+                        glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
+                    }
+                    if (e.key.keysym.sym == SDLK_s) { // --- NEURAL MODE S ---
+                        app_state = STATE_GAME_LOCAL;
+                        USE_NEURAL_NET = 1; // ACTIVATE BRAIN
+                        local_init_match(31);
+                        printf("MODE S ACTIVATED. Neural Network Online.\n");
                         SDL_SetRelativeMouseMode(SDL_TRUE);
                         glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
                         glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
@@ -270,17 +281,20 @@ int main(int argc, char* argv[]) {
             glLoadIdentity();
             glColor3f(1, 1, 0);
             glBegin(GL_LINES); 
-            // D
+            // D, B, N (Existing)
             glVertex2f(200, 300); glVertex2f(200, 400); glVertex2f(200, 400); glVertex2f(250, 350);
             glVertex2f(250, 350); glVertex2f(200, 300);
-            // B
             glVertex2f(400, 300); glVertex2f(400, 400); glVertex2f(400, 350); glVertex2f(450, 350);
             glVertex2f(450, 350); glVertex2f(450, 300); glVertex2f(450, 350); glVertex2f(450, 400);
             glVertex2f(450, 400); glVertex2f(400, 400); glVertex2f(450, 300); glVertex2f(400, 300);
-            // N
             glVertex2f(600, 300); glVertex2f(600, 400); 
             glVertex2f(600, 400); glVertex2f(650, 300);
             glVertex2f(650, 300); glVertex2f(650, 400);
+            
+            // S (Neural)
+            glColor3f(0, 1, 1); 
+            glVertex2f(850, 300); glVertex2f(800, 300); glVertex2f(800, 350); glVertex2f(850, 350);
+            glVertex2f(850, 350); glVertex2f(850, 400); glVertex2f(850, 400); glVertex2f(800, 400);
             glEnd();
         } 
         else if (app_state == STATE_GAME_LOCAL) {
