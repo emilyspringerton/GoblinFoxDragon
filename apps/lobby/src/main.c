@@ -90,6 +90,8 @@ void draw_weapon_p(PlayerState *p) {
     glLoadIdentity();
     float kick = p->recoil_anim * 0.2f;
     float reload_dip = (p->reload_timer > 0) ? sinf(p->reload_timer * 0.2f) * 0.5f - 0.5f : 0.0f;
+    
+    // Sway
     float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
     float bob = sinf(SDL_GetTicks() * 0.015f) * speed * 0.15f; 
 
@@ -124,7 +126,7 @@ void draw_scene(PlayerState *render_p) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
 
-    float cam_h = render_p->crouching ? 2.5f : EYE_HEIGHT; // REQUIRED CONSTANT
+    float cam_h = render_p->crouching ? 2.5f : EYE_HEIGHT;
     glRotatef(-cam_pitch, 1, 0, 0);
     glRotatef(-cam_yaw, 0, 1, 0);
     glTranslatef(-render_p->x, -(render_p->y + cam_h), -render_p->z);
@@ -138,7 +140,9 @@ void draw_scene(PlayerState *render_p) {
         if(local_state.players[i].active) {
             glPushMatrix();
             glTranslatef(local_state.players[i].x, local_state.players[i].y, local_state.players[i].z);
-            glColor3f(1, 0, 0); 
+            if(local_state.players[i].health <= 0) glColor3f(0.2, 0, 0);
+            else glColor3f(1, 0, 0); 
+            
             glScalef(1, 4, 1);
             glBegin(GL_QUADS); 
             glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(-0.5,0.5,0.5);
@@ -175,7 +179,7 @@ int main(int argc, char* argv[]) {
     SDL_Window *win = SDL_CreateWindow("SHANKPIT HYBRID", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
     SDL_GL_CreateContext(win);
     net_init();
-    local_init();
+    local_init_match(1); // Default to 1 bot
 
     int running = 1;
     while(running) {
@@ -187,7 +191,14 @@ int main(int argc, char* argv[]) {
                 if(e.type == SDL_KEYDOWN) {
                     if (e.key.keysym.sym == SDLK_d) {
                         app_state = STATE_GAME_LOCAL;
-                        local_init(); 
+                        local_init_match(1); // 1 Bot
+                        SDL_SetRelativeMouseMode(SDL_TRUE);
+                        glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
+                        glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
+                    }
+                    if (e.key.keysym.sym == SDLK_b) { // B for BOT MATCH
+                        app_state = STATE_GAME_LOCAL;
+                        local_init_match(3); // 3 Bots
                         SDL_SetRelativeMouseMode(SDL_TRUE);
                         glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
                         glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
@@ -221,6 +232,10 @@ int main(int argc, char* argv[]) {
             // D
             glVertex2f(200, 300); glVertex2f(200, 400); glVertex2f(200, 400); glVertex2f(250, 350);
             glVertex2f(250, 350); glVertex2f(200, 300);
+            // B
+            glVertex2f(400, 300); glVertex2f(400, 400); glVertex2f(400, 350); glVertex2f(450, 350);
+            glVertex2f(450, 350); glVertex2f(450, 300); glVertex2f(450, 350); glVertex2f(450, 400);
+            glVertex2f(450, 400); glVertex2f(400, 400); glVertex2f(450, 300); glVertex2f(400, 300);
             glEnd();
         } 
         else if (app_state == STATE_GAME_LOCAL) {
