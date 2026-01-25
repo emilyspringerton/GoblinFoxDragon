@@ -18,53 +18,74 @@ typedef struct { float x, y, z, w, h, d; } Box;
 
 // MAP GEOMETRY
 static Box map_geo[] = {
-    // 0: FLOOR (Fixed 900x300)
+    // 0: FLOOR (900x300)
     {0, -1, 0, 900, 2, 300},
     
     // --- CENTRAL ZIGGURAT (Indices 1-3) ---
-    {0, 2.0, 0, 24, 4, 24},       // Base (Widened)
-    {0, 5.0, 0, 14, 2, 14},       // Mid
-    {0, 8.0, 0, 6, 4, 6},         // Top
+    {0, 2.0, 0, 24, 4, 24},       
+    {0, 5.0, 0, 14, 2, 14},       
+    {0, 8.0, 0, 6, 4, 6},         
     
-    // --- TWIN SPIRES (East/West Towers) ---
-    {300, 10, 0, 10, 20, 10},     // East Spire
-    {310, 2, 0, 4, 2, 4},         // East Step 1
-    {308, 5, 5, 4, 2, 4},         // East Step 2
-    
-    {-300, 10, 0, 10, 20, 10},    // West Spire
-    {-310, 2, 0, 4, 2, 4},        // West Step 1
-    {-308, 5, -5, 4, 2, 4},       // West Step 2
+    // --- TWIN SPIRES (Indices 4-9) ---
+    {300, 10, 0, 10, 20, 10},     
+    {310, 2, 0, 4, 2, 4},         
+    {308, 5, 5, 4, 2, 4},         
+    {-300, 10, 0, 10, 20, 10},    
+    {-310, 2, 0, 4, 2, 4},        
+    {-308, 5, -5, 4, 2, 4},       
 
-    // --- THE SPINE (Central Cover) ---
-    {100, 2, 0, 40, 4, 2},        // East Low Wall
-    {-100, 2, 0, 40, 4, 2},       // West Low Wall
+    // --- THE SPINE (Indices 10-11) ---
+    {100, 2, 0, 40, 4, 2},        
+    {-100, 2, 0, 40, 4, 2},       
     
-    // --- FLOATING PLATFORMS ---
-    {50, 7, 50, 8, 1, 8},         // NE Float
-    {-50, 7, -50, 8, 1, 8},       // SW Float
-    {50, 7, -50, 8, 1, 8},        // SE Float
-    {-50, 7, 50, 8, 1, 8},        // NW Float
+    // --- EAST RUINS (The "Village" at X=150) ---
+    {150, 2, 40, 6, 4, 6},        // House A
+    {160, 2, 35, 2, 4, 10},       // Wall A
+    {140, 1, 45, 4, 2, 4},        // Step A
+    {150, 2, -40, 6, 4, 6},       // House B
+    {160, 2, -35, 2, 4, 10},      // Wall B
+    {180, 4, 0, 8, 8, 8},         // Monolith East
+    
+    // --- WEST RUINS (The "Village" at X=-150) ---
+    {-150, 2, 40, 6, 4, 6},       // House C
+    {-160, 2, 35, 2, 4, 10},      // Wall C
+    {-140, 1, 45, 4, 2, 4},       // Step C
+    {-150, 2, -40, 6, 4, 6},      // House D
+    {-160, 2, -35, 2, 4, 10},     // Wall D
+    {-180, 4, 0, 8, 8, 8},        // Monolith West
 
-    // --- CONTAINMENT WALLS (Indices 15-18) ---
-    // Floor is 900 Wide (X: -450 to 450), 300 Deep (Z: -150 to 150)
-    // Thickness 200 to prevent glitching.
+    // --- PARKOUR LANES (Connecting Spires to Center) ---
+    // East Lane
+    {250, 5, 0, 4, 1, 4},         // Pad 1
+    {200, 7, 10, 4, 1, 4},        // Pad 2
+    {150, 9, -10, 4, 1, 4},       // Pad 3 (High)
     
-    // North Wall (Z+) - Centered at Z=250 (150 boundary + 100 half-thickness)
+    // West Lane
+    {-250, 5, 0, 4, 1, 4},        // Pad 1
+    {-200, 7, -10, 4, 1, 4},      // Pad 2
+    {-150, 9, 10, 4, 1, 4},       // Pad 3 (High)
+    
+    // --- SCATTERED COVER (Random-ish blocks) ---
+    {50, 2, 80, 4, 4, 4},
+    {50, 2, -80, 4, 4, 4},
+    {-50, 2, 80, 4, 4, 4},
+    {-50, 2, -80, 4, 4, 4},
+    {220, 1, 50, 4, 2, 8},        // Low Wall
+    {-220, 1, -50, 4, 2, 8},      // Low Wall
+
+    // --- CONTAINMENT WALLS (Indices 32-35) ---
+    // North Wall (Z+) - Centered at Z=250 
     {0, 25, 250, 1200, 50, 200},   
-    
     // South Wall (Z-) - Centered at Z=-250
     {0, 25, -250, 1200, 50, 200},  
-    
-    // East Wall (X+) - Centered at X=550 (450 boundary + 100 half-thickness)
-    {550, 25, 0, 200, 50, 800},    // Overlaps Z walls
-    
+    // East Wall (X+) - Centered at X=550 
+    {550, 25, 0, 200, 50, 800},    
     // West Wall (X-) - Centered at X=-550
     {-550, 25, 0, 200, 50, 800}    
 };
 
-// CRITICAL: Update count to include all new items
-// 1 Floor + 3 Zig + 6 Spires + 2 Spine + 4 Float + 4 Walls = 20
-static int map_count = 20; 
+// Updated Count: 1 Floor + 3 Zig + 6 Spires + 2 Spine + 6 EastRuins + 6 WestRuins + 6 Parkour + 6 Cover + 4 Walls
+static int map_count = 40; 
 
 float phys_rand_f() { return ((float)(rand()%1000)/500.0f) - 1.0f; }
 
