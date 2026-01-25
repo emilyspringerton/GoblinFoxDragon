@@ -1,9 +1,10 @@
 #ifndef PHYSICS_H
 #define PHYSICS_H
 #include <math.h>
+#include <stdlib.h>
 #include "protocol.h"
 
-// --- TURBO TUNING (RESTORED) ---
+// --- TURBO TUNING ---
 #define GRAVITY 0.025f
 #define JUMP_FORCE 0.55f
 #define MAX_SPEED 0.75f
@@ -11,24 +12,56 @@
 #define ACCEL 1.5f
 #define STOP_SPEED 0.1f
 #define MAX_AIR_SPEED 0.1f
+#define EYE_HEIGHT 4.0f
 
-// --- MAP GEOMETRY ---
 typedef struct { float x, y, z, w, h, d; } Box;
 static Box map_geo[] = {
-    {0, -1, 0, 200, 2, 200},      // Floor
-    {15, 2.5, 15, 10, 5, 10},     // Red Box
-    {-15, 1.5, -15, 10, 3, 10},   // Blue Box
-    {-20, 4.0, 5, 6, 8, 6},       // Pillar
-    {0, 5.0, -25, 4, 10, 4},      // Sniper Perch
-    {10, 1.0, -10, 4, 2, 4}       // Step
+    {0, -1, 0, 200, 2, 200},
+    {15, 2.5, 15, 10, 5, 10},
+    {-15, 1.5, -15, 10, 3, 10},
+    {-20, 4.0, 5, 6, 8, 6},
+    {0, 5.0, -25, 4, 10, 4},
+    {10, 1.0, -10, 4, 2, 4}
 };
 static int map_count = 6;
+
+// Helper for RNG
+float phys_rand_f() { return ((float)(rand()%1000)/500.0f) - 1.0f; }
+
+// Ray-Sphere Intersection
+int check_hit(float ox, float oy, float oz, float dx, float dy, float dz, PlayerState *target) {
+    if (!target->active) return 0;
+    
+    // Target Center (approx chest height)
+    float tx = target->x; 
+    float ty = target->y + 2.0f; 
+    float tz = target->z; 
+    
+    // Vector from Ray Origin to Sphere Center
+    float vx = tx - ox; 
+    float vy = ty - oy; 
+    float vz = tz - oz;
+    
+    // Project V onto D (Ray Direction)
+    float t = vx*dx + vy*dy + vz*dz;
+    if (t < 0) return 0; // Behind shooter
+    
+    // Closest point on ray
+    float cx = ox + dx*t; 
+    float cy = oy + dy*t; 
+    float cz = oz + dz*t;
+    
+    // Distance squared
+    float dist_sq = (tx-cx)*(tx-cx) + (ty-cy)*(ty-cy) + (tz-cz)*(tz-cz);
+    
+    // Hit radius squared (2.5f ~ 1.5 units wide)
+    return (dist_sq < 2.5f);
+}
 
 void apply_friction(PlayerState *p) {
     float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
     if (speed < 0.001f) { p->vx = 0; p->vz = 0; return; }
     if (!p->on_ground) return; 
-
     float control = (speed < STOP_SPEED) ? STOP_SPEED : speed;
     float drop = control * FRICTION;
     float newspeed = speed - drop;
@@ -47,9 +80,7 @@ void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, fl
 }
 
 void resolve_collision(PlayerState *p) {
-    float pw = 0.6f; 
-    float ph = p->crouching ? 2.0f : 4.0f; 
-
+    float pw = 0.6f; float ph = p->crouching ? 2.0f : 4.0f; 
     p->on_ground = 0;
     if (p->y < 0) { p->y = 0; p->vy = 0; p->on_ground = 1; }
 
@@ -57,21 +88,16 @@ void resolve_collision(PlayerState *p) {
         Box b = map_geo[i];
         if (p->x + pw > b.x - b.w/2 && p->x - pw < b.x + b.w/2 &&
             p->z + pw > b.z - b.d/2 && p->z - pw < b.z + b.d/2) {
-            
             if (p->y < b.y + b.h/2 && p->y + ph > b.y - b.h/2) {
                 float prev_y = p->y - p->vy;
                 if (prev_y >= b.y + b.h/2) {
-                    p->y = b.y + b.h/2;
-                    p->vy = 0;
-                    p->on_ground = 1;
+                    p->y = b.y + b.h/2; p->vy = 0; p->on_ground = 1;
                 } else {
                     float dx = p->x - b.x; float dz = p->z - b.z;
                     if (fabs(dx) > fabs(dz)) { 
-                        p->vx = 0;
-                        p->x = (dx > 0) ? b.x + b.w/2 + pw : b.x - b.w/2 - pw;
+                        p->vx = 0; p->x = (dx > 0) ? b.x + b.w/2 + pw : b.x - b.w/2 - pw;
                     } else { 
-                        p->vz = 0;
-                        p->z = (dz > 0) ? b.z + b.d/2 + pw : b.z - b.d/2 - pw;
+                        p->vz = 0; p->z = (dz > 0) ? b.z + b.d/2 + pw : b.z - b.d/2 - pw;
                     }
                 }
             }
@@ -79,7 +105,9 @@ void resolve_collision(PlayerState *p) {
     }
 }
 
-void update_weapons(PlayerState *p, int shoot, int reload) {
+// Updated Weapon Logic with HIT DETECTION
+// Now accepts 'targets' array pointer
+void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload) {
     if (p->reload_timer > 0) p->reload_timer--;
     if (p->attack_cooldown > 0) p->attack_cooldown--;
     if (p->is_shooting > 0) p->is_shooting--;
@@ -92,12 +120,40 @@ void update_weapons(PlayerState *p, int shoot, int reload) {
 
     if (shoot && p->attack_cooldown == 0 && p->reload_timer == 0) {
         if (w == WPN_KNIFE || p->ammo[w] > 0) {
-            p->is_shooting = 5; 
-            p->recoil_anim = 1.0f;
+            p->is_shooting = 5; p->recoil_anim = 1.0f;
             p->attack_cooldown = WPN_STATS[w].rof;
             if (w != WPN_KNIFE) p->ammo[w]--;
+            
+            // --- HITSCAN LOGIC ---
+            // Calculate Vector based on Yaw/Pitch
+            // Note: Yaw is inverted (-yaw) to match Visuals
+            float r = -p->yaw * 0.0174533f;
+            float rp = p->pitch * 0.0174533f;
+            
+            float dx = sinf(r) * cosf(rp);
+            float dy = sinf(rp);
+            float dz = -cosf(r) * cosf(rp);
+            
+            // Iterate targets
+            for(int i=0; i<MAX_CLIENTS; i++) {
+                if (p == &targets[i]) continue; // Don't hit self
+                if (!targets[i].active) continue;
+
+                if (check_hit(p->x, p->y + EYE_HEIGHT, p->z, dx, dy, dz, &targets[i])) {
+                    targets[i].health -= WPN_STATS[w].dmg;
+                    p->hit_feedback = 2; // Signal UI hitmarker
+                    
+                    // Kill Logic
+                    if (targets[i].health <= 0) {
+                        p->kills++;
+                        targets[i].health = 100; // Respawn
+                        targets[i].x = 0; targets[i].y = 10; targets[i].z = 0; // Drop from sky
+                    }
+                }
+            }
+
         } else {
-            p->attack_cooldown = 10; 
+            p->attack_cooldown = 10; // Dry fire click
         }
     }
 }
