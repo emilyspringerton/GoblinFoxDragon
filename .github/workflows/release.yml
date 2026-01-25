@@ -34,7 +34,8 @@ jobs:
 
       - name: Build Linux Server
         run: |
-          gcc apps/server/src/main.c -o ShankServer_Linux -O2 -static
+          # ADDED -Ipackages/common HERE
+          gcc apps/server/src/main.c -o ShankServer_Linux -O2 -static -Ipackages/common
 
       - name: Bundle Artifacts
         run: |
