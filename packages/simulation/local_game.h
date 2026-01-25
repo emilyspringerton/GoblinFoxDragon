@@ -7,7 +7,6 @@
 #include "../common/protocol.h"
 #include "../common/physics.h"
 
-// THE UNIFIED STATE (Global to this compilation unit)
 ServerState state;
 
 void local_init() {
@@ -26,17 +25,13 @@ void local_init() {
     state.players[1].health = 100;
 }
 
-// Raycast for shooting
 int check_hit(float ox, float oy, float oz, float dx, float dy, float dz, int shooter_id) {
     for(int i=0; i<MAX_CLIENTS; i++) {
         if (i == shooter_id || !state.players[i].active) continue;
-        
         PlayerState *t = &state.players[i];
         float tx = t->x - ox; float ty = (t->y + 2.0f) - oy; float tz = t->z - oz;
         float dist = sqrtf(tx*tx + ty*ty + tz*tz);
         float dot = (tx*dx + ty*dy + tz*dz) / dist;
-        
-        // Simple sphere hit detection
         if (dot > 0.95f && dist < 100.0f) return i;
     }
     return -1;
@@ -60,11 +55,12 @@ void update_combat(PlayerState *p, int id, int shoot, int reload) {
             p->attack_cooldown = WPN_STATS[w].rof;
             if (w != WPN_KNIFE) p->ammo[w]--;
 
-            float r = p->yaw * 0.0174533f;
+            // Hitscan Math (Matches Visuals)
+            float rad = -p->yaw * 0.0174533f; // FIX: Negative Yaw for math
             float rp = p->pitch * 0.0174533f;
-            float dx = sinf(r) * cosf(rp);
+            float dx = sinf(rad) * cosf(rp);
             float dy = sinf(rp);
-            float dz = -cosf(r) * cosf(rp);
+            float dz = -cosf(rad) * cosf(rp);
 
             int hit = check_hit(p->x, p->y + 3.0f, p->z, dx, dy, dz, id);
             if (hit != -1) {
@@ -103,10 +99,14 @@ void local_update(float fwd, float strafe, float yaw, float pitch, int shoot, in
 
         apply_friction(p);
 
-        // Standard Math (Yaw = Right)
-        float rad = p->yaw * 0.0174533f;
-        float fwd_x = sinf(rad); float fwd_z = -cosf(rad);
-        float right_x = cosf(rad); float right_z = sinf(rad);
+        // --- VECTOR FIX: INVERT YAW ---
+        // OpenGL rotates world by -Yaw. We must rotate vectors by -Yaw to match.
+        float rad = -p->yaw * 0.0174533f; 
+        
+        float fwd_x = sinf(rad); 
+        float fwd_z = -cosf(rad); 
+        float right_x = cosf(rad); 
+        float right_z = sinf(rad);
 
         float wish_x = (fwd_x * i_fwd) + (right_x * i_str);
         float wish_z = (fwd_z * i_fwd) + (right_z * i_str);

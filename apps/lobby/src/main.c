@@ -43,6 +43,69 @@ void net_init() {
 }
 
 // --- VISUALS ---
+void draw_char(float x, float y, float size, char c) {
+    glPushMatrix(); glTranslatef(x, y, 0); glScalef(size, size, 1);
+    glBegin(GL_LINES);
+    // Minimal Font Set
+    if(c=='A'){ glVertex2f(0,0); glVertex2f(0,2); glVertex2f(0,2); glVertex2f(1,2); glVertex2f(1,2); glVertex2f(1,0); glVertex2f(0,1); glVertex2f(1,1); }
+    if(c=='D'){ glVertex2f(0,0); glVertex2f(0,2); glVertex2f(0,2); glVertex2f(1,1); glVertex2f(1,1); glVertex2f(0,0); }
+    if(c=='H'){ glVertex2f(0,0); glVertex2f(0,2); glVertex2f(1,0); glVertex2f(1,2); glVertex2f(0,1); glVertex2f(1,1); }
+    if(c=='P'){ glVertex2f(0,0); glVertex2f(0,2); glVertex2f(0,2); glVertex2f(1,2); glVertex2f(1,2); glVertex2f(1,1); glVertex2f(1,1); glVertex2f(0,1); }
+    if(c=='0'){ glVertex2f(0,0); glVertex2f(1,0); glVertex2f(1,0); glVertex2f(1,2); glVertex2f(1,2); glVertex2f(0,2); glVertex2f(0,2); glVertex2f(0,0); }
+    if(c=='1'){ glVertex2f(0.5,0); glVertex2f(0.5,2); }
+    if(c=='2'){ glVertex2f(0,2); glVertex2f(1,2); glVertex2f(1,2); glVertex2f(1,1); glVertex2f(1,1); glVertex2f(0,1); glVertex2f(0,1); glVertex2f(0,0); glVertex2f(0,0); glVertex2f(1,0); }
+    if(c=='3'){ glVertex2f(0,2); glVertex2f(1,2); glVertex2f(1,2); glVertex2f(1,0); glVertex2f(1,0); glVertex2f(0,0); glVertex2f(0,1); glVertex2f(1,1); }
+    if(c=='4'){ glVertex2f(0,2); glVertex2f(0,1); glVertex2f(0,1); glVertex2f(1,1); glVertex2f(1,2); glVertex2f(1,0); }
+    if(c=='5'){ glVertex2f(1,2); glVertex2f(0,2); glVertex2f(0,2); glVertex2f(0,1); glVertex2f(0,1); glVertex2f(1,1); glVertex2f(1,1); glVertex2f(1,0); glVertex2f(1,0); glVertex2f(0,0); }
+    if(c=='6'){ glVertex2f(1,2); glVertex2f(0,2); glVertex2f(0,2); glVertex2f(0,0); glVertex2f(0,0); glVertex2f(1,0); glVertex2f(1,0); glVertex2f(1,1); glVertex2f(1,1); glVertex2f(0,1); }
+    if(c=='/'){ glVertex2f(0,0); glVertex2f(1,2); }
+    glEnd(); glPopMatrix();
+}
+
+void draw_text(float x, float y, float size, const char* str) {
+    float cur = x;
+    while(*str) { draw_char(cur, y, size, *str); cur += size * 1.5f; str++; }
+}
+
+void draw_hud(PlayerState *p) {
+    glDisable(GL_DEPTH_TEST);
+    glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
+    glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
+    
+    // Crosshair
+    glLineWidth(2.0f);
+    glColor3f(0, 1, 0);
+    glBegin(GL_LINES); 
+    glVertex2f(640-10, 360); glVertex2f(640+10, 360); 
+    glVertex2f(640, 360-10); glVertex2f(640, 360+10); 
+    glEnd();
+
+    // Stats
+    char buf[64];
+    
+    // HP
+    glColor3f(1, 0, 0);
+    sprintf(buf, "HP %d", p->health);
+    draw_text(50, 50, 30.0f, buf);
+
+    // Ammo
+    glColor3f(1, 1, 0);
+    int cur = p->ammo[p->current_weapon];
+    int max = WPN_STATS[p->current_weapon].ammo_max;
+    if (p->current_weapon == WPN_KNIFE) sprintf(buf, "KNIFE");
+    else sprintf(buf, "%d/%d", cur, max);
+    draw_text(1000, 50, 30.0f, buf);
+
+    if (p->reload_timer > 0) {
+        glColor3f(1, 0.5, 0);
+        draw_text(550, 300, 20.0f, "RELOADING");
+    }
+
+    glEnable(GL_DEPTH_TEST);
+    glMatrixMode(GL_PROJECTION); glPopMatrix(); 
+    glMatrixMode(GL_MODELVIEW); glPopMatrix();
+}
+
 void draw_grid() {
     glBegin(GL_LINES);
     glColor3f(0.0f, 1.0f, 1.0f);
@@ -80,20 +143,15 @@ void draw_bot_model(PlayerState *p) {
     glPushMatrix();
     glTranslatef(p->x, p->y, p->z);
     glRotatef(p->yaw, 0, 1, 0); 
-    
-    // Hurt Flash
     if (p->health < 100) glColor3f(1.0f, 0.0f, 0.0f);
     else glColor3f(0.0f, 1.0f, 0.0f);
-
-    // Simple Box Body
     glScalef(1.0f, 4.0f, 1.0f);
     glBegin(GL_QUADS);
-    glVertex3f(-0.5, 1, 0.5); glVertex3f(0.5, 1, 0.5); glVertex3f(0.5, 0, 0.5); glVertex3f(-0.5, 0, 0.5); // Front
-    glVertex3f(-0.5, 1, -0.5); glVertex3f(0.5, 1, -0.5); glVertex3f(0.5, 0, -0.5); glVertex3f(-0.5, 0, -0.5); // Back
-    glVertex3f(-0.5, 1, -0.5); glVertex3f(-0.5, 1, 0.5); glVertex3f(-0.5, 0, 0.5); glVertex3f(-0.5, 0, -0.5); // Left
-    glVertex3f(0.5, 1, -0.5); glVertex3f(0.5, 1, 0.5); glVertex3f(0.5, 0, 0.5); glVertex3f(0.5, 0, -0.5); // Right
+    glVertex3f(-0.5, 1, 0.5); glVertex3f(0.5, 1, 0.5); glVertex3f(0.5, 0, 0.5); glVertex3f(-0.5, 0, 0.5); 
+    glVertex3f(-0.5, 1, -0.5); glVertex3f(0.5, 1, -0.5); glVertex3f(0.5, 0, -0.5); glVertex3f(-0.5, 0, -0.5); 
+    glVertex3f(-0.5, 1, -0.5); glVertex3f(-0.5, 1, 0.5); glVertex3f(-0.5, 0, 0.5); glVertex3f(-0.5, 0, -0.5); 
+    glVertex3f(0.5, 1, -0.5); glVertex3f(0.5, 1, 0.5); glVertex3f(0.5, 0, 0.5); glVertex3f(0.5, 0, -0.5); 
     glEnd();
-    
     glPopMatrix();
 }
 
@@ -105,14 +163,15 @@ void draw_weapon_p(PlayerState *p) {
     glTranslatef(0.4f, -0.5f + kick + reload_dip, -1.2f + (kick * 0.5f));
     glRotatef(-p->recoil_anim * 10.0f, 1, 0, 0);
     
+    // DISTINCT SHAPES
     switch(p->current_weapon) {
-        case WPN_KNIFE: glColor3f(0.8f,0.8f,0.8f); break;
-        case WPN_MAGNUM: glColor3f(0.6f,0.6f,0.6f); break;
-        case WPN_AR: glColor3f(0.2f,0.2f,0.2f); break;
-        case WPN_SHOTGUN: glColor3f(0.4f,0.2f,0.1f); break;
-        case WPN_SNIPER: glColor3f(0.1f,0.1f,0.1f); break;
+        case WPN_KNIFE:   glColor3f(0.8f, 0.8f, 0.8f); glScalef(0.1f, 0.1f, 0.5f); break;
+        case WPN_MAGNUM:  glColor3f(0.6f, 0.6f, 0.6f); glScalef(0.15f, 0.2f, 0.4f); break;
+        case WPN_AR:      glColor3f(0.2f, 0.2f, 0.2f); glScalef(0.15f, 0.2f, 1.0f); break;
+        case WPN_SHOTGUN: glColor3f(0.4f, 0.2f, 0.1f); glScalef(0.2f, 0.2f, 0.8f); break;
+        case WPN_SNIPER:  glColor3f(0.1f, 0.1f, 0.1f); glScalef(0.1f, 0.15f, 1.5f); break;
     }
-    glScalef(0.15f, 0.2f, 0.8f);
+
     glBegin(GL_QUADS); 
     glVertex3f(-1,1,1); glVertex3f(1,1,1); glVertex3f(1,1,-1); glVertex3f(-1,1,-1); 
     glVertex3f(-1,-1,1); glVertex3f(1,-1,1); glVertex3f(1,1,1); glVertex3f(-1,1,1); 
@@ -125,9 +184,7 @@ void draw_weapon_p(PlayerState *p) {
 
 void draw_scene(PlayerState *render_p) {
     glClearColor(0.05f, 0.05f, 0.1f, 1.0f);
-    
-    if (render_p->hit_feedback > 0) glClearColor(0.2f, 0.0f, 0.0f, 1.0f); // Feedback
-
+    if (render_p->hit_feedback > 0) glClearColor(0.2f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
 
@@ -139,7 +196,6 @@ void draw_scene(PlayerState *render_p) {
     draw_grid();
     draw_map();
     
-    // RENDER OTHER ENTITIES
     for(int i=1; i<MAX_CLIENTS; i++) {
         if(state.players[i].active) {
             draw_bot_model(&state.players[i]);
@@ -147,6 +203,7 @@ void draw_scene(PlayerState *render_p) {
     }
 
     draw_weapon_p(render_p);
+    draw_hud(render_p);
 }
 
 int main(int argc, char* argv[]) {
@@ -218,8 +275,6 @@ int main(int argc, char* argv[]) {
             if(k[SDL_SCANCODE_4]) wpn=3; if(k[SDL_SCANCODE_5]) wpn=4;
 
             local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn, jump, crouch, reload);
-            
-            // LINKAGE FIX: Use state.players[0]
             draw_scene(&state.players[0]);
         }
 
