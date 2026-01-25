@@ -61,6 +61,158 @@ void net_init() {
     }
 }
 
+// --- HELPER: DRAW LETTER VECTORS ---
+// Draws a letter at (x,y) with size (w,h)
+void draw_char(char c, float x, float y, float w, float h) {
+    glBegin(GL_LINES);
+    switch(c) {
+        case 'S': 
+            glVertex2f(x+w, y); glVertex2f(x, y); 
+            glVertex2f(x, y); glVertex2f(x, y+h/2);
+            glVertex2f(x, y+h/2); glVertex2f(x+w, y+h/2);
+            glVertex2f(x+w, y+h/2); glVertex2f(x+w, y+h);
+            glVertex2f(x+w, y+h); glVertex2f(x, y+h);
+            break;
+        case 'H':
+            glVertex2f(x, y); glVertex2f(x, y+h);
+            glVertex2f(x+w, y); glVertex2f(x+w, y+h);
+            glVertex2f(x, y+h/2); glVertex2f(x+w, y+h/2);
+            break;
+        case 'A':
+            glVertex2f(x, y+h); glVertex2f(x+w/2, y);
+            glVertex2f(x+w/2, y); glVertex2f(x+w, y+h);
+            glVertex2f(x+w/4, y+h/2); glVertex2f(x+w*0.75f, y+h/2);
+            break;
+        case 'N':
+            glVertex2f(x, y+h); glVertex2f(x, y);
+            glVertex2f(x, y); glVertex2f(x+w, y+h);
+            glVertex2f(x+w, y+h); glVertex2f(x+w, y);
+            break;
+        case 'K':
+            glVertex2f(x, y); glVertex2f(x, y+h);
+            glVertex2f(x+w, y); glVertex2f(x, y+h/2);
+            glVertex2f(x, y+h/2); glVertex2f(x+w, y+h);
+            break;
+        case 'P':
+            glVertex2f(x, y+h); glVertex2f(x, y);
+            glVertex2f(x, y); glVertex2f(x+w, y);
+            glVertex2f(x+w, y); glVertex2f(x+w, y+h/2);
+            glVertex2f(x+w, y+h/2); glVertex2f(x, y+h/2);
+            break;
+        case 'I':
+            glVertex2f(x+w/2, y); glVertex2f(x+w/2, y+h);
+            glVertex2f(x, y); glVertex2f(x+w, y);
+            glVertex2f(x, y+h); glVertex2f(x+w, y+h);
+            break;
+        case 'T':
+            glVertex2f(x+w/2, y); glVertex2f(x+w/2, y+h);
+            glVertex2f(x, y); glVertex2f(x+w, y);
+            break;
+        case 'D': // Menu D
+            glVertex2f(x, y); glVertex2f(x, y+h);
+            glVertex2f(x, y); glVertex2f(x+w/2, y);
+            glVertex2f(x+w/2, y); glVertex2f(x+w, y+h/2);
+            glVertex2f(x+w, y+h/2); glVertex2f(x+w/2, y+h);
+            glVertex2f(x+w/2, y+h); glVertex2f(x, y+h);
+            break;
+        case 'B': // Menu B
+            glVertex2f(x, y); glVertex2f(x, y+h);
+            glVertex2f(x, y); glVertex2f(x+w*0.8, y);
+            glVertex2f(x+w*0.8, y); glVertex2f(x+w, y+h/4);
+            glVertex2f(x+w, y+h/4); glVertex2f(x+w*0.8, y+h/2);
+            glVertex2f(x+w*0.8, y+h/2); glVertex2f(x, y+h/2);
+            glVertex2f(x+w*0.8, y+h/2); glVertex2f(x+w, y+h*0.75);
+            glVertex2f(x+w, y+h*0.75); glVertex2f(x+w*0.8, y+h);
+            glVertex2f(x+w*0.8, y+h); glVertex2f(x, y+h);
+            break;
+        case 'J': // Menu J
+            glVertex2f(x+w, y); glVertex2f(x+w, y+h*0.8);
+            glVertex2f(x+w, y+h*0.8); glVertex2f(x+w/2, y+h);
+            glVertex2f(x+w/2, y+h); glVertex2f(x, y+h*0.8);
+            glVertex2f(x, y+h*0.8); glVertex2f(x, y+h*0.6);
+            break; 
+        case 'v': // small v
+            glVertex2f(x, y); glVertex2f(x+w/2, y+h);
+            glVertex2f(x+w/2, y+h); glVertex2f(x+w, y);
+            break;
+    }
+    glEnd();
+}
+
+void draw_text_string(const char* s, float x, float y, float size) {
+    float cursor = x;
+    float w = size * 0.6f;
+    float h = size;
+    float gap = size * 0.2f;
+    
+    while(*s) {
+        draw_char(*s, cursor, y, w, h);
+        cursor += w + gap;
+        s++;
+    }
+}
+
+// --- TITLE SCREEN RENDERER ---
+void draw_lobby_screen() {
+    glLoadIdentity();
+    glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    
+    float time = SDL_GetTicks() * 0.005f;
+    
+    // 1. TITLE "SHANKPIT" (CMYK Glitch)
+    float tx = 200, ty = 100, tsize = 100;
+    
+    glLineWidth(3.0f);
+    
+    // Cyan Layer (Shift Left)
+    float jx = sinf(time) * 4.0f;
+    float jy = cosf(time * 1.3f) * 2.0f;
+    glColor3f(0, 1, 1);
+    draw_text_string("SHANKPIT", tx + jx, ty + jy, tsize);
+    
+    // Magenta Layer (Shift Right)
+    glColor3f(1, 0, 1);
+    draw_text_string("SHANKPIT", tx - jx, ty - jy, tsize);
+    
+    // Yellow Layer (Center + Glow)
+    glColor3f(1, 1, 0); // Yellow
+    draw_text_string("SHANKPIT", tx, ty, tsize);
+    
+    // 2. VERSION
+    glLineWidth(1.0f);
+    glColor3f(0.5f, 0.5f, 0.5f);
+    draw_text_string("v0.225", 900, 180, 20);
+    
+    // 3. MENU OPTIONS (Grid Layout)
+    float mx = 300, my = 350, msize = 40, mgap = 60;
+    
+    // [D] 1 Bot
+    glColor3f(0, 1, 0); // Green
+    draw_char('D', mx, my, msize, msize);
+    glColor3f(1, 1, 1);
+    draw_text_string("DUEL 1v1", mx + 60, my + 10, 20);
+    
+    // [B] Horde
+    glColor3f(1, 0.5f, 0); // Orange
+    draw_char('B', mx, my + mgap, msize, msize);
+    glColor3f(1, 1, 1);
+    draw_text_string("HORDE 32", mx + 60, my + mgap + 10, 20);
+    
+    // [S] Neural
+    float flash = (sinf(time*5) + 1.0f) * 0.5f;
+    glColor3f(0, flash, flash); // Cyan Flash
+    draw_char('S', mx, my + mgap*2, msize, msize);
+    glColor3f(1, 1, 1);
+    draw_text_string("NEURAL S", mx + 60, my + mgap*2 + 10, 20);
+    
+    // [N] Net
+    glColor3f(0.5f, 0.5f, 1.0f); // Blue
+    draw_char('N', mx, my + mgap*3, msize, msize);
+    glColor3f(1, 1, 1);
+    draw_text_string("NET PLAY", mx + 60, my + mgap*3 + 10, 20);
+}
+
 void draw_grid() {
     glBegin(GL_LINES);
     glColor3f(0.0f, 1.0f, 1.0f);
@@ -208,10 +360,9 @@ void draw_scene(PlayerState *render_p) {
 
 int main(int argc, char* argv[]) {
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *win = SDL_CreateWindow("SHANKPIT [NEURAL S-MODE]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
+    SDL_Window *win = SDL_CreateWindow("SHANKPIT [v0.225]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
     SDL_GL_CreateContext(win);
     net_init();
-    
     local_init_match(1);
 
     int running = 1;
@@ -238,11 +389,11 @@ int main(int argc, char* argv[]) {
                         glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
                         glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
                     }
-                    if (e.key.keysym.sym == SDLK_s) { // --- NEURAL MODE S ---
+                    if (e.key.keysym.sym == SDLK_s) { 
                         app_state = STATE_GAME_LOCAL;
-                        USE_NEURAL_NET = 1; // ACTIVATE BRAIN
+                        USE_NEURAL_NET = 1; 
                         local_init_match(31);
-                        printf("MODE S ACTIVATED. Neural Network Online.\n");
+                        printf("MODE S ACTIVATED.\n");
                         SDL_SetRelativeMouseMode(SDL_TRUE);
                         glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
                         glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
@@ -276,26 +427,10 @@ int main(int argc, char* argv[]) {
         }
 
         if (app_state == STATE_LOBBY) {
-            glClearColor(0.1f, 0.1f, 0.2f, 1.0f);
-            glClear(GL_COLOR_BUFFER_BIT);
-            glLoadIdentity();
-            glColor3f(1, 1, 0);
-            glBegin(GL_LINES); 
-            // D, B, N (Existing)
-            glVertex2f(200, 300); glVertex2f(200, 400); glVertex2f(200, 400); glVertex2f(250, 350);
-            glVertex2f(250, 350); glVertex2f(200, 300);
-            glVertex2f(400, 300); glVertex2f(400, 400); glVertex2f(400, 350); glVertex2f(450, 350);
-            glVertex2f(450, 350); glVertex2f(450, 300); glVertex2f(450, 350); glVertex2f(450, 400);
-            glVertex2f(450, 400); glVertex2f(400, 400); glVertex2f(450, 300); glVertex2f(400, 300);
-            glVertex2f(600, 300); glVertex2f(600, 400); 
-            glVertex2f(600, 400); glVertex2f(650, 300);
-            glVertex2f(650, 300); glVertex2f(650, 400);
-            
-            // S (Neural)
-            glColor3f(0, 1, 1); 
-            glVertex2f(850, 300); glVertex2f(800, 300); glVertex2f(800, 350); glVertex2f(850, 350);
-            glVertex2f(850, 350); glVertex2f(850, 400); glVertex2f(850, 400); glVertex2f(800, 400);
-            glEnd();
+            // Use new HUD function
+            glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
+            glMatrixMode(GL_MODELVIEW); glLoadIdentity();
+            draw_lobby_screen();
         } 
         else if (app_state == STATE_GAME_LOCAL) {
             const Uint8 *k = SDL_GetKeyboardState(NULL);
