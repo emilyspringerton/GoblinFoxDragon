@@ -25,16 +25,50 @@ void local_init() {
     state.players[1].health = 100;
 }
 
+// PRECISION HIT CHECK
+// Calculates the shortest distance from the ray (ox,oy,oz -> dx,dy,dz) 
+// to the target center.
 int check_hit(float ox, float oy, float oz, float dx, float dy, float dz, int shooter_id) {
+    float best_dist = 1000.0f;
+    int best_hit = -1;
+
     for(int i=0; i<MAX_CLIENTS; i++) {
         if (i == shooter_id || !state.players[i].active) continue;
+        
         PlayerState *t = &state.players[i];
-        float tx = t->x - ox; float ty = (t->y + 2.0f) - oy; float tz = t->z - oz;
-        float dist = sqrtf(tx*tx + ty*ty + tz*tz);
-        float dot = (tx*dx + ty*dy + tz*dz) / dist;
-        if (dot > 0.95f && dist < 100.0f) return i;
+        
+        // Vector from Origin to Target Center (Center approx at Y+2.0 for body mass)
+        float tx = t->x - ox; 
+        float ty = (t->y + 2.0f) - oy; 
+        float tz = t->z - oz;
+
+        // Project T onto Ray Direction (Dot Product)
+        // t_proj is the distance along the ray to the closest point
+        float t_proj = (tx*dx + ty*dy + tz*dz);
+        
+        if (t_proj < 0) continue; // Target is behind us
+
+        // Coordinates of the closest point on the ray
+        float cx = dx * t_proj;
+        float cy = dy * t_proj;
+        float cz = dz * t_proj;
+
+        // Distance squared from closest point to target center
+        float dist_sq = (tx-cx)*(tx-cx) + (ty-cy)*(ty-cy) + (tz-cz)*(tz-cz);
+        
+        // HITBOX RADIUS SQUARED
+        // 1.5 units wide radius = 2.25 sq distance
+        // This is much tighter than the previous cone check
+        if (dist_sq < 2.0f) {
+            // Check if this is the closest hit so far
+            float dist_to_player = sqrtf(tx*tx + ty*ty + tz*tz);
+            if (dist_to_player < best_dist) {
+                best_dist = dist_to_player;
+                best_hit = i;
+            }
+        }
     }
-    return -1;
+    return best_hit;
 }
 
 void update_combat(PlayerState *p, int id, int shoot, int reload) {
@@ -55,8 +89,8 @@ void update_combat(PlayerState *p, int id, int shoot, int reload) {
             p->attack_cooldown = WPN_STATS[w].rof;
             if (w != WPN_KNIFE) p->ammo[w]--;
 
-            // Hitscan Math (Matches Visuals)
-            float rad = -p->yaw * 0.0174533f; // FIX: Negative Yaw for math
+            // Ray Calculation
+            float rad = -p->yaw * 0.0174533f;
             float rp = p->pitch * 0.0174533f;
             float dx = sinf(rad) * cosf(rp);
             float dy = sinf(rp);
@@ -99,14 +133,9 @@ void local_update(float fwd, float strafe, float yaw, float pitch, int shoot, in
 
         apply_friction(p);
 
-        // --- VECTOR FIX: INVERT YAW ---
-        // OpenGL rotates world by -Yaw. We must rotate vectors by -Yaw to match.
-        float rad = -p->yaw * 0.0174533f; 
-        
-        float fwd_x = sinf(rad); 
-        float fwd_z = -cosf(rad); 
-        float right_x = cosf(rad); 
-        float right_z = sinf(rad);
+        float rad = -p->yaw * 0.0174533f;
+        float fwd_x = sinf(rad); float fwd_z = -cosf(rad);
+        float right_x = cosf(rad); float right_z = sinf(rad);
 
         float wish_x = (fwd_x * i_fwd) + (right_x * i_str);
         float wish_z = (fwd_z * i_fwd) + (right_z * i_str);
