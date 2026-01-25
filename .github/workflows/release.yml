@@ -26,16 +26,17 @@ jobs:
 
       - name: Build Windows Client
         run: |
+          # ADDED -lws2_32 -lwinmm -lgdi32 HERE
           x86_64-w64-mingw32-gcc apps/lobby/src/main.c -o ShankPit.exe \
             -O2 -static-libgcc \
-            -I./sdl2_mingw/include -Ipackages/common \
+            -I./sdl2_mingw/include -Ipackages/common -Ipackages/simulation \
             -L./sdl2_mingw/lib \
-            -lmingw32 -lSDL2main -lSDL2 -lopengl32 -lglu32 -lm
+            -lmingw32 -lSDL2main -lSDL2 -lopengl32 -lglu32 -lws2_32 -lwinmm -lgdi32 -lm
 
       - name: Build Linux Server
         run: |
-          # ADDED -Ipackages/common HERE
-          gcc apps/server/src/main.c -o ShankServer_Linux -O2 -static -Ipackages/common
+          # Server needs math lib (-lm) and networking
+          gcc apps/server/src/main.c -o ShankServer_Linux -O2 -static -Ipackages/common -Ipackages/simulation -lm
 
       - name: Bundle Artifacts
         run: |
