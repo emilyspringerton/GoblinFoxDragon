@@ -7,21 +7,25 @@
 #include "../common/protocol.h"
 #include "../common/physics.h"
 
+// --- TUNING OVERRIDES ---
+#undef JUMP_FORCE
+#define JUMP_FORCE 0.55f // Higher Jump (Was 0.45)
+#define JUMP_COOLDOWN 15 // Frames to wait before jumping again
+
 PlayerState local_p;
 PlayerState bots[MAX_CLIENTS];
 
 void local_init() {
     memset(&local_p, 0, sizeof(PlayerState));
-    local_p.active = 1;
-    local_p.pos.y = 10.0f;
+    local_p.active = 1; // Struct field not in protocol but implicit usage in code
+    local_p.y = 10.0f;
     local_p.health = 100;
     local_p.current_weapon = WPN_MAGNUM;
     for(int i=0; i<MAX_WEAPONS; i++) local_p.ammo[i] = WPN_STATS[i].ammo_max;
 
     // Dummy
     memset(&bots[1], 0, sizeof(PlayerState));
-    bots[1].active = 1;
-    bots[1].pos.x = 5.0f; bots[1].pos.y = 0.0f; bots[1].pos.z = 5.0f;
+    bots[1].x = 5.0f; bots[1].y = 0.0f; bots[1].z = 5.0f;
     bots[1].health = 100;
 }
 
@@ -30,16 +34,15 @@ void local_update(float fwd, float strafe, float yaw, float pitch, int shoot, in
     local_p.pitch = pitch;
     if (weapon != -1) local_p.current_weapon = weapon;
 
+    // Tick Jump Timer
+    if (local_p.jump_timer > 0) local_p.jump_timer--;
+
     apply_friction(&local_p);
 
-    // --- VECTOR FIX ---
-    // Invert Yaw (-yaw) to match OpenGL camera rotation
+    // Vector Math (Inverted Yaw to match Camera)
     float rad = -local_p.yaw * 0.0174533f; 
-    
-    float fwd_x = sinf(rad); 
-    float fwd_z = -cosf(rad); 
-    float right_x = cosf(rad); 
-    float right_z = sinf(rad);
+    float fwd_x = sinf(rad); float fwd_z = -cosf(rad); 
+    float right_x = cosf(rad); float right_z = sinf(rad);
 
     float wish_x = (fwd_x * fwd) + (right_x * strafe);
     float wish_z = (fwd_z * fwd) + (right_z * strafe);
@@ -51,19 +54,32 @@ void local_update(float fwd, float strafe, float yaw, float pitch, int shoot, in
 
     if (local_p.on_ground) {
         accelerate(&local_p, wish_x, wish_z, target_speed, ACCEL);
-        if (jump) { local_p.vel.y = JUMP_POWER; local_p.on_ground = 0; }
+        
+        // JUMP LOGIC
+        if (jump && local_p.jump_timer == 0) { 
+            local_p.vy = JUMP_FORCE; 
+            local_p.on_ground = 0;
+            local_p.jump_timer = JUMP_COOLDOWN; // Delay next jump
+            
+            // MOMENTUM BOOST (The "Slippery" Feel)
+            // If moving, multiply velocity to give a surge of speed
+            if (wish_len > 0) {
+                local_p.vx *= 1.15f; 
+                local_p.vz *= 1.15f;
+            }
+        }
     } else {
         accelerate(&local_p, wish_x, wish_z, target_speed * 0.1f, ACCEL);
     }
 
-    local_p.vel.y -= GRAVITY;
-    local_p.pos.x += local_p.vel.x; 
-    local_p.pos.z += local_p.vel.z; 
-    local_p.pos.y += local_p.vel.y;
+    local_p.vy -= GRAVITY;
+    local_p.x += local_p.vx; 
+    local_p.z += local_p.vz; 
+    local_p.y += local_p.vy;
 
-    if (local_p.pos.y < -50.0f) { 
-        local_p.pos.x=0; local_p.pos.y=10; local_p.pos.z=0; 
-        local_p.vel.x=0; local_p.vel.y=0; local_p.vel.z=0; 
+    if (local_p.y < -50.0f) { 
+        local_p.x=0; local_p.y=10; local_p.z=0; 
+        local_p.vx=0; local_p.vy=0; local_p.vz=0; 
     }
 
     resolve_collision(&local_p);
