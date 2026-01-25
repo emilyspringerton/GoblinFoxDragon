@@ -43,7 +43,6 @@ void net_init() {
     WSADATA wsa; WSAStartup(MAKEWORD(2,2), &wsa);
     #endif
     sock = socket(AF_INET, SOCK_DGRAM, 0);
-    
     #ifdef _WIN32
     u_long mode = 1; ioctlsocket(sock, FIONBIO, &mode);
     #else
@@ -209,11 +208,10 @@ void draw_scene(PlayerState *render_p) {
 
 int main(int argc, char* argv[]) {
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *win = SDL_CreateWindow("SHANKPIT [NET JAMES]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
+    SDL_Window *win = SDL_CreateWindow("SHANKPIT [64 BOT HORDE]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
     SDL_GL_CreateContext(win);
     net_init();
     
-    // FIX: Use local_init_match(1) instead of local_init()
     local_init_match(1);
 
     int running = 1;
@@ -233,7 +231,7 @@ int main(int argc, char* argv[]) {
                     }
                     if (e.key.keysym.sym == SDLK_b) {
                         app_state = STATE_GAME_LOCAL;
-                        local_init_match(3);
+                        local_init_match(64); // <--- THE HORDE SPAWNS HERE
                         SDL_SetRelativeMouseMode(SDL_TRUE);
                         glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
                         glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
