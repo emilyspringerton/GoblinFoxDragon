@@ -32,9 +32,14 @@ void local_update(float fwd, float strafe, float yaw, float pitch, int shoot, in
 
     apply_friction(&local_p);
 
-    float rad = local_p.yaw * 0.0174533f;
-    float fwd_x = sinf(rad); float fwd_z = -cosf(rad);
-    float right_x = cosf(rad); float right_z = sinf(rad);
+    // --- VECTOR FIX ---
+    // Invert Yaw (-yaw) to match OpenGL camera rotation
+    float rad = -local_p.yaw * 0.0174533f; 
+    
+    float fwd_x = sinf(rad); 
+    float fwd_z = -cosf(rad); 
+    float right_x = cosf(rad); 
+    float right_z = sinf(rad);
 
     float wish_x = (fwd_x * fwd) + (right_x * strafe);
     float wish_z = (fwd_z * fwd) + (right_z * strafe);
