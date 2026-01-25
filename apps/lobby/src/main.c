@@ -53,7 +53,7 @@ void net_init() {
     server_addr.sin_addr.s_addr = inet_addr("127.0.0.1"); 
 }
 
-// --- RENDER HELPERS ---
+// --- VISUALS ---
 void draw_grid() {
     glBegin(GL_LINES);
     glColor3f(0.0f, 1.0f, 1.0f);
@@ -121,13 +121,14 @@ void draw_scene(PlayerState *render_p) {
     float cam_h = render_p->crouching ? 2.5f : 6.0f;
     glRotatef(-cam_pitch, 1, 0, 0);
     glRotatef(-cam_yaw, 0, 1, 0);
-    glTranslatef(-render_p->x, -(render_p->y + cam_h), -render_p->z);
+    glTranslatef(-render_p->pos.x, -(render_p->pos.y + cam_h), -render_p->pos.z);
 
     draw_grid();
     draw_map();
     draw_weapon_p(render_p);
 }
 
+// --- MAIN LOOP ---
 int main(int argc, char* argv[]) {
     SDL_Init(SDL_INIT_VIDEO);
     SDL_Window *win = SDL_CreateWindow("SHANKPIT HYBRID", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
@@ -149,6 +150,9 @@ int main(int argc, char* argv[]) {
                         SDL_SetRelativeMouseMode(SDL_TRUE);
                         glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
                         glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
+                    }
+                    if (e.key.keysym.sym == SDLK_a) {
+                        // TODO: Implement Online
                     }
                 }
             } 
@@ -175,7 +179,7 @@ int main(int argc, char* argv[]) {
             glLoadIdentity();
             glColor3f(1, 1, 0);
             glBegin(GL_LINES); 
-            // Simple D shape
+            // Simple D
             glVertex2f(200, 300); glVertex2f(200, 400); glVertex2f(200, 400); glVertex2f(250, 350);
             glVertex2f(250, 350); glVertex2f(200, 300);
             glEnd();

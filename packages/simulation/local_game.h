@@ -12,13 +12,16 @@ PlayerState bots[MAX_CLIENTS];
 
 void local_init() {
     memset(&local_p, 0, sizeof(PlayerState));
-    local_p.y = 10.0f;
+    local_p.active = 1;
+    local_p.pos.y = 10.0f;
     local_p.health = 100;
     local_p.current_weapon = WPN_MAGNUM;
     for(int i=0; i<MAX_WEAPONS; i++) local_p.ammo[i] = WPN_STATS[i].ammo_max;
 
+    // Dummy
     memset(&bots[1], 0, sizeof(PlayerState));
-    bots[1].x = 5.0f; bots[1].y = 0.0f; bots[1].z = 5.0f;
+    bots[1].active = 1;
+    bots[1].pos.x = 5.0f; bots[1].pos.y = 0.0f; bots[1].pos.z = 5.0f;
     bots[1].health = 100;
 }
 
@@ -43,17 +46,20 @@ void local_update(float fwd, float strafe, float yaw, float pitch, int shoot, in
 
     if (local_p.on_ground) {
         accelerate(&local_p, wish_x, wish_z, target_speed, ACCEL);
-        if (jump) { local_p.vy = JUMP_FORCE; local_p.on_ground = 0; }
+        if (jump) { local_p.vel.y = JUMP_POWER; local_p.on_ground = 0; }
     } else {
-        accelerate(&local_p, wish_x, wish_z, target_speed * MAX_AIR_SPEED, ACCEL);
+        accelerate(&local_p, wish_x, wish_z, target_speed * 0.1f, ACCEL);
     }
 
-    local_p.vy -= GRAVITY;
-    local_p.x += local_p.vx; 
-    local_p.z += local_p.vz; 
-    local_p.y += local_p.vy;
+    local_p.vel.y -= GRAVITY;
+    local_p.pos.x += local_p.vel.x; 
+    local_p.pos.z += local_p.vel.z; 
+    local_p.pos.y += local_p.vel.y;
 
-    if (local_p.y < -50.0f) { local_p.x=0; local_p.y=10; local_p.z=0; local_p.vx=0; local_p.vy=0; local_p.vz=0; }
+    if (local_p.pos.y < -50.0f) { 
+        local_p.pos.x=0; local_p.pos.y=10; local_p.pos.z=0; 
+        local_p.vel.x=0; local_p.vel.y=0; local_p.vel.z=0; 
+    }
 
     resolve_collision(&local_p);
 
