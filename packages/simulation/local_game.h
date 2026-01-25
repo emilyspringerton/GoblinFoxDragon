@@ -7,18 +7,15 @@
 #include "../common/protocol.h"
 #include "../common/physics.h"
 
-// --- TUNING OVERRIDES ---
-#undef JUMP_FORCE
-#define JUMP_FORCE 0.55f // Higher Jump (Was 0.45)
-#define JUMP_COOLDOWN 15 // Frames to wait before jumping again
+// --- CONSTANTS ---
+#define JUMP_COOLDOWN 15
 
 PlayerState local_p;
 PlayerState bots[MAX_CLIENTS];
 
 void local_init() {
     memset(&local_p, 0, sizeof(PlayerState));
-    local_p.active = 1; // Struct field not in protocol but implicit usage in code
-    local_p.y = 10.0f;
+    local_p.y = 10.0f; // Start high
     local_p.health = 100;
     local_p.current_weapon = WPN_MAGNUM;
     for(int i=0; i<MAX_WEAPONS; i++) local_p.ammo[i] = WPN_STATS[i].ammo_max;
@@ -34,14 +31,13 @@ void local_update(float fwd, float strafe, float yaw, float pitch, int shoot, in
     local_p.pitch = pitch;
     if (weapon != -1) local_p.current_weapon = weapon;
 
-    // Tick Jump Timer
     if (local_p.jump_timer > 0) local_p.jump_timer--;
 
     apply_friction(&local_p);
 
-    // Vector Math (Inverted Yaw to match Camera)
-    float rad = -local_p.yaw * 0.0174533f; 
-    float fwd_x = sinf(rad); float fwd_z = -cosf(rad); 
+    // Vector Fix (Inverted Yaw)
+    float rad = -local_p.yaw * 0.0174533f;
+    float fwd_x = sinf(rad); float fwd_z = -cosf(rad);
     float right_x = cosf(rad); float right_z = sinf(rad);
 
     float wish_x = (fwd_x * fwd) + (right_x * strafe);
@@ -54,19 +50,11 @@ void local_update(float fwd, float strafe, float yaw, float pitch, int shoot, in
 
     if (local_p.on_ground) {
         accelerate(&local_p, wish_x, wish_z, target_speed, ACCEL);
-        
-        // JUMP LOGIC
         if (jump && local_p.jump_timer == 0) { 
             local_p.vy = JUMP_FORCE; 
             local_p.on_ground = 0;
-            local_p.jump_timer = JUMP_COOLDOWN; // Delay next jump
-            
-            // MOMENTUM BOOST (The "Slippery" Feel)
-            // If moving, multiply velocity to give a surge of speed
-            if (wish_len > 0) {
-                local_p.vx *= 1.15f; 
-                local_p.vz *= 1.15f;
-            }
+            local_p.jump_timer = JUMP_COOLDOWN;
+            if (wish_len > 0) { local_p.vx *= 1.15f; local_p.vz *= 1.15f; } // Boost
         }
     } else {
         accelerate(&local_p, wish_x, wish_z, target_speed * 0.1f, ACCEL);
