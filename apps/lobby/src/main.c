@@ -14,6 +14,7 @@
     #include <arpa/inet.h>
     #include <unistd.h>
     #include <fcntl.h>
+    #include <netdb.h> // For gethostbyname
 #endif
 
 #include <SDL2/SDL.h>
@@ -37,19 +38,34 @@ char chat_buf[64] = {0};
 int sock = -1;
 struct sockaddr_in server_addr;
 
+// --- NETWORK INIT (DNS RESOLVE) ---
 void net_init() {
     #ifdef _WIN32
     WSADATA wsa; WSAStartup(MAKEWORD(2,2), &wsa);
     #endif
     sock = socket(AF_INET, SOCK_DGRAM, 0);
+    
+    // Non-blocking
     #ifdef _WIN32
     u_long mode = 1; ioctlsocket(sock, FIONBIO, &mode);
     #else
     int flags = fcntl(sock, F_GETFL, 0); fcntl(sock, F_SETFL, flags | O_NONBLOCK);
     #endif
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(6969);
-    server_addr.sin_addr.s_addr = inet_addr("127.0.0.1"); 
+
+    // Resolve s.farthq.com
+    struct hostent *he = gethostbyname("s.farthq.com");
+    if (he) {
+        server_addr.sin_family = AF_INET;
+        server_addr.sin_port = htons(5314); // Requested Port
+        memcpy(&server_addr.sin_addr, he->h_addr_list[0], he->h_length);
+        printf("Resolved s.farthq.com to %s\n", inet_ntoa(server_addr.sin_addr));
+    } else {
+        // Fallback to local
+        server_addr.sin_family = AF_INET;
+        server_addr.sin_port = htons(6969);
+        server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+        printf("Failed to resolve host. Defaulting to localhost.\n");
+    }
 }
 
 void draw_grid() {
@@ -70,12 +86,15 @@ void draw_map() {
         glScalef(b.w, b.h, b.d);
         glBegin(GL_QUADS);
         glColor3f(0.2f, 0.2f, 0.2f); 
+        // Simple Cube Draw
         glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(-0.5,0.5,0.5);
         glVertex3f(-0.5,0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
         glVertex3f(-0.5,-0.5,-0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
         glVertex3f(-0.5,-0.5,-0.5); glVertex3f(-0.5,-0.5,0.5); glVertex3f(-0.5,0.5,0.5); glVertex3f(-0.5,0.5,-0.5);
         glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(0.5,0.5,0.5);
         glEnd();
+        
+        // Wireframe Overlay
         glLineWidth(2.0f);
         glColor3f(1.0f, 0.0f, 1.0f); 
         glBegin(GL_LINE_LOOP);
@@ -85,6 +104,38 @@ void draw_map() {
     }
 }
 
+// Draw the specific gun model (Used for both 1st and 3rd person)
+void draw_gun_model(int weapon_id) {
+    switch(weapon_id) {
+        case WPN_KNIFE:   
+            glColor3f(0.8f, 0.8f, 0.9f); glScalef(0.05f, 0.05f, 0.8f); 
+            break;
+        case WPN_MAGNUM:  
+            glColor3f(0.4f, 0.4f, 0.4f); glScalef(0.15f, 0.2f, 0.5f); 
+            break;
+        case WPN_AR:      
+            glColor3f(0.2f, 0.3f, 0.2f); glScalef(0.1f, 0.15f, 1.2f); 
+            break;
+        case WPN_SHOTGUN: 
+            glColor3f(0.5f, 0.3f, 0.2f); glScalef(0.25f, 0.15f, 0.8f); 
+            break;
+        case WPN_SNIPER:  
+            glColor3f(0.1f, 0.1f, 0.15f); glScalef(0.08f, 0.12f, 2.0f); 
+            break;
+        default: 
+            glColor3f(1,0,1); glScalef(0.1f, 0.1f, 0.5f);
+    }
+
+    glBegin(GL_QUADS); 
+    glVertex3f(-1,1,1); glVertex3f(1,1,1); glVertex3f(1,1,-1); glVertex3f(-1,1,-1); 
+    glVertex3f(-1,-1,1); glVertex3f(1,-1,1); glVertex3f(1,1,1); glVertex3f(-1,1,1); 
+    glVertex3f(-1,-1,-1); glVertex3f(-1,1,-1); glVertex3f(1,1,-1); glVertex3f(1,-1,-1); 
+    glVertex3f(1,-1,-1); glVertex3f(1,1,-1); glVertex3f(1,1,1); glVertex3f(1,-1,1); 
+    glVertex3f(-1,-1,1); glVertex3f(-1,1,1); glVertex3f(-1,1,-1); glVertex3f(-1,-1,-1); 
+    glEnd();
+}
+
+// 1st Person Render
 void draw_weapon_p(PlayerState *p) {
     glPushMatrix();
     glLoadIdentity();
@@ -97,21 +148,48 @@ void draw_weapon_p(PlayerState *p) {
     glTranslatef(x_offset, -0.5f + kick + reload_dip + (bob * 0.5f), -1.2f + (kick * 0.5f) + bob);
     glRotatef(-p->recoil_anim * 10.0f, 1, 0, 0);
     
-    switch(p->current_weapon) {
-        case WPN_KNIFE:   glColor3f(0.8f, 0.8f, 0.9f); glScalef(0.05f, 0.05f, 0.8f); break;
-        case WPN_MAGNUM:  glColor3f(0.4f, 0.4f, 0.4f); glScalef(0.15f, 0.2f, 0.5f); break;
-        case WPN_AR:      glColor3f(0.2f, 0.3f, 0.2f); glScalef(0.1f, 0.15f, 1.2f); break;
-        case WPN_SHOTGUN: glColor3f(0.5f, 0.3f, 0.2f); glScalef(0.25f, 0.15f, 0.8f); break;
-        case WPN_SNIPER:  glColor3f(0.1f, 0.1f, 0.15f); glScalef(0.08f, 0.12f, 2.0f); break;
-    }
+    draw_gun_model(p->current_weapon);
+    glPopMatrix();
+}
 
-    glBegin(GL_QUADS); 
-    glVertex3f(-1,1,1); glVertex3f(1,1,1); glVertex3f(1,1,-1); glVertex3f(-1,1,-1); 
-    glVertex3f(-1,-1,1); glVertex3f(1,-1,1); glVertex3f(1,1,1); glVertex3f(-1,1,1); 
-    glVertex3f(-1,-1,-1); glVertex3f(-1,1,-1); glVertex3f(1,1,-1); glVertex3f(1,-1,-1); 
-    glVertex3f(1,-1,-1); glVertex3f(1,1,-1); glVertex3f(1,1,1); glVertex3f(1,-1,1); 
-    glVertex3f(-1,-1,1); glVertex3f(-1,1,1); glVertex3f(-1,1,-1); glVertex3f(-1,-1,-1); 
+// 3rd Person Render (Bots & Net Players)
+void draw_player_3rd(PlayerState *p) {
+    glPushMatrix();
+    
+    // 1. Position & Body Orientation
+    // Note: Render Y + 2.0 to stand on floor (Physics origin is center)
+    glTranslatef(p->x, p->y + 2.0f, p->z);
+    
+    // Rotate Body to face aim direction
+    glRotatef(-p->yaw, 0, 1, 0); 
+    
+    // 2. Draw Body
+    if(p->health <= 0) glColor3f(0.2, 0, 0); // Dead
+    else glColor3f(1, 0, 0); // Red Team
+    
+    glPushMatrix();
+    glScalef(1.2f, 3.8f, 1.2f); // Torso
+    glBegin(GL_QUADS);
+    // ... (Simplified Cube) ...
+    glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(-0.5,0.5,0.5);
+    glVertex3f(-0.5,0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
+    glVertex3f(-0.5,-0.5,-0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
+    glVertex3f(-0.5,-0.5,-0.5); glVertex3f(-0.5,-0.5,0.5); glVertex3f(-0.5,0.5,0.5); glVertex3f(-0.5,0.5,-0.5);
+    glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(0.5,0.5,0.5);
     glEnd();
+    glPopMatrix();
+    
+    // 3. Draw Weapon (Articulated)
+    glPushMatrix();
+    glTranslatef(0.5f, 1.0f, 0.5f); // Right Shoulder
+    glRotatef(p->pitch, 1, 0, 0);   // Aim Pitch
+    
+    // Scale down slightly for 3rd person
+    glScalef(0.8f, 0.8f, 0.8f);
+    draw_gun_model(p->current_weapon);
+    
+    glPopMatrix();
+    
     glPopMatrix();
 }
 
@@ -133,33 +211,21 @@ void draw_scene(PlayerState *render_p) {
     draw_map();
     draw_projectiles();
     
-    // Draw Bots
+    // Draw Bots/Other Players
     for(int i=1; i<MAX_CLIENTS; i++) {
         if(local_state.players[i].active) {
-            glPushMatrix();
-            glTranslatef(local_state.players[i].x, local_state.players[i].y + 2.0f, local_state.players[i].z);
-            if(local_state.players[i].health <= 0) glColor3f(0.2, 0, 0);
-            else glColor3f(1, 0, 0); 
-            
-            glScalef(1, 4, 1); 
-            glBegin(GL_QUADS); 
-            glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(-0.5,0.5,0.5);
-            glVertex3f(-0.5,0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
-            glVertex3f(-0.5,-0.5,-0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
-            glVertex3f(-0.5,-0.5,-0.5); glVertex3f(-0.5,-0.5,0.5); glVertex3f(-0.5,0.5,0.5); glVertex3f(-0.5,0.5,-0.5);
-            glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(0.5,0.5,0.5);
-            glEnd();
-            glPopMatrix();
+            draw_player_3rd(&local_state.players[i]);
         }
     }
 
-    draw_weapon_p(render_p);
+    draw_weapon_p(render_p); // Draw local 1st person
     
-    // Crosshair & HUD
+    // HUD
     glDisable(GL_DEPTH_TEST);
     glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
     glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
     
+    // Crosshair
     glColor3f(0, 1, 0);
     if (current_fov < 50.0f) {
         glBegin(GL_LINES); glVertex2f(0, 360); glVertex2f(1280, 360); glVertex2f(640, 0); glVertex2f(640, 720); glEnd();
@@ -168,11 +234,11 @@ void draw_scene(PlayerState *render_p) {
         glBegin(GL_LINES); glVertex2f(630, 360); glVertex2f(650, 360); glVertex2f(640, 350); glVertex2f(640, 370); glEnd();
     }
     
-    // --- CYAN HIT MARKER (BOTTOM LEFT) ---
+    // Hit Marker (Cyan)
     if (render_p->hit_feedback > 0) {
-        glColor3f(0, 1, 1); // Cyan
+        glColor3f(0, 1, 1);
         glBegin(GL_TRIANGLE_FAN);
-        glVertex2f(50, 50); // Center
+        glVertex2f(50, 50); 
         for(int i=0; i<=20; i++) {
             float ang = (float)i / 20.0f * 6.28318f;
             glVertex2f(50 + cosf(ang)*20, 50 + sinf(ang)*20);
@@ -186,7 +252,7 @@ void draw_scene(PlayerState *render_p) {
 
 int main(int argc, char* argv[]) {
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *win = SDL_CreateWindow("SHANKPIT HYBRID", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
+    SDL_Window *win = SDL_CreateWindow("SHANKPIT [NET JAMES]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
     SDL_GL_CreateContext(win);
     net_init();
     local_init();
@@ -209,6 +275,14 @@ int main(int argc, char* argv[]) {
                     if (e.key.keysym.sym == SDLK_b) {
                         app_state = STATE_GAME_LOCAL;
                         local_init_match(3); // 3 Bots
+                        SDL_SetRelativeMouseMode(SDL_TRUE);
+                        glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
+                        glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
+                    }
+                    if (e.key.keysym.sym == SDLK_n) { // NET GAME
+                        app_state = STATE_GAME_NET;
+                        printf("Connecting to s.farthq.com:5314...\n");
+                        // Net logic needs to be fleshed out in future, for now rendering works
                         SDL_SetRelativeMouseMode(SDL_TRUE);
                         glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
                         glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
@@ -248,6 +322,10 @@ int main(int argc, char* argv[]) {
             glVertex2f(400, 300); glVertex2f(400, 400); glVertex2f(400, 350); glVertex2f(450, 350);
             glVertex2f(450, 350); glVertex2f(450, 300); glVertex2f(450, 350); glVertex2f(450, 400);
             glVertex2f(450, 400); glVertex2f(400, 400); glVertex2f(450, 300); glVertex2f(400, 300);
+            // N (Net)
+            glVertex2f(600, 300); glVertex2f(600, 400); 
+            glVertex2f(600, 400); glVertex2f(650, 300);
+            glVertex2f(650, 300); glVertex2f(650, 400);
             glEnd();
         } 
         else if (app_state == STATE_GAME_LOCAL) {
@@ -264,7 +342,6 @@ int main(int argc, char* argv[]) {
             if(k[SDL_SCANCODE_1]) wpn=0; if(k[SDL_SCANCODE_2]) wpn=1; if(k[SDL_SCANCODE_3]) wpn=2;
             if(k[SDL_SCANCODE_4]) wpn=3; if(k[SDL_SCANCODE_5]) wpn=4;
 
-            // Zoom Logic
             float target_fov = (rmb && local_state.players[0].current_weapon == WPN_SNIPER) ? 20.0f : 75.0f;
             current_fov += (target_fov - current_fov) * 0.2f;
             glMatrixMode(GL_PROJECTION); glLoadIdentity(); 
@@ -273,6 +350,10 @@ int main(int argc, char* argv[]) {
 
             local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn, jump, crouch, reload);
             draw_scene(&local_state.players[0]);
+        }
+        else if (app_state == STATE_GAME_NET) {
+            // Placeholder: Just draw scene for now, loop needs packets
+            draw_scene(&local_state.players[0]); 
         }
 
         SDL_GL_SwapWindow(win);
