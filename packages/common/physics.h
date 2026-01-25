@@ -18,28 +18,21 @@ typedef struct { float x, y, z, w, h, d; } Box;
 
 // MAP GEOMETRY
 static Box map_geo[] = {
-    // Floor
-    {0, -1, 0, 200, 2, 200},
-    
-    // Objects
+    {0, -1, 0, 200, 2, 200},      // Floor
     {15, 2.5, 15, 10, 5, 10},     // Red Box
     {-15, 1.5, -15, 10, 3, 10},   // Blue Box
     {-20, 4.0, 5, 6, 8, 6},       // Pillar
     {0, 5.0, -25, 4, 10, 4},      // Sniper Perch
     {10, 1.0, -10, 4, 2, 4},      // Step
-    
-    // BOUNDARY WALLS (New)
-    {0, 10, 50, 100, 20, 2},   // North
-    {0, 10, -50, 100, 20, 2},  // South
-    {50, 10, 0, 2, 20, 100},   // East
-    {-50, 10, 0, 2, 20, 100}   // West
+    {0, 10, 50, 100, 20, 2},      // North Wall
+    {0, 10, -50, 100, 20, 2},     // South Wall
+    {50, 10, 0, 2, 20, 100},      // East Wall
+    {-50, 10, 0, 2, 20, 100}      // West Wall
 };
-static int map_count = 10; // Updated count
+static int map_count = 10;
 
-// Helper
 float phys_rand_f() { return ((float)(rand()%1000)/500.0f) - 1.0f; }
 
-// Hit Detection
 int check_hit(float ox, float oy, float oz, float dx, float dy, float dz, PlayerState *target) {
     if (!target->active) return 0;
     float tx = target->x; float ty = target->y + 2.0f; float tz = target->z;
@@ -133,7 +126,10 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
 
                 if (check_hit(p->x, p->y + EYE_HEIGHT, p->z, dx, dy, dz, &targets[i])) {
                     targets[i].health -= WPN_STATS[w].dmg;
-                    p->hit_feedback = 2; 
+                    
+                    // --- HIT CONFIRMED ---
+                    p->hit_feedback = 10; // Flash for 10 frames
+                    
                     if(targets[i].health <= 0) {
                         p->kills++;
                         targets[i].health = 100;

@@ -137,13 +137,11 @@ void draw_scene(PlayerState *render_p) {
     for(int i=1; i<MAX_CLIENTS; i++) {
         if(local_state.players[i].active) {
             glPushMatrix();
-            // FIX: Offset Y by 2.0f (Half Height) so they stand on the floor
             glTranslatef(local_state.players[i].x, local_state.players[i].y + 2.0f, local_state.players[i].z);
-            
             if(local_state.players[i].health <= 0) glColor3f(0.2, 0, 0);
             else glColor3f(1, 0, 0); 
             
-            glScalef(1, 4, 1); // 4 units high, centered at 0
+            glScalef(1, 4, 1); 
             glBegin(GL_QUADS); 
             glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(-0.5,0.5,0.5);
             glVertex3f(-0.5,0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
@@ -157,7 +155,7 @@ void draw_scene(PlayerState *render_p) {
 
     draw_weapon_p(render_p);
     
-    // Crosshair
+    // Crosshair & HUD
     glDisable(GL_DEPTH_TEST);
     glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
     glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
@@ -168,6 +166,18 @@ void draw_scene(PlayerState *render_p) {
     } else {
         glLineWidth(2.0f);
         glBegin(GL_LINES); glVertex2f(630, 360); glVertex2f(650, 360); glVertex2f(640, 350); glVertex2f(640, 370); glEnd();
+    }
+    
+    // --- CYAN HIT MARKER (BOTTOM LEFT) ---
+    if (render_p->hit_feedback > 0) {
+        glColor3f(0, 1, 1); // Cyan
+        glBegin(GL_TRIANGLE_FAN);
+        glVertex2f(50, 50); // Center
+        for(int i=0; i<=20; i++) {
+            float ang = (float)i / 20.0f * 6.28318f;
+            glVertex2f(50 + cosf(ang)*20, 50 + sinf(ang)*20);
+        }
+        glEnd();
     }
     
     glEnable(GL_DEPTH_TEST);
@@ -206,12 +216,14 @@ int main(int argc, char* argv[]) {
                 }
             } 
             else {
-                if(e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) {
-                    app_state = STATE_LOBBY;
-                    SDL_SetRelativeMouseMode(SDL_FALSE);
-                    glDisable(GL_DEPTH_TEST);
-                    glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
-                    glMatrixMode(GL_MODELVIEW); glLoadIdentity();
+                if(e.type == SDL_KEYDOWN) {
+                    if (e.key.keysym.sym == SDLK_ESCAPE) {
+                        app_state = STATE_LOBBY;
+                        SDL_SetRelativeMouseMode(SDL_FALSE);
+                        glDisable(GL_DEPTH_TEST);
+                        glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
+                        glMatrixMode(GL_MODELVIEW); glLoadIdentity();
+                    }
                 }
                 if(e.type == SDL_MOUSEMOTION) {
                     float sens = (current_fov < 50.0f) ? 0.05f : 0.15f; 

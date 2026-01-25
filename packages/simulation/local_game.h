@@ -24,17 +24,18 @@ void local_init_match(int bot_count) {
     local_state.players[0].current_weapon = WPN_MAGNUM;
     for(int i=0; i<MAX_WEAPONS; i++) local_state.players[0].ammo[i] = WPN_STATS[i].ammo_max;
 
-    // Bots (Agents)
+    // Bots (Stable AR Loadout)
     for(int i=1; i<=bot_count; i++) {
         if (i >= MAX_CLIENTS) break;
         local_state.players[i].id = i;
         local_state.players[i].active = 1;
         local_state.players[i].is_bot = 1;
-        local_state.players[i].x = sinf(i) * 10.0f;
-        local_state.players[i].z = cosf(i) * 10.0f;
+        float angle = (i * 6.28f) / bot_count;
+        local_state.players[i].x = sinf(angle) * 15.0f;
+        local_state.players[i].z = cosf(angle) * 15.0f;
         local_state.players[i].y = 10.0f;
         local_state.players[i].health = 100;
-        local_state.players[i].current_weapon = WPN_AR; 
+        local_state.players[i].current_weapon = WPN_AR;
     }
 }
 
@@ -43,10 +44,12 @@ void update_entity(PlayerState *p) {
     if (!p->active) return;
 
     if (p->jump_timer > 0) p->jump_timer--;
+    
+    // --- DECAY HIT MARKER ---
+    if (p->hit_feedback > 0) p->hit_feedback--;
 
     apply_friction(p);
 
-    // 1. Convert Input
     float rad = -p->yaw * 0.0174533f;
     float fwd_x = sinf(rad); float fwd_z = -cosf(rad);
     float right_x = cosf(rad); float right_z = sinf(rad);
@@ -54,13 +57,11 @@ void update_entity(PlayerState *p) {
     float wish_x = (fwd_x * p->in_fwd) + (right_x * p->in_strafe);
     float wish_z = (fwd_z * p->in_fwd) + (right_z * p->in_strafe);
     
-    // 2. Normalize
     float wish_len = sqrtf(wish_x*wish_x + wish_z*wish_z);
     if (wish_len > 1.0f) { wish_x /= wish_len; wish_z /= wish_len; wish_len = 1.0f; }
 
     float target_speed = p->crouching ? MAX_SPEED * 0.5f : MAX_SPEED;
 
-    // 3. Accelerate
     if (p->on_ground) {
         accelerate(p, wish_x, wish_z, target_speed, ACCEL);
         if (p->in_jump && p->jump_timer == 0) { 
