@@ -4,151 +4,197 @@
 #include <GL/glu.h>
 #include <math.h>
 
-// --- CONSTANTS ---
-#define GRAVITY 0.015f
-#define GRAVITY_FLOAT 0.008f // Slower descent if space held
-#define JUMP_FORCE 0.35f
-#define MOVE_ACCEL 0.04f
-#define FRICTION 0.90f
-#define AIR_FRICTION 0.98f
-#define CUBE_COUNT 10
+// --- HALO-LIKE PHYSICS CONSTANTS ---
+#define GRAVITY 0.012f          // Lower gravity for floatiness
+#define GRAVITY_FLOAT 0.006f    // Feather falling (Space held)
+#define JUMP_FORCE 0.38f        // High jump
+#define MOVE_ACCEL 0.025f       // Slow acceleration (builds up speed)
+#define FRICTION 0.96f          // Slippery ground (drift)
+#define AIR_FRICTION 0.99f      // Very slippery air
+#define MOUSE_SENS 0.15f
 
-// --- WEAPONS ---
+// --- GAME STATE ---
 int current_weapon = 1;
 float recoil_anim = 0.0f;
+int running = 1;
 
-// --- PHYSICS STATE ---
 typedef struct {
-    float x, y, z;      // Position
-    float vx, vy, vz;   // Velocity
-    float yaw, pitch;   // Look Angles
+    float x, y, z;
+    float vx, vy, vz;
+    float yaw, pitch;
     int on_ground;
     int crouching;
 } Player;
 
-Player p = {0, 5, 10, 0, 0, 0, 0, 0, 0, 0};
+Player p = {0, 10, 0, 0, 0, 0, 0, 0, 0, 0};
 
-// --- MAP GEOMETRY (CUBES) ---
-typedef struct { float x, y, z, size; } Cube;
-Cube map_cubes[CUBE_COUNT] = {
-    {0, 0, 0, 50},       // Floor
-    {10, 2, 10, 4},      // Low Box
-    {15, 4, 15, 4},      // Med Box
-    {20, 7, 10, 4},      // High Box
-    {-15, 3, -15, 6},    // Big Platform
-    {-25, 6, -10, 4},    // Step 1
-    {-30, 9, -5, 4},     // Step 2
-    {0, 5, -20, 2},      // Tiny Pillar
-    {5, 2, -5, 3},       // Cover
-    {-5, 2, 5, 3}        // Cover
+// --- MAP DATA (The Arena) ---
+typedef struct { float x, y, z, w, h, d; } Box;
+Box geometry[] = {
+    {0, -1, 0, 200, 2, 200},      // Floor
+    {15, 2.5, 15, 10, 5, 10},     // Big Red Box
+    {-15, 1.5, -15, 10, 3, 10},   // Low Blue Box
+    {0, 2.0, 20, 20, 4, 2},       // Wall
+    {-20, 4.0, 5, 6, 8, 6},       // High Pillar (Needs crouch jump)
+    {0, 6.0, -25, 4, 12, 4},      // Sniper Perch
+    {10, 1.0, -10, 4, 2, 4}       // Step
 };
+int geo_count = 7;
 
-// --- COLLISION LOGIC (AABB) ---
-int check_collision(float new_x, float new_y, float new_z) {
-    // Player Hitbox (Approximation)
-    float pw = 1.0f; // Player Width
-    float ph = p.crouching ? 1.5f : 3.0f; // Player Height (Crouch vs Stand)
+// --- PHYSICS ENGINE ---
+void update_physics(int space_held) {
+    // 1. Gravity
+    if (p.vy < 0 && space_held) p.vy -= GRAVITY_FLOAT;
+    else p.vy -= GRAVITY;
+
+    // 2. Apply Velocity
+    p.x += p.vx;
+    p.y += p.vy;
+    p.z += p.vz;
+
+    // 3. Floor Collision (Simple Plane)
+    if (p.y < 0) {
+        p.y = 0;
+        p.vy = 0;
+        p.on_ground = 1;
+    } else {
+        p.on_ground = 0;
+    }
+
+    // 4. Box Collision (AABB)
+    float pw = 1.0f; // Player Width radius
+    float ph = p.crouching ? 2.5f : 4.0f; // Player Height (Crouch vs Stand)
     
-    // Check against all cubes
-    for(int i=0; i<CUBE_COUNT; i++) {
-        Cube c = map_cubes[i];
-        // Simple AABB check
-        if (new_x + pw > c.x - c.size && new_x - pw < c.x + c.size &&
-            new_y < c.y + c.size && new_y + ph > c.y - c.size && // Height check
-            new_z + pw > c.z - c.size && new_z - pw < c.z + c.size) {
+    for(int i=1; i<geo_count; i++) { // Skip floor (i=0) handled above
+        Box b = geometry[i];
+        // Check overlap
+        if (p.x + pw > b.x - b.w/2 && p.x - pw < b.x + b.w/2 &&
+            p.z + pw > b.z - b.d/2 && p.z - pw < b.z + b.d/2) {
             
-            // If we are falling onto it, snap to top
-            if (p.vy <= 0 && p.y >= c.y + c.size) {
-                p.y = c.y + c.size + 0.01f;
-                p.vy = 0;
-                p.on_ground = 1;
-                // Add tiny momentum boost if jumping off logic triggers here?
-                // For now, simple landing.
-                return 1; // Handled as ground
+            // Vertical check
+            if (p.y < b.y + b.h/2 && p.y + ph > b.y - b.h/2) {
+                // COLLISION!
+                
+                // Are we falling ONTO it?
+                float prev_y = p.y - p.vy;
+                if (prev_y >= b.y + b.h/2) {
+                    p.y = b.y + b.h/2; // Snap to top
+                    p.vy = 0;
+                    p.on_ground = 1;
+                    // JUMP BOOST logic: If holding space right as we land, preserve momentum
+                    if (space_held) {
+                        p.vx *= 1.05f; p.vz *= 1.05f;
+                    }
+                } else {
+                    // Hit side/bottom - Stop horizontal movement (Wall slide)
+                    p.vx *= 0.5f; 
+                    p.vz *= 0.5f;
+                    // Push out simple (not perfect, but works for arena)
+                    float dx = p.x - b.x;
+                    float dz = p.z - b.z;
+                    if (fabs(dx) > fabs(dz)) {
+                         p.x = (dx > 0) ? b.x + b.w/2 + pw : b.x - b.w/2 - pw;
+                    } else {
+                         p.z = (dz > 0) ? b.z + b.d/2 + pw : b.z - b.d/2 - pw;
+                    }
+                }
             }
-            return 2; // Wall Hit
         }
     }
-    return 0; // Air
+
+    // 5. Friction
+    float f = p.on_ground ? FRICTION : AIR_FRICTION;
+    p.vx *= f;
+    p.vz *= f;
 }
 
-// --- RENDER FUNCTIONS ---
-void draw_map() {
-    // Draw Cubes
-    for(int i=0; i<CUBE_COUNT; i++) {
-        Cube c = map_cubes[i];
+// --- RENDER ---
+void draw_grid() {
+    glBegin(GL_LINES);
+    // Neon Purple Grid
+    glColor3f(0.6f, 0.0f, 1.0f);
+    for(int i=-100; i<=100; i+=5) {
+        glVertex3f(i, 0, -100); glVertex3f(i, 0, 100);
+        glVertex3f(-100, 0, i); glVertex3f(100, 0, i);
+    }
+    glEnd();
+}
+
+void draw_boxes() {
+    for(int i=1; i<geo_count; i++) {
+        Box b = geometry[i];
         glPushMatrix();
-        glTranslatef(c.x, c.y, c.z);
-        glScalef(c.size, c.size, c.size);
+        glTranslatef(b.x, b.y, b.z);
+        glScalef(b.w, b.h, b.d);
         
         glBegin(GL_QUADS);
-        // Neon Edges look
-        if(i==0) glColor3f(0.1f, 0.1f, 0.2f); // Floor
-        else glColor3f(0.8f, 0.3f, 0.1f);     // Red Rock Cubes
-        
-        // Simple Cube Mesh
-        glVertex3f(-1,1,1); glVertex3f(1,1,1); glVertex3f(1,1,-1); glVertex3f(-1,1,-1); // Top
-        glColor3f(0.5f, 0.2f, 0.1f); // Sides Darker
-        glVertex3f(-1,-1,1); glVertex3f(1,-1,1); glVertex3f(1,1,1); glVertex3f(-1,1,1); // Front
-        glVertex3f(-1,-1,-1); glVertex3f(-1,1,-1); glVertex3f(1,1,-1); glVertex3f(1,-1,-1); // Back
-        glVertex3f(-1,-1,-1); glVertex3f(-1,-1,1); glVertex3f(-1,1,1); glVertex3f(-1,1,-1); // Left
-        glVertex3f(1,-1,1); glVertex3f(1,-1,-1); glVertex3f(1,1,-1); glVertex3f(1,1,1); // Right
+        // Top (Lit)
+        glColor3f(0.8f, 0.2f, 0.2f);
+        glVertex3f(-0.5, 0.5, 0.5); glVertex3f(0.5, 0.5, 0.5); glVertex3f(0.5, 0.5, -0.5); glVertex3f(-0.5, 0.5, -0.5);
+        // Sides (Darker)
+        glColor3f(0.5f, 0.1f, 0.1f);
+        glVertex3f(-0.5,-0.5, 0.5); glVertex3f(0.5,-0.5, 0.5); glVertex3f(0.5, 0.5, 0.5); glVertex3f(-0.5, 0.5, 0.5); // Front
+        glVertex3f(-0.5,-0.5,-0.5); glVertex3f(-0.5, 0.5,-0.5); glVertex3f(0.5, 0.5,-0.5); glVertex3f(0.5,-0.5,-0.5); // Back
+        glVertex3f(-0.5,-0.5,-0.5); glVertex3f(-0.5,-0.5, 0.5); glVertex3f(-0.5, 0.5, 0.5); glVertex3f(-0.5, 0.5,-0.5); // Left
+        glVertex3f(0.5,-0.5, 0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5, 0.5,-0.5); glVertex3f(0.5, 0.5, 0.5); // Right
         glEnd();
+        
+        // Wireframe Outline (Neon Style)
+        glColor3f(1.0f, 0.5f, 0.0f);
+        glLineWidth(2.0f);
+        glBegin(GL_LINE_LOOP); // Top Loop
+        glVertex3f(-0.5, 0.5, 0.5); glVertex3f(0.5, 0.5, 0.5); glVertex3f(0.5, 0.5, -0.5); glVertex3f(-0.5, 0.5, -0.5);
+        glEnd();
+        
         glPopMatrix();
     }
 }
 
-void draw_weapon() {
+void draw_weapon_model() {
     glPushMatrix();
     glLoadIdentity();
     
-    // Weapon Sway + Recoil
-    float bob = sinf(SDL_GetTicks() * 0.005f) * 0.02f;
-    // Apply Recoil Kick (Back and Up)
-    glTranslatef(0.4f, -0.4f + bob + (recoil_anim * 0.1f), -1.2f + (recoil_anim * 0.2f));
-    glRotatef(-5.0f - (recoil_anim * 10.0f), 1, 0, 0); // Pitch up on fire
+    // Recoil Kick
+    float kick = recoil_anim * 0.3f;
+    glTranslatef(0.5f, -0.6f + kick, -1.5f + (kick * 0.5f));
+    glRotatef(-recoil_anim * 15.0f, 1, 0, 0);
 
-    // Basic Model (Switch Color based on WPN)
-    if(current_weapon == 1) glColor3f(0.3f, 0.3f, 0.3f); // Magnum
-    if(current_weapon == 2) glColor3f(0.2f, 0.5f, 0.2f); // AR
-    if(current_weapon == 3) glColor3f(0.5f, 0.2f, 0.1f); // Shotgun
-    if(current_weapon == 4) glColor3f(0.1f, 0.1f, 0.1f); // Sniper
-    
-    glScalef(0.1f, 0.15f, 0.5f);
+    // Color based on weapon
+    if(current_weapon == 1) glColor3f(0.6f, 0.6f, 0.6f); // Magnum
+    if(current_weapon == 2) glColor3f(0.2f, 0.8f, 0.2f); // AR
+    if(current_weapon == 3) glColor3f(0.6f, 0.4f, 0.2f); // Shotgun
+    if(current_weapon == 4) glColor3f(0.2f, 0.2f, 0.2f); // Sniper
+
+    glScalef(0.1f, 0.15f, 0.6f);
     glBegin(GL_QUADS);
-    glVertex3f(-1,1,1); glVertex3f(1,1,1); glVertex3f(1,1,-1); glVertex3f(-1,1,-1);
-    glVertex3f(-1,-1,1); glVertex3f(1,-1,1); glVertex3f(1,1,1); glVertex3f(-1,1,1);
-    glVertex3f(-1,-1,-1); glVertex3f(-1,1,-1); glVertex3f(1,1,-1); glVertex3f(1,-1,-1);
+        // Simple Gun Box
+        glVertex3f(-1, 1, 1); glVertex3f(1, 1, 1); glVertex3f(1, 1, -1); glVertex3f(-1, 1, -1);
+        glVertex3f(-1, -1, 1); glVertex3f(1, -1, 1); glVertex3f(1, 1, 1); glVertex3f(-1, 1, 1);
+        glVertex3f(-1, -1, -1); glVertex3f(-1, 1, -1); glVertex3f(1, 1, -1); glVertex3f(1, -1, -1);
+        glVertex3f(-1, -1, -1); glVertex3f(-1, -1, 1); glVertex3f(-1, 1, 1); glVertex3f(-1, 1, -1);
+        glVertex3f(1, -1, 1); glVertex3f(1, -1, -1); glVertex3f(1, 1, -1); glVertex3f(1, 1, 1);
     glEnd();
-    
     glPopMatrix();
 }
 
 int main(int argc, char* argv[]) {
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *win = SDL_CreateWindow("SHANKPIT // HALO PHYSICS", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
+    SDL_Window *win = SDL_CreateWindow("SHANKPIT // PHYSICS TUNED", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
     SDL_GL_CreateContext(win);
-    SDL_SetRelativeMouseMode(SDL_TRUE);
+    SDL_SetRelativeMouseMode(SDL_TRUE); // LOCK MOUSE
 
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    gluPerspective(70.0, 1280.0/720.0, 0.1, 1000.0);
+    gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0); // Wider FOV (75)
     glMatrixMode(GL_MODELVIEW);
     glEnable(GL_DEPTH_TEST);
 
-    int running = 1;
     int space_held = 0;
 
     while(running) {
         SDL_Event e;
         while(SDL_PollEvent(&e)) {
             if(e.type == SDL_QUIT) running = 0;
-            if(e.type == SDL_MOUSEMOTION) {
-                p.yaw += e.motion.xrel * 0.1f;
-                p.pitch += e.motion.yrel * 0.1f;
-                if(p.pitch > 89.0f) p.pitch = 89.0f;
-                if(p.pitch < -89.0f) p.pitch = -89.0f;
-            }
             if(e.type == SDL_KEYDOWN) {
                 if(e.key.keysym.sym == SDLK_ESCAPE) running = 0;
                 if(e.key.keysym.sym >= SDLK_1 && e.key.keysym.sym <= SDLK_5) 
@@ -160,69 +206,52 @@ int main(int argc, char* argv[]) {
                 if(e.key.keysym.sym == SDLK_SPACE) space_held = 0;
                 if(e.key.keysym.sym == SDLK_LCTRL) p.crouching = 0;
             }
-            if(e.type == SDL_MOUSEBUTTONDOWN) {
-                recoil_anim = 1.0f; // Fire!
+            if(e.type == SDL_MOUSEMOTION) {
+                p.yaw += e.motion.xrel * MOUSE_SENS;
+                p.pitch += e.motion.yrel * MOUSE_SENS;
+                if(p.pitch > 89.0f) p.pitch = 89.0f;
+                if(p.pitch < -89.0f) p.pitch = -89.0f;
             }
+            if(e.type == SDL_MOUSEBUTTONDOWN) recoil_anim = 1.0f;
         }
 
-        // --- PHYSICS UPDATE ---
-        const Uint8 *state = SDL_GetKeyboardState(NULL);
-        
-        // Acceleration (WASD) - Relative to YAW
+        // --- ACCELERATION ---
+        const Uint8 *s = SDL_GetKeyboardState(NULL);
         float rad = p.yaw * 0.0174533f;
         float cx = sinf(rad);
         float cz = -cosf(rad);
-        
-        if(state[SDL_SCANCODE_W]) { p.vx += cx * MOVE_ACCEL; p.vz += cz * MOVE_ACCEL; }
-        if(state[SDL_SCANCODE_S]) { p.vx -= cx * MOVE_ACCEL; p.vz -= cz * MOVE_ACCEL; }
-        if(state[SDL_SCANCODE_A]) { p.vx -= cz * MOVE_ACCEL; p.vz += cx * MOVE_ACCEL; } // Strafe Left
-        if(state[SDL_SCANCODE_D]) { p.vx += cz * MOVE_ACCEL; p.vz -= cx * MOVE_ACCEL; } // Strafe Right
-        
-        // Jump Logic
+        float sx = cosf(rad); // Strafe vector X
+        float sz = sinf(rad); // Strafe vector Z
+
+        if(s[SDL_SCANCODE_W]) { p.vx += cx * MOVE_ACCEL; p.vz += cz * MOVE_ACCEL; }
+        if(s[SDL_SCANCODE_S]) { p.vx -= cx * MOVE_ACCEL; p.vz -= cz * MOVE_ACCEL; }
+        if(s[SDL_SCANCODE_A]) { p.vx -= sx * MOVE_ACCEL; p.vz -= sz * MOVE_ACCEL; }
+        if(s[SDL_SCANCODE_D]) { p.vx += sx * MOVE_ACCEL; p.vz += sz * MOVE_ACCEL; }
+
+        // Jump
         if(space_held && p.on_ground) {
              p.vy = JUMP_FORCE;
              p.on_ground = 0;
-             // "Extra momentum off cube" - slight forward boost
-             p.vx *= 1.1f; p.vz *= 1.1f;
         }
 
-        // Gravity (Variable)
-        if(p.vy < 0 && space_held) p.vy -= GRAVITY_FLOAT; // Float down
-        else p.vy -= GRAVITY; // Normal gravity
+        update_physics(space_held);
+        if(recoil_anim > 0) recoil_anim -= 0.08f;
 
-        // Apply Velocity
-        p.x += p.vx;
-        p.z += p.vz;
-        
-        // Collision Checks (Wall/Ground)
-        if(p.y <= 0) { p.y = 0; p.vy = 0; p.on_ground = 1; } // Floor
-        int col = check_collision(p.x, p.y + p.vy, p.z);
-        if(col != 2) p.y += p.vy; // Only move Y if not hitting ceiling/floor hard
-        
-        // Friction
-        float f = p.on_ground ? FRICTION : AIR_FRICTION;
-        p.vx *= f;
-        p.vz *= f;
-
-        // Recoil Decay
-        if(recoil_anim > 0) recoil_anim -= 0.1f;
-
-        // --- RENDER ---
-        glClearColor(0.1f, 0.15f, 0.2f, 1.0f);
+        // --- RENDER FRAME ---
+        glClearColor(0.05f, 0.02f, 0.1f, 1.0f); // Deep Space Purple
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glLoadIdentity();
 
-        // Camera Transform
-        float cam_h = p.crouching ? 1.5f : 3.0f;
+        // Camera Logic (Crouch lowers view)
+        float cam_h = p.crouching ? 2.5f : 6.0f; // Tall spartan height
         
-        // Look Rotation
         glRotatef(-p.pitch, 1, 0, 0);
         glRotatef(-p.yaw, 0, 1, 0);
-        // Position translation (Inverse of player pos)
         glTranslatef(-p.x, -(p.y + cam_h), -p.z);
 
-        draw_map();
-        draw_weapon();
+        draw_grid();
+        draw_boxes();
+        draw_weapon_model();
 
         SDL_GL_SwapWindow(win);
         SDL_Delay(16);
