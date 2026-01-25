@@ -24,17 +24,22 @@ void local_init_match(int bot_count) {
     local_state.players[0].current_weapon = WPN_MAGNUM;
     for(int i=0; i<MAX_WEAPONS; i++) local_state.players[0].ammo[i] = WPN_STATS[i].ammo_max;
 
-    // Bots (Spread out)
+    // Bots (Safe Spawn)
     for(int i=1; i<=bot_count; i++) {
         if (i >= MAX_CLIENTS) break;
         local_state.players[i].id = i;
         local_state.players[i].active = 1;
         local_state.players[i].is_bot = 1;
         
-        // Linear Spawn along Canyon (X axis)
-        float x_pos = (i % 2 == 0) ? 200.0f + (i*10) : -200.0f - (i*10);
-        local_state.players[i].x = x_pos;
-        local_state.players[i].z = 0;
+        // Modulo math to ensure we wrap around the map instead of going off the edge
+        // Map X range: -450 to 450. Safe range: -400 to 400.
+        // We calculate an offset based on ID.
+        int step = i * 25; 
+        int x_raw = (step % 800) - 400; // -400 to 400
+        
+        local_state.players[i].x = (float)x_raw;
+        // Alternate sides of the canyon (Z axis +/- 50)
+        local_state.players[i].z = (i % 2 == 0) ? 50.0f : -50.0f;
         local_state.players[i].y = 10.0f;
         
         local_state.players[i].health = 100;
