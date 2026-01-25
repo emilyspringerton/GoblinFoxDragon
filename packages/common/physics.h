@@ -17,15 +17,6 @@
 typedef struct { float x, y, z, w, h, d; } Box;
 
 // MAP GEOMETRY
-// 0: Floor
-// 1-3: Ziggurat
-// 4-5: Spine
-// 6-11: East Ruins
-// 12-17: West Ruins
-// 18-34: BASE ALPHA (East)
-// 35-51: BASE OMEGA (West)
-// 52-55: Walls
-
 static Box map_geo[] = {
     // 0: FLOOR (900x300)
     {0, -1, 0, 900, 2, 300},
@@ -39,7 +30,7 @@ static Box map_geo[] = {
     {100, 2, 0, 40, 4, 2},        
     {-100, 2, 0, 40, 4, 2},       
     
-    // --- EAST RUINS (X=150) ---
+    // --- EAST RUINS ---
     {150, 2, 40, 6, 4, 6},        
     {160, 2, 35, 2, 4, 10},       
     {140, 1, 45, 4, 2, 4},        
@@ -47,7 +38,7 @@ static Box map_geo[] = {
     {160, 2, -35, 2, 4, 10},      
     {180, 4, 0, 8, 8, 8},         
     
-    // --- WEST RUINS (X=-150) ---
+    // --- WEST RUINS ---
     {-150, 2, 40, 6, 4, 6},       
     {-160, 2, 35, 2, 4, 10},      
     {-140, 1, 45, 4, 2, 4},       
@@ -61,22 +52,21 @@ static Box map_geo[] = {
     // Main Bunker Walls (40x40 footprint)
     {350, 5, 20, 40, 10, 2},      // North Wall
     {350, 5, -20, 40, 10, 2},     // South Wall
-    {370, 5, 0, 2, 10, 40},       // Back Wall (East)
+    {370, 5, 0, 2, 10, 40},       // Back Wall
     {330, 5, 12, 2, 10, 16},      // Front Wall Left
-    {330, 5, -12, 2, 10, 16},     // Front Wall Right (Door in middle)
+    {330, 5, -12, 2, 10, 16},     // Front Wall Right
     
-    // Roof (Walkable Sniping Platform with Hole)
-    {350, 10, 15, 40, 1, 10},     // Roof North Plate
-    {350, 10, -15, 40, 1, 10},    // Roof South Plate
-    {365, 10, 0, 10, 1, 20},      // Roof Back Plate
-    {335, 10, 0, 10, 1, 20},      // Roof Front Plate
-    // Hole is at 350, 10, 0 (size 20x20)
+    // Roof
+    {350, 10, 15, 40, 1, 10},     // Roof North
+    {350, 10, -15, 40, 1, 10},    // Roof South
+    {365, 10, 0, 10, 1, 20},      // Roof Back
+    {335, 10, 0, 10, 1, 20},      // Roof Front
     
-    // Ramps (Stepped) - Leading to Roof from front
+    // Ramps
     {325, 2, 25, 6, 2, 6},        // Step 1
     {328, 4, 25, 6, 2, 6},        // Step 2
     {331, 6, 25, 6, 2, 6},        // Step 3
-    {335, 8, 25, 6, 2, 6},        // Step 4 (Jump to roof)
+    {335, 8, 25, 6, 2, 6},        // Step 4
     
     // Interior Flag Stand
     {360, 1, 0, 4, 2, 4},
@@ -85,23 +75,23 @@ static Box map_geo[] = {
     // BASE OMEGA (WEST - BLUE TEAM) X = -350
     // ==========================================
     // Main Bunker Walls
-    {-350, 5, 20, 40, 10, 2},     // North Wall
-    {-350, 5, -20, 40, 10, 2},    // South Wall
-    {-370, 5, 0, 2, 10, 40},      // Back Wall (West)
-    {-330, 5, 12, 2, 10, 16},     // Front Wall Left
-    {-330, 5, -12, 2, 10, 16},    // Front Wall Right
+    {-350, 5, 20, 40, 10, 2},     
+    {-350, 5, -20, 40, 10, 2},    
+    {-370, 5, 0, 2, 10, 40},      
+    {-330, 5, 12, 2, 10, 16},     
+    {-330, 5, -12, 2, 10, 16},    
     
     // Roof
-    {-350, 10, 15, 40, 1, 10},    // Roof North
-    {-350, 10, -15, 40, 1, 10},   // Roof South
-    {-365, 10, 0, 10, 1, 20},     // Roof Back
-    {-335, 10, 0, 10, 1, 20},     // Roof Front
+    {-350, 10, 15, 40, 1, 10},    
+    {-350, 10, -15, 40, 1, 10},   
+    {-365, 10, 0, 10, 1, 20},     
+    {-335, 10, 0, 10, 1, 20},     
     
     // Ramps
-    {-325, 2, -25, 6, 2, 6},      // Step 1
-    {-328, 4, -25, 6, 2, 6},      // Step 2
-    {-331, 6, -25, 6, 2, 6},      // Step 3
-    {-335, 8, -25, 6, 2, 6},      // Step 4
+    {-325, 2, -25, 6, 2, 6},      
+    {-328, 4, -25, 6, 2, 6},      
+    {-331, 6, -25, 6, 2, 6},      
+    {-335, 8, -25, 6, 2, 6},      
     
     // Interior Flag Stand
     {-360, 1, 0, 4, 2, 4},
@@ -115,7 +105,10 @@ static Box map_geo[] = {
     {-550, 25, 0, 200, 50, 800}    // West
 };
 
-static int map_count = 56; 
+// --- FIX: AUTOMATIC CALCULATION ---
+// We calculate the number of elements automatically.
+// This prevents "index out of bounds" reading garbage memory if we miscount.
+static int map_count = sizeof(map_geo) / sizeof(Box);
 
 float phys_rand_f() { return ((float)(rand()%1000)/500.0f) - 1.0f; }
 
@@ -166,7 +159,11 @@ void resolve_collision(PlayerState *p) {
                     p->y = b.y + b.h/2; p->vy = 0; p->on_ground = 1;
                 } else {
                     float dx = p->x - b.x; float dz = p->z - b.z;
-                    if (fabs(dx)/b.w > fabs(dz)/b.d) { 
+                    // Avoid Divide By Zero if width/depth is 0 (safeguard)
+                    float w = (b.w > 0.1f) ? b.w : 1.0f;
+                    float d = (b.d > 0.1f) ? b.d : 1.0f;
+                    
+                    if (fabs(dx)/w > fabs(dz)/d) { 
                         p->vx = 0; 
                         p->x = (dx > 0) ? b.x + b.w/2 + pw : b.x - b.w/2 - pw;
                     } else { 
