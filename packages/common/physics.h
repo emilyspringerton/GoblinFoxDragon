@@ -18,24 +18,40 @@ typedef struct { float x, y, z, w, h, d; } Box;
 
 // MAP GEOMETRY
 static Box map_geo[] = {
-    // 0: Floor
-    {0, -1, 0, 200, 2, 200},
+    // 0: Floor (Expanded to 300x300)
+    {0, -1, 0, 300, 2, 300},
     
-    // 1-5: Internal Obstacles
+    // --- CLASSIC STRUCTURES ---
     {15, 2.5, 15, 10, 5, 10},     // Red Box
     {-15, 1.5, -15, 10, 3, 10},   // Blue Box
     {-20, 4.0, 5, 6, 8, 6},       // Pillar
-    {0, 5.0, -25, 4, 10, 4},      // Sniper Perch
+    {0, 5.0, -35, 4, 10, 4},      // Sniper Perch (Moved back)
     {10, 1.0, -10, 4, 2, 4},      // Step
     
-    // 6-9: BOUNDARY WALLS (REINFORCED)
-    // Thickness increased from 2 to 50. Centers shifted to keep inner face at +/- 50.
-    {0, 10, 75, 150, 20, 50},   // North Wall (Z+): Center 75, Depth 50 -> Inner Face at 50
-    {0, 10, -75, 150, 20, 50},  // South Wall (Z-): Center -75, Depth 50 -> Inner Face at -50
-    {75, 10, 0, 50, 20, 150},   // East Wall (X+): Center 75, Width 50 -> Inner Face at 50
-    {-75, 10, 0, 50, 20, 150}   // West Wall (X-): Center -75, Width 50 -> Inner Face at -50
+    // --- NEW ZIGGURAT CENTER ---
+    {0, 2.0, 0, 20, 4, 20},       // Base Tier
+    {0, 5.0, 0, 10, 2, 10},       // Mid Tier
+    {0, 8.0, 0, 4, 4, 4},         // Top Spire
+    
+    // --- PARKOUR ELEMENTS ---
+    {-40, 3.0, 0, 10, 6, 2},      // West Wall Jump
+    {40, 3.0, 0, 10, 6, 2},       // East Wall Jump
+    {0, 6.0, -20, 2, 1, 20},      // Skybridge (Connecting Ziggurat to North)
+    
+    // --- PERIMETER COVER ---
+    {30, 2.0, 30, 4, 4, 4},       // NE Cover
+    {-30, 2.0, 30, 4, 4, 4},      // NW Cover
+    {30, 2.0, -30, 4, 4, 4},      // SE Cover
+    {-30, 2.0, -30, 4, 4, 4},     // SW Cover
+
+    // --- BOUNDARY WALLS (Expanded) ---
+    // Moved out to +/- 125
+    {0, 15, 125, 250, 30, 50},    // North Wall (Z+)
+    {0, 15, -125, 250, 30, 50},   // South Wall (Z-)
+    {125, 15, 0, 50, 30, 250},    // East Wall (X+)
+    {-125, 15, 0, 50, 30, 250}    // West Wall (X-)
 };
-static int map_count = 10;
+static int map_count = 19; // Updated count
 
 float phys_rand_f() { return ((float)(rand()%1000)/500.0f) - 1.0f; }
 
@@ -136,8 +152,9 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
                     if(targets[i].health <= 0) {
                         p->kills++;
                         targets[i].health = 100;
-                        targets[i].x = (rand()%20)-10; 
-                        targets[i].z = (rand()%20)-10; 
+                        // Respawn inside new bounds (+/- 100)
+                        targets[i].x = (rand()%100)-50; 
+                        targets[i].z = (rand()%100)-50; 
                         targets[i].y = 10;
                     }
                 }
