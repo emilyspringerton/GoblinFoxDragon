@@ -17,75 +17,105 @@
 typedef struct { float x, y, z, w, h, d; } Box;
 
 // MAP GEOMETRY
+// 0: Floor
+// 1-3: Ziggurat
+// 4-5: Spine
+// 6-11: East Ruins
+// 12-17: West Ruins
+// 18-34: BASE ALPHA (East)
+// 35-51: BASE OMEGA (West)
+// 52-55: Walls
+
 static Box map_geo[] = {
     // 0: FLOOR (900x300)
     {0, -1, 0, 900, 2, 300},
     
-    // --- CENTRAL ZIGGURAT (Indices 1-3) ---
+    // --- CENTRAL ZIGGURAT ---
     {0, 2.0, 0, 24, 4, 24},       
     {0, 5.0, 0, 14, 2, 14},       
     {0, 8.0, 0, 6, 4, 6},         
-    
-    // --- TWIN SPIRES (Indices 4-9) ---
-    {300, 10, 0, 10, 20, 10},     
-    {310, 2, 0, 4, 2, 4},         
-    {308, 5, 5, 4, 2, 4},         
-    {-300, 10, 0, 10, 20, 10},    
-    {-310, 2, 0, 4, 2, 4},        
-    {-308, 5, -5, 4, 2, 4},       
 
-    // --- THE SPINE (Indices 10-11) ---
+    // --- THE SPINE ---
     {100, 2, 0, 40, 4, 2},        
     {-100, 2, 0, 40, 4, 2},       
     
-    // --- EAST RUINS (The "Village" at X=150) ---
-    {150, 2, 40, 6, 4, 6},        // House A
-    {160, 2, 35, 2, 4, 10},       // Wall A
-    {140, 1, 45, 4, 2, 4},        // Step A
-    {150, 2, -40, 6, 4, 6},       // House B
-    {160, 2, -35, 2, 4, 10},      // Wall B
-    {180, 4, 0, 8, 8, 8},         // Monolith East
+    // --- EAST RUINS (X=150) ---
+    {150, 2, 40, 6, 4, 6},        
+    {160, 2, 35, 2, 4, 10},       
+    {140, 1, 45, 4, 2, 4},        
+    {150, 2, -40, 6, 4, 6},       
+    {160, 2, -35, 2, 4, 10},      
+    {180, 4, 0, 8, 8, 8},         
     
-    // --- WEST RUINS (The "Village" at X=-150) ---
-    {-150, 2, 40, 6, 4, 6},       // House C
-    {-160, 2, 35, 2, 4, 10},      // Wall C
-    {-140, 1, 45, 4, 2, 4},       // Step C
-    {-150, 2, -40, 6, 4, 6},      // House D
-    {-160, 2, -35, 2, 4, 10},     // Wall D
-    {-180, 4, 0, 8, 8, 8},        // Monolith West
+    // --- WEST RUINS (X=-150) ---
+    {-150, 2, 40, 6, 4, 6},       
+    {-160, 2, 35, 2, 4, 10},      
+    {-140, 1, 45, 4, 2, 4},       
+    {-150, 2, -40, 6, 4, 6},      
+    {-160, 2, -35, 2, 4, 10},     
+    {-180, 4, 0, 8, 8, 8},        
 
-    // --- PARKOUR LANES (Connecting Spires to Center) ---
-    // East Lane
-    {250, 5, 0, 4, 1, 4},         // Pad 1
-    {200, 7, 10, 4, 1, 4},        // Pad 2
-    {150, 9, -10, 4, 1, 4},       // Pad 3 (High)
+    // ==========================================
+    // BASE ALPHA (EAST - RED TEAM) X = 350
+    // ==========================================
+    // Main Bunker Walls (40x40 footprint)
+    {350, 5, 20, 40, 10, 2},      // North Wall
+    {350, 5, -20, 40, 10, 2},     // South Wall
+    {370, 5, 0, 2, 10, 40},       // Back Wall (East)
+    {330, 5, 12, 2, 10, 16},      // Front Wall Left
+    {330, 5, -12, 2, 10, 16},     // Front Wall Right (Door in middle)
     
-    // West Lane
-    {-250, 5, 0, 4, 1, 4},        // Pad 1
-    {-200, 7, -10, 4, 1, 4},      // Pad 2
-    {-150, 9, 10, 4, 1, 4},       // Pad 3 (High)
+    // Roof (Walkable Sniping Platform with Hole)
+    {350, 10, 15, 40, 1, 10},     // Roof North Plate
+    {350, 10, -15, 40, 1, 10},    // Roof South Plate
+    {365, 10, 0, 10, 1, 20},      // Roof Back Plate
+    {335, 10, 0, 10, 1, 20},      // Roof Front Plate
+    // Hole is at 350, 10, 0 (size 20x20)
     
-    // --- SCATTERED COVER (Random-ish blocks) ---
-    {50, 2, 80, 4, 4, 4},
-    {50, 2, -80, 4, 4, 4},
-    {-50, 2, 80, 4, 4, 4},
-    {-50, 2, -80, 4, 4, 4},
-    {220, 1, 50, 4, 2, 8},        // Low Wall
-    {-220, 1, -50, 4, 2, 8},      // Low Wall
+    // Ramps (Stepped) - Leading to Roof from front
+    {325, 2, 25, 6, 2, 6},        // Step 1
+    {328, 4, 25, 6, 2, 6},        // Step 2
+    {331, 6, 25, 6, 2, 6},        // Step 3
+    {335, 8, 25, 6, 2, 6},        // Step 4 (Jump to roof)
+    
+    // Interior Flag Stand
+    {360, 1, 0, 4, 2, 4},
 
-    // --- CONTAINMENT WALLS (Indices 32-35) ---
-    // North Wall (Z+) - Centered at Z=250 
-    {0, 25, 250, 1200, 50, 200},   
-    // South Wall (Z-) - Centered at Z=-250
-    {0, 25, -250, 1200, 50, 200},  
-    // East Wall (X+) - Centered at X=550 
-    {550, 25, 0, 200, 50, 800},    
-    // West Wall (X-) - Centered at X=-550
-    {-550, 25, 0, 200, 50, 800}    
+    // ==========================================
+    // BASE OMEGA (WEST - BLUE TEAM) X = -350
+    // ==========================================
+    // Main Bunker Walls
+    {-350, 5, 20, 40, 10, 2},     // North Wall
+    {-350, 5, -20, 40, 10, 2},    // South Wall
+    {-370, 5, 0, 2, 10, 40},      // Back Wall (West)
+    {-330, 5, 12, 2, 10, 16},     // Front Wall Left
+    {-330, 5, -12, 2, 10, 16},    // Front Wall Right
+    
+    // Roof
+    {-350, 10, 15, 40, 1, 10},    // Roof North
+    {-350, 10, -15, 40, 1, 10},   // Roof South
+    {-365, 10, 0, 10, 1, 20},     // Roof Back
+    {-335, 10, 0, 10, 1, 20},     // Roof Front
+    
+    // Ramps
+    {-325, 2, -25, 6, 2, 6},      // Step 1
+    {-328, 4, -25, 6, 2, 6},      // Step 2
+    {-331, 6, -25, 6, 2, 6},      // Step 3
+    {-335, 8, -25, 6, 2, 6},      // Step 4
+    
+    // Interior Flag Stand
+    {-360, 1, 0, 4, 2, 4},
+
+    // ==========================================
+    // CONTAINMENT WALLS
+    // ==========================================
+    {0, 25, 250, 1200, 50, 200},   // North
+    {0, 25, -250, 1200, 50, 200},  // South
+    {550, 25, 0, 200, 50, 800},    // East
+    {-550, 25, 0, 200, 50, 800}    // West
 };
 
-// Updated Count: 1 Floor + 3 Zig + 6 Spires + 2 Spine + 6 EastRuins + 6 WestRuins + 6 Parkour + 6 Cover + 4 Walls
-static int map_count = 40; 
+static int map_count = 56; 
 
 float phys_rand_f() { return ((float)(rand()%1000)/500.0f) - 1.0f; }
 
@@ -136,7 +166,6 @@ void resolve_collision(PlayerState *p) {
                     p->y = b.y + b.h/2; p->vy = 0; p->on_ground = 1;
                 } else {
                     float dx = p->x - b.x; float dz = p->z - b.z;
-                    // Push out to nearest side
                     if (fabs(dx)/b.w > fabs(dz)/b.d) { 
                         p->vx = 0; 
                         p->x = (dx > 0) ? b.x + b.w/2 + pw : b.x - b.w/2 - pw;
