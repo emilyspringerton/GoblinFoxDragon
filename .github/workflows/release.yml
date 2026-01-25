@@ -14,7 +14,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install MinGW & SDL2
         run: |
@@ -46,7 +46,7 @@ jobs:
           mv ShankServer_Linux ShankPit_Server_Linux
 
       - name: Upload Artifacts (Build)
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ShankPit_Builds
           path: |
@@ -54,7 +54,7 @@ jobs:
             ShankPit_Server_Linux
 
       - name: Publish Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
