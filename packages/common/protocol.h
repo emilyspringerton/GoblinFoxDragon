@@ -25,21 +25,28 @@ static const WeaponStats WPN_STATS[MAX_WEAPONS] = {
 };
 
 typedef struct {
+    int active;
     float x, y, z;
     float vx, vy, vz;
     float yaw, pitch;
     int on_ground;
     int crouching;
     
+    // Combat
     int current_weapon;
     int ammo[MAX_WEAPONS];
     int reload_timer;
     int attack_cooldown;
-    int is_shooting;
-    int jump_timer; // NEW: Delays next jump
+    int is_shooting; // Visual frame counter
+    int hit_feedback; // 1=Hit, 2=Kill
     
     int health;
     float recoil_anim;
 } PlayerState;
+
+typedef struct {
+    int tick;
+    PlayerState players[MAX_CLIENTS];
+} ServerState;
 
 #endif
