@@ -1,7 +1,6 @@
 #ifndef PROTOCOL_H
 #define PROTOCOL_H
 
-// SCALED UP FOR 64-BOT MATCHES
 #define MAX_CLIENTS 70
 #define MAX_WEAPONS 5
 #define MAX_PROJECTILES 1024
@@ -13,6 +12,7 @@
 #define WPN_SNIPER 4
 
 #define RELOAD_TIME 60
+#define SHIELD_REGEN_DELAY 180 // 3 Seconds @ 60 FPS
 
 typedef struct {
     int id; int dmg; int rof; int cnt; float spr; int ammo_max;
@@ -58,8 +58,11 @@ typedef struct {
     int jump_timer;
     
     int health;
+    int shield;             // <--- NEW
+    int shield_regen_timer; // <--- NEW
+    
     int kills;
-    int hit_feedback;
+    int hit_feedback;       // 10 = Body, 20 = Head
     float recoil_anim;
     
     float accumulated_reward; 

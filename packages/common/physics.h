@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include "protocol.h"
 
-// --- TURBO TUNING ---
 #define GRAVITY 0.025f
 #define JUMP_FORCE 0.55f
 #define MAX_SPEED 0.75f
@@ -13,114 +12,64 @@
 #define STOP_SPEED 0.1f
 #define MAX_AIR_SPEED 0.1f
 #define EYE_HEIGHT 4.0f
+#define HEAD_SIZE 0.8f
+#define HEAD_OFFSET 4.5f
 
 typedef struct { float x, y, z, w, h, d; } Box;
 
-// MAP GEOMETRY
+// MAP GEOMETRY (Standard 40-count map)
 static Box map_geo[] = {
-    // 0: FLOOR (900x300)
-    {0, -1, 0, 900, 2, 300},
-    
-    // --- CENTRAL ZIGGURAT ---
-    {0, 2.0, 0, 24, 4, 24},       
-    {0, 5.0, 0, 14, 2, 14},       
-    {0, 8.0, 0, 6, 4, 6},         
-
-    // --- THE SPINE ---
-    {100, 2, 0, 40, 4, 2},        
-    {-100, 2, 0, 40, 4, 2},       
-    
-    // --- EAST RUINS ---
-    {150, 2, 40, 6, 4, 6},        
-    {160, 2, 35, 2, 4, 10},       
-    {140, 1, 45, 4, 2, 4},        
-    {150, 2, -40, 6, 4, 6},       
-    {160, 2, -35, 2, 4, 10},      
-    {180, 4, 0, 8, 8, 8},         
-    
-    // --- WEST RUINS ---
-    {-150, 2, 40, 6, 4, 6},       
-    {-160, 2, 35, 2, 4, 10},      
-    {-140, 1, 45, 4, 2, 4},       
-    {-150, 2, -40, 6, 4, 6},      
-    {-160, 2, -35, 2, 4, 10},     
-    {-180, 4, 0, 8, 8, 8},        
-
-    // ==========================================
-    // BASE ALPHA (EAST - RED TEAM) X = 350
-    // ==========================================
-    // Main Bunker Walls (40x40 footprint)
-    {350, 5, 20, 40, 10, 2},      // North Wall
-    {350, 5, -20, 40, 10, 2},     // South Wall
-    {370, 5, 0, 2, 10, 40},       // Back Wall
-    {330, 5, 12, 2, 10, 16},      // Front Wall Left
-    {330, 5, -12, 2, 10, 16},     // Front Wall Right
-    
-    // Roof
-    {350, 10, 15, 40, 1, 10},     // Roof North
-    {350, 10, -15, 40, 1, 10},    // Roof South
-    {365, 10, 0, 10, 1, 20},      // Roof Back
-    {335, 10, 0, 10, 1, 20},      // Roof Front
-    
-    // Ramps
-    {325, 2, 25, 6, 2, 6},        // Step 1
-    {328, 4, 25, 6, 2, 6},        // Step 2
-    {331, 6, 25, 6, 2, 6},        // Step 3
-    {335, 8, 25, 6, 2, 6},        // Step 4
-    
-    // Interior Flag Stand
-    {360, 1, 0, 4, 2, 4},
-
-    // ==========================================
-    // BASE OMEGA (WEST - BLUE TEAM) X = -350
-    // ==========================================
-    // Main Bunker Walls
-    {-350, 5, 20, 40, 10, 2},     
-    {-350, 5, -20, 40, 10, 2},    
-    {-370, 5, 0, 2, 10, 40},      
-    {-330, 5, 12, 2, 10, 16},     
-    {-330, 5, -12, 2, 10, 16},    
-    
-    // Roof
-    {-350, 10, 15, 40, 1, 10},    
-    {-350, 10, -15, 40, 1, 10},   
-    {-365, 10, 0, 10, 1, 20},     
-    {-335, 10, 0, 10, 1, 20},     
-    
-    // Ramps
-    {-325, 2, -25, 6, 2, 6},      
-    {-328, 4, -25, 6, 2, 6},      
-    {-331, 6, -25, 6, 2, 6},      
-    {-335, 8, -25, 6, 2, 6},      
-    
-    // Interior Flag Stand
-    {-360, 1, 0, 4, 2, 4},
-
-    // ==========================================
-    // CONTAINMENT WALLS
-    // ==========================================
-    {0, 25, 250, 1200, 50, 200},   // North
-    {0, 25, -250, 1200, 50, 200},  // South
-    {550, 25, 0, 200, 50, 800},    // East
-    {-550, 25, 0, 200, 50, 800}    // West
+    {0, -1, 0, 900, 2, 300}, // Floor
+    {0, 2.0, 0, 24, 4, 24}, {0, 5.0, 0, 14, 2, 14}, {0, 8.0, 0, 6, 4, 6}, // Zig
+    {300, 10, 0, 10, 20, 10}, {310, 2, 0, 4, 2, 4}, {308, 5, 5, 4, 2, 4}, // East Spire
+    {-300, 10, 0, 10, 20, 10}, {-310, 2, 0, 4, 2, 4}, {-308, 5, -5, 4, 2, 4}, // West Spire
+    {100, 2, 0, 40, 4, 2}, {-100, 2, 0, 40, 4, 2}, // Spine
+    {150, 2, 40, 6, 4, 6}, {160, 2, 35, 2, 4, 10}, {140, 1, 45, 4, 2, 4}, // E Ruins
+    {150, 2, -40, 6, 4, 6}, {160, 2, -35, 2, 4, 10}, {180, 4, 0, 8, 8, 8},
+    {-150, 2, 40, 6, 4, 6}, {-160, 2, 35, 2, 4, 10}, {-140, 1, 45, 4, 2, 4}, // W Ruins
+    {-150, 2, -40, 6, 4, 6}, {-160, 2, -35, 2, 4, 10}, {-180, 4, 0, 8, 8, 8},
+    {250, 5, 0, 4, 1, 4}, {200, 7, 10, 4, 1, 4}, {150, 9, -10, 4, 1, 4}, // E Parkour
+    {-250, 5, 0, 4, 1, 4}, {-200, 7, -10, 4, 1, 4}, {-150, 9, 10, 4, 1, 4}, // W Parkour
+    {50, 2, 80, 4, 4, 4}, {50, 2, -80, 4, 4, 4}, {-50, 2, 80, 4, 4, 4}, {-50, 2, -80, 4, 4, 4}, 
+    {220, 1, 50, 4, 2, 8}, {-220, 1, -50, 4, 2, 8}, // Cover
+    {0, 25, 250, 1200, 50, 200}, {0, 25, -250, 1200, 50, 200}, // N/S Walls
+    {550, 25, 0, 200, 50, 800}, {-550, 25, 0, 200, 50, 800} // E/W Walls
 };
-
-// --- FIX: AUTOMATIC CALCULATION ---
-// We calculate the number of elements automatically.
-// This prevents "index out of bounds" reading garbage memory if we miscount.
 static int map_count = sizeof(map_geo) / sizeof(Box);
 
 float phys_rand_f() { return ((float)(rand()%1000)/500.0f) - 1.0f; }
 
-int check_hit(float ox, float oy, float oz, float dx, float dy, float dz, PlayerState *target) {
+// Return: 0=Miss, 1=Body, 2=Head
+int check_hit_location(float ox, float oy, float oz, float dx, float dy, float dz, PlayerState *target) {
     if (!target->active) return 0;
-    float tx = target->x; float ty = target->y + 2.0f; float tz = target->z;
-    float vx = tx - ox; float vy = ty - oy; float vz = tz - oz;
+    
+    float tx = target->x; 
+    float tz = target->z;
+    
+    // 1. Check Head (Small Box on top)
+    float head_y = target->y + HEAD_OFFSET;
+    float h_size = HEAD_SIZE;
+    
+    // Ray-Sphere for head (simplified)
+    float vx = tx - ox, vy = head_y - oy, vz = tz - oz;
     float t = vx*dx + vy*dy + vz*dz;
-    if (t < 0) return 0;
-    float cx = ox + dx*t; float cy = oy + dy*t; float cz = oz + dz*t;
-    float dist_sq = (tx-cx)*(tx-cx) + (ty-cy)*(ty-cy) + (tz-cz)*(tz-cz);
-    return (dist_sq < 2.5f);
+    if (t > 0) {
+        float cx = ox + dx*t, cy = oy + dy*t, cz = oz + dz*t;
+        float dist_sq = (tx-cx)*(tx-cx) + (head_y-cy)*(head_y-cy) + (tz-cz)*(tz-cz);
+        if (dist_sq < (h_size*h_size)) return 2; // HEADSHOT
+    }
+
+    // 2. Check Body (Larger Box)
+    float body_y = target->y + 2.0f;
+    vx = tx - ox; vy = body_y - oy; vz = tz - oz;
+    t = vx*dx + vy*dy + vz*dz;
+    if (t > 0) {
+        float cx = ox + dx*t, cy = oy + dy*t, cz = oz + dz*t;
+        float dist_sq = (tx-cx)*(tx-cx) + (body_y-cy)*(body_y-cy) + (tz-cz)*(tz-cz);
+        if (dist_sq < 2.5f) return 1; // BODYSHOT
+    }
+    
+    return 0;
 }
 
 void apply_friction(PlayerState *p) {
@@ -148,7 +97,6 @@ void resolve_collision(PlayerState *p) {
     float pw = 0.6f; float ph = p->crouching ? 2.0f : 4.0f; 
     p->on_ground = 0;
     if (p->y < 0) { p->y = 0; p->vy = 0; p->on_ground = 1; }
-
     for(int i=1; i<map_count; i++) {
         Box b = map_geo[i];
         if (p->x + pw > b.x - b.w/2 && p->x - pw < b.x + b.w/2 &&
@@ -159,10 +107,8 @@ void resolve_collision(PlayerState *p) {
                     p->y = b.y + b.h/2; p->vy = 0; p->on_ground = 1;
                 } else {
                     float dx = p->x - b.x; float dz = p->z - b.z;
-                    // Avoid Divide By Zero if width/depth is 0 (safeguard)
                     float w = (b.w > 0.1f) ? b.w : 1.0f;
                     float d = (b.d > 0.1f) ? b.d : 1.0f;
-                    
                     if (fabs(dx)/w > fabs(dz)/d) { 
                         p->vx = 0; 
                         p->x = (dx > 0) ? b.x + b.w/2 + pw : b.x - b.w/2 - pw;
@@ -209,12 +155,40 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
                 if (p == &targets[i]) continue;
                 if (!targets[i].active) continue;
 
-                if (check_hit(p->x, p->y + EYE_HEIGHT, p->z, dx, dy, dz, &targets[i])) {
-                    targets[i].health -= WPN_STATS[w].dmg;
-                    p->hit_feedback = 10;
+                int hit_type = check_hit_location(p->x, p->y + EYE_HEIGHT, p->z, dx, dy, dz, &targets[i]);
+                
+                if (hit_type > 0) {
+                    // --- DAMAGE LOGIC ---
+                    int damage = WPN_STATS[w].dmg;
+                    
+                    // Reset regen timer on hit
+                    targets[i].shield_regen_timer = SHIELD_REGEN_DELAY;
+                    
+                    // Headshot Crit (Only if shield is down)
+                    if (hit_type == 2 && targets[i].shield <= 0) {
+                        damage *= 3; // CRITICAL
+                        p->hit_feedback = 20; // Magenta
+                    } else {
+                        p->hit_feedback = 10; // Cyan
+                    }
+                    
+                    // Shield Absorption
+                    if (targets[i].shield > 0) {
+                        if (targets[i].shield >= damage) {
+                            targets[i].shield -= damage;
+                            damage = 0;
+                        } else {
+                            damage -= targets[i].shield;
+                            targets[i].shield = 0;
+                        }
+                    }
+                    
+                    targets[i].health -= damage;
+                    
                     if(targets[i].health <= 0) {
                         p->kills++;
                         targets[i].health = 100;
+                        targets[i].shield = 100; // Reset Shield too
                         targets[i].x = (rand()%800)-400; 
                         targets[i].z = (rand()%200)-100; 
                         targets[i].y = 10;
