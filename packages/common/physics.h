@@ -3,13 +3,13 @@
 #include <math.h>
 #include "protocol.h"
 
-// --- QUAKE / HALO HYBRID TUNING ---
-#define GRAVITY 0.02f
-#define JUMP_FORCE 0.50f
-#define MAX_SPEED 0.6f
+// --- PHASE 38 "TURBO" TUNING ---
+#define GRAVITY 0.025f      // Heavier gravity (Snappy jumps)
+#define JUMP_FORCE 0.45f    // Adjusted for new gravity
+#define MAX_SPEED 0.75f     // FAST (Was 0.45f)
 #define MAX_AIR_SPEED 0.1f
-#define FRICTION 0.82f     // Slidey
-#define ACCEL 1.0f         // Snappy acceleration
+#define FRICTION 0.82f      // Slidey but controlled
+#define ACCEL 1.5f          // Instant start
 #define STOP_SPEED 0.1f
 
 // --- MAP GEOMETRY ---
@@ -54,12 +54,10 @@ void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, fl
 }
 
 void resolve_collision(PlayerState *p) {
-    float pw = 0.6f; // Fat hitbox
+    float pw = 0.6f; 
     float ph = p->crouching ? 2.0f : 4.0f; 
 
     p->on_ground = 0;
-    
-    // Floor Safety
     if (p->y < 0) { p->y = 0; p->vy = 0; p->on_ground = 1; }
 
     for(int i=1; i<map_count; i++) {
@@ -68,14 +66,12 @@ void resolve_collision(PlayerState *p) {
             p->z + pw > b.z - b.d/2 && p->z - pw < b.z + b.d/2) {
             
             if (p->y < b.y + b.h/2 && p->y + ph > b.y - b.h/2) {
-                // Landing on top
                 float prev_y = p->y - p->vy;
                 if (prev_y >= b.y + b.h/2) {
                     p->y = b.y + b.h/2;
                     p->vy = 0;
                     p->on_ground = 1;
                 } else {
-                    // Wall Slide logic
                     float dx = p->x - b.x;
                     float dz = p->z - b.z;
                     if (fabs(dx) > fabs(dz)) { 
