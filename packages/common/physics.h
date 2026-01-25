@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include "protocol.h"
 
+// --- TURBO TUNING ---
 #define GRAVITY 0.025f
 #define JUMP_FORCE 0.55f
 #define MAX_SPEED 0.75f
@@ -15,9 +16,12 @@
 #define HEAD_SIZE 0.8f
 #define HEAD_OFFSET 4.5f
 
+// KNIFE RANGE LIMIT
+#define MELEE_RANGE_SQ 36.0f // 6.0 * 6.0
+
 typedef struct { float x, y, z, w, h, d; } Box;
 
-// MAP GEOMETRY (Standard 40-count map)
+// MAP GEOMETRY (Standard 40-count map + auto-calc)
 static Box map_geo[] = {
     {0, -1, 0, 900, 2, 300}, // Floor
     {0, 2.0, 0, 24, 4, 24}, {0, 5.0, 0, 14, 2, 14}, {0, 8.0, 0, 6, 4, 6}, // Zig
@@ -32,6 +36,18 @@ static Box map_geo[] = {
     {-250, 5, 0, 4, 1, 4}, {-200, 7, -10, 4, 1, 4}, {-150, 9, 10, 4, 1, 4}, // W Parkour
     {50, 2, 80, 4, 4, 4}, {50, 2, -80, 4, 4, 4}, {-50, 2, 80, 4, 4, 4}, {-50, 2, -80, 4, 4, 4}, 
     {220, 1, 50, 4, 2, 8}, {-220, 1, -50, 4, 2, 8}, // Cover
+    
+    // BASES (Alpha)
+    {350, 5, 20, 40, 10, 2}, {350, 5, -20, 40, 10, 2}, {370, 5, 0, 2, 10, 40}, {330, 5, 12, 2, 10, 16}, {330, 5, -12, 2, 10, 16},
+    {350, 10, 15, 40, 1, 10}, {350, 10, -15, 40, 1, 10}, {365, 10, 0, 10, 1, 20}, {335, 10, 0, 10, 1, 20},
+    {325, 2, 25, 6, 2, 6}, {328, 4, 25, 6, 2, 6}, {331, 6, 25, 6, 2, 6}, {335, 8, 25, 6, 2, 6}, {360, 1, 0, 4, 2, 4},
+    
+    // BASES (Omega)
+    {-350, 5, 20, 40, 10, 2}, {-350, 5, -20, 40, 10, 2}, {-370, 5, 0, 2, 10, 40}, {-330, 5, 12, 2, 10, 16}, {-330, 5, -12, 2, 10, 16},
+    {-350, 10, 15, 40, 1, 10}, {-350, 10, -15, 40, 1, 10}, {-365, 10, 0, 10, 1, 20}, {-335, 10, 0, 10, 1, 20},
+    {-325, 2, -25, 6, 2, 6}, {-328, 4, -25, 6, 2, 6}, {-331, 6, -25, 6, 2, 6}, {-335, 8, -25, 6, 2, 6}, {-360, 1, 0, 4, 2, 4},
+
+    // WALLS
     {0, 25, 250, 1200, 50, 200}, {0, 25, -250, 1200, 50, 200}, // N/S Walls
     {550, 25, 0, 200, 50, 800}, {-550, 25, 0, 200, 50, 800} // E/W Walls
 };
@@ -46,27 +62,26 @@ int check_hit_location(float ox, float oy, float oz, float dx, float dy, float d
     float tx = target->x; 
     float tz = target->z;
     
-    // 1. Check Head (Small Box on top)
+    // 1. Check Head
     float head_y = target->y + HEAD_OFFSET;
     float h_size = HEAD_SIZE;
     
-    // Ray-Sphere for head (simplified)
     float vx = tx - ox, vy = head_y - oy, vz = tz - oz;
     float t = vx*dx + vy*dy + vz*dz;
     if (t > 0) {
         float cx = ox + dx*t, cy = oy + dy*t, cz = oz + dz*t;
         float dist_sq = (tx-cx)*(tx-cx) + (head_y-cy)*(head_y-cy) + (tz-cz)*(tz-cz);
-        if (dist_sq < (h_size*h_size)) return 2; // HEADSHOT
+        if (dist_sq < (h_size*h_size)) return 2; 
     }
 
-    // 2. Check Body (Larger Box)
+    // 2. Check Body
     float body_y = target->y + 2.0f;
     vx = tx - ox; vy = body_y - oy; vz = tz - oz;
     t = vx*dx + vy*dy + vz*dz;
     if (t > 0) {
         float cx = ox + dx*t, cy = oy + dy*t, cz = oz + dz*t;
         float dist_sq = (tx-cx)*(tx-cx) + (body_y-cy)*(body_y-cy) + (tz-cz)*(tz-cz);
-        if (dist_sq < 2.5f) return 1; // BODYSHOT
+        if (dist_sq < 2.5f) return 1; 
     }
     
     return 0;
@@ -155,24 +170,28 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
                 if (p == &targets[i]) continue;
                 if (!targets[i].active) continue;
 
+                // --- FIX: KNIFE RANGE CHECK ---
+                if (w == WPN_KNIFE) {
+                    float kx = p->x - targets[i].x;
+                    float ky = p->y - targets[i].y;
+                    float kz = p->z - targets[i].z;
+                    float kdist = kx*kx + ky*ky + kz*kz;
+                    if (kdist > MELEE_RANGE_SQ) continue; // Too far!
+                }
+
                 int hit_type = check_hit_location(p->x, p->y + EYE_HEIGHT, p->z, dx, dy, dz, &targets[i]);
                 
                 if (hit_type > 0) {
-                    // --- DAMAGE LOGIC ---
                     int damage = WPN_STATS[w].dmg;
-                    
-                    // Reset regen timer on hit
                     targets[i].shield_regen_timer = SHIELD_REGEN_DELAY;
                     
-                    // Headshot Crit (Only if shield is down)
                     if (hit_type == 2 && targets[i].shield <= 0) {
-                        damage *= 3; // CRITICAL
-                        p->hit_feedback = 20; // Magenta
+                        damage *= 3; 
+                        p->hit_feedback = 20; 
                     } else {
-                        p->hit_feedback = 10; // Cyan
+                        p->hit_feedback = 10; 
                     }
                     
-                    // Shield Absorption
                     if (targets[i].shield > 0) {
                         if (targets[i].shield >= damage) {
                             targets[i].shield -= damage;
@@ -188,7 +207,7 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
                     if(targets[i].health <= 0) {
                         p->kills++;
                         targets[i].health = 100;
-                        targets[i].shield = 100; // Reset Shield too
+                        targets[i].shield = 100; 
                         targets[i].x = (rand()%800)-400; 
                         targets[i].z = (rand()%200)-100; 
                         targets[i].y = 10;
