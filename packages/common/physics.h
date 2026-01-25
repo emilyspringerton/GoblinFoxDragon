@@ -18,40 +18,53 @@ typedef struct { float x, y, z, w, h, d; } Box;
 
 // MAP GEOMETRY
 static Box map_geo[] = {
-    // 0: Floor (900x300)
+    // 0: FLOOR (Fixed 900x300)
     {0, -1, 0, 900, 2, 300},
     
     // --- CENTRAL ZIGGURAT (Indices 1-3) ---
-    {0, 2.0, 0, 20, 4, 20},       
-    {0, 5.0, 0, 10, 2, 10},       
-    {0, 8.0, 0, 4, 4, 4},
+    {0, 2.0, 0, 24, 4, 24},       // Base (Widened)
+    {0, 5.0, 0, 14, 2, 14},       // Mid
+    {0, 8.0, 0, 6, 4, 6},         // Top
     
-    // --- EAST CANYON (Indices 4-8) ---
-    {200, 10, 80, 200, 20, 20},   
-    {200, 10, -80, 200, 20, 20},  
-    {350, 4, 0, 10, 8, 10},       
-    {250, 2, 40, 4, 4, 4},        
-    {150, 2, -40, 4, 4, 4},       
+    // --- TWIN SPIRES (East/West Towers) ---
+    {300, 10, 0, 10, 20, 10},     // East Spire
+    {310, 2, 0, 4, 2, 4},         // East Step 1
+    {308, 5, 5, 4, 2, 4},         // East Step 2
+    
+    {-300, 10, 0, 10, 20, 10},    // West Spire
+    {-310, 2, 0, 4, 2, 4},        // West Step 1
+    {-308, 5, -5, 4, 2, 4},       // West Step 2
 
-    // --- WEST CANYON (Indices 9-13) ---
-    {-200, 10, 80, 200, 20, 20},  
-    {-200, 10, -80, 200, 20, 20}, 
-    {-350, 4, 0, 10, 8, 10},      
-    {-250, 2, -40, 4, 4, 4},      
-    {-150, 2, 40, 4, 4, 4},       
-
-    // --- PARKOUR BRIDGES (Index 14) ---
-    {0, 12, 0, 800, 1, 2},        
+    // --- THE SPINE (Central Cover) ---
+    {100, 2, 0, 40, 4, 2},        // East Low Wall
+    {-100, 2, 0, 40, 4, 2},       // West Low Wall
+    
+    // --- FLOATING PLATFORMS ---
+    {50, 7, 50, 8, 1, 8},         // NE Float
+    {-50, 7, -50, 8, 1, 8},       // SW Float
+    {50, 7, -50, 8, 1, 8},        // SE Float
+    {-50, 7, 50, 8, 1, 8},        // NW Float
 
     // --- CONTAINMENT WALLS (Indices 15-18) ---
-    {0, 25, 200, 1200, 50, 100},   // North Wall (Z+) - Index 15
-    {0, 25, -200, 1200, 50, 100},  // South Wall (Z-) - Index 16
-    {550, 25, 0, 200, 50, 600},    // East Wall (X+)  - Index 17 (Was skipped!)
-    {-550, 25, 0, 200, 50, 600}    // West Wall (X-)  - Index 18 (Was skipped!)
+    // Floor is 900 Wide (X: -450 to 450), 300 Deep (Z: -150 to 150)
+    // Thickness 200 to prevent glitching.
+    
+    // North Wall (Z+) - Centered at Z=250 (150 boundary + 100 half-thickness)
+    {0, 25, 250, 1200, 50, 200},   
+    
+    // South Wall (Z-) - Centered at Z=-250
+    {0, 25, -250, 1200, 50, 200},  
+    
+    // East Wall (X+) - Centered at X=550 (450 boundary + 100 half-thickness)
+    {550, 25, 0, 200, 50, 800},    // Overlaps Z walls
+    
+    // West Wall (X-) - Centered at X=-550
+    {-550, 25, 0, 200, 50, 800}    
 };
 
-// FIX: COUNT IS 19, NOT 17
-static int map_count = 19; 
+// CRITICAL: Update count to include all new items
+// 1 Floor + 3 Zig + 6 Spires + 2 Spine + 4 Float + 4 Walls = 20
+static int map_count = 20; 
 
 float phys_rand_f() { return ((float)(rand()%1000)/500.0f) - 1.0f; }
 
