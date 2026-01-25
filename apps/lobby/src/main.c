@@ -11,8 +11,7 @@ PlayerState p = {0, 10.0f, 0, 0, 0, 0, 0, 0, 1, 100, 0};
 
 void draw_grid() {
     glBegin(GL_LINES);
-    // Neon Cyan Grid
-    glColor3f(0.0f, 1.0f, 1.0f);
+    glColor3f(0.0f, 1.0f, 1.0f); // Cyan
     for(int i=-100; i<=100; i+=5) {
         glVertex3f(i, 0, -100); glVertex3f(i, 0, 100);
         glVertex3f(-100, 0, i); glVertex3f(100, 0, i);
@@ -27,7 +26,6 @@ void draw_map() {
         glTranslatef(b.x, b.y, b.z);
         glScalef(b.w, b.h, b.d);
         
-        // Solid Body
         glBegin(GL_QUADS);
         glColor3f(0.2f, 0.2f, 0.2f); 
         glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(-0.5,0.5,0.5);
@@ -37,7 +35,6 @@ void draw_map() {
         glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(0.5,0.5,0.5);
         glEnd();
 
-        // Neon Edges
         glLineWidth(2.0f);
         glColor3f(1.0f, 0.0f, 1.0f); // Magenta
         glBegin(GL_LINE_LOOP);
@@ -56,7 +53,6 @@ void draw_weapon() {
     glTranslatef(0.4f, -0.5f + kick, -1.2f + (kick * 0.5f));
     glRotatef(-p.recoil_anim * 10.0f, 1, 0, 0);
 
-    // Phase 85 Weapon Colors
     switch(p.current_weapon) {
         case WPN_KNIFE:   glColor3f(0.8f, 0.8f, 0.8f); glScalef(0.1f, 0.1f, 0.5f); break;
         case WPN_MAGNUM:  glColor3f(0.6f, 0.6f, 0.6f); glScalef(0.15f, 0.2f, 0.4f); break;
@@ -78,7 +74,7 @@ void draw_weapon() {
 
 int main(int argc, char* argv[]) {
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *win = SDL_CreateWindow("SHANKPIT // CONTROL FIX", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
+    SDL_Window *win = SDL_CreateWindow("SHANKPIT // CALIBRATED", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
     SDL_GL_CreateContext(win);
     SDL_SetRelativeMouseMode(SDL_TRUE);
     
@@ -104,34 +100,39 @@ int main(int argc, char* argv[]) {
                 if(e.key.keysym.sym == SDLK_LCTRL) p.crouching = 0;
             }
             if(e.type == SDL_MOUSEMOTION) {
+                // SENSITIVITY
                 p.yaw += e.motion.xrel * 0.15f;
                 p.pitch += e.motion.yrel * 0.15f;
                 
-                // ANGLE NORMALIZATION (Phase 37 Fix)
+                // NORMALIZE ANGLES
                 if (p.yaw >= 360.0f) p.yaw -= 360.0f;
                 if (p.yaw < 0.0f) p.yaw += 360.0f;
 
-                if(p.pitch > 89.0f) p.pitch = 89.0f; if(p.pitch < -89.0f) p.pitch = -89.0f;
+                if(p.pitch > 89.0f) p.pitch = 89.0f;
+                if(p.pitch < -89.0f) p.pitch = -89.0f;
             }
             if(e.type == SDL_MOUSEBUTTONDOWN) p.recoil_anim = 1.0f;
         }
 
-        // --- PHYSICS UPDATE ---
+        // --- PHYSICS STEP ---
         apply_friction(&p);
 
         const Uint8 *k = SDL_GetKeyboardState(NULL);
         
-        // VECTOR MATH FIX (Phase 37)
-        // Invert yaw to match OpenGL camera rotation
-        float rad = -p.yaw * 0.0174533f;
+        // --- VECTOR FIX: REMOVE NEGATIVE SIGN ---
+        // Positive Yaw = Right Rotation.
+        // sin/cos logic:
+        // yaw=0  -> fwd=(0,-1) (-Z)
+        // yaw=90 -> fwd=(1, 0) (+X)
+        float rad = p.yaw * 0.0174533f; // NO NEGATIVE SIGN HERE
         
-        // Calculate Forward and Right vectors manually
-        float fwd_x = sinf(rad); float fwd_z = -cosf(rad);
-        float right_x = cosf(rad); float right_z = sinf(rad);
+        float fwd_x = sinf(rad);
+        float fwd_z = -cosf(rad);
+        float right_x = cosf(rad);
+        float right_z = sinf(rad);
         
         float wish_x = 0; float wish_z = 0;
         
-        // Apply WASD using corrected vectors
         if(k[SDL_SCANCODE_W]) { wish_x += fwd_x; wish_z += fwd_z; }
         if(k[SDL_SCANCODE_S]) { wish_x -= fwd_x; wish_z -= fwd_z; }
         if(k[SDL_SCANCODE_D]) { wish_x += right_x; wish_z += right_z; }
@@ -152,21 +153,21 @@ int main(int argc, char* argv[]) {
         p.vy -= GRAVITY;
         p.x += p.vx; p.z += p.vz; p.y += p.vy;
 
-        // Fall Safety
+        // Respawn Safety
         if (p.pos.y < -50.0f) { p.pos.x = 0; p.pos.y = 10.0f; p.pos.z = 0; p.vx=0; p.vy=0; p.vz=0; }
 
         resolve_collision(&p);
         
         if (p.recoil_anim > 0) p.recoil_anim -= 0.1f;
 
-        // --- RENDER UPDATE ---
+        // --- RENDER STEP ---
         glClearColor(0.05f, 0.05f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glLoadIdentity();
 
         float cam_h = p.crouching ? 2.5f : 6.0f;
         glRotatef(-p.pitch, 1, 0, 0);
-        glRotatef(-p.yaw, 0, 1, 0); // Visuals match Math now
+        glRotatef(-p.yaw, 0, 1, 0); // Visuals match Physics now
         glTranslatef(-p.x, -(p.y + cam_h), -p.z);
 
         draw_grid();
