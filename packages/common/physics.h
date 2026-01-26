@@ -137,7 +137,7 @@ void resolve_collision(PlayerState *p) {
     }
 }
 
-void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload) {
+void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload, void *server_ptr, unsigned int cmd_time) {
     if (p->reload_timer > 0) p->reload_timer--;
     if (p->attack_cooldown > 0) p->attack_cooldown--;
     if (p->is_shooting > 0) p->is_shooting--;
@@ -179,7 +179,39 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
                     if (kdist > MELEE_RANGE_SQ + 22.0f ) continue; // Too far!
                 }
 
+                
+                // --- TIME MACHINE (Phase 317) ---
+                float original_pos[3];
+                int rewound = 0;
+                
+                // If we are the server (server_ptr provided) and have a valid history time
+                if (server_ptr && cmd_time > 0) {
+                    ServerState *s = (ServerState*)server_ptr;
+                    // Save current state (The Present)
+                    original_pos[0] = targets[i].x; 
+                    original_pos[1] = targets[i].y; 
+                    original_pos[2] = targets[i].z;
+                    
+                    // Travel to the Past
+                    float past_pos[3];
+                    if (phys_resolve_rewind(s, i, cmd_time, past_pos)) {
+                        targets[i].x = past_pos[0];
+                        targets[i].y = past_pos[1];
+                        targets[i].z = past_pos[2];
+                        rewound = 1;
+                    }
+                }
+
                 int hit_type = check_hit_location(p->x, p->y + EYE_HEIGHT, p->z, dx, dy, dz, &targets[i]);
+
+                // Restore Reality
+                if (rewound) {
+                    targets[i].x = original_pos[0];
+                    targets[i].y = original_pos[1];
+                    targets[i].z = original_pos[2];
+                }
+                // --------------------------------
+
                 
                 if (hit_type > 0) {
                     int damage = WPN_STATS[w].dmg;
