@@ -28,6 +28,14 @@ struct sockaddr_in bind_addr;
 // Track last processed sequence per client to reject duplicates
 unsigned int client_last_seq[MAX_CLIENTS]; 
 
+
+// --- HEADLESS TIMER (No SDL Required) ---
+unsigned int get_server_time() {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (unsigned int)(ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
+}
+
 void server_net_init() {
     #ifdef _WIN32
     WSADATA wsa; WSAStartup(MAKEWORD(2,2), &wsa);
@@ -148,7 +156,7 @@ int main() {
         // Every tick, store the state of all active players
         for(int i=0; i<MAX_CLIENTS; i++) {
             if (local_state.players[i].active) {
-                phys_store_history(&local_state, i, SDL_GetTicks()); 
+                phys_store_history(&local_state, i, get_server_time()); 
             }
         }
         
