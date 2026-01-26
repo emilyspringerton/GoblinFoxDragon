@@ -152,6 +152,25 @@ int main() {
         // In a real server, we step physics here independent of inputs.
         // For now, inputs drive the sim steps.
         
+        
+        // --- PHASE 407: RULES OF ENGAGEMENT ---
+        unsigned int now = get_server_time();
+        
+        for(int i=0; i<MAX_CLIENTS; i++) {
+            PlayerState *p = &local_state.players[i];
+            
+            // 1. Respawn Check
+            if (p->state == STATE_DEAD) {
+                // In Survival Mode, you stay dead until round reset (TODO: Round logic)
+                int can_respawn = (local_state.game_mode != MODE_SURVIVAL);
+                
+                if (can_respawn && now > p->respawn_time) {
+                    phys_respawn(p, now);
+                    printf("👼 Client %d Respawned at <%.1f, %.1f, %.1f>\n", i, p->x, p->y, p->z);
+                }
+            }
+        }
+    
         // 3. LAG COMP HISTORY (Req 5)
         // Every tick, store the state of all active players
         for(int i=0; i<MAX_CLIENTS; i++) {
