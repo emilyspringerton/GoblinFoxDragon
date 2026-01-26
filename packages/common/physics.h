@@ -219,4 +219,66 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
         }
     }
 }
+
+// --- PHASE 310: TIME MACHINE LOGIC ---
+void phys_store_history(ServerState *server, int client_id, unsigned int now) {
+    if (client_id < 0 || client_id >= MAX_CLIENTS) return;
+    if (!server->players[client_id].active) return;
+
+    // Use a circular buffer index based on tick or simple modulus of timestamp?
+    // Using tick count is safer, but for now we'll use a rolling index if we track it.
+    // Simpler: Just shift? No, slow.
+    // Let's use server_tick % LAG_HISTORY.
+    int slot = server->server_tick % LAG_HISTORY;
+    
+    server->history[client_id][slot].active = 1;
+    server->history[client_id][slot].timestamp = now;
+    server->history[client_id][slot].x = server->players[client_id].x;
+    server->history[client_id][slot].y = server->players[client_id].y;
+    server->history[client_id][slot].z = server->players[client_id].z;
+}
+
+// Returns 1 if we successfully rewound and wrote to out_pos
+int phys_resolve_rewind(ServerState *server, int client_id, unsigned int target_time, float *out_pos) {
+    LagRecord *hist = server->history[client_id];
+    
+    LagRecord *prev = NULL;
+    LagRecord *next = NULL;
+    
+    // Scan history (Optimization: Start from newest)
+    // Since it's a ring buffer, we iterate 0..63. Ideally we'd know the head.
+    // For this alpha, a linear scan is acceptable (64 items is nothing for a CPU).
+    for (int i=0; i<LAG_HISTORY; i++) {
+        if (!hist[i].active) continue;
+        
+        if (hist[i].timestamp <= target_time) {
+            if (!prev || hist[i].timestamp > prev->timestamp) prev = &hist[i];
+        }
+        if (hist[i].timestamp >= target_time) {
+            if (!next || hist[i].timestamp < next->timestamp) next = &hist[i];
+        }
+    }
+    
+    if (!prev || !next) return 0; // No valid history for this time
+    
+    // Exact match
+    if (prev == next) {
+        out_pos[0] = prev->x; out_pos[1] = prev->y; out_pos[2] = prev->z;
+        return 1;
+    }
+    
+    // Interpolate
+    float total = (float)(next->timestamp - prev->timestamp);
+    if (total <= 0.0001f) return 0;
+    
+    float dt = (float)(target_time - prev->timestamp);
+    float frac = dt / total;
+    
+    out_pos[0] = prev->x + (next->x - prev->x) * frac;
+    out_pos[1] = prev->y + (next->y - prev->y) * frac;
+    out_pos[2] = prev->z + (next->z - prev->z) * frac;
+    
+    return 1;
+}
+
 #endif

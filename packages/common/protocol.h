@@ -68,7 +68,19 @@ typedef struct {
     float accumulated_reward; 
 } PlayerState;
 
+
+// --- PHASE 310: LAG COMPENSATION ---
+#define LAG_HISTORY 64
+
 typedef struct {
+    int active;
+    unsigned int timestamp;
+    float x, y, z;
+    // We can add hitbox bounds here later if we implement crouching hitboxes
+} LagRecord;
+
+typedef struct {
+    LagRecord history[MAX_CLIENTS][LAG_HISTORY]; // Time Machine
     PlayerState players[MAX_CLIENTS];
     Projectile projectiles[MAX_PROJECTILES];
     int server_tick;
