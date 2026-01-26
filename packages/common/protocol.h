@@ -14,6 +14,20 @@
 #define RELOAD_TIME 60
 #define SHIELD_REGEN_DELAY 180 // 3 Seconds @ 60 FPS
 
+
+// --- PHASE 405: GAME MODES ---
+typedef enum {
+    MODE_DEATHMATCH = 0, // Default: FFA, Instant Respawn
+    MODE_TDM        = 1, // Red vs Blue, Kill Limit
+    MODE_SURVIVAL   = 2, // CS Style: No Respawn, Round Based
+    MODE_CTF        = 3, // Capture The Flag
+    MODE_ODDBALL    = 4  // Halo Style: Hold the Ball for time
+} GameMode;
+
+#define TEAM_RED  1
+#define TEAM_BLUE 2
+#define TEAM_FFA  0
+
 typedef struct {
     int id; int dmg; int rof; int cnt; float spr; int ammo_max;
 } WeaponStats;
@@ -28,6 +42,10 @@ static const WeaponStats WPN_STATS[MAX_WEAPONS] = {
 
 typedef struct {
     int active;
+
+    int team;           // TEAM_RED, TEAM_BLUE, TEAM_FFA
+    int object_held;    // 0=None, 1=Oddball, 2=Flag
+
     float x, y, z;
     float vx, vy, vz;
     int owner_id;
@@ -36,6 +54,10 @@ typedef struct {
 typedef struct {
     int id;
     int active;
+
+    int team;           // TEAM_RED, TEAM_BLUE, TEAM_FFA
+    int object_held;    // 0=None, 1=Oddball, 2=Flag
+
     int is_bot;
     
     float x, y, z;
@@ -74,6 +96,10 @@ typedef struct {
 
 typedef struct {
     int active;
+
+    int team;           // TEAM_RED, TEAM_BLUE, TEAM_FFA
+    int object_held;    // 0=None, 1=Oddball, 2=Flag
+
     unsigned int timestamp;
     float x, y, z;
     // We can add hitbox bounds here later if we implement crouching hitboxes
@@ -81,6 +107,25 @@ typedef struct {
 
 typedef struct {
     LagRecord history[MAX_CLIENTS][LAG_HISTORY]; // Time Machine
+    
+    // --- MODE STATE (Phase 405) ---
+    int game_mode;          // See GameMode enum
+    int round_state;        // 0=Warmup, 1=Active, 2=End
+    unsigned int round_timer; // Time remaining
+    
+    // Scoring
+    int team_scores[3];     // Index 0=FFA, 1=Red, 2=Blue
+    
+    // Oddball
+    int oddball_holder;     // Client ID of carrier (-1 if dropped)
+    float oddball_pos[3];   // World position if dropped
+    
+    // CTF
+    int flag_carrier_red;   // Who has the Red flag? (Blue player)
+    int flag_carrier_blue;  // Who has the Blue flag? (Red player)
+    float flag_pos_red[3];
+    float flag_pos_blue[3];
+
     PlayerState players[MAX_CLIENTS];
     Projectile projectiles[MAX_PROJECTILES];
     int server_tick;
