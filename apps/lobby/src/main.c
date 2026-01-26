@@ -1,24 +1,3 @@
-#include "../../packages/common/protocol.h"
-#ifndef STATE_MENU
-#define STATE_MENU 0
-#define STATE_PLAYING 1
-#define MODE_BOTS 0
-#define MODE_DEV 1
-#define MODE_SERV 2
-#define MODE_NET 3
-#define SCREEN_HEIGHT 600
-#endif
-#include "../../packages/common/protocol.h"
-#ifndef STATE_MENU
-#define STATE_MENU 0
-#define STATE_PLAYING 1
-#define MODE_BOTS 0
-#define MODE_DEV 1
-#define MODE_SERV 2
-#define MODE_NET 3
-#define SCREEN_HEIGHT 600
-#endif
-
 #define SDL_MAIN_HANDLED
 #include <stdio.h>
 #include <stdlib.h>
@@ -79,6 +58,7 @@ void net_init() {
         server_addr.sin_port = htons(6969);
         server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
     }
+}
 
 // Reuse Title Screen functions...
 void draw_char(char c, float x, float y, float w, float h) {
@@ -90,15 +70,15 @@ void draw_char(char c, float x, float y, float w, float h) {
     glVertex2f(x+w, y+h); glVertex2f(x, y+h);
     glVertex2f(x, y+h); glVertex2f(x, y);
     glEnd();
+}
 void draw_text_string(const char* s, float x, float y, float size) {
     float cursor = x;
     while(*s) {
-
-        }
         draw_char(*s, cursor, y, size*0.6f, size);
         cursor += size * 0.8f;
         s++;
     }
+}
 void draw_lobby_screen() { /* Kept simple for now */ }
 
 void draw_grid() {
@@ -109,6 +89,7 @@ void draw_grid() {
         glVertex3f(-100, 0, i); glVertex3f(100, 0, i);
     }
     glEnd();
+}
 
 void draw_map() {
     for(int i=1; i<map_count; i++) {
@@ -131,6 +112,7 @@ void draw_map() {
         glEnd();
         glPopMatrix();
     }
+}
 
 void draw_gun_model(int weapon_id) {
     switch(weapon_id) {
@@ -147,6 +129,7 @@ void draw_gun_model(int weapon_id) {
     glVertex3f(1,-1,-1); glVertex3f(1,1,-1); glVertex3f(1,1,1); glVertex3f(1,-1,1); 
     glVertex3f(-1,-1,1); glVertex3f(-1,1,1); glVertex3f(-1,1,-1); glVertex3f(-1,-1,-1); 
     glEnd();
+}
 
 void draw_weapon_p(PlayerState *p) {
     glPushMatrix();
@@ -160,6 +143,7 @@ void draw_weapon_p(PlayerState *p) {
     glRotatef(-p->recoil_anim * 10.0f, 1, 0, 0);
     draw_gun_model(p->current_weapon);
     glPopMatrix();
+}
 
 // --- NEW: DRAW HEAD ---
 void draw_head(int weapon_id) {
@@ -181,6 +165,7 @@ void draw_head(int weapon_id) {
     glVertex3f(-0.4, 0.8, 0.4); glVertex3f(-0.4, 0, 0.4); glVertex3f(-0.4, 0, -0.4); glVertex3f(-0.4, 0.8, -0.4);
     glVertex3f(0.4, 0.8, 0.4); glVertex3f(0.4, 0, 0.4); glVertex3f(0.4, 0, -0.4); glVertex3f(0.4, 0.8, -0.4);
     glEnd();
+}
 
 void draw_player_3rd(PlayerState *p) {
     glPushMatrix();
@@ -215,6 +200,7 @@ void draw_player_3rd(PlayerState *p) {
     draw_gun_model(p->current_weapon);
     glPopMatrix();
     glPopMatrix();
+}
 
 void draw_projectiles() {}
 
@@ -265,6 +251,7 @@ void draw_hud(PlayerState *p) {
     
     glEnable(GL_DEPTH_TEST);
     glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW); glPopMatrix();
+}
 
 void draw_scene(PlayerState *render_p) {
     glClearColor(0.05f, 0.05f, 0.1f, 1.0f);
@@ -288,65 +275,134 @@ void draw_scene(PlayerState *render_p) {
 
     draw_weapon_p(render_p);
     draw_hud(render_p);
+}
 
 int main(int argc, char* argv[]) {
-
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *win = SDL_CreateWindow("SHANKPIT", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
+    SDL_Window *win = SDL_CreateWindow("SHANKPIT [SHIELDS UPDATED]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
     SDL_GL_CreateContext(win);
     net_init();
+    
     local_init_match(1);
 
-    int game_state = STATE_MENU;
-    int game_mode = MODE_BOTS;
     int running = 1;
-
-    while (running) {
+    while(running) {
         SDL_Event e;
-        while (SDL_PollEvent(&e)) {
-            if (e.type == SDL_QUIT) running = 0;
-            if (game_state == STATE_PLAYING && e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) {
-                game_state = STATE_MENU;
-                SDL_SetRelativeMouseMode(SDL_FALSE);
+        while(SDL_PollEvent(&e)) {
+            if(e.type == SDL_QUIT) running = 0;
+            
+            if (app_state == STATE_LOBBY) {
+                if(e.type == SDL_KEYDOWN) {
+                    if (e.key.keysym.sym == SDLK_d) {
+                        app_state = STATE_GAME_LOCAL;
+                        USE_NEURAL_NET = 0;
+                        local_init_match(1);
+                        SDL_SetRelativeMouseMode(SDL_TRUE);
+                        glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
+                        glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
+                    }
+                    if (e.key.keysym.sym == SDLK_b) {
+                        app_state = STATE_GAME_LOCAL;
+                        USE_NEURAL_NET = 0; 
+                        local_init_match(31); 
+                        SDL_SetRelativeMouseMode(SDL_TRUE);
+                        glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
+                        glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
+                    }
+                    if (e.key.keysym.sym == SDLK_s) { 
+                        app_state = STATE_GAME_LOCAL;
+                        USE_NEURAL_NET = 1; 
+                        local_init_match(31);
+                        printf("MODE S ACTIVATED.\n");
+                        SDL_SetRelativeMouseMode(SDL_TRUE);
+                        glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
+                        glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
+                    }
+                    if (e.key.keysym.sym == SDLK_n) {
+                        app_state = STATE_GAME_NET;
+                        SDL_SetRelativeMouseMode(SDL_TRUE);
+                        glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
+                        glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
+                    }
+                }
+            } 
+            else {
+                if(e.type == SDL_KEYDOWN) {
+                    if (e.key.keysym.sym == SDLK_ESCAPE) {
+                        app_state = STATE_LOBBY;
+                        SDL_SetRelativeMouseMode(SDL_FALSE);
+                        glDisable(GL_DEPTH_TEST);
+                        glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
+                        glMatrixMode(GL_MODELVIEW); glLoadIdentity();
+                    }
+                }
+                if(e.type == SDL_MOUSEMOTION) {
+                    float sens = (current_fov < 50.0f) ? 0.05f : 0.15f; 
+                    cam_yaw -= e.motion.xrel * sens;
+                    if(cam_yaw > 360) cam_yaw -= 360; if(cam_yaw < 0) cam_yaw += 360;
+                    cam_pitch -= e.motion.yrel * sens;
+                    if(cam_pitch > 89) cam_pitch = 89; if(cam_pitch < -89) cam_pitch = -89;
+                }
             }
         }
 
-        const Uint8 *k = SDL_GetKeyboardState(NULL);
-
-        if (game_state == STATE_MENU) {
-            glClearColor(0.05f, 0.05f, 0.1f, 1.0f);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            glLoadIdentity();
-            
-            float glitch_x = (rand() % 100 > 95) ? (float)(rand() % 10 - 5) : 0;
-            draw_text_string("SHANKPIT", 500 + glitch_x, 400, 4.0f);
-            draw_text_string("[B] BOTS   [D] DEV/DEMO", 450, 300, 1.2f);
-            draw_text_string("[S] SERVER [N] NETWORK", 450, 260, 1.2f);
-
-            if (k[SDL_SCANCODE_B]) { game_mode = MODE_BOTS; game_state = STATE_PLAYING; local_init_match(31); SDL_SetRelativeMouseMode(SDL_TRUE); }
-            if (k[SDL_SCANCODE_D]) { game_mode = MODE_DEV;  game_state = STATE_PLAYING; local_init_match(1);  SDL_SetRelativeMouseMode(SDL_TRUE); }
-            if (k[SDL_SCANCODE_S]) { game_mode = MODE_SERV; game_state = STATE_PLAYING; local_init_match(31); USE_NEURAL_NET = 1; SDL_SetRelativeMouseMode(SDL_TRUE); }
-            if (k[SDL_SCANCODE_N]) { game_mode = MODE_NET;  game_state = STATE_PLAYING; SDL_SetRelativeMouseMode(SDL_TRUE); }
-            
-            SDL_GL_SwapWindow(win);
-            continue; 
-        }
-
-        // --- GAMEPLAY STATE ---
-        if (game_state == STATE_PLAYING) {
+        if (app_state == STATE_LOBBY) {
+             glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
+             glMatrixMode(GL_MODELVIEW); glLoadIdentity();
+             draw_lobby_screen(); // Re-use old drawing function (omitted for brevity but assumed present)
+             
+             // Redraw menu if needed
+             glClearColor(0.1f, 0.1f, 0.2f, 1.0f);
+             glClear(GL_COLOR_BUFFER_BIT);
+             glLoadIdentity();
+             glColor3f(1, 1, 0);
+             glBegin(GL_LINES); 
+             // D, B, N, S (Basic letters)
+             glVertex2f(200, 300); glVertex2f(200, 400); glVertex2f(200, 400); glVertex2f(250, 350);
+             glVertex2f(250, 350); glVertex2f(200, 300);
+             glVertex2f(400, 300); glVertex2f(400, 400); glVertex2f(400, 350); glVertex2f(450, 350);
+             glVertex2f(450, 350); glVertex2f(450, 300); glVertex2f(450, 350); glVertex2f(450, 400);
+             glVertex2f(450, 400); glVertex2f(400, 400); glVertex2f(450, 300); glVertex2f(400, 300);
+             glVertex2f(600, 300); glVertex2f(600, 400); 
+             glVertex2f(600, 400); glVertex2f(650, 300);
+             glVertex2f(650, 300); glVertex2f(650, 400);
+             glColor3f(0, 1, 1); 
+             glVertex2f(850, 300); glVertex2f(800, 300); glVertex2f(800, 350); glVertex2f(850, 350);
+             glVertex2f(850, 350); glVertex2f(850, 400); glVertex2f(850, 400); glVertex2f(800, 400);
+             glEnd();
+        } 
+        else if (app_state == STATE_GAME_LOCAL) {
+            const Uint8 *k = SDL_GetKeyboardState(NULL);
             float fwd=0, str=0;
             if(k[SDL_SCANCODE_W]) fwd+=1; if(k[SDL_SCANCODE_S]) fwd-=1;
             if(k[SDL_SCANCODE_D]) str+=1; if(k[SDL_SCANCODE_A]) str-=1;
-            
             int jump = k[SDL_SCANCODE_SPACE];
             int crouch = k[SDL_SCANCODE_LCTRL];
             int shoot = (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT));
+            int rmb = (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT));
             int reload = k[SDL_SCANCODE_R];
+            int wpn = -1;
+            if(k[SDL_SCANCODE_1]) wpn=0; if(k[SDL_SCANCODE_2]) wpn=1; if(k[SDL_SCANCODE_3]) wpn=2;
+            if(k[SDL_SCANCODE_4]) wpn=3; if(k[SDL_SCANCODE_5]) wpn=4;
 
-            local_update(fwd, str, cam_yaw, cam_pitch, shoot, -1, jump, crouch, reload);
+            // --- REGEN LOGIC (Simulation side logic handled in physics.h but timer needs ticking)
+            if (local_state.players[0].shield_regen_timer > 0) local_state.players[0].shield_regen_timer--;
+            else if (local_state.players[0].shield < 100) local_state.players[0].shield++;
+
+            float target_fov = (rmb && local_state.players[0].current_weapon == WPN_SNIPER) ? 20.0f : 75.0f;
+            current_fov += (target_fov - current_fov) * 0.2f;
+            glMatrixMode(GL_PROJECTION); glLoadIdentity(); 
+            gluPerspective(current_fov, 1280.0/720.0, 0.1, 1000.0);
+            glMatrixMode(GL_MODELVIEW);
+
+            local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn, jump, crouch, reload);
             draw_scene(&local_state.players[0]);
-            SDL_GL_SwapWindow(win);
         }
+        else if (app_state == STATE_GAME_NET) {
+            draw_scene(&local_state.players[0]); 
+        }
+
+        SDL_GL_SwapWindow(win);
         SDL_Delay(16);
     }
     SDL_Quit();
