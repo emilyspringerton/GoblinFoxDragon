@@ -412,8 +412,6 @@ int main(int argc, char* argv[]) {
                         app_state = STATE_GAME_LOCAL;
                         // NN Disabled 
                         local_init_match(31, 0);
-                        printf("MODE S ACTIVATED.
-");
                         SDL_SetRelativeMouseMode(SDL_TRUE);
                         glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
                         glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);

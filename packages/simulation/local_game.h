@@ -74,8 +74,8 @@ void local_update(float fwd, float str, float yaw, float pitch, int shoot, int w
     
     // Simple Movement
     float rad = yaw * 3.14159f / 180.0f;
-    p0->x += sinf(rad) * fwd * MOVE_SPEED;
-    p0->z += cosf(rad) * fwd * MOVE_SPEED;
+    p0->vx = sinf(rad) * fwd * MOVE_SPEED; p0->x += p0->vx;
+    p0->vz = cosf(rad) * fwd * MOVE_SPEED; p0->z += p0->vz;
     
     if (shoot) p0->in_shoot = 1; // Trigger
     

@@ -67,6 +67,7 @@ typedef struct {
     
     // Position & Look
     float x, y, z;
+    float vx, vy, vz;
     float yaw, pitch;
     
     // State
@@ -102,6 +103,7 @@ typedef struct {
     int active;
     unsigned int timestamp;
     float x, y, z;
+    float vx, vy, vz;
 } LagRecord;
 
 typedef struct {
