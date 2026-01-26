@@ -37,6 +37,41 @@ float current_fov = 75.0f;
 int sock = -1;
 struct sockaddr_in server_addr;
 
+
+// --- PHASE 300: CLIENT INPUT PACKER ---
+static unsigned int client_sequence = 0;
+
+UserCmd client_create_cmd(float fwd, float str, float yaw, float pitch, int shoot, int jump, int crouch, int reload, int wpn_idx) {
+    UserCmd cmd;
+    memset(&cmd, 0, sizeof(UserCmd));
+    
+    // 1. Header Info
+    cmd.sequence = ++client_sequence;
+    cmd.timestamp = SDL_GetTicks();
+    cmd.msec = 16; // Fixed timestep for now
+    
+    // 2. View Angles
+    cmd.yaw = yaw;
+    cmd.pitch = pitch;
+    
+    // 3. Movement (Normalized)
+    // We clamp to -127 to 127 purely for "Quake feel", though floats allow more.
+    // For now, we pass the raw float as the simulation expects it.
+    cmd.fwd = fwd;
+    cmd.str = str;
+    
+    // 4. Buttons (Bitmask Packing)
+    if (shoot)  cmd.buttons |= BTN_ATTACK;
+    if (jump)   cmd.buttons |= BTN_JUMP;
+    if (crouch) cmd.buttons |= BTN_CROUCH;
+    if (reload) cmd.buttons |= BTN_RELOAD;
+    
+    // 5. Weapon
+    cmd.weapon_idx = wpn_idx;
+    
+    return cmd;
+}
+
 void net_init() {
     #ifdef _WIN32
     WSADATA wsa; WSAStartup(MAKEWORD(2,2), &wsa);
