@@ -1,6 +1,10 @@
 #ifndef PHYSICS_H
 #define PHYSICS_H
 #include <math.h>
+
+// Phase 403 Forward Decl
+int phys_resolve_rewind(ServerState *server, int client_id, unsigned int target_time, float *out_pos);
+
 #include <stdlib.h>
 #include "protocol.h"
 
