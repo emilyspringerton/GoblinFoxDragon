@@ -92,7 +92,7 @@ void update_entity(PlayerState *p) {
     resolve_collision(p);
 
     if (p->recoil_anim > 0) p->recoil_anim -= 0.1f;
-    update_weapons(p, local_state.players, p->in_shoot, p->in_reload);
+    update_weapons(p, local_state.players, p->in_shoot, p->in_reload, server_context, cmd_time);
 }
 
 void local_update(float fwd, float strafe, float yaw, float pitch, int shoot, int weapon, int jump, int crouch, int reload) {
