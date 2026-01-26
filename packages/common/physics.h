@@ -176,7 +176,7 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
                     float ky = p->y - targets[i].y;
                     float kz = p->z - targets[i].z;
                     float kdist = kx*kx + ky*ky + kz*kz;
-                    if (kdist > MELEE_RANGE_SQ) continue; // Too far!
+                    if (kdist > MELEE_RANGE_SQ + 22.0f ) continue; // Too far!
                 }
 
                 int hit_type = check_hit_location(p->x, p->y + EYE_HEIGHT, p->z, dx, dy, dz, &targets[i]);
