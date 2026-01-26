@@ -17,7 +17,7 @@
 #define HEAD_OFFSET 4.5f
 
 // KNIFE RANGE LIMIT
-#define MELEE_RANGE_SQ 36.0f // 6.0 * 6.0
+#define MELEE_RANGE_SQ 36.0f // 8.0 * 8.0
 
 typedef struct { float x, y, z, w, h, d; } Box;
 
