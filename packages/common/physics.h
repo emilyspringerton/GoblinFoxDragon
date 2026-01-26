@@ -5,8 +5,8 @@
 #include "protocol.h"
 
 // --- TURBO TUNING ---
-#define GRAVITY 0.016f
-#define JUMP_FORCE 0.64f
+#define GRAVITY 0.018f
+#define JUMP_FORCE 0.61f
 #define MAX_SPEED 0.75f
 #define FRICTION 0.42f
 #define ACCEL 1.618f
@@ -17,7 +17,7 @@
 #define HEAD_OFFSET 4.5f
 
 // KNIFE RANGE LIMIT
-#define MELEE_RANGE_SQ 36.0f // 8.0 * 8.0
+#define MELEE_RANGE_SQ 100.0f // 10.0 * 10.0
 
 typedef struct { float x, y, z, w, h, d; } Box;
 
@@ -81,7 +81,7 @@ int check_hit_location(float ox, float oy, float oz, float dx, float dy, float d
     if (t > 0) {
         float cx = ox + dx*t, cy = oy + dy*t, cz = oz + dz*t;
         float dist_sq = (tx-cx)*(tx-cx) + (body_y-cy)*(body_y-cy) + (tz-cz)*(tz-cz);
-        if (dist_sq < 4.6f) return 1; 
+        if (dist_sq < 20.6f) return 1; 
     }
     
     return 0;
