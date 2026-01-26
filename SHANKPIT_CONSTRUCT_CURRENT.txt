@@ -1,0 +1,1288 @@
+SHANKPIT BUILD 101 DIAGNOSTIC SNAPSHOT
+=======================================
+
+
+--- FILE START: packages/common/protocol.h ---
+#ifndef PROTOCOL_H
+#define PROTOCOL_H
+
+#define MAX_CLIENTS 32
+#define PACKET_CONNECT 0
+#define PACKET_USERCMD 1
+#define PACKET_SNAPSHOT 2
+
+// --- GAME MODES ---
+typedef enum {
+    MODE_DEATHMATCH = 0,
+    MODE_TDM        = 1,
+    MODE_SURVIVAL   = 2,
+    MODE_CTF        = 3,
+    MODE_ODDBALL    = 4,
+    MODE_LOCAL      = 98,
+    MODE_NET        = 99
+} GameMode;
+
+#define STATE_ALIVE 0
+#define STATE_DEAD  1
+#define STATE_SPECTATOR 2
+#define MAX_HEALTH 100
+#define RESPAWN_DELAY 3000
+
+// --- NETWORK STRUCTURES ---
+typedef struct {
+    unsigned char type;     // 0=Connect, 1=UserCmd, 2=Snapshot
+    unsigned char client_id;
+    unsigned short sequence;
+    unsigned int timestamp; // Local time
+} NetHeader;
+
+typedef struct {
+    unsigned int sequence;
+    unsigned int timestamp;
+    unsigned short msec;
+    
+    // Inputs
+    float fwd;      // -1.0 to 1.0
+    float str;      // -1.0 to 1.0
+    float yaw;      // Degrees
+    float pitch;    // Degrees
+    
+    // Actions (Bitmask)
+    unsigned int buttons; // 1=Jump, 2=Attack, 4=Crouch, 8=Reload
+    int weapon_idx;
+} UserCmd;
+
+// Input Constants
+#define BTN_JUMP   1
+#define BTN_ATTACK 2
+#define BTN_CROUCH 4
+#define BTN_RELOAD 8
+
+// --- WEAPON DEFINITIONS (Restored Phase 410) ---
+#define WPN_KNIFE   0
+#define WPN_MAGNUM  1
+#define WPN_AR      2
+#define WPN_SHOTGUN 3
+#define WPN_SNIPER  4
+
+
+// --- GAME STATE ---
+typedef struct {
+    int active;
+    
+    // Position & Look
+    float x, y, z;
+    float vx, vy, vz;
+    float yaw, pitch;
+    
+    // State
+    int current_weapon;
+    int in_shoot;  // Frame counter for animation/logic
+    int in_reload;
+    
+    // VITALS (Fixed Build 100)
+    int health;
+    int armor;
+    int state; // STATE_ALIVE / STATE_DEAD
+    
+    // SCORING
+    int frags;
+    int deaths;
+    int team;
+    
+    // TIMING
+    unsigned int last_hit_time;
+    unsigned int respawn_time;
+
+    // --- VISUALS & ANIMATION (Restored Phase 410) ---
+    int ammo[5];          // Ammo per weapon
+    float recoil_anim;    // Visual kickback (0.0 to 1.0)
+    int reload_timer;     // Visual reload state
+    int hit_feedback;     // Flash screen on hit
+    int crouching;        // State flag
+
+} PlayerState;
+
+#define LAG_HISTORY 64
+typedef struct {
+    int active;
+    unsigned int timestamp;
+    float x, y, z;
+    float vx, vy, vz;
+} LagRecord;
+
+typedef struct {
+    unsigned int server_tick;
+    int game_mode;
+    
+    // Player Entities
+    PlayerState players[MAX_CLIENTS];
+    
+    // Time Machine
+    LagRecord history[MAX_CLIENTS][LAG_HISTORY];
+    
+    // Mode State
+    int team_scores[3];
+} ServerState;
+
+#endif
+
+--- FILE END: packages/common/protocol.h ---
+
+
+--- FILE START: packages/common/physics.h ---
+#ifndef PHYSICS_H
+#define PHYSICS_H
+
+#include <math.h>
+#include <stdlib.h> // For rand()
+#include "protocol.h"
+
+// --- CONSTANTS ---
+#define GRAVITY 0.5f
+#define MOVE_SPEED 0.5f
+#define JUMP_FORCE 2.0f
+#define EYE_HEIGHT 1.5f
+
+// Golden Ratio Math (Phase 319)
+#define PHI         1.61803398875f
+#define GOLDEN_GAIN 0.38196601125f
+
+float golden_smooth(float current, float target) {
+    float error = target - current;
+    return current + (error * GOLDEN_GAIN);
+}
+
+float golden_noise(unsigned int seed, float offset) {
+    double val = (seed * PHI) + offset;
+    return (float)(val - (long)val);
+}
+
+// --- FORWARD DECLARATIONS ---
+int phys_resolve_rewind(ServerState *server, int client_id, unsigned int target_time, float *out_pos);
+
+// --- LOGIC ---
+int check_hit_location(float x, float y, float z, float dx, float dy, float dz, PlayerState *target) {
+    // Simple Cylinder/Box Hitbox
+    // Target center is target->x, target->z
+    // Height is 0 to 2.0
+    
+    // This is a placeholder for ray-cylinder intersection
+    // For now, simple distance check along the ray? No, that's inaccurate.
+    // Let's assume a simplified "Cone of Fire" or distance check for Alpha.
+    
+    float tx = target->x - x;
+    float tz = target->z - z;
+    float dist = sqrtf(tx*tx + tz*tz);
+    
+    if (dist < 1.0f) return 1; // Hit
+    return 0;
+}
+
+void phys_respawn(PlayerState *p, unsigned int now) {
+    p->active = 1;
+    p->state = STATE_ALIVE;
+    p->health = MAX_HEALTH;
+    p->respawn_time = 0;
+    
+    // Golden Spawn
+    float n_x = golden_noise(p->deaths + now, 0.1f);
+    float n_z = golden_noise(p->deaths + now, 0.9f);
+    
+    p->x = (n_x * 40.0f) - 20.0f;
+    p->z = (n_z * 40.0f) - 20.0f;
+    p->y = 0;
+}
+
+void phys_damage(PlayerState *victim, PlayerState *attacker, int damage, unsigned int now) {
+    if (victim->state == STATE_DEAD) return;
+    
+    victim->health -= damage;
+    victim->last_hit_time = now;
+    
+    if (victim->health <= 0) {
+        victim->health = 0;
+        victim->state = STATE_DEAD;
+        victim->deaths++;
+        victim->respawn_time = now + RESPAWN_DELAY;
+        if (attacker && attacker != victim) attacker->frags++;
+    }
+}
+
+void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload, void *server_ptr, unsigned int cmd_time) {
+    if (p->in_shoot > 0) p->in_shoot--;
+    
+    if (shoot && p->in_shoot == 0) {
+        p->in_shoot = 10; // Cooldown
+        
+        // Raycast Direction
+        float rad_yaw = p->yaw * 3.14159f / 180.0f;
+        float dx = sinf(rad_yaw);
+        float dz = cosf(rad_yaw);
+        float dy = 0; // Pitch ignored for simple 2D aim
+        
+        // Check Hits
+        for(int i=0; i<MAX_CLIENTS; i++) {
+            if (&targets[i] == p) continue;
+            if (!targets[i].active) continue;
+            if (targets[i].state == STATE_DEAD) continue;
+            
+            // TIME MACHINE REWIND
+            float original_pos[3];
+            int rewound = 0;
+            
+            if (server_ptr && cmd_time > 0) {
+                ServerState *s = (ServerState*)server_ptr;
+                original_pos[0] = targets[i].x;
+                original_pos[1] = targets[i].y;
+                original_pos[2] = targets[i].z;
+                
+                float past[3];
+                if (phys_resolve_rewind(s, i, cmd_time, past)) {
+                    targets[i].x = past[0];
+                    targets[i].y = past[1];
+                    targets[i].z = past[2];
+                    rewound = 1;
+                }
+            }
+            
+            // Check Hit
+            if (check_hit_location(p->x, p->y + EYE_HEIGHT, p->z, dx, dy, dz, &targets[i])) {
+                if (server_ptr) {
+                    phys_damage(&targets[i], p, 25, cmd_time);
+                }
+            }
+            
+            // Restore
+            if (rewound) {
+                targets[i].x = original_pos[0];
+                targets[i].y = original_pos[1];
+                targets[i].z = original_pos[2];
+            }
+        }
+    }
+}
+
+// --- HISTORY STORE ---
+void phys_store_history(ServerState *server, int client_id, unsigned int now) {
+    if (client_id < 0 || client_id >= MAX_CLIENTS) return;
+    int slot = (now / 16) % LAG_HISTORY; // Simple tick map
+    
+    server->history[client_id][slot].active = 1;
+    server->history[client_id][slot].timestamp = now;
+    server->history[client_id][slot].x = server->players[client_id].x;
+    server->history[client_id][slot].y = server->players[client_id].y;
+    server->history[client_id][slot].z = server->players[client_id].z;
+}
+
+int phys_resolve_rewind(ServerState *server, int client_id, unsigned int target_time, float *out_pos) {
+    LagRecord *hist = server->history[client_id];
+    // Simple linear scan for match (Optimized version in real engine)
+    for(int i=0; i<LAG_HISTORY; i++) {
+        if (!hist[i].active) continue;
+        if (hist[i].timestamp == target_time) { // Exact match for simplicity
+            out_pos[0] = hist[i].x; out_pos[1] = hist[i].y; out_pos[2] = hist[i].z;
+            return 1;
+        }
+    }
+    return 0; // Interpolation logic omitted for brevity in reset, assume 60Hz lock
+}
+
+#endif
+
+--- FILE END: packages/common/physics.h ---
+
+
+--- FILE START: packages/simulation/local_game.h ---
+#ifndef LOCAL_GAME_H
+#define LOCAL_GAME_H
+
+#include "protocol.h"
+#include "physics.h"
+#include <string.h>
+
+ServerState local_state;
+
+// --- BOT AI (Internal Definition to avoid Conflicts) ---
+void bot_think(int bot_idx, PlayerState *players, float *out_fwd, float *out_yaw, int *out_buttons) {
+    PlayerState *me = &players[bot_idx];
+    if (me->state == STATE_DEAD) {
+        *out_buttons = 0;
+        return;
+    }
+
+    int target_idx = -1;
+    float min_dist = 9999.0f;
+
+    // Find Enemy
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (i == bot_idx) continue;
+        if (!players[i].active) continue;
+        if (players[i].state == STATE_DEAD) continue;
+        
+        float dx = players[i].x - me->x;
+        float dz = players[i].z - me->z;
+        float dist = sqrtf(dx*dx + dz*dz);
+        
+        if (dist < min_dist) {
+            min_dist = dist;
+            target_idx = i;
+        }
+    }
+
+    if (target_idx != -1) {
+        // Aim and Attack
+        PlayerState *t = &players[target_idx];
+        float dx = t->x - me->x;
+        float dz = t->z - me->z;
+        float target_yaw = atan2f(dx, dz) * (180.0f / 3.14159f);
+        
+        *out_yaw = target_yaw;
+        *out_fwd = (min_dist > 5.0f) ? 1.0f : 0.0f;
+        *out_buttons |= BTN_ATTACK;
+    } else {
+        // Patrol
+        *out_yaw += 2.0f;
+        *out_fwd = 0.5f;
+    }
+}
+
+// --- UPDATE ENTITY ---
+void update_entity(PlayerState *p, float dt, void *server_context, unsigned int cmd_time) {
+    if (!p->active) return;
+    if (p->state == STATE_DEAD) return;
+
+    // Physics
+    p->y -= GRAVITY * dt;
+    if (p->y < 0) p->y = 0; // Floor collision
+
+    // Weapons
+    update_weapons(p, local_state.players, p->in_shoot > 0, 0, server_context, cmd_time);
+}
+
+// --- LOCAL UPDATE LOOP ---
+void local_update(float fwd, float str, float yaw, float pitch, int shoot, int weapon_req, int jump, int crouch, int reload, void *server_context, unsigned int cmd_time) {
+    
+    // 1. Update Local Player (Index 0)
+    PlayerState *p0 = &local_state.players[0];
+    p0->yaw = yaw;
+    p0->pitch = pitch;
+    
+    // Simple Movement
+    float rad = yaw * 3.14159f / 180.0f;
+    p0->vx = sinf(rad) * fwd * MOVE_SPEED; p0->x += p0->vx;
+    p0->vz = cosf(rad) * fwd * MOVE_SPEED; p0->z += p0->vz;
+    
+    if (shoot) p0->in_shoot = 1; // Trigger
+    
+    // 2. Update Bots / All Entities
+    for(int i=0; i<MAX_CLIENTS; i++) {
+        PlayerState *p = &local_state.players[i];
+        if (!p->active) continue;
+        
+        // Bot AI Hook
+        if (i > 0 && p->active && p->state != STATE_DEAD) {
+            float b_fwd=0, b_yaw=p->yaw;
+            int b_btns=0;
+            
+            bot_think(i, local_state.players, &b_fwd, &b_yaw, &b_btns);
+            
+            p->yaw = b_yaw;
+            float brad = b_yaw * 3.14159f / 180.0f;
+            p->x += sinf(brad) * b_fwd * MOVE_SPEED * 0.5f;
+            p->z += cosf(brad) * b_fwd * MOVE_SPEED * 0.5f;
+            
+            if (b_btns & BTN_ATTACK) p->in_shoot = 1;
+        }
+        
+        // Physics & Resolve
+        update_entity(p, 0.016f, server_context, cmd_time);
+    }
+}
+
+void local_init_match(int num_players, int mode) {
+    memset(&local_state, 0, sizeof(ServerState));
+    local_state.game_mode = mode;
+    
+    // Spawn Player
+    local_state.players[0].active = 1;
+    phys_respawn(&local_state.players[0], 0);
+    
+    // Spawn Bots
+    for(int i=1; i<num_players; i++) {
+        local_state.players[i].active = 1;
+        phys_respawn(&local_state.players[i], i*100);
+    }
+}
+
+#endif
+
+--- FILE END: packages/simulation/local_game.h ---
+
+
+--- FILE START: apps/lobby/src/main.c ---
+#define SDL_MAIN_HANDLED
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+
+// --- MAP DATA (Phase 410) ---
+typedef struct { float x,y,z,w,h,d; } Box;
+Box map_geo[10];
+int map_count = 0;
+
+void init_map() {
+    map_count = 0;
+    // Floor
+    map_geo[map_count++] = (Box){0, -1, 0, 40, 1, 40};
+    // Random Cover
+    map_geo[map_count++] = (Box){-5, 0, 5, 2, 2, 2};
+    map_geo[map_count++] = (Box){5, 0, -5, 2, 2, 2};
+    map_geo[map_count++] = (Box){-10, 0, -10, 1, 4, 10};
+}
+
+
+#ifdef _WIN32
+    #include <winsock2.h>
+    #include <ws2tcpip.h>
+    #pragma comment(lib, "ws2_32.lib")
+#else
+    #include <sys/socket.h>
+    #include <netinet/in.h>
+    #include <arpa/inet.h>
+    #include <unistd.h>
+    #include <fcntl.h>
+    #include <netdb.h>
+#endif
+
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_opengl.h>
+#include <GL/glu.h>
+
+#include "../../../packages/common/protocol.h"
+#include "../../../packages/common/physics.h"
+#include "../../../packages/simulation/local_game.h"
+
+#define STATE_LOBBY 0
+#define STATE_GAME_NET 1
+#define STATE_GAME_LOCAL 2
+int app_state = STATE_LOBBY;
+
+float cam_yaw = 0.0f;
+float cam_pitch = 0.0f;
+float current_fov = 75.0f;
+
+int sock = -1;
+struct sockaddr_in server_addr;
+
+
+// --- PHASE 300: CLIENT INPUT PACKER ---
+
+// --- PHASE 308: NETWORK TRANSMITTER (Requirement 3) ---
+#define CMD_HISTORY_SIZE 64
+UserCmd cmd_history[CMD_HISTORY_SIZE];
+#define PACKET_REDUNDANCY 2 // Send Current + 2 Past
+
+void net_send_cmd(UserCmd cmd) {
+    if (sock == -1) return;
+
+    // 1. Save to History
+    int slot = cmd.sequence % CMD_HISTORY_SIZE;
+    cmd_history[slot] = cmd;
+    
+    // 2. Prepare Buffer
+    char packet_data[1024];
+    int cursor = 0;
+    
+    // 3. Header
+    NetHeader head;
+    head.type = PACKET_USERCMD;
+    head.client_id = 1; // TODO: Handshake ID
+    memcpy(packet_data + cursor, &head, sizeof(NetHeader));
+    cursor += sizeof(NetHeader);
+    
+    // 4. Determine Stuffing Count
+    // We try to send PACKET_REDUNDANCY extra commands, but stop if sequence < 1
+    int count = 1; 
+    for(int i=1; i<=PACKET_REDUNDANCY; i++) {
+        if (cmd.sequence > i) count++;
+    }
+    
+    unsigned char count_byte = (unsigned char)count;
+    memcpy(packet_data + cursor, &count_byte, 1);
+    cursor += 1;
+    
+    // 5. Serialize (Current -> Oldest)
+    for(int i=0; i<count; i++) {
+        int seq_to_send = cmd.sequence - i;
+        int hist_slot = seq_to_send % CMD_HISTORY_SIZE;
+        memcpy(packet_data + cursor, &cmd_history[hist_slot], sizeof(UserCmd));
+        cursor += sizeof(UserCmd);
+    }
+    
+    // 6. Blast it (UDP)
+    sendto(sock, packet_data, cursor, 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
+}
+
+static unsigned int client_sequence = 0;
+
+UserCmd client_create_cmd(float fwd, float str, float yaw, float pitch, int shoot, int jump, int crouch, int reload, int wpn_idx) {
+    UserCmd cmd;
+    memset(&cmd, 0, sizeof(UserCmd));
+    
+    // 1. Header Info
+    cmd.sequence = ++client_sequence;
+    cmd.timestamp = SDL_GetTicks();
+    cmd.msec = 16; // Fixed timestep for now
+    
+    // 2. View Angles
+    cmd.yaw = yaw;
+    cmd.pitch = pitch;
+    
+    // 3. Movement (Normalized)
+    // We clamp to -127 to 127 purely for "Quake feel", though floats allow more.
+    // For now, we pass the raw float as the simulation expects it.
+    cmd.fwd = fwd;
+    cmd.str = str;
+    
+    // 4. Buttons (Bitmask Packing)
+    if (shoot)  cmd.buttons |= BTN_ATTACK;
+    if (jump)   cmd.buttons |= BTN_JUMP;
+    if (crouch) cmd.buttons |= BTN_CROUCH;
+    if (reload) cmd.buttons |= BTN_RELOAD;
+    
+    // 5. Weapon
+    cmd.weapon_idx = wpn_idx;
+    
+    return cmd;
+}
+
+void net_init() {
+    #ifdef _WIN32
+    WSADATA wsa; WSAStartup(MAKEWORD(2,2), &wsa);
+    #endif
+    sock = socket(AF_INET, SOCK_DGRAM, 0);
+    #ifdef _WIN32
+    u_long mode = 1; ioctlsocket(sock, FIONBIO, &mode);
+    #else
+    int flags = fcntl(sock, F_GETFL, 0); fcntl(sock, F_SETFL, flags | O_NONBLOCK);
+    #endif
+
+    struct hostent *he = gethostbyname("s.farthq.com");
+    if (he) {
+        server_addr.sin_family = AF_INET;
+        server_addr.sin_port = htons(5314); 
+        memcpy(&server_addr.sin_addr, he->h_addr_list[0], he->h_length);
+    } else {
+        server_addr.sin_family = AF_INET;
+        server_addr.sin_port = htons(6969);
+        server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    }
+}
+
+// Reuse Title Screen functions...
+void draw_char(char c, float x, float y, float w, float h) {
+    glBegin(GL_LINES);
+    // (Simplified for HUD brevity - same vector font logic as previous phase)
+    // Just drawing standard box for missing chars
+    glVertex2f(x, y); glVertex2f(x+w, y);
+    glVertex2f(x+w, y); glVertex2f(x+w, y+h);
+    glVertex2f(x+w, y+h); glVertex2f(x, y+h);
+    glVertex2f(x, y+h); glVertex2f(x, y);
+    glEnd();
+}
+void draw_text_string(const char* s, float x, float y, float size) {
+    float cursor = x;
+    while(*s) {
+        draw_char(*s, cursor, y, size*0.6f, size);
+        cursor += size * 0.8f;
+        s++;
+    }
+}
+void draw_lobby_screen() { /* Kept simple for now */ }
+
+void draw_grid() {
+    glBegin(GL_LINES);
+    glColor3f(0.0f, 1.0f, 1.0f);
+    for(int i=-100; i<=900; i+=5) {
+        glVertex3f(i, 0, -100); glVertex3f(i, 0, 100);
+        glVertex3f(-100, 0, i); glVertex3f(100, 0, i);
+    }
+    glEnd();
+}
+
+void draw_map() {
+    for(int i=1; i<map_count; i++) {
+        Box b = map_geo[i];
+        glPushMatrix();
+        glTranslatef(b.x, b.y, b.z);
+        glScalef(b.w, b.h, b.d);
+        glBegin(GL_QUADS);
+        glColor3f(0.2f, 0.2f, 0.2f); 
+        glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(-0.5,0.5,0.5);
+        glVertex3f(-0.5,0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
+        glVertex3f(-0.5,-0.5,-0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
+        glVertex3f(-0.5,-0.5,-0.5); glVertex3f(-0.5,-0.5,0.5); glVertex3f(-0.5,0.5,0.5); glVertex3f(-0.5,0.5,-0.5);
+        glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(0.5,0.5,0.5);
+        glEnd();
+        glLineWidth(2.0f);
+        glColor3f(1.0f, 0.0f, 1.0f); 
+        glBegin(GL_LINE_LOOP);
+        glVertex3f(-0.5, 0.5, 0.5); glVertex3f(0.5, 0.5, 0.5); glVertex3f(0.5, 0.5, -0.5); glVertex3f(-0.5, 0.5, -0.5);
+        glEnd();
+        glPopMatrix();
+    }
+}
+
+void draw_gun_model(int weapon_id) {
+    switch(weapon_id) {
+        case WPN_KNIFE:   glColor3f(0.8f, 0.8f, 0.9f); glScalef(0.05f, 0.05f, 0.8f); break;
+        case WPN_MAGNUM:  glColor3f(0.4f, 0.4f, 0.4f); glScalef(0.15f, 0.2f, 0.5f); break;
+        case WPN_AR:      glColor3f(0.2f, 0.3f, 0.2f); glScalef(0.1f, 0.15f, 1.2f); break;
+        case WPN_SHOTGUN: glColor3f(0.5f, 0.3f, 0.2f); glScalef(0.25f, 0.15f, 0.8f); break;
+        case WPN_SNIPER:  glColor3f(0.1f, 0.1f, 0.15f); glScalef(0.08f, 0.12f, 2.0f); break;
+    }
+    glBegin(GL_QUADS); 
+    glVertex3f(-1,1,1); glVertex3f(1,1,1); glVertex3f(1,1,-1); glVertex3f(-1,1,-1); 
+    glVertex3f(-1,-1,1); glVertex3f(1,-1,1); glVertex3f(1,1,1); glVertex3f(-1,1,1); 
+    glVertex3f(-1,-1,-1); glVertex3f(-1,1,-1); glVertex3f(1,1,-1); glVertex3f(1,-1,-1); 
+    glVertex3f(1,-1,-1); glVertex3f(1,1,-1); glVertex3f(1,1,1); glVertex3f(1,-1,1); 
+    glVertex3f(-1,-1,1); glVertex3f(-1,1,1); glVertex3f(-1,1,-1); glVertex3f(-1,-1,-1); 
+    glEnd();
+}
+
+void draw_weapon_p(PlayerState *p) {
+    glPushMatrix();
+    glLoadIdentity();
+    float kick = p->recoil_anim * 0.2f;
+    float reload_dip = (p->reload_timer > 0) ? sinf(p->reload_timer * 0.2f) * 0.5f - 0.5f : 0.0f;
+    float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
+    float bob = sinf(SDL_GetTicks() * 0.015f) * speed * 0.15f; 
+    float x_offset = (current_fov < 50.0f) ? 0.25f : 0.4f;
+    glTranslatef(x_offset, -0.5f + kick + reload_dip + (bob * 0.5f), -1.2f + (kick * 0.5f) + bob);
+    glRotatef(-p->recoil_anim * 10.0f, 1, 0, 0);
+    draw_gun_model(p->current_weapon);
+    glPopMatrix();
+}
+
+// --- NEW: DRAW HEAD ---
+void draw_head(int weapon_id) {
+    // Color matches gun
+    switch(weapon_id) {
+        case WPN_KNIFE:   glColor3f(0.8f, 0.8f, 0.9f); break;
+        case WPN_MAGNUM:  glColor3f(0.4f, 0.4f, 0.4f); break;
+        case WPN_AR:      glColor3f(0.2f, 0.3f, 0.2f); break;
+        case WPN_SHOTGUN: glColor3f(0.5f, 0.3f, 0.2f); break;
+        case WPN_SNIPER:  glColor3f(0.1f, 0.1f, 0.15f); break;
+    }
+    
+    glBegin(GL_QUADS);
+    // Simple Cube
+    glVertex3f(-0.4, 0.8, 0.4); glVertex3f(0.4, 0.8, 0.4); glVertex3f(0.4, 0, 0.4); glVertex3f(-0.4, 0, 0.4);
+    glVertex3f(-0.4, 0.8, -0.4); glVertex3f(0.4, 0.8, -0.4); glVertex3f(0.4, 0, -0.4); glVertex3f(-0.4, 0, -0.4);
+    glVertex3f(-0.4, 0.8, 0.4); glVertex3f(0.4, 0.8, 0.4); glVertex3f(0.4, 0.8, -0.4); glVertex3f(-0.4, 0.8, -0.4);
+    glVertex3f(-0.4, 0, 0.4); glVertex3f(0.4, 0, 0.4); glVertex3f(0.4, 0, -0.4); glVertex3f(-0.4, 0, -0.4);
+    glVertex3f(-0.4, 0.8, 0.4); glVertex3f(-0.4, 0, 0.4); glVertex3f(-0.4, 0, -0.4); glVertex3f(-0.4, 0.8, -0.4);
+    glVertex3f(0.4, 0.8, 0.4); glVertex3f(0.4, 0, 0.4); glVertex3f(0.4, 0, -0.4); glVertex3f(0.4, 0.8, -0.4);
+    glEnd();
+}
+
+void draw_player_3rd(PlayerState *p) {
+    glPushMatrix();
+    glTranslatef(p->x, p->y + 2.0f, p->z);
+    glRotatef(-p->yaw, 0, 1, 0); 
+    
+    if(p->health <= 0) glColor3f(0.2, 0, 0); 
+    else glColor3f(1, 0, 0); 
+    
+    glPushMatrix();
+    glScalef(1.2f, 3.8f, 1.2f);
+    glBegin(GL_QUADS);
+    glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(-0.5,0.5,0.5);
+    glVertex3f(-0.5,0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
+    glVertex3f(-0.5,-0.5,-0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
+    glVertex3f(-0.5,-0.5,-0.5); glVertex3f(-0.5,-0.5,0.5); glVertex3f(-0.5,0.5,0.5); glVertex3f(-0.5,0.5,-0.5);
+    glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(0.5,0.5,0.5);
+    glEnd();
+    glPopMatrix();
+    
+    // DRAW HEAD
+    glPushMatrix();
+    glTranslatef(0, 2.0f, 0); // On top of body
+    draw_head(p->current_weapon);
+    glPopMatrix();
+    
+    // Weapon
+    glPushMatrix();
+    glTranslatef(0.5f, 1.0f, 0.5f);
+    glRotatef(p->pitch, 1, 0, 0);   
+    glScalef(0.8f, 0.8f, 0.8f);
+    draw_gun_model(p->current_weapon);
+    glPopMatrix();
+    glPopMatrix();
+}
+
+void draw_projectiles() {}
+
+void draw_hud(PlayerState *p) {
+    glDisable(GL_DEPTH_TEST);
+    glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
+    glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
+    
+    // CROSSHAIR
+    glColor3f(0, 1, 0);
+    if (current_fov < 50.0f) {
+        glBegin(GL_LINES); glVertex2f(0, 360); glVertex2f(1280, 360); glVertex2f(640, 0); glVertex2f(640, 720); glEnd();
+    } else {
+        glLineWidth(2.0f);
+        glBegin(GL_LINES); glVertex2f(630, 360); glVertex2f(650, 360); glVertex2f(640, 350); glVertex2f(640, 370); glEnd();
+    }
+    
+    // HIT MARKER
+    if (p->hit_feedback > 0) {
+        if (p->hit_feedback == 20) glColor3f(1, 0, 1); // MAGENTA (Headshot)
+        else glColor3f(0, 1, 1); // CYAN (Body)
+        
+        glBegin(GL_TRIANGLE_FAN);
+        glVertex2f(640, 360); 
+        for(int i=0; i<=20; i++) {
+            float ang = (float)i / 20.0f * 6.28318f;
+            glVertex2f(640 + cosf(ang)*15, 360 + sinf(ang)*15);
+        }
+        glEnd();
+    }
+
+    // --- BARS (Bottom Left) ---
+    // Health (Red)
+    glColor3f(0.2f, 0, 0); glRectf(50, 50, 250, 70);
+    glColor3f(1.0f, 0, 0); glRectf(50, 50, 50 + (p->health * 2), 70);
+    
+    // Shield (Blue)
+    glColor3f(0, 0, 0.2f); glRectf(50, 80, 250, 100);
+    glColor3f(0.2f, 0.2f, 1.0f); glRectf(50, 80, 50 + (p->armor * 2), 100);
+
+    // --- AMMO (Bottom Right) ---
+    int w = p->current_weapon;
+    int ammo = (w == WPN_KNIFE) ? 99 : p->ammo[w];
+    glColor3f(1, 1, 0);
+    for(int i=0; i<ammo; i++) {
+        glRectf(1200 - (i*10), 50, 1205 - (i*10), 80);
+    }
+    
+    glEnable(GL_DEPTH_TEST);
+    glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW); glPopMatrix();
+}
+
+void draw_scene(PlayerState *render_p) {
+    glClearColor(0.05f, 0.05f, 0.1f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glLoadIdentity();
+
+    float cam_h = render_p->crouching ? 2.5f : EYE_HEIGHT;
+    glRotatef(-cam_pitch, 1, 0, 0);
+    glRotatef(-cam_yaw, 0, 1, 0);
+    glTranslatef(-render_p->x, -(render_p->y + cam_h), -render_p->z);
+
+    draw_grid();
+    draw_map();
+    draw_projectiles();
+    
+    for(int i=1; i<MAX_CLIENTS; i++) {
+        if(local_state.players[i].active) {
+            draw_player_3rd(&local_state.players[i]);
+        }
+    }
+
+    draw_weapon_p(render_p);
+    draw_hud(render_p);
+}
+
+int main(int argc, char* argv[]) {
+    SDL_Init(SDL_INIT_VIDEO);
+    SDL_Window *win = SDL_CreateWindow("SHANKPIT [SHIELDS UPDATED]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
+    SDL_GL_CreateContext(win);
+    net_init();
+    
+    local_init_match(1, 0);
+
+    init_map();
+    int running = 1;
+    while(running) {
+        SDL_Event e;
+        while(SDL_PollEvent(&e)) {
+            if(e.type == SDL_QUIT) running = 0;
+            
+            if (app_state == STATE_LOBBY) {
+                if(e.type == SDL_KEYDOWN) {
+                    if (e.key.keysym.sym == SDLK_d) {
+                        app_state = STATE_GAME_LOCAL;
+                        // NN Disabled
+                        local_init_match(1, 0);
+                        SDL_SetRelativeMouseMode(SDL_TRUE);
+                        glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
+                        glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
+                    }
+                    if (e.key.keysym.sym == SDLK_b) {
+                        app_state = STATE_GAME_LOCAL;
+                        // NN Disabled 
+                        local_init_match(31, 0); 
+                        SDL_SetRelativeMouseMode(SDL_TRUE);
+                        glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
+                        glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
+                    }
+                    if (e.key.keysym.sym == SDLK_s) { 
+                        app_state = STATE_GAME_LOCAL;
+                        // NN Disabled 
+                        local_init_match(31, 0);
+                        SDL_SetRelativeMouseMode(SDL_TRUE);
+                        glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
+                        glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
+                    }
+                    if (e.key.keysym.sym == SDLK_n) {
+                        app_state = STATE_GAME_NET;
+                        SDL_SetRelativeMouseMode(SDL_TRUE);
+                        glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
+                        glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
+                    }
+                }
+            } 
+            else {
+                if(e.type == SDL_KEYDOWN) {
+                    if (e.key.keysym.sym == SDLK_ESCAPE) {
+                        app_state = STATE_LOBBY;
+                        SDL_SetRelativeMouseMode(SDL_FALSE);
+                        glDisable(GL_DEPTH_TEST);
+                        glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
+                        glMatrixMode(GL_MODELVIEW); glLoadIdentity();
+                    }
+                }
+                if(e.type == SDL_MOUSEMOTION) {
+                    float sens = (current_fov < 50.0f) ? 0.05f : 0.15f; 
+                    cam_yaw -= e.motion.xrel * sens;
+                    if(cam_yaw > 360) cam_yaw -= 360; if(cam_yaw < 0) cam_yaw += 360;
+                    cam_pitch -= e.motion.yrel * sens;
+                    if(cam_pitch > 89) cam_pitch = 89; if(cam_pitch < -89) cam_pitch = -89;
+                }
+            }
+        }
+
+        if (app_state == STATE_LOBBY) {
+             glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
+             glMatrixMode(GL_MODELVIEW); glLoadIdentity();
+             draw_lobby_screen(); // Re-use old drawing function (omitted for brevity but assumed present)
+             
+             // Redraw menu if needed
+             glClearColor(0.1f, 0.1f, 0.2f, 1.0f);
+             glClear(GL_COLOR_BUFFER_BIT);
+             glLoadIdentity();
+             glColor3f(1, 1, 0);
+             glBegin(GL_LINES); 
+             // D, B, N, S (Basic letters)
+             glVertex2f(200, 300); glVertex2f(200, 400); glVertex2f(200, 400); glVertex2f(250, 350);
+             glVertex2f(250, 350); glVertex2f(200, 300);
+             glVertex2f(400, 300); glVertex2f(400, 400); glVertex2f(400, 350); glVertex2f(450, 350);
+             glVertex2f(450, 350); glVertex2f(450, 300); glVertex2f(450, 350); glVertex2f(450, 400);
+             glVertex2f(450, 400); glVertex2f(400, 400); glVertex2f(450, 300); glVertex2f(400, 300);
+             glVertex2f(600, 300); glVertex2f(600, 400); 
+             glVertex2f(600, 400); glVertex2f(650, 300);
+             glVertex2f(650, 300); glVertex2f(650, 400);
+             glColor3f(0, 1, 1); 
+             glVertex2f(850, 300); glVertex2f(800, 300); glVertex2f(800, 350); glVertex2f(850, 350);
+             glVertex2f(850, 350); glVertex2f(850, 400); glVertex2f(850, 400); glVertex2f(800, 400);
+             glEnd();
+        } 
+        else if (app_state == STATE_GAME_LOCAL) {
+            const Uint8 *k = SDL_GetKeyboardState(NULL);
+            float fwd=0, str=0;
+            if(k[SDL_SCANCODE_W]) fwd+=1; if(k[SDL_SCANCODE_S]) fwd-=1;
+            if(k[SDL_SCANCODE_D]) str+=1; if(k[SDL_SCANCODE_A]) str-=1;
+            int jump = k[SDL_SCANCODE_SPACE];
+            int crouch = k[SDL_SCANCODE_LCTRL];
+            int shoot = (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT));
+            int rmb = (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT));
+            int reload = k[SDL_SCANCODE_R];
+            int wpn = -1;
+            if(k[SDL_SCANCODE_1]) wpn=0; if(k[SDL_SCANCODE_2]) wpn=1; if(k[SDL_SCANCODE_3]) wpn=2;
+            if(k[SDL_SCANCODE_4]) wpn=3; if(k[SDL_SCANCODE_5]) wpn=4;
+
+            // --- REGEN LOGIC (Simulation side logic handled in physics.h but timer needs ticking)
+            if (local_state.players[0].reload_timer > 0) local_state.players[0].reload_timer--;
+            // else if (local_state.players[0].armor < 100) local_state.players[0].armor++;
+
+            float target_fov = (rmb && local_state.players[0].current_weapon == WPN_SNIPER) ? 20.0f : 75.0f;
+            current_fov += (target_fov - current_fov) * 0.2f;
+            glMatrixMode(GL_PROJECTION); glLoadIdentity(); 
+            gluPerspective(current_fov, 1280.0/720.0, 0.1, 1000.0);
+            glMatrixMode(GL_MODELVIEW);
+
+            local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn, jump, crouch, reload, NULL, 0);
+            draw_scene(&local_state.players[0]);
+        }
+        else if (app_state == STATE_GAME_NET) {
+            draw_scene(&local_state.players[0]); 
+        }
+
+        SDL_GL_SwapWindow(win);
+        SDL_Delay(16);
+    }
+    SDL_Quit();
+    return 0;
+}
+
+--- FILE END: apps/lobby/src/main.c ---
+
+
+--- FILE START: apps/server/src/main.c ---
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <math.h>
+
+#ifdef _WIN32
+    #include <winsock2.h>
+    #include <ws2tcpip.h>
+    #pragma comment(lib, "ws2_32.lib")
+#else
+    #include <sys/socket.h>
+    #include <netinet/in.h>
+    #include <arpa/inet.h>
+    #include <unistd.h>
+    #include <fcntl.h>
+#endif
+
+#include "../../../packages/common/protocol.h"
+#include "../../../packages/common/physics.h"
+#include "../../../packages/simulation/local_game.h" // Re-using the sim logic
+
+// --- SERVER STATE ---
+int sock = -1;
+struct sockaddr_in bind_addr;
+
+// Track last processed sequence per client to reject duplicates
+unsigned int client_last_seq[MAX_CLIENTS]; 
+
+
+// --- HEADLESS TIMER (No SDL Required) ---
+unsigned int get_server_time() {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (unsigned int)(ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
+}
+
+void server_net_init() {
+    #ifdef _WIN32
+    WSADATA wsa; WSAStartup(MAKEWORD(2,2), &wsa);
+    #endif
+    
+    sock = socket(AF_INET, SOCK_DGRAM, 0);
+    
+    #ifdef _WIN32
+    u_long mode = 1; ioctlsocket(sock, FIONBIO, &mode);
+    #else
+    int flags = fcntl(sock, F_GETFL, 0); fcntl(sock, F_SETFL, flags | O_NONBLOCK);
+    #endif
+
+    bind_addr.sin_family = AF_INET;
+    bind_addr.sin_port = htons(6969); // Standard ShankPort
+    bind_addr.sin_addr.s_addr = INADDR_ANY;
+    
+    if (bind(sock, (struct sockaddr*)&bind_addr, sizeof(bind_addr)) < 0) {
+        printf("❌ FAILED TO BIND PORT 6969\n");
+    } else {
+        printf("✅ SERVER LISTENING ON PORT 6969\n");
+    }
+}
+
+// --- THE JUDGE LOGIC (From Test Suite) ---
+void process_user_cmd(int client_id, UserCmd *cmd) {
+    if (cmd->sequence <= client_last_seq[client_id]) return; // Old/Duplicate
+
+    // 1. Sanitize (Phase 305-B)
+    if (isnan(cmd->yaw) || isinf(cmd->yaw)) cmd->yaw = 0;
+    if (isnan(cmd->pitch) || isinf(cmd->pitch)) cmd->pitch = 0;
+    
+    // 2. Execute Physics (The Truth)
+    // We map the UserCmd back to the raw inputs local_update expects
+    float fwd = cmd->fwd;
+    float str = cmd->str;
+    int shoot = (cmd->buttons & BTN_ATTACK);
+    int jump = (cmd->buttons & BTN_JUMP);
+    int crouch = (cmd->buttons & BTN_CROUCH);
+    int reload = (cmd->buttons & BTN_RELOAD);
+    
+    // UPDATE THE SPECIFIC PLAYER
+    // Note: In a real engine we'd pass client_id to local_update. 
+    // For now, we hack it to update Player 0 or specific ID if local_game supports it.
+    // Assuming local_game updates 'local_state.players[0]' by default, we need to adapt.
+    // We will assume a helper 'server_update_player' exists or we do it manually.
+    
+    // Manual Update for transparency:
+    PlayerState *p = &local_state.players[client_id];
+    p->yaw = cmd->yaw;
+    p->pitch = cmd->pitch;
+    p->current_weapon = cmd->weapon_idx;
+    
+    // Use the physics engine (re-using client logic for now, but authoritative)
+    // We temporarily override the "inputs" in the player struct if needed, 
+    // or just call logic.
+    // For this Alpha, we trust the movement logic is shared.
+    
+    // CRITICAL: LAG COMP HOOK (Req 5 - Rewind)
+    // If shooting, we must rewind OTHERS before checking hits.
+    // But local_update handles shooting internally. 
+    // We will implement the rewind hook inside physics.h later.
+    
+    client_last_seq[client_id] = cmd->sequence;
+}
+
+void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
+    if (size < sizeof(NetHeader)) return;
+    
+    NetHeader *head = (NetHeader*)buffer;
+    
+    // Simple Client ID assignment (Hash IP or just Slot 1 for now)
+    int client_id = 1; // TODO: Real connection manager
+    
+    if (head->type == PACKET_USERCMD) {
+        int cursor = sizeof(NetHeader);
+        unsigned char count = *(unsigned char*)(buffer + cursor);
+        cursor += 1;
+        
+        UserCmd *cmds = (UserCmd*)(buffer + cursor);
+        
+        // DE-STUFF: Execute Oldest -> Newest
+        for (int i = count - 1; i >= 0; i--) {
+            process_user_cmd(client_id, &cmds[i]);
+        }
+        
+        // HEARTBEAT: Mark client as active/alive
+        local_state.players[client_id].active = 1;
+    }
+}
+
+int main() {
+    server_net_init();
+    local_init_match(1, 0); // Init physics state
+    
+    printf("🛡️ SHANKPIT DEDICATED SERVER v0.2 (AUTHORITATIVE) 🛡️\n");
+    
+    int running = 1;
+    unsigned int tick = 0;
+    
+    while(running) {
+        // 1. NETWORK RECEIVE
+        char buffer[1024];
+        struct sockaddr_in sender;
+        socklen_t slen = sizeof(sender);
+        
+        int len = recvfrom(sock, buffer, 1024, 0, (struct sockaddr*)&sender, &slen);
+        while (len > 0) {
+            server_handle_packet(&sender, buffer, len);
+            len = recvfrom(sock, buffer, 1024, 0, (struct sockaddr*)&sender, &slen);
+        }
+        
+        // 2. SIMULATION STEP
+        // In a real server, we step physics here independent of inputs.
+        // For now, inputs drive the sim steps.
+        
+        
+        // --- PHASE 407: RULES OF ENGAGEMENT ---
+        unsigned int now = get_server_time();
+        
+        for(int i=0; i<MAX_CLIENTS; i++) {
+            PlayerState *p = &local_state.players[i];
+            
+            // 1. Respawn Check
+            if (p->state == STATE_DEAD) {
+                // In Survival Mode, you stay dead until round reset (TODO: Round logic)
+                int can_respawn = (local_state.game_mode != MODE_SURVIVAL);
+                
+                if (can_respawn && now > p->respawn_time) {
+                    phys_respawn(p, now);
+                    printf("👼 Client %d Respawned at <%.1f, %.1f, %.1f>\n", i, p->x, p->y, p->z);
+                }
+            }
+        }
+    
+        // 3. LAG COMP HISTORY (Req 5)
+        // Every tick, store the state of all active players
+        for(int i=0; i<MAX_CLIENTS; i++) {
+            if (local_state.players[i].active) {
+                phys_store_history(&local_state, i, get_server_time()); 
+            }
+        }
+        
+        // 4. BROADCAST SNAPSHOT (To be implemented)
+        // We need to tell clients where everyone is.
+        
+        // 5. TICK RATE (60Hz)
+        #ifdef _WIN32
+        Sleep(16);
+        #else
+        usleep(16000);
+        #endif
+        tick++;
+    }
+    return 0;
+}
+
+--- FILE END: apps/server/src/main.c ---
+
+
+--- FILE START: apps/client/bot_main.c ---
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <time.h>
+
+#ifdef _WIN32
+    #include <winsock2.h>
+    #include <ws2tcpip.h>
+    #pragma comment(lib, "ws2_32.lib")
+#else
+    #include <sys/socket.h>
+    #include <netinet/in.h>
+    #include <arpa/inet.h>
+    #include <unistd.h>
+    #include <fcntl.h>
+#endif
+
+#include "../../packages/common/protocol.h"
+#include "../../packages/common/physics.h"
+
+// --- BOT STATE ---
+int sock = -1;
+struct sockaddr_in server_addr;
+unsigned int bot_seq = 0;
+float bot_x = 0, bot_y = 10, bot_z = 0;
+float bot_yaw = 0;
+
+// History for stuffing
+#define HISTORY_SIZE 64
+UserCmd history[HISTORY_SIZE];
+
+void init_network(const char* ip, int port) {
+    #ifdef _WIN32
+    WSADATA wsa; WSAStartup(MAKEWORD(2,2), &wsa);
+    #endif
+    
+    sock = socket(AF_INET, SOCK_DGRAM, 0);
+    
+    // Non-blocking
+    #ifdef _WIN32
+    u_long mode = 1; ioctlsocket(sock, FIONBIO, &mode);
+    #else
+    int flags = fcntl(sock, F_GETFL, 0); fcntl(sock, F_SETFL, flags | O_NONBLOCK);
+    #endif
+
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(port);
+    server_addr.sin_addr.s_addr = inet_addr(ip);
+    
+    printf("[BOT] Network Initialized. Target: %s:%d\n", ip, port);
+}
+
+// --- LOGIC: The "Brain" ---
+// This mimics client_create_cmd but driven by Math instead of Keyboard
+UserCmd bot_think(int tick) {
+    UserCmd cmd;
+    memset(&cmd, 0, sizeof(UserCmd));
+    
+    cmd.sequence = ++bot_seq;
+    cmd.timestamp = tick * 16;
+    cmd.msec = 16;
+    
+    // BEHAVIOR: Run in a circle
+    bot_yaw += 2.0f;
+    if (bot_yaw > 360) bot_yaw -= 360;
+    
+    cmd.yaw = bot_yaw;
+    cmd.pitch = 0;
+    
+    // Always move forward
+    cmd.fwd = 1.0f; 
+    cmd.str = 0.0f;
+    
+    // Randomly Jump or Shoot
+    if (tick % 60 == 0) cmd.buttons |= BTN_JUMP;
+    if (tick % 120 == 0) cmd.buttons |= BTN_ATTACK;
+    
+    return cmd;
+}
+
+void bot_send(UserCmd cmd) {
+    // 1. Store
+    history[cmd.sequence % HISTORY_SIZE] = cmd;
+    
+    // 2. Pack (Stuffing Logic)
+    char buffer[1024];
+    int cursor = 0;
+    
+    NetHeader head;
+    head.type = PACKET_USERCMD;
+    head.client_id = 999; // ID for "Bot"
+    memcpy(buffer + cursor, &head, sizeof(NetHeader)); cursor += sizeof(NetHeader);
+    
+    // Redundancy
+    int count = 1;
+    if (cmd.sequence > 1) count++;
+    if (cmd.sequence > 2) count++;
+    unsigned char c = (unsigned char)count;
+    memcpy(buffer + cursor, &c, 1); cursor += 1;
+    
+    for(int i=0; i<count; i++) {
+        int slot = (cmd.sequence - i) % HISTORY_SIZE;
+        memcpy(buffer + cursor, &history[slot], sizeof(UserCmd));
+        cursor += sizeof(UserCmd);
+    }
+    
+    sendto(sock, buffer, cursor, 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
+}
+
+int main(int argc, char* argv[]) {
+    const char* ip = "127.0.0.1";
+    int port = 6969;
+    
+    if (argc > 1) ip = argv[1];
+    
+    init_network(ip, port);
+    
+    printf("[BOT] Starting Loop (60Hz)...\n");
+    printf("[BOT] FORMAT: Seq | Yaw | Action\n");
+    
+    int tick = 0;
+    while(1) {
+        // 1. THINK
+        UserCmd cmd = bot_think(tick);
+        
+        // 2. ACT (Send)
+        bot_send(cmd);
+        
+        // 3. LOG (Chatty)
+        if (tick % 60 == 0) { // Log once per second
+            char action[32] = "RUN";
+            if (cmd.buttons & BTN_JUMP) strcpy(action, "JUMP");
+            if (cmd.buttons & BTN_ATTACK) strcpy(action, "SHOOT");
+            
+            printf("[BOT] Seq: %5d | Yaw: %6.1f | Act: %s | Packet Size: %lu\n", 
+                   cmd.sequence, cmd.yaw, action, 
+                   sizeof(NetHeader) + 1 + (3*sizeof(UserCmd))); // Approx size with stuffing
+        }
+        
+        // 4. WAIT (Simulate 60Hz)
+        // Simple sleep for now
+        #ifdef _WIN32
+        Sleep(16);
+        #else
+        usleep(16000);
+        #endif
+        
+        tick++;
+    }
+    return 0;
+}
+
+--- FILE END: apps/client/bot_main.c ---
