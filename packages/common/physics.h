@@ -81,7 +81,7 @@ int check_hit_location(float ox, float oy, float oz, float dx, float dy, float d
     if (t > 0) {
         float cx = ox + dx*t, cy = oy + dy*t, cz = oz + dz*t;
         float dist_sq = (tx-cx)*(tx-cx) + (body_y-cy)*(body_y-cy) + (tz-cz)*(tz-cz);
-        if (dist_sq < 2.5f) return 1; 
+        if (dist_sq < 4.6f) return 1; 
     }
     
     return 0;
