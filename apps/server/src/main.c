@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -129,7 +128,7 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
 
 int main() {
     server_net_init();
-    local_init_match(1); // Init physics state
+    local_init_match(1, 0); // Init physics state
     
     printf("🛡️ SHANKPIT DEDICATED SERVER v0.2 (AUTHORITATIVE) 🛡️\n");
     

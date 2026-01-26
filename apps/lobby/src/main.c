@@ -412,7 +412,8 @@ int main(int argc, char* argv[]) {
                         app_state = STATE_GAME_LOCAL;
                         // NN Disabled 
                         local_init_match(31, 0);
-                        printf("MODE S ACTIVATED.\n");
+                        printf("MODE S ACTIVATED.
+");
                         SDL_SetRelativeMouseMode(SDL_TRUE);
                         glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
                         glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
@@ -485,8 +486,8 @@ int main(int argc, char* argv[]) {
             if(k[SDL_SCANCODE_4]) wpn=3; if(k[SDL_SCANCODE_5]) wpn=4;
 
             // --- REGEN LOGIC (Simulation side logic handled in physics.h but timer needs ticking)
-            if (local_state.players[0].armor_regen_timer > 0) local_state.players[0].armor_regen_timer--;
-            else if (local_state.players[0].armor < 100) local_state.players[0].armor++;
+            if (local_state.players[0].reload_timer > 0) local_state.players[0].reload_timer--;
+            // else if (local_state.players[0].armor < 100) local_state.players[0].armor++;
 
             float target_fov = (rmb && local_state.players[0].current_weapon == WPN_SNIPER) ? 20.0f : 75.0f;
             current_fov += (target_fov - current_fov) * 0.2f;
