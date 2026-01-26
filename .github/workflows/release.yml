@@ -26,27 +26,39 @@ jobs:
           tar xzf SDL2-devel-2.28.5-mingw.tar.gz
           mv SDL2-2.28.5/x86_64-w64-mingw32 ./sdl2_mingw
 
-      # --- 2. NETCODE REGRESSION SUITE (The Gatekeeper) ---
-      - name: Compile Netcode Tests
-        run: gcc apps/tests/test_netcode.c -o run_tests
-
-      - name: Run Netcode Regression Suite
-        run: ./run_tests
+      # --- 2. THE GRAND TEST BATTERY ---
+      - name: Run Full Regression Suite
+        run: |
+          echo "🧪 TEST 1: Protocol Verification"
+          gcc apps/tests/test_netcode.c -o test_net -lm && ./test_net
+          
+          echo "🧪 TEST 2: Input Logic"
+          gcc apps/tests/test_inputs.c -o test_input && ./test_input
+          
+          echo "🧪 TEST 3: Packet Stuffing"
+          gcc apps/tests/test_stuffing.c -o test_stuff && ./test_stuff
+          
+          echo "🧪 TEST 4: Server De-Stuffing (The Judge)"
+          gcc apps/tests/test_server_logic.c -o test_judge && ./test_judge
+          
+          echo "🧪 TEST 5: Lag Compensation (Time Machine)"
+          gcc apps/tests/test_lag_comp.c -o test_lag -lm && ./test_lag
+          
+          echo "🧪 TEST 6: Live Fire Integration"
+          gcc apps/tests/test_integration.c -o test_fire && ./test_fire
 
       # --- 3. BUILD ARTIFACTS ---
       - name: Build Windows Client
         run: |
           x86_64-w64-mingw32-gcc apps/lobby/src/main.c -o ShankPit.exe             -O2 -static-libgcc             -I./sdl2_mingw/include -Ipackages/common -Ipackages/simulation             -L./sdl2_mingw/lib             -lmingw32 -lSDL2main -lSDL2 -lopengl32 -lglu32 -lws2_32 -lwinmm -lgdi32 -lm
 
-      # Note: We assume the server source exists or this step might fail. 
-      # If you haven't created apps/server/src/main.c yet, this acts as a placeholder.
       - name: Build Linux Server
         run: |
           if [ -f apps/server/src/main.c ]; then
             gcc apps/server/src/main.c -o ShankServer_Linux -O2 -static -Ipackages/common -Ipackages/simulation -lm
           else
             echo "⚠️ Server source not found, skipping build."
-            touch ShankServer_Linux # Create dummy to prevent artifact upload failure
+            touch ShankServer_Linux 
           fi
 
       # --- 4. PACKAGE ---
