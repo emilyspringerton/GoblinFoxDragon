@@ -22,7 +22,22 @@ void map_init(GameMap *map) {
             2.0f, h, 2.0f, 
             0.8f, 0.8f, 0.8f, 0.98f // High friction/slip
         };
+        
     }
+
+    srand(41); 
+    for(int i=0; i<30; i++) {
+        float x = (rand() % 60) - 30.0f;
+        float z = (rand() % 60) - 30.0f;
+        // Make them accessible steps
+        float h = 1.0f + (rand() % 3); 
+        
+        map->walls[map->wall_count++] = (Wall){
+            10 + i, 
+            x, h/2.0f, z, 
+            2.0f, h, 2.0f, 
+            0.8f, 0.8f, 0.8f, 0.98f // High friction/slip
+        };
     
     // 3. The "Shank" Platform (Center)
     map->walls[map->wall_count++] = (Wall){99, 0.0f, 0.5f, 0.0f, 4.0f, 1.0f, 4.0f, 1.0f, 0.8f, 0.0f, 0.96f};
@@ -124,3 +139,4 @@ void map_resolve_collision(GameMap *map, Vec3 *pos, Vec3 *vel) {
     // Floor Safety
     if (pos->y < -20.0f) { pos->y = 10.0f; pos->x = 0; pos->z = 0; vel->y = 0; }
 }
+
