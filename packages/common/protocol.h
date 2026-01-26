@@ -19,11 +19,11 @@ typedef struct {
 } WeaponStats;
 
 static const WeaponStats WPN_STATS[MAX_WEAPONS] = {
-    {WPN_KNIFE,   35, 20, 1, 0.0f,  0},   
+    {WPN_KNIFE,   200, 20, 1, 0.0f,  0},   
     {WPN_MAGNUM,  45, 25, 1, 0.0f,  6},   
-    {WPN_AR,      12, 6,  1, 0.04f, 30},  
-    {WPN_SHOTGUN, 8,  50, 8, 0.15f, 8},   
-    {WPN_SNIPER,  90, 70, 1, 0.0f,  5}    
+    {WPN_AR,      20, 6,  1, 0.04f, 30},  
+    {WPN_SHOTGUN, 64,  50, 8, 0.15f, 8},   
+    {WPN_SNIPER,  101, 70, 1, 0.0f,  5}    
 };
 
 typedef struct {
