@@ -305,6 +305,29 @@ int main(int argc, char* argv[]) {
     int running = 1;
 
     while (running) {
+
+        // --- B-D-S-N GLITCH MENU ---
+        if (game_state == STATE_MENU) {
+            float glitch_x = (rand() % 100 > 95) ? (float)(rand() % 10 - 5) : 0;
+            glClearColor(0.05f, 0.05f, 0.1f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            glLoadIdentity();
+            
+            // Note: render_background_canyon and draw_text_centered must be defined or replaced with draw_text_string
+            draw_text_string("SHANKPIT", 500 + glitch_x, 400, 4.0f);
+            draw_text_string("[B] BOTS   [D] DEV/DEMO", 450, 300, 1.2f);
+            draw_text_string("[S] SERVER [N] NETWORK", 450, 260, 1.2f);
+
+            const Uint8 *k = SDL_GetKeyboardState(NULL);
+            if (k[SDL_SCANCODE_B]) { game_mode = MODE_BOTS; game_state = STATE_PLAYING; local_init_match(31); SDL_SetRelativeMouseMode(SDL_TRUE); }
+            if (k[SDL_SCANCODE_D]) { game_mode = MODE_DEV;  game_state = STATE_PLAYING; local_init_match(1);  SDL_SetRelativeMouseMode(SDL_TRUE); }
+            if (k[SDL_SCANCODE_S]) { game_mode = MODE_SERV; game_state = STATE_PLAYING; local_init_match(31); USE_NEURAL_NET = 1; SDL_SetRelativeMouseMode(SDL_TRUE); }
+            if (k[SDL_SCANCODE_N]) { game_mode = MODE_NET;  game_state = STATE_PLAYING; SDL_SetRelativeMouseMode(SDL_TRUE); }
+            
+            SDL_GL_SwapWindow(win);
+            continue; 
+        }
+
         if (game_state == STATE_MENU) {
             float glitch_x = (rand() % 100 > 95) ? (float)(rand() % 10 - 5) : 0;
             render_background_canyon(); 
