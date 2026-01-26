@@ -61,15 +61,33 @@ jobs:
             touch ShankServer_Linux 
           fi
 
+      # --- NEW: BUILD BOTS ---
+      - name: Build Bots (Windows & Linux)
+        run: |
+          # Windows Bot
+          x86_64-w64-mingw32-gcc apps/client/bot_main.c -o ShankBot.exe             -O2 -static-libgcc             -Ipackages/common -Ipackages/simulation             -lws2_32 -lwinmm
+            
+          # Linux Bot
+          gcc apps/client/bot_main.c -o ShankBot_Linux             -O2 -static             -Ipackages/common -Ipackages/simulation -lm
+
       # --- 4. PACKAGE ---
       - name: Bundle Artifacts
         run: |
+          # Client Bundle
           mkdir ShankPit_Client
           cp ShankPit.exe ShankPit_Client/
           cp sdl2_mingw/bin/SDL2.dll ShankPit_Client/
           echo "start ShankPit.exe" > ShankPit_Client/PLAY.bat
           zip -r ShankPit_Windows.zip ShankPit_Client
+          
+          # Server Bundle
           mv ShankServer_Linux ShankPit_Server_Linux
+          
+          # Bot Bundle
+          mkdir ShankPit_Bots
+          cp ShankBot.exe ShankPit_Bots/
+          cp ShankBot_Linux ShankPit_Bots/
+          zip -r ShankPit_Bots.zip ShankPit_Bots
 
       - name: Upload Artifacts (Build)
         uses: actions/upload-artifact@v4
@@ -78,6 +96,7 @@ jobs:
           path: |
             ShankPit_Windows.zip
             ShankPit_Server_Linux
+            ShankPit_Bots.zip
 
       # --- 5. RELEASE (Only on Tag) ---
       - name: Publish Release
@@ -87,3 +106,4 @@ jobs:
           files: |
             ShankPit_Windows.zip
             ShankPit_Server_Linux
+            ShankPit_Bots.zip
