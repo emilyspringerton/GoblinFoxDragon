@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #define PORT 5314 
-#define MAX_CLIENTS 10
+#define MAX_CLIENTS 64
 #define MAX_WEAPONS 5
 
 // PACKET TYPES
@@ -33,8 +33,8 @@ typedef struct {
 } WeaponStats;
 
 static WeaponStats WPN_STATS[MAX_WEAPONS] = {
-    {0, 45, 20, 1, 0.0f, 0, 3.5f}, {1, 24, 12, 1, 0.0f, 12, 200.0f}, 
-    {2, 12, 6, 1, 0.04f, 30, 200.0f}, {3, 10, 50, 12, 0.22f, 8, 70.0f}, {4, 95, 70, 1, 0.0f, 5, 500.0f}
+    {0, 110, 20, 1, 0.0f, 0, 3.5f}, {1, 32, 12, 1, 0.0f, 9, 200.0f}, 
+    {2, 16, 6, 1, 0.04f, 30, 200.0f}, {3, 50, 50, 12, 0.22f, 8, 70.0f}, {4, 101, 70, 1, 0.0f, 5, 500.0f}
 };
 
 typedef struct {
@@ -70,3 +70,4 @@ typedef struct {
 } ClientInput;
 
 #endif
+
