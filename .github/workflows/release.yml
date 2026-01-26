@@ -62,3 +62,12 @@ jobs:
           files: |
             ShankPit_Windows.zip
             ShankPit_Server_Linux
+
+    - name: Set up GCC (Netcode)
+      run: sudo apt-get update && sudo apt-get install -y build-essential
+
+    - name: Compile Netcode Tests
+      run: gcc apps/tests/test_netcode.c -o run_tests
+
+    - name: Run Netcode Regression Suite
+      run: ./run_tests
