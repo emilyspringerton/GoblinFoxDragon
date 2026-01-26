@@ -8,6 +8,8 @@
 ServerState local_state;
 
 // --- BOT AI (Internal Definition to avoid Conflicts) ---
+
+// --- BOT AI (Restored Phase 418) ---
 void bot_think(int bot_idx, PlayerState *players, float *out_fwd, float *out_yaw, int *out_buttons) {
     PlayerState *me = &players[bot_idx];
     if (me->state == STATE_DEAD) {
@@ -18,7 +20,7 @@ void bot_think(int bot_idx, PlayerState *players, float *out_fwd, float *out_yaw
     int target_idx = -1;
     float min_dist = 9999.0f;
 
-    // Find Enemy
+    // Find Closest Enemy
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (i == bot_idx) continue;
         if (!players[i].active) continue;
@@ -35,23 +37,27 @@ void bot_think(int bot_idx, PlayerState *players, float *out_fwd, float *out_yaw
     }
 
     if (target_idx != -1) {
-        // Aim and Attack
+        // ENGAGE
         PlayerState *t = &players[target_idx];
         float dx = t->x - me->x;
         float dz = t->z - me->z;
         float target_yaw = atan2f(dx, dz) * (180.0f / 3.14159f);
         
-        *out_yaw = target_yaw;
-        *out_fwd = (min_dist > 5.0f) ? 1.0f : 0.0f;
+        *out_yaw = target_yaw; // Aimbot
+        
+        // Move to engage range (keep distance 5-10 units)
+        if (min_dist > 8.0f) *out_fwd = 1.0f;
+        else if (min_dist < 4.0f) *out_fwd = -1.0f; // Back up
+        else *out_fwd = 0.0f;
+        
         *out_buttons |= BTN_ATTACK;
     } else {
-        // Patrol
+        // PATROL
         *out_yaw += 2.0f;
         *out_fwd = 0.5f;
     }
 }
 
-// --- UPDATE ENTITY ---
 void update_entity(PlayerState *p, float dt, void *server_context, unsigned int cmd_time) {
     if (!p->active) return;
     if (p->state == STATE_DEAD) return;
