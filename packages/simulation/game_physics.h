@@ -12,9 +12,9 @@
 #define GRAVITY 0.025f
 #define JUMP_POWER 0.45f
 #define MAX_SPEED 0.75f  
-#define FRICTION 0.82f
-#define ACCEL 1.5f       
-#define RELOAD_TIME 60
+#define FRICTION 0.64f
+#define ACCEL 1.618f       
+#define RELOAD_TIME 42
 #define GAME_DURATION 7200 
 #define KILL_LIMIT 20
 
@@ -120,3 +120,4 @@ void phys_update_player(GameMap *map, PlayerState *p, float fwd, float strafe, f
     p->hit_feedback = 0; 
 }
 #endif
+
