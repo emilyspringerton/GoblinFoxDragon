@@ -48,6 +48,69 @@ void local_init_match(int bot_count) {
 }
 
 // THE UNIFIED PHYSICS SOLVER
+
+// --- PHASE 408: BOT ARTIFICIAL INTELLIGENCE ---
+
+#include <math.h>
+
+void bot_think(int bot_idx, PlayerState *players, float *out_fwd, float *out_yaw, int *out_buttons) {
+    PlayerState *me = &players[bot_idx];
+    if (me->state == STATE_DEAD) {
+        *out_buttons = 0;
+        return;
+    }
+
+    int target_idx = -1;
+    float min_dist = 9999.0f;
+
+    // 1. Find Closest Living Enemy
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (i == bot_idx) continue;
+        if (!players[i].active) continue;
+        if (players[i].state == STATE_DEAD) continue;
+        
+        // Team Check (Simple: If mode is TDM, check team)
+        // For now, assume FFA (Attack everyone)
+        
+        float dx = players[i].x - me->x;
+        float dz = players[i].z - me->z;
+        float dist = sqrtf(dx*dx + dz*dz);
+        
+        if (dist < min_dist) {
+            min_dist = dist;
+            target_idx = i;
+        }
+    }
+
+    // 2. Engage
+    if (target_idx != -1) {
+        PlayerState *t = &players[target_idx];
+        float dx = t->x - me->x;
+        float dz = t->z - me->z;
+        
+        // Calculate Yaw (Atan2 returns radians, convert to degrees)
+        float target_yaw = atan2f(dx, dz) * (180.0f / 3.14159f);
+        
+        // Smoothly rotate towards target (Simple P-Controller)
+        // For now, snap aim (Aimbot style) because they are bots.
+        *out_yaw = target_yaw;
+        
+        // Move towards them if far away, strafe if close
+        if (min_dist > 5.0f) {
+            *out_fwd = 1.0f; // Run fwd
+        } else {
+            *out_fwd = 0.0f; // Stand ground
+        }
+        
+        // Shoot!
+        *out_buttons |= BTN_ATTACK;
+    } else {
+        // No targets? Patrol.
+        *out_yaw += 2.0f; // Spin
+        *out_fwd = 0.5f;
+    }
+}
+
 void update_entity(PlayerState *p) {
     if (!p->active) return;
 
