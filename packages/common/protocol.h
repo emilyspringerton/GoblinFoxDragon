@@ -54,6 +54,14 @@ typedef struct {
 #define BTN_CROUCH 4
 #define BTN_RELOAD 8
 
+// --- WEAPON DEFINITIONS (Restored Phase 410) ---
+#define WPN_KNIFE   0
+#define WPN_MAGNUM  1
+#define WPN_AR      2
+#define WPN_SHOTGUN 3
+#define WPN_SNIPER  4
+
+
 // --- GAME STATE ---
 typedef struct {
     int active;
@@ -80,6 +88,14 @@ typedef struct {
     // TIMING
     unsigned int last_hit_time;
     unsigned int respawn_time;
+
+    // --- VISUALS & ANIMATION (Restored Phase 410) ---
+    int ammo[5];          // Ammo per weapon
+    float recoil_anim;    // Visual kickback (0.0 to 1.0)
+    int reload_timer;     // Visual reload state
+    int hit_feedback;     // Flash screen on hit
+    int crouching;        // State flag
+
 } PlayerState;
 
 #define LAG_HISTORY 64

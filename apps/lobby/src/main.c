@@ -4,6 +4,22 @@
 #include <string.h>
 #include <math.h>
 
+// --- MAP DATA (Phase 410) ---
+typedef struct { float x,y,z,w,h,d; } Box;
+Box map_geo[10];
+int map_count = 0;
+
+void init_map() {
+    map_count = 0;
+    // Floor
+    map_geo[map_count++] = (Box){0, -1, 0, 40, 1, 40};
+    // Random Cover
+    map_geo[map_count++] = (Box){-5, 0, 5, 2, 2, 2};
+    map_geo[map_count++] = (Box){5, 0, -5, 2, 2, 2};
+    map_geo[map_count++] = (Box){-10, 0, -10, 1, 4, 10};
+}
+
+
 #ifdef _WIN32
     #include <winsock2.h>
     #include <ws2tcpip.h>
@@ -321,7 +337,7 @@ void draw_hud(PlayerState *p) {
     
     // Shield (Blue)
     glColor3f(0, 0, 0.2f); glRectf(50, 80, 250, 100);
-    glColor3f(0.2f, 0.2f, 1.0f); glRectf(50, 80, 50 + (p->shield * 2), 100);
+    glColor3f(0.2f, 0.2f, 1.0f); glRectf(50, 80, 50 + (p->armor * 2), 100);
 
     // --- AMMO (Bottom Right) ---
     int w = p->current_weapon;
@@ -365,8 +381,9 @@ int main(int argc, char* argv[]) {
     SDL_GL_CreateContext(win);
     net_init();
     
-    local_init_match(1);
+    local_init_match(1, 0);
 
+    init_map();
     int running = 1;
     while(running) {
         SDL_Event e;
@@ -377,24 +394,24 @@ int main(int argc, char* argv[]) {
                 if(e.type == SDL_KEYDOWN) {
                     if (e.key.keysym.sym == SDLK_d) {
                         app_state = STATE_GAME_LOCAL;
-                        USE_NEURAL_NET = 0;
-                        local_init_match(1);
+                        // NN Disabled
+                        local_init_match(1, 0);
                         SDL_SetRelativeMouseMode(SDL_TRUE);
                         glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
                         glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
                     }
                     if (e.key.keysym.sym == SDLK_b) {
                         app_state = STATE_GAME_LOCAL;
-                        USE_NEURAL_NET = 0; 
-                        local_init_match(31); 
+                        // NN Disabled 
+                        local_init_match(31, 0); 
                         SDL_SetRelativeMouseMode(SDL_TRUE);
                         glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
                         glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
                     }
                     if (e.key.keysym.sym == SDLK_s) { 
                         app_state = STATE_GAME_LOCAL;
-                        USE_NEURAL_NET = 1; 
-                        local_init_match(31);
+                        // NN Disabled 
+                        local_init_match(31, 0);
                         printf("MODE S ACTIVATED.\n");
                         SDL_SetRelativeMouseMode(SDL_TRUE);
                         glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
@@ -468,8 +485,8 @@ int main(int argc, char* argv[]) {
             if(k[SDL_SCANCODE_4]) wpn=3; if(k[SDL_SCANCODE_5]) wpn=4;
 
             // --- REGEN LOGIC (Simulation side logic handled in physics.h but timer needs ticking)
-            if (local_state.players[0].shield_regen_timer > 0) local_state.players[0].shield_regen_timer--;
-            else if (local_state.players[0].shield < 100) local_state.players[0].shield++;
+            if (local_state.players[0].armor_regen_timer > 0) local_state.players[0].armor_regen_timer--;
+            else if (local_state.players[0].armor < 100) local_state.players[0].armor++;
 
             float target_fov = (rmb && local_state.players[0].current_weapon == WPN_SNIPER) ? 20.0f : 75.0f;
             current_fov += (target_fov - current_fov) * 0.2f;
@@ -477,7 +494,7 @@ int main(int argc, char* argv[]) {
             gluPerspective(current_fov, 1280.0/720.0, 0.1, 1000.0);
             glMatrixMode(GL_MODELVIEW);
 
-            local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn, jump, crouch, reload);
+            local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn, jump, crouch, reload, NULL, 0);
             draw_scene(&local_state.players[0]);
         }
         else if (app_state == STATE_GAME_NET) {
