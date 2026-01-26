@@ -1,4 +1,14 @@
-#include "protocol.h"
+#include "../../packages/common/protocol.h"
+#ifndef STATE_MENU
+#define STATE_MENU 0
+#define STATE_PLAYING 1
+#define MODE_BOTS 0
+#define MODE_DEV 1
+#define MODE_SERV 2
+#define MODE_NET 3
+#define SCREEN_HEIGHT 600
+#endif
+
 #define SDL_MAIN_HANDLED
 #include <stdio.h>
 #include <stdlib.h>
@@ -59,7 +69,6 @@ void net_init() {
         server_addr.sin_port = htons(6969);
         server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
     }
-}
 
 // Reuse Title Screen functions...
 void draw_char(char c, float x, float y, float w, float h) {
@@ -71,7 +80,6 @@ void draw_char(char c, float x, float y, float w, float h) {
     glVertex2f(x+w, y+h); glVertex2f(x, y+h);
     glVertex2f(x, y+h); glVertex2f(x, y);
     glEnd();
-}
 void draw_text_string(const char* s, float x, float y, float size) {
     float cursor = x;
     while(*s) {
@@ -81,7 +89,6 @@ void draw_text_string(const char* s, float x, float y, float size) {
         cursor += size * 0.8f;
         s++;
     }
-}
 void draw_lobby_screen() { /* Kept simple for now */ }
 
 void draw_grid() {
@@ -92,7 +99,6 @@ void draw_grid() {
         glVertex3f(-100, 0, i); glVertex3f(100, 0, i);
     }
     glEnd();
-}
 
 void draw_map() {
     for(int i=1; i<map_count; i++) {
@@ -115,7 +121,6 @@ void draw_map() {
         glEnd();
         glPopMatrix();
     }
-}
 
 void draw_gun_model(int weapon_id) {
     switch(weapon_id) {
@@ -132,7 +137,6 @@ void draw_gun_model(int weapon_id) {
     glVertex3f(1,-1,-1); glVertex3f(1,1,-1); glVertex3f(1,1,1); glVertex3f(1,-1,1); 
     glVertex3f(-1,-1,1); glVertex3f(-1,1,1); glVertex3f(-1,1,-1); glVertex3f(-1,-1,-1); 
     glEnd();
-}
 
 void draw_weapon_p(PlayerState *p) {
     glPushMatrix();
@@ -146,7 +150,6 @@ void draw_weapon_p(PlayerState *p) {
     glRotatef(-p->recoil_anim * 10.0f, 1, 0, 0);
     draw_gun_model(p->current_weapon);
     glPopMatrix();
-}
 
 // --- NEW: DRAW HEAD ---
 void draw_head(int weapon_id) {
@@ -168,7 +171,6 @@ void draw_head(int weapon_id) {
     glVertex3f(-0.4, 0.8, 0.4); glVertex3f(-0.4, 0, 0.4); glVertex3f(-0.4, 0, -0.4); glVertex3f(-0.4, 0.8, -0.4);
     glVertex3f(0.4, 0.8, 0.4); glVertex3f(0.4, 0, 0.4); glVertex3f(0.4, 0, -0.4); glVertex3f(0.4, 0.8, -0.4);
     glEnd();
-}
 
 void draw_player_3rd(PlayerState *p) {
     glPushMatrix();
@@ -203,7 +205,6 @@ void draw_player_3rd(PlayerState *p) {
     draw_gun_model(p->current_weapon);
     glPopMatrix();
     glPopMatrix();
-}
 
 void draw_projectiles() {}
 
@@ -254,7 +255,6 @@ void draw_hud(PlayerState *p) {
     
     glEnable(GL_DEPTH_TEST);
     glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW); glPopMatrix();
-}
 
 void draw_scene(PlayerState *render_p) {
     glClearColor(0.05f, 0.05f, 0.1f, 1.0f);
@@ -278,7 +278,6 @@ void draw_scene(PlayerState *render_p) {
 
     draw_weapon_p(render_p);
     draw_hud(render_p);
-}
 
 int main(int argc, char* argv[]) {
     SDL_Init(SDL_INIT_VIDEO);
@@ -289,11 +288,26 @@ int main(int argc, char* argv[]) {
     local_init_match(1);
 
     
+    
     int game_state = STATE_MENU;
     int game_mode = MODE_BOTS;
     int running = 1;
 
     while (running) {
+        if (game_state == STATE_MENU) {
+            float glitch_x = (rand() % 100 > 95) ? (float)(rand() % 10 - 5) : 0;
+            render_background_canyon(); 
+            draw_text_centered("SHANKPIT", (SCREEN_HEIGHT/2 - 40) + glitch_x, 4.0f);
+            draw_text_centered("[B] BOTS   [D] DEV/DEMO", SCREEN_HEIGHT/2 + 10, 1.2f);
+            draw_text_centered("[S] SERVER [N] NETWORK", SCREEN_HEIGHT/2 + 35, 1.2f);
+
+            if (is_key_pressed('B')) { game_mode = MODE_BOTS; game_state = STATE_PLAYING; init_local_player(); }
+            if (is_key_pressed('D')) { game_mode = MODE_DEV;  game_state = STATE_PLAYING; }
+            if (is_key_pressed('S')) { game_mode = MODE_SERV; game_state = STATE_PLAYING; start_server(); }
+            if (is_key_pressed('N')) { game_mode = MODE_NET;  game_state = STATE_PLAYING; connect_to_lan(); }
+            continue; 
+        }
+
         // --- B-D-S-N GLITCH MENU ---
         if (game_state == STATE_MENU) {
             float glitch_x = (rand() % 100 > 95) ? (float)(rand() % 10 - 5) : 0;
@@ -430,4 +444,3 @@ int main(int argc, char* argv[]) {
     }
     SDL_Quit();
     return 0;
-}
