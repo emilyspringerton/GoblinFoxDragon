@@ -8,6 +8,16 @@
 #define MODE_NET 3
 #define SCREEN_HEIGHT 600
 #endif
+#include "../../packages/common/protocol.h"
+#ifndef STATE_MENU
+#define STATE_MENU 0
+#define STATE_PLAYING 1
+#define MODE_BOTS 0
+#define MODE_DEV 1
+#define MODE_SERV 2
+#define MODE_NET 3
+#define SCREEN_HEIGHT 600
+#endif
 
 #define SDL_MAIN_HANDLED
 #include <stdio.h>
@@ -289,11 +299,26 @@ int main(int argc, char* argv[]) {
 
     
     
+    
     int game_state = STATE_MENU;
     int game_mode = MODE_BOTS;
     int running = 1;
 
     while (running) {
+        if (game_state == STATE_MENU) {
+            float glitch_x = (rand() % 100 > 95) ? (float)(rand() % 10 - 5) : 0;
+            render_background_canyon(); 
+            draw_text_centered("SHANKPIT", (SCREEN_HEIGHT/2 - 40) + glitch_x, 4.0f);
+            draw_text_centered("[B] BOTS   [D] DEV/DEMO", SCREEN_HEIGHT/2 + 10, 1.2f);
+            draw_text_centered("[S] SERVER [N] NETWORK", SCREEN_HEIGHT/2 + 35, 1.2f);
+
+            if (is_key_pressed('B')) { game_mode = MODE_BOTS; game_state = STATE_PLAYING; init_local_player(); }
+            if (is_key_pressed('D')) { game_mode = MODE_DEV;  game_state = STATE_PLAYING; }
+            if (is_key_pressed('S')) { game_mode = MODE_SERV; game_state = STATE_PLAYING; start_server(); }
+            if (is_key_pressed('N')) { game_mode = MODE_NET;  game_state = STATE_PLAYING; connect_to_lan(); }
+            continue; 
+        }
+
         if (game_state == STATE_MENU) {
             float glitch_x = (rand() % 100 > 95) ? (float)(rand() % 10 - 5) : 0;
             render_background_canyon(); 
