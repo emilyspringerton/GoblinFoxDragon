@@ -39,6 +39,53 @@ struct sockaddr_in server_addr;
 
 
 // --- PHASE 300: CLIENT INPUT PACKER ---
+
+// --- PHASE 308: NETWORK TRANSMITTER (Requirement 3) ---
+#define CMD_HISTORY_SIZE 64
+UserCmd cmd_history[CMD_HISTORY_SIZE];
+#define PACKET_REDUNDANCY 2 // Send Current + 2 Past
+
+void net_send_cmd(UserCmd cmd) {
+    if (sock == -1) return;
+
+    // 1. Save to History
+    int slot = cmd.sequence % CMD_HISTORY_SIZE;
+    cmd_history[slot] = cmd;
+    
+    // 2. Prepare Buffer
+    char packet_data[1024];
+    int cursor = 0;
+    
+    // 3. Header
+    NetHeader head;
+    head.type = PACKET_USERCMD;
+    head.client_id = 1; // TODO: Handshake ID
+    memcpy(packet_data + cursor, &head, sizeof(NetHeader));
+    cursor += sizeof(NetHeader);
+    
+    // 4. Determine Stuffing Count
+    // We try to send PACKET_REDUNDANCY extra commands, but stop if sequence < 1
+    int count = 1; 
+    for(int i=1; i<=PACKET_REDUNDANCY; i++) {
+        if (cmd.sequence > i) count++;
+    }
+    
+    unsigned char count_byte = (unsigned char)count;
+    memcpy(packet_data + cursor, &count_byte, 1);
+    cursor += 1;
+    
+    // 5. Serialize (Current -> Oldest)
+    for(int i=0; i<count; i++) {
+        int seq_to_send = cmd.sequence - i;
+        int hist_slot = seq_to_send % CMD_HISTORY_SIZE;
+        memcpy(packet_data + cursor, &cmd_history[hist_slot], sizeof(UserCmd));
+        cursor += sizeof(UserCmd);
+    }
+    
+    // 6. Blast it (UDP)
+    sendto(sock, packet_data, cursor, 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
+}
+
 static unsigned int client_sequence = 0;
 
 UserCmd client_create_cmd(float fwd, float str, float yaw, float pitch, int shoot, int jump, int crouch, int reload, int wpn_idx) {
