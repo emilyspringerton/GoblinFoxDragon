@@ -75,22 +75,6 @@ void draw_text_string(const char* s, float x, float y, float size) {
     float cursor = x;
     while(*s) {
 
-        // --- REVISED GLITCHY TITLE SCREEN (PHASE 242) ---
-        if (game_state == STATE_MENU) {
-            float glitch_x = (rand() % 100 > 95) ? (float)(rand() % 10 - 5) : 0;
-            render_background_canyon(); 
-            
-            draw_text_centered("SHANKPIT", (SCREEN_HEIGHT/2 - 40) + glitch_x, 4.0f);
-            
-            draw_text_centered("[B] BOTS   [D] DEV/DEMO", SCREEN_HEIGHT/2 + 10, 1.2f);
-            draw_text_centered("[S] SERVER [N] NETWORK", SCREEN_HEIGHT/2 + 35, 1.2f);
-
-            if (is_key_pressed(KEY_B)) { game_mode = MODE_BOTS; game_state = STATE_PLAYING; init_local_player(); }
-            if (is_key_pressed(KEY_D)) { game_mode = MODE_DEV;  game_state = STATE_PLAYING; }
-            if (is_key_pressed(KEY_S)) { game_mode = MODE_SERV; game_state = STATE_PLAYING; start_server(); }
-            if (is_key_pressed(KEY_N)) { game_mode = MODE_NET;  game_state = STATE_PLAYING; connect_to_lan(); }
-            
-            continue; 
         }
         draw_char(*s, cursor, y, size*0.6f, size);
         cursor += size * 0.8f;
@@ -305,6 +289,21 @@ int main(int argc, char* argv[]) {
 
     int running = 1;
     while(running) {
+
+    // --- REVISED GLITCHY TITLE SCREEN ---
+    if (game_state == STATE_MENU) {
+        float glitch_x = (rand() % 100 > 95) ? (float)(rand() % 10 - 5) : 0;
+        render_background_canyon(); 
+        draw_text_centered("SHANKPIT", (SCREEN_HEIGHT/2 - 40) + glitch_x, 4.0f);
+        draw_text_centered("[B] BOTS   [D] DEV/DEMO", SCREEN_HEIGHT/2 + 10, 1.2f);
+        draw_text_centered("[S] SERVER [N] NETWORK", SCREEN_HEIGHT/2 + 35, 1.2f);
+
+        if (is_key_pressed(KEY_B)) { game_mode = MODE_BOTS; game_state = STATE_PLAYING; init_local_player(); }
+        if (is_key_pressed(KEY_D)) { game_mode = MODE_DEV;  game_state = STATE_PLAYING; }
+        if (is_key_pressed(KEY_S)) { game_mode = MODE_SERV; game_state = STATE_PLAYING; start_server(); }
+        if (is_key_pressed(KEY_N)) { game_mode = MODE_NET;  game_state = STATE_PLAYING; connect_to_lan(); }
+        continue; 
+    }
         SDL_Event e;
         while(SDL_PollEvent(&e)) {
             if(e.type == SDL_QUIT) running = 0;
