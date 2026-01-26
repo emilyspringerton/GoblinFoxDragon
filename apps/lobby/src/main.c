@@ -84,7 +84,7 @@ void draw_lobby_screen() { /* Kept simple for now */ }
 void draw_grid() {
     glBegin(GL_LINES);
     glColor3f(0.0f, 1.0f, 1.0f);
-    for(int i=-100; i<=100; i+=5) {
+    for(int i=-100; i<=900; i+=5) {
         glVertex3f(i, 0, -100); glVertex3f(i, 0, 100);
         glVertex3f(-100, 0, i); glVertex3f(100, 0, i);
     }
