@@ -30,50 +30,58 @@ int tests_passed = 0;
 
 // --- TESTS ---
 
-void test_usercmd_size() {
-    printf("--- Testing Struct Alignment ---\n");
-    // We want UserCmd to be reasonably compact.
-    // 4(seq) + 4(ts) + 4(fwd) + 4(str) + 4(yaw) + 4(pitch) + 4(wpn) + 1(btn) + 2(msec) = ~31 bytes
-    // With padding it might be 32 or 36.
-    size_t size = sizeof(UserCmd);
-    printf("UserCmd Size: %zu bytes\n", size);
-    ASSERT_TRUE(size <= 48, "UserCmd should be under 48 bytes for efficiency");
+void test_packet_structure() {
+    printf("--- Testing Packet Overhead ---\n");
+    size_t header_size = sizeof(NetHeader);
+    size_t cmd_size = sizeof(UserCmd);
+    size_t total_packet = header_size + cmd_size;
+    
+    printf("Header: %zu bytes | UserCmd: %zu bytes | Total: %zu bytes\n", header_size, cmd_size, total_packet);
+    
+    // Safety check: Is this way smaller than a standard MTU (1400)?
+    ASSERT_TRUE(total_packet < 1400, "Packet fits comfortably in UDP MTU");
+    ASSERT_TRUE(total_packet < 64, "Packet is hyper-optimized (Target < 64 bytes)");
+}
+
+void test_handshake_enums() {
+    printf("--- Testing Handshake Types ---\n");
+    // Ensure distinct values
+    ASSERT_EQ(PACKET_CONNECT, 0, "Connect is type 0");
+    ASSERT_EQ(PACKET_USERCMD, 1, "UserCmd is type 1");
+    ASSERT_EQ(PACKET_SNAPSHOT, 2, "Snapshot is type 2");
+    
+    // Verify differentiation
+    ASSERT_TRUE(PACKET_CONNECT != PACKET_USERCMD, "Connect != UserCmd");
+}
+
+void test_simulation_delta() {
+    printf("--- Testing Delta Time Limits ---\n");
+    UserCmd cmd;
+    cmd.msec = 16; // 60 FPS
+    ASSERT_EQ(cmd.msec, 16, "Stores 16ms correctly");
+    
+    cmd.msec = 1000; // 1 FPS (Lag spike)
+    ASSERT_EQ(cmd.msec, 1000, "Stores 1000ms lag spike correctly");
+    
+    // Max unsigned short is 65535, so we are safe from overflow unless lag is > 65 seconds
+    ASSERT_TRUE(sizeof(cmd.msec) == 2, "msec is 2 bytes (ushort)");
 }
 
 void test_button_bits() {
-    printf("--- Testing Button Bitmasks ---\n");
-    UserCmd cmd;
-    memset(&cmd, 0, sizeof(UserCmd));
-    
-    // Set Jump and Attack
-    cmd.buttons |= BTN_JUMP;
-    cmd.buttons |= BTN_ATTACK;
-    
-    ASSERT_EQ((cmd.buttons & BTN_JUMP), BTN_JUMP, "Jump bit set");
-    ASSERT_EQ((cmd.buttons & BTN_ATTACK), BTN_ATTACK, "Attack bit set");
-    ASSERT_EQ((cmd.buttons & BTN_CROUCH), 0, "Crouch bit NOT set");
-    
-    // Toggle Reload
-    cmd.buttons |= BTN_RELOAD;
-    ASSERT_EQ((cmd.buttons & BTN_RELOAD), BTN_RELOAD, "Reload bit set");
-}
-
-void test_sequence_monotonicity() {
-    printf("--- Testing Sequence Logic ---\n");
-    unsigned int last_seq = 100;
-    unsigned int incoming = 101;
-    
-    ASSERT_TRUE(incoming > last_seq, "New packet is newer (101 > 100)");
-    
-    incoming = 99; // Out of order / Late
-    ASSERT_TRUE(incoming < last_seq, "Old packet detected (99 < 100)");
+    printf("--- Testing Button Bitmasks (Regression) ---\n");
+    unsigned char btns = 0;
+    btns |= BTN_JUMP | BTN_ATTACK;
+    ASSERT_EQ((btns & BTN_JUMP), BTN_JUMP, "Jump bit set");
+    ASSERT_EQ((btns & BTN_ATTACK), BTN_ATTACK, "Attack bit set");
+    ASSERT_EQ((btns & BTN_CROUCH), 0, "Crouch bit NOT set");
 }
 
 int main() {
-    printf("🛡️ SHANKPIT NETCODE REGRESSION SUITE 🛡️\n");
-    test_usercmd_size();
+    printf("🛡️ SHANKPIT PROTOCOL VERIFICATION 🛡️\n");
+    test_packet_structure();
+    test_handshake_enums();
+    test_simulation_delta();
     test_button_bits();
-    test_sequence_monotonicity();
     
     printf("\n--------------------------------------\n");
     printf("SUMMARY: %d/%d Tests Passed.\n", tests_passed, tests_run);
