@@ -74,4 +74,46 @@ typedef struct {
     int server_tick;
 } ServerState;
 
+
+// --- PHASE 300: SERVER AUTHORITY PROTOCOL ---
+
+// Button Bits (for UserCmd)
+#define BTN_ATTACK  (1 << 0)
+#define BTN_JUMP    (1 << 1)
+#define BTN_CROUCH  (1 << 2)
+#define BTN_RELOAD  (1 << 3)
+#define BTN_USE     (1 << 4)
+
+// 1. Client Intent (The Input)
+typedef struct {
+    unsigned int sequence;  // Monotonic counter (1, 2, 3...)
+    unsigned int timestamp; // Client time
+    
+    float fwd;      // -127 to 127 (normalized to float for sim)
+    float str;      // -127 to 127
+    float yaw;      // View Angle
+    float pitch;    // View Angle
+    
+    int weapon_idx; // Desired weapon
+    unsigned char buttons; // Bitmask of BTN_*
+    
+    unsigned short msec; // Duration of this command (usually 16ms)
+} UserCmd;
+
+// 2. The Header (Traffic Control)
+typedef enum {
+    PACKET_CONNECT = 0,
+    PACKET_USERCMD,
+    PACKET_SNAPSHOT,
+    PACKET_DISCONNECT
+} NetPacketType;
+
+typedef struct {
+    unsigned int type; // NetPacketType
+    unsigned int client_id;
+} NetHeader;
+
+// 3. The "Truth" (Server Update)
+// This will eventually wrap ServerState for delta compression.
+
 #endif
