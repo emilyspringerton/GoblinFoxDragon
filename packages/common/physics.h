@@ -5,13 +5,13 @@
 #include <stdio.h>
 #include "protocol.h"
 
-// --- TURBO TUNING (PHASE 435) ---
-#define GRAVITY 0.08f
-#define JUMP_FORCE 0.61f
-#define MAX_SPEED 0.5f
-#define FRICTION 8.0f
-#define ACCEL 6.0f
-#define STOP_SPEED 1.0f
+// --- VELOCITY TUNING (PHASE 437) ---
+#define GRAVITY 0.05f       // Tuned for good arcs
+#define JUMP_FORCE 0.8f     // Powerful jump
+#define MAX_SPEED 0.8f      // Fast run
+#define FRICTION 4.0f       // SLIPPERY (Was 8.0)
+#define ACCEL 5.0f          // Smooth buildup
+#define STOP_SPEED 0.1f     // Allow micro-sliding
 #define MAX_AIR_SPEED 0.2f
 #define EYE_HEIGHT 1.6f 
 #define HEAD_SIZE 1.2f
@@ -72,24 +72,31 @@ int check_hit_location(float ox, float oy, float oz, float dx, float dy, float d
 void apply_friction(PlayerState *p) {
     float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
     if (speed < 0.001f) { p->vx = 0; p->vz = 0; return; }
+    
     float drop = 0;
+    
+    // SLIPPERY LOGIC:
+    // Only apply friction if on ground.
+    // Air friction is ZERO to allow bunny hopping / momentum.
     if (p->on_ground) {
         float control = (speed < STOP_SPEED) ? STOP_SPEED : speed;
         drop = control * FRICTION;
-    } else {
-        drop = speed * 0.5f; 
-    }
+    } 
+    // else { drop = 0; } // NO AIR RESISTANCE
+    
     float newspeed = speed - drop;
     if (newspeed < 0) newspeed = 0;
     newspeed /= speed;
-    p->vx *= newspeed; p->vz *= newspeed;
+    
+    p->vx *= newspeed;
+    p->vz *= newspeed;
 }
 
 void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, float accel) {
     float current_speed = (p->vx * wish_x) + (p->vz * wish_z);
     float add_speed = wish_speed - current_speed;
     if (add_speed <= 0) return;
-    float acc_speed = accel * wish_speed;
+    float acc_speed = accel * wish_speed; // Removed delta time for simple scaling
     if (acc_speed > add_speed) acc_speed = add_speed;
     p->vx += acc_speed * wish_x; p->vz += acc_speed * wish_z;
 }
@@ -192,11 +199,10 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
     }
 }
 
-// --- HISTORY STORE (RESTORED PHASE 436) ---
+// RESTORE HISTORY FUNCTIONS (Required for Server)
 void phys_store_history(ServerState *server, int client_id, unsigned int now) {
     if (client_id < 0 || client_id >= MAX_CLIENTS) return;
-    int slot = (now / 16) % LAG_HISTORY; // Simple tick map
-    
+    int slot = (now / 16) % LAG_HISTORY; 
     server->history[client_id][slot].active = 1;
     server->history[client_id][slot].timestamp = now;
     server->history[client_id][slot].x = server->players[client_id].x;
@@ -206,10 +212,9 @@ void phys_store_history(ServerState *server, int client_id, unsigned int now) {
 
 int phys_resolve_rewind(ServerState *server, int client_id, unsigned int target_time, float *out_pos) {
     LagRecord *hist = server->history[client_id];
-    // Simple linear scan for match (Optimized version in real engine)
     for(int i=0; i<LAG_HISTORY; i++) {
         if (!hist[i].active) continue;
-        if (hist[i].timestamp == target_time) { // Exact match for simplicity
+        if (hist[i].timestamp == target_time) { 
             out_pos[0] = hist[i].x; out_pos[1] = hist[i].y; out_pos[2] = hist[i].z;
             return 1;
         }
