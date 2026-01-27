@@ -90,6 +90,10 @@ jobs:
           done
 
       # --- 4. PACKAGE ---
+      
+      - name: Diagnostic List
+        run: ls -R
+        
       - name: Bundle Artifacts
         run: |
           # Client Bundle
@@ -108,6 +112,7 @@ jobs:
           mkdir ShankPit_Bots
           cp ShankBot.exe ShankPit_Bots/
           cp ShankBot_Linux ShankPit_Bots/
+          cp SHANKPIT_CONSTRUCT.txt ShankPit_Bots/
           zip -r ShankPit_Bots.zip
             SHANKPIT_CONSTRUCT.txt
             SHANKPIT_CONSTRUCT.txt ShankPit_Bots
