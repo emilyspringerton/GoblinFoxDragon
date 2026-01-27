@@ -6,7 +6,6 @@
 #define MAX_PROJECTILES 1024
 #define LAG_HISTORY 64
 
-// Packet Types
 #define PACKET_CONNECT 0
 #define PACKET_USERCMD 1
 #define PACKET_SNAPSHOT 2
@@ -29,7 +28,7 @@ typedef struct {
     unsigned char client_id;
     unsigned short sequence;
     unsigned int timestamp;
-    unsigned char entity_count; // Added for Delta Compression
+    unsigned char entity_count; 
 } NetHeader;
 
 typedef struct {
@@ -62,24 +61,29 @@ typedef struct {
     int active; float x, y, z; float vx, vy, vz; int owner_id;
 } Projectile;
 
-// COMPRESSED PLAYER STATE (Network Efficient)
+// NET PLAYER (Compressed Snapshot)
 typedef struct {
-    unsigned char id; // Who is this?
-    
-    // Position (Compressed? No, keep float for precision for now)
-    float x, y, z;
-    float yaw, pitch;
-    
-    // State
+    unsigned char id; 
+    float x, y, z; float yaw, pitch;
     unsigned char current_weapon;
     unsigned char state;
     unsigned char health;
     unsigned char shield;
-    
-    // Visuals
     unsigned char is_shooting;
     unsigned char crouching;
+    float reward_feedback; // <--- NEW: Server tells bot how well it did this tick
 } NetPlayer;
+
+// BOT GENOME (The Brain - Versioned)
+typedef struct {
+    int version;
+    float w_aggro;      
+    float w_strafe;     
+    float w_jump;       
+    float w_slide;      
+    float w_turret;     
+    float w_repel;      
+} BotGenome;
 
 typedef struct {
     int id; int active; int is_bot;
@@ -90,7 +94,10 @@ typedef struct {
     int reload_timer; int attack_cooldown; int is_shooting; int jump_timer;
     int health; int shield; int shield_regen_timer; int state;
     int kills; int deaths; int hit_feedback; float recoil_anim;
+    
     float accumulated_reward; 
+    BotGenome brain; 
+    
     unsigned int last_hit_time; unsigned int respawn_time;
 } PlayerState;
 
@@ -99,7 +106,7 @@ typedef struct {
     float x, y, z; float vx, vy, vz;
 } LagRecord;
 
-typedef enum { MODE_DEATHMATCH=0, MODE_TDM=1, MODE_SURVIVAL=2, MODE_CTF=3, MODE_ODDBALL=4, MODE_LOCAL=98, MODE_NET=99 } GameMode;
+typedef enum { MODE_DEATHMATCH=0, MODE_TDM=1, MODE_SURVIVAL=2, MODE_CTF=3, MODE_ODDBALL=4, MODE_LOCAL=98, MODE_NET=99, MODE_EVOLUTION=100 } GameMode;
 
 typedef struct {
     PlayerState players[MAX_CLIENTS];
