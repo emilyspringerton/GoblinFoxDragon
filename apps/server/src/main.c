@@ -20,7 +20,6 @@
 #include "../../../packages/common/physics.h"
 #include "../../../packages/simulation/local_game.h"
 
-// --- SERVER STATE ---
 int sock = -1;
 struct sockaddr_in bind_addr;
 unsigned int client_last_seq[MAX_CLIENTS]; 
@@ -32,47 +31,39 @@ unsigned int get_server_time() {
 }
 
 void server_net_init() {
-    // DISABLE BUFFERING
     setbuf(stdout, NULL);
-
     #ifdef _WIN32
     WSADATA wsa; WSAStartup(MAKEWORD(2,2), &wsa);
     #endif
-    
     sock = socket(AF_INET, SOCK_DGRAM, 0);
-    
     #ifdef _WIN32
     u_long mode = 1; ioctlsocket(sock, FIONBIO, &mode);
     #else
     int flags = fcntl(sock, F_GETFL, 0); fcntl(sock, F_SETFL, flags | O_NONBLOCK);
     #endif
-
     bind_addr.sin_family = AF_INET;
     bind_addr.sin_port = htons(6969); 
     bind_addr.sin_addr.s_addr = INADDR_ANY;
-    
     if (bind(sock, (struct sockaddr*)&bind_addr, sizeof(bind_addr)) < 0) {
-        printf("FAILED TO BIND PORT 6969 (Is another server running?)\n");
-        exit(1);
+        printf("FAILED TO BIND PORT 6969\n"); exit(1);
     } else {
-        printf("SERVER LISTENING ON PORT 6969\n");
-        printf("Waiting for connections...\n");
+        printf("SERVER LISTENING ON PORT 6969\nWaiting...\n");
     }
 }
 
 void process_user_cmd(int client_id, UserCmd *cmd) {
     if (cmd->sequence <= client_last_seq[client_id]) return; 
-    
     PlayerState *p = &local_state.players[client_id];
+    
+    // Direct Input Mapping
     p->yaw = cmd->yaw;
     p->pitch = cmd->pitch;
-    p->in_fwd = cmd->fwd;
+    p->in_fwd = cmd->fwd; // Used in simulation step
     p->in_strafe = cmd->str;
     p->in_jump = (cmd->buttons & BTN_JUMP);
     p->in_shoot = (cmd->buttons & BTN_ATTACK);
     p->crouching = (cmd->buttons & BTN_CROUCH);
     p->in_reload = (cmd->buttons & BTN_RELOAD);
-    
     if (cmd->weapon_idx >= 0 && cmd->weapon_idx < MAX_WEAPONS) p->current_weapon = cmd->weapon_idx;
     
     client_last_seq[client_id] = cmd->sequence;
@@ -81,10 +72,8 @@ void process_user_cmd(int client_id, UserCmd *cmd) {
 void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
     if (size < sizeof(NetHeader)) return;
     NetHeader *head = (NetHeader*)buffer;
-    
     int client_id = -1;
     
-    // 1. Identify Client
     for(int i=1; i<MAX_CLIENTS; i++) {
         if (local_state.client_active[i] && 
             memcmp(&local_state.clients[i].sin_addr, &sender->sin_addr, sizeof(struct in_addr)) == 0 &&
@@ -94,37 +83,34 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
         }
     }
     
-    // 2. New Connection
     if (client_id == -1) {
-        char *ip_str = inet_ntoa(sender->sin_addr);
-        printf("PACKET FROM NEW IP: %s:%d (Type: %d)\n", ip_str, ntohs(sender->sin_port), head->type);
-
-        for(int i=1; i<MAX_CLIENTS; i++) {
-            if (!local_state.client_active[i]) {
-                client_id = i;
-                local_state.client_active[i] = 1;
-                local_state.clients[i] = *sender;
-                local_state.players[i].active = 1;
-                
-                phys_respawn(&local_state.players[i], get_server_time());
-                for(int w=0; w<MAX_WEAPONS; w++) local_state.players[i].ammo[w] = WPN_STATS[w].ammo_max;
-
-                printf("CLIENT %d ASSIGNED to %s\n", client_id, ip_str);
-                break;
+        if (head->type == PACKET_CONNECT) {
+            char *ip_str = inet_ntoa(sender->sin_addr);
+            for(int i=1; i<MAX_CLIENTS; i++) {
+                if (!local_state.client_active[i]) {
+                    client_id = i;
+                    local_state.client_active[i] = 1;
+                    local_state.clients[i] = *sender;
+                    local_state.players[i].active = 1;
+                    phys_respawn(&local_state.players[i], get_server_time());
+                    printf("CLIENT %d CONNECTED (%s)\n", client_id, ip_str);
+                    
+                    // SEND WELCOME (Assignment)
+                    NetHeader h; h.type = PACKET_WELCOME; h.client_id = client_id; 
+                    h.sequence = 0; h.timestamp = get_server_time(); h.entity_count = 0;
+                    sendto(sock, (char*)&h, sizeof(NetHeader), 0, (struct sockaddr*)sender, sizeof(struct sockaddr_in));
+                    break;
+                }
             }
         }
     }
     
-    // 3. Process Payload
     if (client_id != -1 && head->type == PACKET_USERCMD) {
         int cursor = sizeof(NetHeader);
         unsigned char count = *(unsigned char*)(buffer + cursor); cursor += 1;
-        
         if (size >= cursor + (count * sizeof(UserCmd))) {
             UserCmd *cmds = (UserCmd*)(buffer + cursor);
-            for (int i = count - 1; i >= 0; i--) {
-                process_user_cmd(client_id, &cmds[i]);
-            }
+            for (int i = count - 1; i >= 0; i--) process_user_cmd(client_id, &cmds[i]);
             local_state.players[client_id].active = 1; 
         }
     }
@@ -133,12 +119,8 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
 void server_broadcast() {
     char buffer[4096];
     int cursor = 0;
-    
-    NetHeader head; 
-    head.type = PACKET_SNAPSHOT; 
-    head.client_id = 0; 
-    head.sequence = local_state.server_tick;
-    head.timestamp = get_server_time();
+    NetHeader head; head.type = PACKET_SNAPSHOT; head.client_id = 0; 
+    head.sequence = local_state.server_tick; head.timestamp = get_server_time();
     
     unsigned char count = 0;
     for(int i=0; i<MAX_CLIENTS; i++) if (local_state.players[i].active) count++;
@@ -177,7 +159,6 @@ void server_broadcast() {
 int main() {
     server_net_init();
     local_init_match(1, 0); 
-    
     int running = 1;
     unsigned int tick = 0;
     
@@ -200,18 +181,34 @@ int main() {
             if (p->state == STATE_DEAD) {
                if (local_state.game_mode != MODE_SURVIVAL && now > p->respawn_time) {
                    phys_respawn(p, now);
-                   printf("Client %d Respawned\n", i);
                }
             }
+            
+            // --- FIX MOVEMENT: CALCULATE VELOCITY FROM INPUTS ---
+            // This was missing! The server knew inputs but didn't apply them to physics.
+            if (p->active && p->state != STATE_DEAD) {
+                float rad = p->yaw * 3.14159f / 180.0f;
+                float wish_x = sinf(rad) * p->in_fwd + cosf(rad) * p->in_strafe;
+                float wish_z = cosf(rad) * p->in_fwd - sinf(rad) * p->in_strafe;
+                
+                float wish_speed = sqrtf(wish_x*wish_x + wish_z*wish_z);
+                if (wish_speed > 1.0f) { wish_speed = 1.0f; wish_x/=wish_speed; wish_z/=wish_speed; }
+                wish_speed *= MAX_SPEED;
+                
+                accelerate(p, wish_x, wish_z, wish_speed, ACCEL);
+                
+                // JUMP LOGIC
+                if (p->in_jump && p->on_ground) { 
+                     p->y += 0.1f; p->vy += JUMP_FORCE; 
+                }
+            }
+            
             update_entity(p, 0.016f, NULL, now);
         }
         
         server_broadcast();
         
-        if (tick % 300 == 0) {
-            printf("[STATUS] Tick: %d | Active Entities: %d\n", tick, active_count);
-        }
-        
+        if (tick % 300 == 0) printf("[STATUS] Tick: %d | Clients: %d\n", tick, active_count);
         local_state.server_tick++;
         #ifdef _WIN32
         Sleep(16);

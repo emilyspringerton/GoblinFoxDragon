@@ -9,6 +9,7 @@
 #define PACKET_CONNECT 0
 #define PACKET_USERCMD 1
 #define PACKET_SNAPSHOT 2
+#define PACKET_WELCOME  3 // <--- NEW: Handshake
 
 #define STATE_ALIVE 0
 #define STATE_DEAD  1
@@ -20,7 +21,6 @@
 #define WPN_SHOTGUN 3
 #define WPN_SNIPER 4
 
-// --- RELOAD TIMINGS ---
 #define RELOAD_TIME_FULL 60      
 #define RELOAD_TIME_TACTICAL 42  
 #define SHIELD_REGEN_DELAY 180 
@@ -63,7 +63,6 @@ typedef struct {
     int active; float x, y, z; float vx, vy, vz; int owner_id;
 } Projectile;
 
-// NET PLAYER (Compressed Snapshot)
 typedef struct {
     unsigned char id; 
     float x, y, z; float yaw, pitch;
@@ -77,15 +76,9 @@ typedef struct {
     unsigned char ammo; 
 } NetPlayer;
 
-// --- MISSING STRUCT RESTORED ---
 typedef struct {
     int version;
-    float w_aggro;      
-    float w_strafe;     
-    float w_jump;       
-    float w_slide;      
-    float w_turret;     
-    float w_repel;      
+    float w_aggro; float w_strafe; float w_jump; float w_slide; float w_turret; float w_repel;      
 } BotGenome;
 
 typedef struct {
@@ -97,10 +90,8 @@ typedef struct {
     int reload_timer; int attack_cooldown; int is_shooting; int jump_timer;
     int health; int shield; int shield_regen_timer; int state;
     int kills; int deaths; int hit_feedback; float recoil_anim;
-    
     float accumulated_reward; 
-    BotGenome brain; // <--- RESTORED
-    
+    BotGenome brain;
     unsigned int last_hit_time; unsigned int respawn_time;
 } PlayerState;
 

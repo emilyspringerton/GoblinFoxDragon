@@ -30,12 +30,12 @@
 #define STATE_GAME_LOCAL 2
 #define STATE_LISTEN_SERVER 99
 
-// --- CONFIG ---
 char SERVER_HOST[64] = "s.farthq.com"; 
 int SERVER_PORT = 6969;
 
 int app_state = STATE_LOBBY;
 int wpn_req = 1; 
+int my_client_id = -1; // <--- ASSIGNED BY SERVER
 
 float cam_yaw = 0.0f;
 float cam_pitch = 0.0f;
@@ -44,17 +44,15 @@ float current_fov = 75.0f;
 int sock = -1;
 struct sockaddr_in server_addr;
 
-// --- RENDER FUNCTIONS ---
+// --- RENDER ---
 void draw_scene(PlayerState *render_p); 
-
 void draw_char(char c, float x, float y, float s) {
     glLineWidth(1.0f);
     glBegin(GL_LINES);
-    // FLIPPED Y-AXIS (Correct Text)
     if(c>='0'&&c<='9'){ glVertex2f(x,y+s);glVertex2f(x+s,y+s);glVertex2f(x+s,y);glVertex2f(x,y);glVertex2f(x,y+s); }
     else if(c=='A'){glVertex2f(x,y);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y);glVertex2f(x,y+s/2);glVertex2f(x+s/2,y+s);glVertex2f(x+s/2,y+s);glVertex2f(x+s,y+s/2);}
     else if(c=='B'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s,y+s*0.75);glVertex2f(x+s,y+s*0.75);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x+s,y+s/4);glVertex2f(x+s,y+s/4);glVertex2f(x+s*0.8,y);glVertex2f(x+s*0.8,y);glVertex2f(x,y);}
-    else if(c=='D'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s*0.8,y);glVertex2f(x+s*0.8,y);glVertex2f(x,y);}
+    else if(c=='D'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x,y);}
     else if(c=='J'){glVertex2f(x+s,y+s);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x,y+s/2);}
     else if(c=='O'){glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x,y);}
     else if(c=='I'){glVertex2f(x+s/2,y);glVertex2f(x+s/2,y+s);glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x,y+s);glVertex2f(x+s,y+s);}
@@ -67,17 +65,12 @@ void draw_char(char c, float x, float y, float s) {
     else { glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x,y); }
     glEnd();
 }
-
-void draw_string(const char* str, float x, float y, float size) {
-    while(*str) { draw_char(*str, x, y, size); x += size * 1.5f; str++; }
-}
-
+void draw_string(const char* str, float x, float y, float size) { while(*str) { draw_char(*str, x, y, size); x += size * 1.5f; str++; } }
 void draw_grid() {
     glBegin(GL_LINES); glColor3f(0.0f, 1.0f, 1.0f);
     for(int i=-100; i<=900; i+=50) { glVertex3f(i, 0, -100); glVertex3f(i, 0, 100); glVertex3f(-100, 0, i); glVertex3f(100, 0, i); }
     glEnd();
 }
-
 void draw_map() {
     for(int i=1; i<map_count; i++) {
         Box b = map_geo[i];
@@ -92,11 +85,9 @@ void draw_map() {
         glLineWidth(2.0f); glColor3f(1.0f, 0.0f, 1.0f); 
         glBegin(GL_LINE_LOOP);
         glVertex3f(-0.5, 0.5, 0.5); glVertex3f(0.5, 0.5, 0.5); glVertex3f(0.5, 0.5, -0.5); glVertex3f(-0.5, 0.5, -0.5);
-        glEnd();
-        glPopMatrix();
+        glEnd(); glPopMatrix();
     }
 }
-
 void draw_gun_model(int weapon_id) {
     switch(weapon_id) {
         case WPN_KNIFE:   glColor3f(0.8f, 0.8f, 0.9f); glScalef(0.05f, 0.05f, 0.8f); break;
@@ -113,7 +104,6 @@ void draw_gun_model(int weapon_id) {
     glVertex3f(-1,-1,1); glVertex3f(-1,1,1); glVertex3f(-1,1,-1); glVertex3f(-1,-1,-1); 
     glEnd();
 }
-
 void draw_weapon_p(PlayerState *p) {
     glPushMatrix(); glLoadIdentity();
     float kick = p->recoil_anim * 0.2f;
@@ -126,7 +116,6 @@ void draw_weapon_p(PlayerState *p) {
     draw_gun_model(p->current_weapon);
     glPopMatrix();
 }
-
 void draw_head(int weapon_id) {
     switch(weapon_id) {
         case WPN_KNIFE:   glColor3f(0.8f, 0.8f, 0.9f); break;
@@ -144,13 +133,11 @@ void draw_head(int weapon_id) {
     glVertex3f(0.4, 0.8, 0.4); glVertex3f(0.4, 0, 0.4); glVertex3f(0.4, 0, -0.4); glVertex3f(0.4, 0.8, -0.4);
     glEnd();
 }
-
 void draw_player_3rd(PlayerState *p) {
     glPushMatrix();
     glTranslatef(p->x, p->y + 2.0f, p->z);
     glRotatef(-p->yaw, 0, 1, 0); 
     if(p->health <= 0) glColor3f(0.2, 0, 0); else glColor3f(1, 0, 0); 
-    
     glPushMatrix(); glScalef(0.97f, 2.91f, 0.97f); 
     glBegin(GL_QUADS);
     glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(-0.5,0.5,0.5);
@@ -159,14 +146,10 @@ void draw_player_3rd(PlayerState *p) {
     glVertex3f(-0.5,-0.5,-0.5); glVertex3f(-0.5,-0.5,0.5); glVertex3f(-0.5,0.5,0.5); glVertex3f(-0.5,0.5,-0.5);
     glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(0.5,0.5,0.5);
     glEnd(); glPopMatrix();
-    
     glPushMatrix(); glTranslatef(0, 1.54f, 0); draw_head(p->current_weapon); glPopMatrix();
     glPushMatrix(); glTranslatef(0.5f, 1.0f, 0.5f); glRotatef(p->pitch, 1, 0, 0);   
     glScalef(0.8f, 0.8f, 0.8f); draw_gun_model(p->current_weapon); glPopMatrix(); glPopMatrix();
 }
-
-void draw_projectiles() { }
-
 void draw_hud(PlayerState *p) {
     glDisable(GL_DEPTH_TEST);
     glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
@@ -174,33 +157,29 @@ void draw_hud(PlayerState *p) {
     glColor3f(0, 1, 0);
     if (current_fov < 50.0f) { glBegin(GL_LINES); glVertex2f(0, 360); glVertex2f(1280, 360); glVertex2f(640, 0); glVertex2f(640, 720); glEnd(); } 
     else { glLineWidth(2.0f); glBegin(GL_LINES); glVertex2f(630, 360); glVertex2f(650, 360); glVertex2f(640, 350); glVertex2f(640, 370); glEnd(); }
-    
     if (p->hit_feedback > 0) {
         if (p->hit_feedback == 20) glColor3f(1, 0, 1); else glColor3f(0, 1, 1);
         glBegin(GL_TRIANGLE_FAN); glVertex2f(640, 360); for(int i=0; i<=20; i++) { float ang = (float)i/20.0f*6.283f; glVertex2f(640+cosf(ang)*15, 360+sinf(ang)*15); } glEnd();
     }
-    
     glColor3f(0.2f, 0, 0); glRectf(50, 50, 250, 70); glColor3f(1.0f, 0, 0); glRectf(50, 50, 50 + (p->health * 2), 70);
     glColor3f(0, 0, 0.2f); glRectf(50, 80, 250, 100); glColor3f(0.2f, 0.2f, 1.0f); glRectf(50, 80, 50 + (p->shield * 2), 100);
     int w = p->current_weapon; int ammo = (w == WPN_KNIFE) ? 99 : p->ammo[w];
     glColor3f(1, 1, 0); for(int i=0; i<ammo; i++) glRectf(1200 - (i*10), 50, 1205 - (i*10), 80);
-    
     float raw_speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
     char vel_buf[32]; sprintf(vel_buf, "VEL: %.2f", raw_speed);
     glColor3f(1.0f, 1.0f, 0.0f); draw_string(vel_buf, 1100, 50, 8); 
-
     glEnable(GL_DEPTH_TEST); glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW); glPopMatrix();
 }
-
 void draw_scene(PlayerState *render_p) {
     glClearColor(0.05f, 0.05f, 0.1f, 1.0f); glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); glLoadIdentity();
     float cam_h = render_p->crouching ? 2.5f : EYE_HEIGHT;
     glRotatef(-cam_pitch, 1, 0, 0); glRotatef(-cam_yaw, 0, 1, 0); glTranslatef(-render_p->x, -(render_p->y + cam_h), -render_p->z);
     draw_grid(); draw_map(); 
-    for(int i=1; i<MAX_CLIENTS; i++) if(local_state.players[i].active && i != 0) draw_player_3rd(&local_state.players[i]);
+    for(int i=1; i<MAX_CLIENTS; i++) if(local_state.players[i].active && i != my_client_id) draw_player_3rd(&local_state.players[i]);
     draw_weapon_p(render_p); draw_hud(render_p);
 }
 
+// --- NETWORKING ---
 void net_init() {
     #ifdef _WIN32
     WSADATA wsa; WSAStartup(MAKEWORD(2,2), &wsa);
@@ -212,23 +191,17 @@ void net_init() {
     int flags = fcntl(sock, F_GETFL, 0); fcntl(sock, F_SETFL, flags | O_NONBLOCK);
     #endif
 }
-
 void net_connect() {
     struct hostent *he = gethostbyname(SERVER_HOST);
     if (he) {
         server_addr.sin_family = AF_INET; 
         server_addr.sin_port = htons(SERVER_PORT); 
         memcpy(&server_addr.sin_addr, he->h_addr_list[0], he->h_length);
-        char buffer[128];
-        NetHeader *h = (NetHeader*)buffer;
-        h->type = PACKET_CONNECT;
+        char buffer[128]; NetHeader *h = (NetHeader*)buffer; h->type = PACKET_CONNECT;
         sendto(sock, buffer, sizeof(NetHeader), 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
         printf("Connected to %s...\n", SERVER_HOST);
-    } else {
-        printf("Failed to resolve %s\n", SERVER_HOST);
     }
 }
-
 UserCmd client_create_cmd(float fwd, float str, float yaw, float pitch, int shoot, int jump, int crouch, int reload, int wpn_idx) {
     UserCmd cmd; memset(&cmd, 0, sizeof(UserCmd));
     static int seq = 0; cmd.sequence = ++seq; cmd.timestamp = SDL_GetTicks();
@@ -237,93 +210,72 @@ UserCmd client_create_cmd(float fwd, float str, float yaw, float pitch, int shoo
     if(crouch) cmd.buttons |= BTN_CROUCH; if(reload) cmd.buttons |= BTN_RELOAD;
     cmd.weapon_idx = wpn_idx; return cmd;
 }
-
 void net_send_cmd(UserCmd cmd) {
-    char packet_data[256];
-    int cursor = 0;
+    char packet_data[256]; int cursor = 0;
     NetHeader head; head.type = PACKET_USERCMD; head.client_id = 0; 
     memcpy(packet_data + cursor, &head, sizeof(NetHeader)); cursor += sizeof(NetHeader);
-    unsigned char count = 1;
-    memcpy(packet_data + cursor, &count, 1); cursor += 1;
+    unsigned char count = 1; memcpy(packet_data + cursor, &count, 1); cursor += 1;
     memcpy(packet_data + cursor, &cmd, sizeof(UserCmd)); cursor += sizeof(UserCmd);
     sendto(sock, packet_data, cursor, 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
 }
-
-void net_process_snapshot(char *buffer, int len) {
-    int cursor = sizeof(NetHeader);
-    unsigned char count = *(unsigned char*)(buffer + cursor); cursor++;
-    
-    for(int i=0; i<count; i++) {
-        NetPlayer *np = (NetPlayer*)(buffer + cursor);
-        cursor += sizeof(NetPlayer);
-        
-        int id = np->id;
-        if (id > 0 && id < MAX_CLIENTS) {
-            PlayerState *p = &local_state.players[id];
-            p->active = 1;
-            p->x = np->x; p->y = np->y; p->z = np->z;
-            p->yaw = np->yaw; p->pitch = np->pitch;
-            p->health = np->health;
-            
-            // --- FULL WEAPON SYNC (Phase 476) ---
-            // Now we can see others shoot!
-            p->current_weapon = np->current_weapon;
-            p->is_shooting = np->is_shooting;
-            if (p->is_shooting) p->recoil_anim = 1.0f; // Visual Pop
-            
-        } else if (id == 0) {
-            local_state.players[0].ammo[local_state.players[0].current_weapon] = np->ammo;
+void net_process_packet(char *buffer, int len) {
+    NetHeader *head = (NetHeader*)buffer;
+    if (head->type == PACKET_WELCOME) {
+        my_client_id = head->client_id;
+        printf("✅ JOINED SERVER AS CLIENT ID: %d\n", my_client_id);
+    }
+    if (head->type == PACKET_SNAPSHOT) {
+        int cursor = sizeof(NetHeader);
+        unsigned char count = *(unsigned char*)(buffer + cursor); cursor++;
+        for(int i=0; i<count; i++) {
+            NetPlayer *np = (NetPlayer*)(buffer + cursor);
+            cursor += sizeof(NetPlayer);
+            int id = np->id;
+            if (id == my_client_id) {
+                // Sync Local Data
+                local_state.players[0].ammo[local_state.players[0].current_weapon] = np->ammo;
+                local_state.players[0].health = np->health;
+            } else if (id > 0 && id < MAX_CLIENTS) {
+                // Sync Remote Player
+                PlayerState *p = &local_state.players[id];
+                p->active = 1;
+                p->x = np->x; p->y = np->y; p->z = np->z;
+                p->yaw = np->yaw; p->pitch = np->pitch;
+                p->health = np->health;
+                p->current_weapon = np->current_weapon;
+                p->is_shooting = np->is_shooting;
+                if (p->is_shooting) p->recoil_anim = 1.0f;
+            }
         }
     }
 }
-
 void net_tick() {
-    char buffer[4096];
-    struct sockaddr_in sender;
-    socklen_t slen = sizeof(sender);
+    char buffer[4096]; struct sockaddr_in sender; socklen_t slen = sizeof(sender);
     int len = recvfrom(sock, buffer, 4096, 0, (struct sockaddr*)&sender, &slen);
     while (len > 0) {
-        NetHeader *head = (NetHeader*)buffer;
-        if (head->type == PACKET_SNAPSHOT) {
-            net_process_snapshot(buffer, len);
-        }
+        net_process_packet(buffer, len);
         len = recvfrom(sock, buffer, 4096, 0, (struct sockaddr*)&sender, &slen);
     }
 }
 
 int main(int argc, char* argv[]) {
-    for(int i=1; i<argc; i++) {
-        if(strcmp(argv[i], "--host") == 0 && i+1<argc) {
-            strncpy(SERVER_HOST, argv[++i], 63);
-        }
-    }
-
-    SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *win = SDL_CreateWindow("SHANKPIT [BUILD 156 - INTEGRITY]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
-    SDL_GL_CreateContext(win);
-    net_init();
-    
-    local_init_match(1, 0);
-    
+    for(int i=1; i<argc; i++) if(strcmp(argv[i], "--host") == 0 && i+1<argc) strncpy(SERVER_HOST, argv[++i], 63);
+    SDL_Init(SDL_INIT_VIDEO); SDL_Window *win = SDL_CreateWindow("SHANKPIT", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
+    SDL_GL_CreateContext(win); net_init(); local_init_match(1, 0);
     int running = 1;
     while(running) {
         SDL_Event e;
         while(SDL_PollEvent(&e)) {
             if(e.type == SDL_QUIT) running = 0;
-            
-            // --- FORCE MOUSE CAPTURE (Phase 476) ---
-            // If we are in game, we aggressively grab the mouse.
-            if (app_state != STATE_LOBBY) SDL_SetRelativeMouseMode(SDL_TRUE);
-            
+            if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_FOCUS_GAINED && app_state != STATE_LOBBY) SDL_SetRelativeMouseMode(SDL_TRUE);
+            if (e.type == SDL_MOUSEBUTTONDOWN && app_state != STATE_LOBBY) SDL_SetRelativeMouseMode(SDL_TRUE);
             if (app_state == STATE_LOBBY) {
                 if(e.type == SDL_KEYDOWN) {
                     if (e.key.keysym.sym == SDLK_d) { app_state = STATE_GAME_LOCAL; local_init_match(1, MODE_DEATHMATCH); }
                     if (e.key.keysym.sym == SDLK_b) { app_state = STATE_GAME_LOCAL; local_init_match(8, MODE_DEATHMATCH); }
                     if (e.key.keysym.sym == SDLK_k) { app_state = STATE_GAME_LOCAL; local_init_match(8, MODE_EVOLUTION); }
-                    
-                    if (e.key.keysym.sym == SDLK_j) { 
-                        app_state = STATE_GAME_NET; 
-                        net_connect(); 
+                    if (e.key.keysym.sym == SDLK_j) { app_state = STATE_GAME_NET; net_connect(); }
+                    if (app_state != STATE_LOBBY) {
                         SDL_SetRelativeMouseMode(SDL_TRUE);
                         glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
                         glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
@@ -343,13 +295,8 @@ int main(int argc, char* argv[]) {
                 }
             }
         }
+        if (app_state != STATE_LOBBY) SDL_SetRelativeMouseMode(SDL_TRUE);
         
-        // --- BRUTE FORCE SAFETY ---
-        // Every frame, if in game, assume relative mode.
-        if (app_state != STATE_LOBBY) {
-             SDL_SetRelativeMouseMode(SDL_TRUE);
-        }
-
         if (app_state == STATE_LOBBY) {
              glClearColor(0.1f, 0.1f, 0.2f, 1.0f); glClear(GL_COLOR_BUFFER_BIT);
              glLoadIdentity(); glColor3f(1, 1, 0);
@@ -358,8 +305,7 @@ int main(int argc, char* argv[]) {
              draw_string("B: BATTLE", 400, 350, 10);
              draw_string("J: JOIN S.FARTHQ.COM", 400, 300, 10);
              SDL_GL_SwapWindow(win);
-        } 
-        else {
+        } else {
             const Uint8 *k = SDL_GetKeyboardState(NULL);
             float fwd=0, str=0;
             if(k[SDL_SCANCODE_W]) fwd-=1; if(k[SDL_SCANCODE_S]) fwd+=1;
@@ -382,12 +328,10 @@ int main(int argc, char* argv[]) {
             } else {
                 local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn_req, jump, crouch, reload, NULL, 0);
             }
-            
             draw_scene(&local_state.players[0]);
             SDL_GL_SwapWindow(win);
         }
         SDL_Delay(16);
     }
-    SDL_Quit();
-    return 0;
+    SDL_Quit(); return 0;
 }
