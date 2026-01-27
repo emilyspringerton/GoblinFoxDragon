@@ -64,11 +64,8 @@ void update_entity(PlayerState *p, float dt, void *server_context, unsigned int 
 
     apply_friction(p);
     
-    // --- FEATHER GRAVITY LOGIC ---
-    // If Holding Jump -> Low Gravity (Float)
-    // If Released Jump -> High Gravity (Drop)
+    // Feather Gravity
     float g = (p->in_jump) ? GRAVITY_FLOAT : GRAVITY_DROP;
-    
     p->vy -= g; 
     p->y += p->vy;
     
@@ -76,8 +73,12 @@ void update_entity(PlayerState *p, float dt, void *server_context, unsigned int 
     p->x += p->vx;
     p->z += p->vz;
 
+    // Visual Decay
     if (p->recoil_anim > 0) p->recoil_anim -= 0.1f;
     if (p->recoil_anim < 0) p->recoil_anim = 0;
+    
+    // --- FIX: DECREMENT HIT MARKER ---
+    if (p->hit_feedback > 0) p->hit_feedback--;
 
     update_weapons(p, local_state.players, p->in_shoot > 0, p->in_reload > 0);
 }
@@ -100,26 +101,14 @@ void local_update(float fwd, float str, float yaw, float pitch, int shoot, int w
     
     accelerate(p0, wish_x, wish_z, wish_speed, ACCEL);
     
-    // --- JUMP LOGIC (With Nerf) ---
-    // Only boost if we are NOT holding jump from the previous frame (fresh press)
-    // OR if we were already on the ground (to allow rapid hops if timed well)
-    // BUT user said: "if holding jump when landing -> ineligible"
-    // So we check: If we just landed this frame, were we holding jump?
-    
     int fresh_jump_press = (jump && !was_holding_jump);
     
     if (jump && p0->on_ground) {
         float speed = sqrtf(p0->vx*p0->vx + p0->vz*p0->vz);
-        
-        // SUPERGLIDE CHECK: 
-        // 1. Must be sliding (Crouch + Speed)
-        // 2. Must be a FRESH jump press (Cannot hold space through landing)
         if (p0->crouching && speed > 0.5f && fresh_jump_press) {
             p0->vx *= 1.5f;
             p0->vz *= 1.5f;
-            // printf("SUPERGLIDE!\n");
         }
-        
         p0->y += 0.1f; 
         p0->vy += JUMP_FORCE;
     }
@@ -127,9 +116,9 @@ void local_update(float fwd, float str, float yaw, float pitch, int shoot, int w
     p0->in_shoot = shoot;
     p0->in_reload = reload;
     p0->crouching = crouch;
-    p0->in_jump = jump; // Store for gravity logic
+    p0->in_jump = jump; 
     
-    was_holding_jump = jump; // Update history
+    was_holding_jump = jump;
     
     for(int i=0; i<MAX_CLIENTS; i++) {
         PlayerState *p = &local_state.players[i];
