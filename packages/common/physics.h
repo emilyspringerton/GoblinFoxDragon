@@ -5,15 +5,15 @@
 #include <stdio.h>
 #include "protocol.h"
 
-// --- TURBO TUNING (PHASE 442) ---
-#define GRAVITY 0.04f       
-#define JUMP_FORCE 0.65f    
-#define MAX_SPEED 0.85f     
-#define FRICTION 4.0f       // Grip for stopping
-#define ACCEL 15.0f         // <--- BOOSTED: Overpowers friction easily
+// --- FINE TUNING (PHASE 443) ---
+#define GRAVITY 0.045f      // Slightly heavier for better ground snap
+#define JUMP_FORCE 0.68f    // Compensate for heavier gravity
+#define MAX_SPEED 0.90f     // Fast top speed
+#define FRICTION 3.5f       // Reduced friction (Less glue)
+#define ACCEL 20.0f         // INSTANT START (Breaks static friction)
 #define STOP_SPEED 0.1f     
-#define SLIDE_FRICTION 0.05f // Ice-like slide
-#define CROUCH_SPEED 0.4f   // Slow walk when crouching
+#define SLIDE_FRICTION 0.02f // Ice (Super slide)
+#define CROUCH_SPEED 0.35f  // Tactical walk
 #define EYE_HEIGHT 1.6f 
 #define HEAD_SIZE 1.2f
 #define HEAD_OFFSET 1.5f 
@@ -84,17 +84,18 @@ void apply_friction(PlayerState *p) {
     
     float drop = 0;
     
-    // 1. Sliding Logic (Apex Style)
-    // If holding Crouch AND moving fast (>0.5), we are sliding. Low friction.
+    // SLIDE LOGIC:
+    // Speed threshold to START sliding is 0.5.
+    // Once sliding, we keep low friction until very slow.
     int is_sliding = (p->crouching && speed > 0.5f);
     
     if (p->on_ground) {
         if (is_sliding) {
-            drop = speed * SLIDE_FRICTION; // 0.05 (Glide)
+            drop = speed * SLIDE_FRICTION; // 0.02 (Pure Ice)
         } else {
-            // Normal Walking or Slow Crouch Walk
+            // Normal / Slow Crouch Walk
             float control = (speed < STOP_SPEED) ? STOP_SPEED : speed;
-            drop = control * FRICTION; // 4.0 (Stop fast)
+            drop = control * FRICTION; // 3.5 (Grip)
         }
     } else {
         drop = 0; // Air: No friction
@@ -222,7 +223,6 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
     }
 }
 
-// RESTORE HISTORY FUNCTIONS
 void phys_store_history(ServerState *server, int client_id, unsigned int now) {
     if (client_id < 0 || client_id >= MAX_CLIENTS) return;
     int slot = (now / 16) % LAG_HISTORY; 
