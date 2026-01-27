@@ -16,8 +16,8 @@
     #include <fcntl.h>
 #endif
 
-#include "../../packages/common/protocol.h"
-#include "../../packages/common/physics.h"
+#include "protocol.h"
+#include "physics.h"
 
 // --- BOT STATE ---
 int sock = -1;

@@ -62,38 +62,18 @@ jobs:
           fi
 
       # --- NEW: BUILD BOTS ---
+            # --- NEW: BUILD BOTS ---
       - name: Build Bots (Windows & Linux)
         run: |
-          # Windows Bot
-          x86_64-w64-mingw32-gcc apps/client/bot_main.c -o ShankBot.exe             -O2 -static-libgcc             -Ipackages/common -Ipackages/simulation             -lws2_32 -lwinmm
-            
-          # Linux Bot
-          gcc apps/client/bot_main.c -o ShankBot_Linux             -O2 -static             -Ipackages/common -Ipackages/simulation -lm
-
-      
-      # --- 3.5 GENERATE CONSTRUCT (The Black Box) ---
-      - name: Generate Source Construct
-        run: |
-          echo "SHANKPIT BUILD ${{ github.run_number }} CONSTRUCT" > SHANKPIT_CONSTRUCT.txt
-          echo "=======================================" >> SHANKPIT_CONSTRUCT.txt
+          echo "🔨 Compiling Windows Bot..."
+          x86_64-w64-mingw32-gcc apps/client/bot_main.c -o ShankBot.exe -O2 -static-libgcc -Ipackages/common -Ipackages/simulation -lws2_32 -lwinmm || exit 1
           
-          for file in packages/common/protocol.h packages/common/physics.h packages/simulation/local_game.h apps/lobby/src/main.c apps/server/src/main.c apps/client/bot_main.c apps/training/headless.c; do
-            if [ -f "$file" ]; then
-              echo "" >> SHANKPIT_CONSTRUCT.txt
-              echo "--- FILE START: $file ---" >> SHANKPIT_CONSTRUCT.txt
-              cat "$file" >> SHANKPIT_CONSTRUCT.txt
-              echo "" >> SHANKPIT_CONSTRUCT.txt
-              echo "--- FILE END: $file ---" >> SHANKPIT_CONSTRUCT.txt
-            else
-              echo "MISSING: $file" >> SHANKPIT_CONSTRUCT.txt
-            fi
-          done
+          echo "🔨 Compiling Linux Bot..."
+          gcc apps/client/bot_main.c -o ShankBot_Linux -O2 -static -Ipackages/common -Ipackages/simulation -lm || exit 1
+          
+          echo "✅ Bots Built. Verifying..."
+          ls -l ShankBot.exe ShankBot_Linux
 
-      # --- 4. PACKAGE ---
-      
-      - name: Diagnostic List
-        run: ls -R
-        
       - name: Bundle Artifacts
         run: |
           # Client Bundle
@@ -110,8 +90,8 @@ jobs:
           
           # Bot Bundle
           mkdir ShankPit_Bots
-          cp ShankBot.exe ShankPit_Bots/
-          cp ShankBot_Linux ShankPit_Bots/
+          [ -f ShankBot.exe ] && cp ShankBot.exe ShankPit_Bots/ || echo '⚠️ Missing Win Bot'
+          [ -f ShankBot_Linux ] && cp ShankBot_Linux ShankPit_Bots/ || echo '⚠️ Missing Lin Bot'
           cp SHANKPIT_CONSTRUCT.txt ShankPit_Bots/
           zip -r ShankPit_Bots.zip
             SHANKPIT_CONSTRUCT.txt
