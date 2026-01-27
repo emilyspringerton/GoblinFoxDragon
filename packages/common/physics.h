@@ -5,10 +5,10 @@
 #include <stdio.h>
 #include "protocol.h"
 
-// --- TITAN & FEATHER TUNING (PHASE 452 - PHI) ---
-#define GRAVITY_FLOAT 0.03f  
-#define GRAVITY_DROP 0.08f   
-#define JUMP_FORCE 0.88f     // Boosted for larger mass feel
+// --- MOON TUNING (PHASE 455) ---
+#define GRAVITY_FLOAT 0.025f // <--- FLOATIER (Was 0.03)
+#define GRAVITY_DROP 0.075f  // <--- SOFTER DROP (Was 0.08)
+#define JUMP_FORCE 0.95f     // <--- POWERFUL (Was 0.88)
 #define MAX_SPEED 0.95f      
 #define FRICTION 0.15f      
 #define ACCEL 0.6f          
@@ -17,12 +17,11 @@
 #define CROUCH_SPEED 0.35f  
 
 // --- GOLDEN RATIO SCALE (1.618) ---
-// Base: W=0.6, H=4.0, Eye=1.6
-#define EYE_HEIGHT 2.59f    // 1.6 * 1.618
-#define PLAYER_WIDTH 0.97f  // 0.6 * 1.618
-#define PLAYER_HEIGHT 6.47f // 4.0 * 1.618
-#define HEAD_SIZE 1.94f     // 1.2 * 1.618
-#define HEAD_OFFSET 2.42f   // 1.5 * 1.618
+#define EYE_HEIGHT 2.59f    
+#define PLAYER_WIDTH 0.97f  
+#define PLAYER_HEIGHT 6.47f 
+#define HEAD_SIZE 1.94f     
+#define HEAD_OFFSET 2.42f   
 #define MELEE_RANGE_SQ 250.0f 
 
 typedef struct { float x, y, z, w, h, d; } Box;
@@ -89,7 +88,6 @@ void apply_friction(PlayerState *p) {
     
     float drop = 0;
     
-    // SLIDE LOGIC
     int is_sliding = (p->crouching && speed > 0.5f);
     
     if (p->on_ground) {
@@ -129,7 +127,6 @@ void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, fl
 }
 
 void resolve_collision(PlayerState *p) {
-    // SCALED COLLISION BOX
     float pw = PLAYER_WIDTH; 
     float ph = p->crouching ? (PLAYER_HEIGHT / 2.0f) : PLAYER_HEIGHT; 
     
