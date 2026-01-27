@@ -9,9 +9,9 @@
 #define GRAVITY 0.05f       // Tuned for good arcs
 #define JUMP_FORCE 0.8f     // Powerful jump
 #define MAX_SPEED 0.8f      // Fast run
-#define FRICTION 4.0f       // SLIPPERY (Was 8.0)
-#define ACCEL 5.0f          // Smooth buildup
-#define STOP_SPEED 0.1f     // Allow micro-sliding
+#define FRICTION 8.0f       // SLIPPERY (Was 8.0)
+#define ACCEL 6.5f          // Smooth buildup
+#define STOP_SPEED 1.0f     // Allow micro-sliding
 #define MAX_AIR_SPEED 0.2f
 #define EYE_HEIGHT 1.6f 
 #define HEAD_SIZE 1.2f
@@ -69,20 +69,22 @@ int check_hit_location(float ox, float oy, float oz, float dx, float dy, float d
     return 0;
 }
 
+
 void apply_friction(PlayerState *p) {
     float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
     if (speed < 0.001f) { p->vx = 0; p->vz = 0; return; }
     
     float drop = 0;
     
-    // SLIPPERY LOGIC:
-    // Only apply friction if on ground.
-    // Air friction is ZERO to allow bunny hopping / momentum.
+    // GROUND: Snappy Stop
     if (p->on_ground) {
         float control = (speed < STOP_SPEED) ? STOP_SPEED : speed;
         drop = control * FRICTION;
     } 
-    // else { drop = 0; } // NO AIR RESISTANCE
+    // AIR: Slight Drag (Prevents Infinite Glide)
+    else {
+        drop = speed * 0.2f; 
+    }
     
     float newspeed = speed - drop;
     if (newspeed < 0) newspeed = 0;
@@ -223,3 +225,10 @@ int phys_resolve_rewind(ServerState *server, int client_id, unsigned int target_
 }
 
 #endif
+
+float angle_diff(float a, float b) {
+    float d = a - b;
+    while (d < -180) d += 360;
+    while (d > 180) d -= 360;
+    return d;
+}
