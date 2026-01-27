@@ -31,7 +31,7 @@
 #define STATE_LISTEN_SERVER 99
 
 // --- CONFIG ---
-char SERVER_HOST[64] = "s.farthq.com"; // <--- TARGET LOCKED
+char SERVER_HOST[64] = "s.farthq.com"; 
 int SERVER_PORT = 6969;
 
 int app_state = STATE_LOBBY;
@@ -47,16 +47,11 @@ struct sockaddr_in server_addr;
 // --- RENDER FUNCTIONS ---
 void draw_scene(PlayerState *render_p); 
 
-// --- TEXT RENDERER (FLIPPED Y) ---
-// Note: In standard GL ortho (0,0 bottom-left), y+s is higher.
-// If text was upside down, it meant we were drawing 'top' at y and 'bottom' at y+s.
-// We swap them here to flip it back.
 void draw_char(char c, float x, float y, float s) {
     glLineWidth(1.0f);
     glBegin(GL_LINES);
-    // 0-9
+    // FLIPPED Y-AXIS (Correct Text)
     if(c>='0'&&c<='9'){ glVertex2f(x,y+s);glVertex2f(x+s,y+s);glVertex2f(x+s,y);glVertex2f(x,y);glVertex2f(x,y+s); }
-    // Letters (Manually Flipped Coords)
     else if(c=='A'){glVertex2f(x,y);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y);glVertex2f(x,y+s/2);glVertex2f(x+s/2,y+s);glVertex2f(x+s/2,y+s);glVertex2f(x+s,y+s/2);}
     else if(c=='B'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s,y+s*0.75);glVertex2f(x+s,y+s*0.75);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x+s,y+s/4);glVertex2f(x+s,y+s/4);glVertex2f(x+s*0.8,y);glVertex2f(x+s*0.8,y);glVertex2f(x,y);}
     else if(c=='D'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s*0.8,y);glVertex2f(x+s*0.8,y);glVertex2f(x,y);}
@@ -132,6 +127,24 @@ void draw_weapon_p(PlayerState *p) {
     glPopMatrix();
 }
 
+void draw_head(int weapon_id) {
+    switch(weapon_id) {
+        case WPN_KNIFE:   glColor3f(0.8f, 0.8f, 0.9f); break;
+        case WPN_MAGNUM:  glColor3f(0.4f, 0.4f, 0.4f); break;
+        case WPN_AR:      glColor3f(0.2f, 0.3f, 0.2f); break;
+        case WPN_SHOTGUN: glColor3f(0.5f, 0.3f, 0.2f); break;
+        case WPN_SNIPER:  glColor3f(0.1f, 0.1f, 0.15f); break;
+    }
+    glBegin(GL_QUADS);
+    glVertex3f(-0.4, 0.8, 0.4); glVertex3f(0.4, 0.8, 0.4); glVertex3f(0.4, 0, 0.4); glVertex3f(-0.4, 0, 0.4);
+    glVertex3f(-0.4, 0.8, -0.4); glVertex3f(0.4, 0.8, -0.4); glVertex3f(0.4, 0, -0.4); glVertex3f(-0.4, 0, -0.4);
+    glVertex3f(-0.4, 0.8, 0.4); glVertex3f(0.4, 0.8, 0.4); glVertex3f(0.4, 0.8, -0.4); glVertex3f(-0.4, 0.8, -0.4);
+    glVertex3f(-0.4, 0, 0.4); glVertex3f(0.4, 0, 0.4); glVertex3f(0.4, 0, -0.4); glVertex3f(-0.4, 0, -0.4);
+    glVertex3f(-0.4, 0.8, 0.4); glVertex3f(-0.4, 0, 0.4); glVertex3f(-0.4, 0, -0.4); glVertex3f(-0.4, 0.8, -0.4);
+    glVertex3f(0.4, 0.8, 0.4); glVertex3f(0.4, 0, 0.4); glVertex3f(0.4, 0, -0.4); glVertex3f(0.4, 0.8, -0.4);
+    glEnd();
+}
+
 void draw_player_3rd(PlayerState *p) {
     glPushMatrix();
     glTranslatef(p->x, p->y + 2.0f, p->z);
@@ -146,16 +159,19 @@ void draw_player_3rd(PlayerState *p) {
     glVertex3f(-0.5,-0.5,-0.5); glVertex3f(-0.5,-0.5,0.5); glVertex3f(-0.5,0.5,0.5); glVertex3f(-0.5,0.5,-0.5);
     glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(0.5,0.5,0.5);
     glEnd(); glPopMatrix();
-    glPopMatrix();
+    
+    glPushMatrix(); glTranslatef(0, 1.54f, 0); draw_head(p->current_weapon); glPopMatrix();
+    glPushMatrix(); glTranslatef(0.5f, 1.0f, 0.5f); glRotatef(p->pitch, 1, 0, 0);   
+    glScalef(0.8f, 0.8f, 0.8f); draw_gun_model(p->current_weapon); glPopMatrix(); glPopMatrix();
 }
+
+void draw_projectiles() { }
 
 void draw_hud(PlayerState *p) {
     glDisable(GL_DEPTH_TEST);
     glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
     glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
     glColor3f(0, 1, 0);
-    
-    // Crosshair
     if (current_fov < 50.0f) { glBegin(GL_LINES); glVertex2f(0, 360); glVertex2f(1280, 360); glVertex2f(640, 0); glVertex2f(640, 720); glEnd(); } 
     else { glLineWidth(2.0f); glBegin(GL_LINES); glVertex2f(630, 360); glVertex2f(650, 360); glVertex2f(640, 350); glVertex2f(640, 370); glEnd(); }
     
@@ -164,7 +180,6 @@ void draw_hud(PlayerState *p) {
         glBegin(GL_TRIANGLE_FAN); glVertex2f(640, 360); for(int i=0; i<=20; i++) { float ang = (float)i/20.0f*6.283f; glVertex2f(640+cosf(ang)*15, 360+sinf(ang)*15); } glEnd();
     }
     
-    // Bars
     glColor3f(0.2f, 0, 0); glRectf(50, 50, 250, 70); glColor3f(1.0f, 0, 0); glRectf(50, 50, 50 + (p->health * 2), 70);
     glColor3f(0, 0, 0.2f); glRectf(50, 80, 250, 100); glColor3f(0.2f, 0.2f, 1.0f); glRectf(50, 80, 50 + (p->shield * 2), 100);
     int w = p->current_weapon; int ammo = (w == WPN_KNIFE) ? 99 : p->ammo[w];
@@ -237,9 +252,11 @@ void net_send_cmd(UserCmd cmd) {
 void net_process_snapshot(char *buffer, int len) {
     int cursor = sizeof(NetHeader);
     unsigned char count = *(unsigned char*)(buffer + cursor); cursor++;
+    
     for(int i=0; i<count; i++) {
         NetPlayer *np = (NetPlayer*)(buffer + cursor);
         cursor += sizeof(NetPlayer);
+        
         int id = np->id;
         if (id > 0 && id < MAX_CLIENTS) {
             PlayerState *p = &local_state.players[id];
@@ -247,6 +264,13 @@ void net_process_snapshot(char *buffer, int len) {
             p->x = np->x; p->y = np->y; p->z = np->z;
             p->yaw = np->yaw; p->pitch = np->pitch;
             p->health = np->health;
+            
+            // --- FULL WEAPON SYNC (Phase 476) ---
+            // Now we can see others shoot!
+            p->current_weapon = np->current_weapon;
+            p->is_shooting = np->is_shooting;
+            if (p->is_shooting) p->recoil_anim = 1.0f; // Visual Pop
+            
         } else if (id == 0) {
             local_state.players[0].ammo[local_state.players[0].current_weapon] = np->ammo;
         }
@@ -275,7 +299,7 @@ int main(int argc, char* argv[]) {
     }
 
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *win = SDL_CreateWindow("SHANKPIT [BUILD 154 - S.FARTHQ.COM]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
+    SDL_Window *win = SDL_CreateWindow("SHANKPIT [BUILD 156 - INTEGRITY]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
     SDL_GL_CreateContext(win);
     net_init();
     
@@ -287,15 +311,9 @@ int main(int argc, char* argv[]) {
         while(SDL_PollEvent(&e)) {
             if(e.type == SDL_QUIT) running = 0;
             
-            // --- MOUSE SAFETY ---
-            if (e.type == SDL_WINDOWEVENT) {
-                if (e.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
-                    if (app_state != STATE_LOBBY) SDL_SetRelativeMouseMode(SDL_TRUE);
-                }
-            }
-            if (e.type == SDL_MOUSEBUTTONDOWN) {
-                if (app_state != STATE_LOBBY) SDL_SetRelativeMouseMode(SDL_TRUE);
-            }
+            // --- FORCE MOUSE CAPTURE (Phase 476) ---
+            // If we are in game, we aggressively grab the mouse.
+            if (app_state != STATE_LOBBY) SDL_SetRelativeMouseMode(SDL_TRUE);
             
             if (app_state == STATE_LOBBY) {
                 if(e.type == SDL_KEYDOWN) {
@@ -303,13 +321,9 @@ int main(int argc, char* argv[]) {
                     if (e.key.keysym.sym == SDLK_b) { app_state = STATE_GAME_LOCAL; local_init_match(8, MODE_DEATHMATCH); }
                     if (e.key.keysym.sym == SDLK_k) { app_state = STATE_GAME_LOCAL; local_init_match(8, MODE_EVOLUTION); }
                     
-                    // J TO JOIN
                     if (e.key.keysym.sym == SDLK_j) { 
                         app_state = STATE_GAME_NET; 
                         net_connect(); 
-                    }
-                    
-                    if (app_state != STATE_LOBBY) {
                         SDL_SetRelativeMouseMode(SDL_TRUE);
                         glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
                         glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
@@ -328,6 +342,12 @@ int main(int argc, char* argv[]) {
                     if(cam_pitch > 89) cam_pitch = 89; if(cam_pitch < -89) cam_pitch = -89;
                 }
             }
+        }
+        
+        // --- BRUTE FORCE SAFETY ---
+        // Every frame, if in game, assume relative mode.
+        if (app_state != STATE_LOBBY) {
+             SDL_SetRelativeMouseMode(SDL_TRUE);
         }
 
         if (app_state == STATE_LOBBY) {
