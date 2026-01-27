@@ -5,15 +5,16 @@
 #include <stdio.h>
 #include "protocol.h"
 
-// --- FINE TUNING (PHASE 443) ---
-#define GRAVITY 0.045f      // Slightly heavier for better ground snap
-#define JUMP_FORCE 0.68f    // Compensate for heavier gravity
-#define MAX_SPEED 0.90f     // Fast top speed
-#define FRICTION 3.5f       // Reduced friction (Less glue)
-#define ACCEL 20.0f         // INSTANT START (Breaks static friction)
+// --- NORMALIZED TUNING (PHASE 445) ---
+// Values are now scaled for ~60 FPS (16ms per frame)
+#define GRAVITY 0.04f       
+#define JUMP_FORCE 0.65f    
+#define MAX_SPEED 0.85f     // Top Run Speed
+#define FRICTION 0.15f      // <--- FIXED: Was 3.5 (Glue). Now 0.15 (Grip).
+#define ACCEL 0.6f          // <--- FIXED: Smooth ramp up, not teleport.
 #define STOP_SPEED 0.1f     
-#define SLIDE_FRICTION 0.02f // Ice (Super slide)
-#define CROUCH_SPEED 0.35f  // Tactical walk
+#define SLIDE_FRICTION 0.01f // Almost zero friction for sliding
+#define CROUCH_SPEED 0.35f  // Tactical walk cap
 #define EYE_HEIGHT 1.6f 
 #define HEAD_SIZE 1.2f
 #define HEAD_OFFSET 1.5f 
@@ -77,7 +78,7 @@ int check_hit_location(float ox, float oy, float oz, float dx, float dy, float d
     return 0;
 }
 
-// --- HYBRID SLIDE LOGIC ---
+// --- PHYSICS ENGINE ---
 void apply_friction(PlayerState *p) {
     float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
     if (speed < 0.001f) { p->vx = 0; p->vz = 0; return; }
@@ -85,17 +86,16 @@ void apply_friction(PlayerState *p) {
     float drop = 0;
     
     // SLIDE LOGIC:
-    // Speed threshold to START sliding is 0.5.
-    // Once sliding, we keep low friction until very slow.
+    // Sliding only happens if fast AND crouching
     int is_sliding = (p->crouching && speed > 0.5f);
     
     if (p->on_ground) {
         if (is_sliding) {
-            drop = speed * SLIDE_FRICTION; // 0.02 (Pure Ice)
+            drop = speed * SLIDE_FRICTION; // 0.01
         } else {
-            // Normal / Slow Crouch Walk
+            // Normal Friction (Grip)
             float control = (speed < STOP_SPEED) ? STOP_SPEED : speed;
-            drop = control * FRICTION; // 3.5 (Grip)
+            drop = control * FRICTION; // 0.15
         }
     } else {
         drop = 0; // Air: No friction
@@ -108,18 +108,19 @@ void apply_friction(PlayerState *p) {
 }
 
 void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, float accel) {
-    // If sliding, you lose control! (Cannot accelerate while sliding)
+    // If crouching on ground (but not sliding fast), cap speed
     float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
-    if (p->crouching && speed > 0.5f && p->on_ground) return;
-
-    // Cap speed for Crouch Walking
-    if (p->crouching && p->on_ground) {
+    
+    // Crouch Walk Cap
+    if (p->crouching && p->on_ground && speed < 0.5f) {
         if (wish_speed > CROUCH_SPEED) wish_speed = CROUCH_SPEED;
     }
+    // Note: If sliding (speed > 0.5 & crouch), we allow momentum but input has little effect (Quake style)
 
     float current_speed = (p->vx * wish_x) + (p->vz * wish_z);
     float add_speed = wish_speed - current_speed;
     if (add_speed <= 0) return;
+    
     float acc_speed = accel * wish_speed; 
     if (acc_speed > add_speed) acc_speed = add_speed;
     p->vx += acc_speed * wish_x; p->vz += acc_speed * wish_z;
