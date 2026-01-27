@@ -76,6 +76,11 @@ void update_entity(PlayerState *p, float dt, void *server_context, unsigned int 
     p->z += p->vz;
 
     // Weapons
+    
+    // Animation Decay
+    if (p->recoil_anim > 0) p->recoil_anim -= 0.1f;
+    if (p->recoil_anim < 0) p->recoil_anim = 0;
+    
     update_weapons(p, local_state.players, p->in_shoot > 0, p->in_reload > 0);
 }
 
