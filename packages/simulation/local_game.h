@@ -6,20 +6,59 @@
 #include <string.h>
 
 ServerState local_state;
-
-// Track previous jump state to nerf auto-hops
 int was_holding_jump = 0;
 
 void local_update(float fwd, float str, float yaw, float pitch, int shoot, int weapon_req, int jump, int crouch, int reload, void *server_context, unsigned int cmd_time);
 void update_entity(PlayerState *p, float dt, void *server_context, unsigned int cmd_time);
 void local_init_match(int num_players, int mode);
 
+// --- GENETIC FUNCTIONS (Restored) ---
+float rand_weight() { return ((float)(rand()%2000)/1000.0f) - 1.0f; } 
+float rand_pos() { return ((float)(rand()%1000)/1000.0f); } 
+
+void init_genome(BotGenome *g) {
+    g->version = 1;
+    g->w_aggro = 0.5f + rand_weight() * 0.5f;
+    g->w_strafe = rand_weight();
+    g->w_jump = 0.05f + rand_pos() * 0.1f; 
+    g->w_slide = 0.01f + rand_pos() * 0.05f;
+    g->w_turret = 5.0f + rand_pos() * 10.0f;
+    g->w_repel = 1.0f + rand_pos();
+}
+
+// DEFINITION: evolve_bot (Required by physics.h)
+void evolve_bot(PlayerState *loser, PlayerState *winner) {
+    loser->brain = winner->brain;
+    // Mutate
+    loser->brain.w_aggro += rand_weight() * 0.1f;
+    loser->brain.w_strafe += rand_weight() * 0.1f;
+    loser->brain.w_jump += rand_weight() * 0.01f;
+    loser->brain.w_slide += rand_weight() * 0.01f;
+    // printf("🧬 Bot %d evolved from Bot %d\n", loser->id, winner->id);
+}
+
+// DEFINITION: get_best_bot (Required by physics.h)
+PlayerState* get_best_bot() {
+    PlayerState *best = NULL;
+    float max_score = -99999.0f;
+    for(int i=1; i<MAX_CLIENTS; i++) {
+        if (!local_state.players[i].active) continue;
+        if (local_state.players[i].accumulated_reward > max_score) {
+            max_score = local_state.players[i].accumulated_reward;
+            best = &local_state.players[i];
+        }
+    }
+    return best;
+}
+
+// --- BOT AI ---
 void bot_think(int bot_idx, PlayerState *players, float *out_fwd, float *out_yaw, int *out_buttons) {
     PlayerState *me = &players[bot_idx];
     if (me->state == STATE_DEAD) { *out_buttons = 0; return; }
 
     int target_idx = -1;
     float min_dist = 9999.0f;
+    float closest_friend_dist = 9999.0f;
 
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (i == bot_idx) continue;
@@ -29,7 +68,15 @@ void bot_think(int bot_idx, PlayerState *players, float *out_fwd, float *out_yaw
         float dx = players[i].x - me->x;
         float dz = players[i].z - me->z;
         float dist = sqrtf(dx*dx + dz*dz);
-        if (dist < min_dist) { min_dist = dist; target_idx = i; }
+        
+        if (i == 0 || dist < min_dist) { 
+            if (i == 0) dist *= 0.5f; 
+            if (dist < min_dist) { min_dist = dist; target_idx = i; }
+        }
+        
+        if (dist < 3.0f && dist < closest_friend_dist) {
+            closest_friend_dist = dist;
+        }
     }
 
     if (target_idx != -1) {
@@ -38,26 +85,35 @@ void bot_think(int bot_idx, PlayerState *players, float *out_fwd, float *out_yaw
         float dz = t->z - me->z;
         float target_yaw = atan2f(dx, dz) * (180.0f / 3.14159f);
         
+        float turn_speed = (me->brain.w_turret > 1.0f) ? me->brain.w_turret : 10.0f;
+        
         float diff = angle_diff(target_yaw, *out_yaw);
-        if (diff > 10.0f) diff = 10.0f;
-        if (diff < -10.0f) diff = -10.0f;
+        if (diff > turn_speed) diff = turn_speed;
+        if (diff < -turn_speed) diff = -turn_speed;
         *out_yaw += diff;
         
         *out_buttons |= BTN_ATTACK;
         
-        if (min_dist > 8.0f) *out_fwd = 1.0f; 
-        else if (min_dist < 5.0f) *out_fwd = -1.0f; 
+        if (min_dist > 15.0f) *out_fwd = me->brain.w_aggro; 
+        else if (min_dist < 5.0f) *out_fwd = -me->brain.w_aggro; 
         else *out_fwd = 0.2f; 
         
-        if (me->on_ground && (rand()%100 < 5)) *out_buttons |= BTN_JUMP;
+        *out_yaw += me->brain.w_strafe * 10.0f; 
+        
+        if (closest_friend_dist < 3.0f) *out_fwd *= 0.5f; 
+
+        if (me->on_ground && (rand()%1000 < (me->brain.w_jump * 1000.0f))) *out_buttons |= BTN_JUMP;
+        if (me->on_ground && (rand()%1000 < (me->brain.w_slide * 1000.0f))) *out_buttons |= BTN_CROUCH;
+        
+        if (me->ammo[me->current_weapon] <= 0) *out_buttons |= BTN_RELOAD;
         
     } else {
         *out_yaw += 2.0f;
         *out_fwd = 0.5f;
-        if (me->on_ground && (rand()%100 < 2)) *out_buttons |= BTN_JUMP;
     }
 }
 
+// --- UPDATE LOOP ---
 void update_entity(PlayerState *p, float dt, void *server_context, unsigned int cmd_time) {
     if (!p->active) return;
     if (p->state == STATE_DEAD) return;
@@ -73,12 +129,16 @@ void update_entity(PlayerState *p, float dt, void *server_context, unsigned int 
     p->x += p->vx;
     p->z += p->vz;
 
-    // Visual Decay
+    // Decay
     if (p->recoil_anim > 0) p->recoil_anim -= 0.1f;
     if (p->recoil_anim < 0) p->recoil_anim = 0;
-    
-    // --- FIX: DECREMENT HIT MARKER ---
     if (p->hit_feedback > 0) p->hit_feedback--;
+
+    // Reward: Slide
+    float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
+    if (p->crouching && speed > 0.6f && p->on_ground) {
+        p->accumulated_reward += 0.1f;
+    }
 
     update_weapons(p, local_state.players, p->in_shoot > 0, p->in_reload > 0);
 }
@@ -86,9 +146,7 @@ void update_entity(PlayerState *p, float dt, void *server_context, unsigned int 
 void local_update(float fwd, float str, float yaw, float pitch, int shoot, int weapon_req, int jump, int crouch, int reload, void *server_context, unsigned int cmd_time) {
     
     PlayerState *p0 = &local_state.players[0];
-    p0->yaw = yaw;
-    p0->pitch = pitch;
-    
+    p0->yaw = yaw; p0->pitch = pitch;
     if (weapon_req >= 0 && weapon_req < MAX_WEAPONS) p0->current_weapon = weapon_req;
     
     float rad = yaw * 3.14159f / 180.0f;
@@ -102,22 +160,15 @@ void local_update(float fwd, float str, float yaw, float pitch, int shoot, int w
     accelerate(p0, wish_x, wish_z, wish_speed, ACCEL);
     
     int fresh_jump_press = (jump && !was_holding_jump);
-    
     if (jump && p0->on_ground) {
         float speed = sqrtf(p0->vx*p0->vx + p0->vz*p0->vz);
         if (p0->crouching && speed > 0.5f && fresh_jump_press) {
-            p0->vx *= 1.5f;
-            p0->vz *= 1.5f;
+            p0->vx *= 1.5f; p0->vz *= 1.5f;
         }
-        p0->y += 0.1f; 
-        p0->vy += JUMP_FORCE;
+        p0->y += 0.1f; p0->vy += JUMP_FORCE;
     }
     
-    p0->in_shoot = shoot;
-    p0->in_reload = reload;
-    p0->crouching = crouch;
-    p0->in_jump = jump; 
-    
+    p0->in_shoot = shoot; p0->in_reload = reload; p0->crouching = crouch; p0->in_jump = jump; 
     was_holding_jump = jump;
     
     for(int i=0; i<MAX_CLIENTS; i++) {
@@ -135,9 +186,10 @@ void local_update(float fwd, float str, float yaw, float pitch, int shoot, int w
             accelerate(p, bx, bz, MAX_SPEED, ACCEL);
             p->in_shoot = (b_btns & BTN_ATTACK);
             p->in_jump = (b_btns & BTN_JUMP);
+            p->in_reload = (b_btns & BTN_RELOAD);
+            p->crouching = (b_btns & BTN_CROUCH);
             if ((b_btns & BTN_JUMP) && p->on_ground) { p->y += 0.1f; p->vy += JUMP_FORCE; }
         }
-        
         update_entity(p, 0.016f, server_context, cmd_time);
     }
 }
@@ -147,9 +199,11 @@ void local_init_match(int num_players, int mode) {
     local_state.game_mode = mode;
     local_state.players[0].active = 1;
     phys_respawn(&local_state.players[0], 0);
+    
     for(int i=1; i<num_players; i++) {
         local_state.players[i].active = 1;
         phys_respawn(&local_state.players[i], i*100);
+        init_genome(&local_state.players[i].brain);
     }
 }
 #endif
