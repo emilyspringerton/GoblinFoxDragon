@@ -4,6 +4,7 @@
 #define MAX_CLIENTS 70
 #define MAX_WEAPONS 5
 #define MAX_PROJECTILES 1024
+#define LAG_HISTORY 64
 
 #define PACKET_CONNECT 0
 #define PACKET_USERCMD 1
@@ -22,9 +23,6 @@
 
 #define RELOAD_TIME 60
 #define SHIELD_REGEN_DELAY 180 
-
-// --- LAG COMPENSATION SETTINGS ---
-#define LAG_HISTORY 64  // Fixed: Added back for physics.h
 
 // --- NETWORK STRUCTURES ---
 typedef struct {
@@ -69,14 +67,6 @@ typedef struct {
     float vx, vy, vz;
     int owner_id;
 } Projectile;
-
-// --- TIME MACHINE STRUCT ---
-typedef struct {
-    int active;
-    unsigned int timestamp;
-    float x, y, z;
-    float vx, vy, vz;
-} LagRecord;
 
 typedef struct {
     int id;
@@ -124,6 +114,14 @@ typedef struct {
     unsigned int respawn_time;
 } PlayerState;
 
+// Lag Compensation Record
+typedef struct {
+    int active;
+    unsigned int timestamp;
+    float x, y, z;
+    float vx, vy, vz;
+} LagRecord;
+
 // Game Modes
 typedef enum {
     MODE_DEATHMATCH = 0,
@@ -138,10 +136,7 @@ typedef enum {
 typedef struct {
     PlayerState players[MAX_CLIENTS];
     Projectile projectiles[MAX_PROJECTILES];
-    
-    // --- LAG COMPENSATION STORAGE ---
-    LagRecord history[MAX_CLIENTS][LAG_HISTORY]; // Fixed: Added back
-    
+    LagRecord history[MAX_CLIENTS][LAG_HISTORY]; // RESTORED
     int server_tick;
     int game_mode;
 } ServerState;

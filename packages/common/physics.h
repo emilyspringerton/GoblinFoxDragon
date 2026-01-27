@@ -191,4 +191,30 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
         } else { p->attack_cooldown = 10; }
     }
 }
+
+// --- HISTORY STORE (RESTORED PHASE 436) ---
+void phys_store_history(ServerState *server, int client_id, unsigned int now) {
+    if (client_id < 0 || client_id >= MAX_CLIENTS) return;
+    int slot = (now / 16) % LAG_HISTORY; // Simple tick map
+    
+    server->history[client_id][slot].active = 1;
+    server->history[client_id][slot].timestamp = now;
+    server->history[client_id][slot].x = server->players[client_id].x;
+    server->history[client_id][slot].y = server->players[client_id].y;
+    server->history[client_id][slot].z = server->players[client_id].z;
+}
+
+int phys_resolve_rewind(ServerState *server, int client_id, unsigned int target_time, float *out_pos) {
+    LagRecord *hist = server->history[client_id];
+    // Simple linear scan for match (Optimized version in real engine)
+    for(int i=0; i<LAG_HISTORY; i++) {
+        if (!hist[i].active) continue;
+        if (hist[i].timestamp == target_time) { // Exact match for simplicity
+            out_pos[0] = hist[i].x; out_pos[1] = hist[i].y; out_pos[2] = hist[i].z;
+            return 1;
+        }
+    }
+    return 0; 
+}
+
 #endif
