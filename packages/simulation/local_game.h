@@ -116,12 +116,20 @@ void local_init_match(int num_players, int mode) {
     
     // Spawn Player
     local_state.players[0].active = 1;
+    
     phys_respawn(&local_state.players[0], 0);
+    local_state.players[0].current_weapon = 1; // WPN_MAGNUM
+    local_state.players[0].ammo[1] = 6;
+    
     
     // Spawn Bots
     for(int i=1; i<num_players; i++) {
         local_state.players[i].active = 1;
+        
         phys_respawn(&local_state.players[i], i*100);
+        local_state.players[i].current_weapon = 1; // WPN_MAGNUM
+        local_state.players[i].ammo[1] = 999; // Infinite ammo for bots
+    
     }
 }
 

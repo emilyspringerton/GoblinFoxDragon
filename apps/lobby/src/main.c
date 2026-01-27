@@ -274,7 +274,7 @@ void draw_player_3rd(PlayerState *p) {
     else glColor3f(1, 0, 0); 
     
     glPushMatrix();
-    glScalef(1.2f, 3.8f, 1.2f);
+    glScalef(0.6f, 1.8f, 0.6f);
     glBegin(GL_QUADS);
     glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(-0.5,0.5,0.5);
     glVertex3f(-0.5,0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
@@ -472,7 +472,7 @@ int main(int argc, char* argv[]) {
         else if (app_state == STATE_GAME_LOCAL) {
             const Uint8 *k = SDL_GetKeyboardState(NULL);
             float fwd=0, str=0;
-            if(k[SDL_SCANCODE_W]) fwd+=1; if(k[SDL_SCANCODE_S]) fwd-=1;
+            if(k[SDL_SCANCODE_W]) fwd-=1; if(k[SDL_SCANCODE_S]) fwd+=1;
             if(k[SDL_SCANCODE_D]) str+=1; if(k[SDL_SCANCODE_A]) str-=1;
             int jump = k[SDL_SCANCODE_SPACE];
             int crouch = k[SDL_SCANCODE_LCTRL];
