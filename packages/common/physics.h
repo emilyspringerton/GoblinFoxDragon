@@ -5,25 +5,25 @@
 #include <stdio.h>
 #include "protocol.h"
 
-// --- TITAN & FEATHER TUNING (PHASE 451) ---
-// Gravity is now dynamic (See local_game.h)
-#define GRAVITY_FLOAT 0.03f  // Holding Space (Glide)
-#define GRAVITY_DROP 0.08f   // Release Space (Anchor)
-#define JUMP_FORCE 0.85f     // Stronger launch for bigger body
-#define MAX_SPEED 0.95f      // Faster to match scale
+// --- TITAN & FEATHER TUNING (PHASE 452 - PHI) ---
+#define GRAVITY_FLOAT 0.03f  
+#define GRAVITY_DROP 0.08f   
+#define JUMP_FORCE 0.88f     // Boosted for larger mass feel
+#define MAX_SPEED 0.95f      
 #define FRICTION 0.15f      
 #define ACCEL 0.6f          
 #define STOP_SPEED 0.1f     
 #define SLIDE_FRICTION 0.01f 
 #define CROUCH_SPEED 0.35f  
 
-// --- SCALE UPDATE (1.5x) ---
-#define EYE_HEIGHT 2.4f     // Was 1.6
-#define PLAYER_WIDTH 0.9f   // Was 0.6
-#define PLAYER_HEIGHT 6.0f  // Was 4.0
-#define HEAD_SIZE 1.8f      // Was 1.2
-#define HEAD_OFFSET 2.25f   // Was 1.5
-#define MELEE_RANGE_SQ 225.0f // Scaled range
+// --- GOLDEN RATIO SCALE (1.618) ---
+// Base: W=0.6, H=4.0, Eye=1.6
+#define EYE_HEIGHT 2.59f    // 1.6 * 1.618
+#define PLAYER_WIDTH 0.97f  // 0.6 * 1.618
+#define PLAYER_HEIGHT 6.47f // 4.0 * 1.618
+#define HEAD_SIZE 1.94f     // 1.2 * 1.618
+#define HEAD_OFFSET 2.42f   // 1.5 * 1.618
+#define MELEE_RANGE_SQ 250.0f 
 
 typedef struct { float x, y, z, w, h, d; } Box;
 
