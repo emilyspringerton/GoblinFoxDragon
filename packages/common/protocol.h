@@ -71,19 +71,9 @@ typedef struct {
     unsigned char shield;
     unsigned char is_shooting;
     unsigned char crouching;
-    float reward_feedback; // <--- NEW: Server tells bot how well it did this tick
+    float reward_feedback; 
+    unsigned char ammo; // <--- NEW: Bot needs to know this!
 } NetPlayer;
-
-// BOT GENOME (The Brain - Versioned)
-typedef struct {
-    int version;
-    float w_aggro;      
-    float w_strafe;     
-    float w_jump;       
-    float w_slide;      
-    float w_turret;     
-    float w_repel;      
-} BotGenome;
 
 typedef struct {
     int id; int active; int is_bot;
@@ -94,10 +84,7 @@ typedef struct {
     int reload_timer; int attack_cooldown; int is_shooting; int jump_timer;
     int health; int shield; int shield_regen_timer; int state;
     int kills; int deaths; int hit_feedback; float recoil_anim;
-    
     float accumulated_reward; 
-    BotGenome brain; 
-    
     unsigned int last_hit_time; unsigned int respawn_time;
 } PlayerState;
 
@@ -114,6 +101,8 @@ typedef struct {
     LagRecord history[MAX_CLIENTS][LAG_HISTORY];
     int server_tick;
     int game_mode;
+    struct sockaddr_in clients[MAX_CLIENTS]; // Address cache
+    int client_active[MAX_CLIENTS];
 } ServerState;
 
 #endif
