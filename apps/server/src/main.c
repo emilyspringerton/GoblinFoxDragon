@@ -20,9 +20,10 @@
 #include "../../../packages/common/physics.h"
 #include "../../../packages/simulation/local_game.h"
 
+// --- SERVER STATE ---
 int sock = -1;
 struct sockaddr_in bind_addr;
-unsigned int client_last_seq[MAX_CLIENTS];
+unsigned int client_last_seq[MAX_CLIENTS]; 
 
 unsigned int get_server_time() {
     struct timespec ts;
@@ -31,26 +32,41 @@ unsigned int get_server_time() {
 }
 
 void server_net_init() {
+    // DISABLE BUFFERING (Fix for SSH logs)
+    setbuf(stdout, NULL);
+
     #ifdef _WIN32
     WSADATA wsa; WSAStartup(MAKEWORD(2,2), &wsa);
     #endif
+    
     sock = socket(AF_INET, SOCK_DGRAM, 0);
+    
     #ifdef _WIN32
     u_long mode = 1; ioctlsocket(sock, FIONBIO, &mode);
     #else
     int flags = fcntl(sock, F_GETFL, 0); fcntl(sock, F_SETFL, flags | O_NONBLOCK);
     #endif
+
     bind_addr.sin_family = AF_INET;
-    bind_addr.sin_port = htons(6969);
+    bind_addr.sin_port = htons(6969); 
     bind_addr.sin_addr.s_addr = INADDR_ANY;
-    if (bind(sock, (struct sockaddr*)&bind_addr, sizeof(bind_addr)) < 0) printf("❌ BIND FAILED\n");
-    else printf("✅ SERVER LISTENING ON 6969\n");
+    
+    if (bind(sock, (struct sockaddr*)&bind_addr, sizeof(bind_addr)) < 0) {
+        printf("❌ FAILED TO BIND PORT 6969 (Is another server running?)
+");
+        exit(1);
+    } else {
+        printf("✅ SERVER LISTENING ON PORT 6969
+");
+        printf("👉 Waiting for connections...
+");
+    }
 }
 
 void process_user_cmd(int client_id, UserCmd *cmd) {
-    if (cmd->sequence <= client_last_seq[client_id]) return;
+    if (cmd->sequence <= client_last_seq[client_id]) return; 
+    
     PlayerState *p = &local_state.players[client_id];
-    // Apply Inputs (The Physics Loop will use these)
     p->yaw = cmd->yaw;
     p->pitch = cmd->pitch;
     p->in_fwd = cmd->fwd;
@@ -60,7 +76,6 @@ void process_user_cmd(int client_id, UserCmd *cmd) {
     p->crouching = (cmd->buttons & BTN_CROUCH);
     p->in_reload = (cmd->buttons & BTN_RELOAD);
     
-    // Weapon Switch
     if (cmd->weapon_idx >= 0 && cmd->weapon_idx < MAX_WEAPONS) p->current_weapon = cmd->weapon_idx;
     
     client_last_seq[client_id] = cmd->sequence;
@@ -70,13 +85,9 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
     if (size < sizeof(NetHeader)) return;
     NetHeader *head = (NetHeader*)buffer;
     
-    // --- SIMPLE CONNECTION MANAGER ---
-    // Identify client by ID in header (Client must know its ID, or we assign)
-    // For this Alpha, we rely on the header ID or assign next slot.
-    // Hack: Just check if we know this IP.
-    
     int client_id = -1;
-    // Find existing
+    
+    // 1. Identify Client by IP/Port
     for(int i=1; i<MAX_CLIENTS; i++) {
         if (local_state.client_active[i] && 
             memcmp(&local_state.clients[i].sin_addr, &sender->sin_addr, sizeof(struct in_addr)) == 0 &&
@@ -86,44 +97,60 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
         }
     }
     
-    // New Client?
+    // 2. New Connection Handling
     if (client_id == -1) {
-        if (head->type == PACKET_CONNECT || head->type == PACKET_USERCMD) {
-            for(int i=1; i<MAX_CLIENTS; i++) {
-                if (!local_state.client_active[i]) {
-                    client_id = i;
-                    local_state.client_active[i] = 1;
-                    local_state.clients[i] = *sender;
-                    local_state.players[i].active = 1;
-                    phys_respawn(&local_state.players[i], get_server_time());
-                    printf("👋 NEW CLIENT CONNECTED: ID %d\n", i);
-                    break;
-                }
+        // Log the attempt
+        char *ip_str = inet_ntoa(sender->sin_addr);
+        printf("📡 PACKET FROM NEW IP: %s:%d (Type: %d)
+", ip_str, ntohs(sender->sin_port), head->type);
+
+        // Assign Slot
+        for(int i=1; i<MAX_CLIENTS; i++) {
+            if (!local_state.client_active[i]) {
+                client_id = i;
+                local_state.client_active[i] = 1;
+                local_state.clients[i] = *sender;
+                local_state.players[i].active = 1;
+                
+                // Init Player
+                phys_respawn(&local_state.players[i], get_server_time());
+                
+                // IMPORTANT: Init Ammo for new player
+                for(int w=0; w<MAX_WEAPONS; w++) local_state.players[i].ammo[w] = WPN_STATS[w].ammo_max;
+
+                printf("👋 CLIENT %d ASSIGNED to %s
+", client_id, ip_str);
+                break;
             }
         }
     }
     
+    // 3. Process Payload
     if (client_id != -1 && head->type == PACKET_USERCMD) {
         int cursor = sizeof(NetHeader);
         unsigned char count = *(unsigned char*)(buffer + cursor); cursor += 1;
-        UserCmd *cmds = (UserCmd*)(buffer + cursor);
-        for (int i = count - 1; i >= 0; i--) process_user_cmd(client_id, &cmds[i]);
+        
+        // Safety check size
+        if (size >= cursor + (count * sizeof(UserCmd))) {
+            UserCmd *cmds = (UserCmd*)(buffer + cursor);
+            for (int i = count - 1; i >= 0; i--) {
+                process_user_cmd(client_id, &cmds[i]);
+            }
+            local_state.players[client_id].active = 1; // Keep alive
+        }
     }
 }
 
-// --- BROADCAST SNAPSHOT ---
 void server_broadcast() {
     char buffer[4096];
     int cursor = 0;
     
-    // Header
     NetHeader head; 
     head.type = PACKET_SNAPSHOT; 
-    head.client_id = 0; // Broadcast
+    head.client_id = 0; 
     head.sequence = local_state.server_tick;
     head.timestamp = get_server_time();
     
-    // Count active entities
     unsigned char count = 0;
     for(int i=0; i<MAX_CLIENTS; i++) if (local_state.players[i].active) count++;
     head.entity_count = count;
@@ -131,7 +158,6 @@ void server_broadcast() {
     memcpy(buffer + cursor, &head, sizeof(NetHeader)); cursor += sizeof(NetHeader);
     memcpy(buffer + cursor, &count, 1); cursor += 1;
     
-    // Pack Entities
     for(int i=0; i<MAX_CLIENTS; i++) {
         PlayerState *p = &local_state.players[i];
         if (p->active) {
@@ -145,17 +171,13 @@ void server_broadcast() {
             np.shield = (unsigned char)p->shield;
             np.is_shooting = (unsigned char)p->is_shooting;
             np.crouching = (unsigned char)p->crouching;
-            np.reward_feedback = p->accumulated_reward; // Feedback for ML
-            np.ammo = (unsigned char)p->ammo[p->current_weapon]; // <--- AMMO SENT HERE
-            
-            // Clear reward after sending (so we don't count it twice)
+            np.reward_feedback = p->accumulated_reward;
+            np.ammo = (unsigned char)p->ammo[p->current_weapon];
             p->accumulated_reward = 0; 
-            
             memcpy(buffer + cursor, &np, sizeof(NetPlayer)); cursor += sizeof(NetPlayer);
         }
     }
     
-    // Send to all active clients
     for(int i=1; i<MAX_CLIENTS; i++) {
         if (local_state.client_active[i]) {
             sendto(sock, buffer, cursor, 0, (struct sockaddr*)&local_state.clients[i], sizeof(struct sockaddr_in));
@@ -165,18 +187,12 @@ void server_broadcast() {
 
 int main() {
     server_net_init();
-    local_init_match(1, 0); // Init Physics (Server is ID 0 implicitly or just host)
+    local_init_match(1, 0); 
     
-    // ADD SOME DUMMY BOTS FOR TRAINING TARGETS
-    for(int i=60; i<65; i++) {
-        local_state.players[i].active = 1;
-        local_state.players[i].is_bot = 1; // Mark as server-side bot
-        phys_respawn(&local_state.players[i], 0);
-    }
-
-    printf("🛡️ SHANKPIT SERVER READY. AMMO BROADCAST ENABLED.\n");
+    int running = 1;
+    unsigned int tick = 0;
     
-    while(1) {
+    while(running) {
         // 1. RECV
         char buffer[1024];
         struct sockaddr_in sender; socklen_t slen = sizeof(sender);
@@ -186,32 +202,32 @@ int main() {
             len = recvfrom(sock, buffer, 1024, 0, (struct sockaddr*)&sender, &slen);
         }
         
-        // 2. SIMULATE (60Hz)
+        // 2. SIMULATE
         unsigned int now = get_server_time();
+        int active_count = 0;
         
-        // Run Physics for Clients
         for(int i=0; i<MAX_CLIENTS; i++) {
             PlayerState *p = &local_state.players[i];
+            if (p->active) active_count++;
             
-            // Server-Side Bot Logic (Simple wander for targets)
-            if (p->active && p->is_bot) {
-                // Dummy logic so they move slightly
-                p->yaw += 1.0f;
-                // Keep them alive/respawning
-            }
-            
-            // Respawn Logic
             if (p->state == STATE_DEAD) {
-               if (now > p->respawn_time) phys_respawn(p, now);
+               if (local_state.game_mode != MODE_SURVIVAL && now > p->respawn_time) {
+                   phys_respawn(p, now);
+                   printf("👼 Client %d Respawned
+", i);
+               }
             }
-            
-            // Standard Update (Gravity, Velocity, etc)
-            // We pass NULL context because inputs are already in 'p' struct
             update_entity(p, 0.016f, NULL, now);
         }
         
         // 3. BROADCAST
         server_broadcast();
+        
+        // 4. PERIODIC LOG (Every ~5 seconds)
+        if (tick % 300 == 0) {
+            printf("[STATUS] Tick: %d | Active Entities: %d
+", tick, active_count);
+        }
         
         local_state.server_tick++;
         #ifdef _WIN32
@@ -219,6 +235,7 @@ int main() {
         #else
         usleep(16000);
         #endif
+        tick++;
     }
     return 0;
 }
