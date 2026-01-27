@@ -70,6 +70,7 @@ int check_hit_location(float ox, float oy, float oz, float dx, float dy, float d
 }
 
 
+
 void apply_friction(PlayerState *p) {
     float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
     if (speed < 0.001f) { p->vx = 0; p->vz = 0; return; }

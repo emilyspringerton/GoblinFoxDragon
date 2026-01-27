@@ -44,6 +44,11 @@ void bot_think(int bot_idx, PlayerState *players, float *out_fwd, float *out_yaw
         PlayerState *t = &players[target_idx];
         float dx = t->x - me->x;
         float dz = t->z - me->z;
+        
+        // Aim Smoothing
+        PlayerState *t = &players[target_idx];
+        float dx = t->x - me->x;
+        float dz = t->z - me->z;
         float target_yaw = atan2f(dx, dz) * (180.0f / 3.14159f);
         
         // Smoothly rotate towards target (10 degrees per tick max)
@@ -51,6 +56,7 @@ void bot_think(int bot_idx, PlayerState *players, float *out_fwd, float *out_yaw
         if (diff > 10.0f) diff = 10.0f;
         if (diff < -10.0f) diff = -10.0f;
         *out_yaw += diff;
+
 
     }
 }
