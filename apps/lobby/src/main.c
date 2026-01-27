@@ -25,49 +25,52 @@
 #include "../../../packages/common/physics.h"
 #include "../../../packages/simulation/local_game.h"
 
+// --- CONSTANTS & STATE ---
 #define STATE_LOBBY 0
 #define STATE_GAME_NET 1
 #define STATE_GAME_LOCAL 2
 #define STATE_LISTEN_SERVER 99
 
-// Forward Declaration
-void draw_scene(PlayerState *render_p); // Added
-
 int app_state = STATE_LOBBY;
-int wpn_req = 1; // Persistent Weapon
+int wpn_req = 1; // Persistent Weapon request
 
 float cam_yaw = 0.0f;
 float cam_pitch = 0.0f;
 float current_fov = 75.0f;
 
+// --- NETWORKING ---
 int sock = -1;
 struct sockaddr_in server_addr;
 
-// Listen Server State
 int sv_sock = -1;
 unsigned int sv_client_last_seq[MAX_CLIENTS];
+
+// --- FORWARD DECLARATIONS ---
+void draw_scene(PlayerState *render_p); // Critical for linker
 
 // --- LISTEN SERVER LOGIC ---
 void sv_process_cmd(int client_id, UserCmd *cmd) {
     if (cmd->sequence <= sv_client_last_seq[client_id]) return;
     PlayerState *p = &local_state.players[client_id];
     
+    // Inputs
     if (!isnan(cmd->yaw)) p->yaw = cmd->yaw;
     if (!isnan(cmd->pitch)) p->pitch = cmd->pitch;
     p->current_weapon = cmd->weapon_idx;
     
-    // Use local_update logic but authoritative
-    // We cheat and call update_entity/accelerate directly
+    // Physics
     float rad = p->yaw * 0.0174533f;
     float wish_x = sinf(rad) * cmd->fwd + cosf(rad) * cmd->str;
     float wish_z = cosf(rad) * cmd->fwd - sinf(rad) * cmd->str;
     
     accelerate(p, wish_x, wish_z, MAX_SPEED, ACCEL);
     
+    // Jump
     if ((cmd->buttons & BTN_JUMP) && p->on_ground) {
         p->y += 0.1f; p->vy += JUMP_FORCE;
     }
     
+    // State
     p->in_shoot = (cmd->buttons & BTN_ATTACK);
     p->in_reload = (cmd->buttons & BTN_RELOAD);
     p->crouching = (cmd->buttons & BTN_CROUCH);
@@ -78,9 +81,11 @@ void sv_process_cmd(int client_id, UserCmd *cmd) {
 }
 
 void sv_tick() {
+    // 1. Process Network
     char buffer[1024];
     struct sockaddr_in sender;
     socklen_t slen = sizeof(sender);
+    
     if (sv_sock != -1) {
         int len = recvfrom(sv_sock, buffer, 1024, 0, (struct sockaddr*)&sender, &slen);
         while (len > 0) {
@@ -90,43 +95,35 @@ void sv_tick() {
                     int cursor = sizeof(NetHeader);
                     unsigned char count = *(unsigned char*)(buffer + cursor); cursor++;
                     UserCmd *cmds = (UserCmd*)(buffer + cursor);
+                    // Assume Client 0 is the sender for local test
                     for (int i = count - 1; i >= 0; i--) sv_process_cmd(0, &cmds[i]);
                 }
             }
             len = recvfrom(sv_sock, buffer, 1024, 0, (struct sockaddr*)&sender, &slen);
         }
     }
-    // Bots
+    
+    // 2. Process Bots
     for(int i=1; i<MAX_CLIENTS; i++) {
         PlayerState *p = &local_state.players[i];
         if (!p->active) continue;
+        
         float bfwd=0, byaw=p->yaw; int bbtns=0;
         bot_think(i, local_state.players, &bfwd, &byaw, &bbtns);
+        
         p->yaw = byaw;
-        // Bot physics in server
+        // Bot physics
         float brad = byaw * 0.0174533f;
         float bx = sinf(brad) * bfwd;
         float bz = cosf(brad) * bfwd;
         accelerate(p, bx, bz, MAX_SPEED, ACCEL);
+        
         p->in_shoot = (bbtns & BTN_ATTACK);
         update_entity(p, 0.016f, NULL, 0);
     }
 }
 
-void net_send_cmd(UserCmd cmd) {
-    if (sock == -1) return;
-    char packet_data[1024];
-    int cursor = 0;
-    NetHeader head;
-    head.type = PACKET_USERCMD;
-    head.client_id = 1; 
-    memcpy(packet_data + cursor, &head, sizeof(NetHeader)); cursor += sizeof(NetHeader);
-    unsigned char count = 1;
-    memcpy(packet_data + cursor, &count, 1); cursor += 1;
-    memcpy(packet_data + cursor, &cmd, sizeof(UserCmd)); cursor += sizeof(UserCmd);
-    sendto(sock, packet_data, cursor, 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
-}
-
+// --- CLIENT NETWORKING ---
 UserCmd client_create_cmd(float fwd, float str, float yaw, float pitch, int shoot, int jump, int crouch, int reload, int wpn_idx) {
     UserCmd cmd;
     memset(&cmd, 0, sizeof(UserCmd));
@@ -143,6 +140,18 @@ UserCmd client_create_cmd(float fwd, float str, float yaw, float pitch, int shoo
     return cmd;
 }
 
+void net_send_cmd(UserCmd cmd) {
+    if (sock == -1) return;
+    char packet_data[1024];
+    int cursor = 0;
+    NetHeader head; head.type = PACKET_USERCMD; head.client_id = 1; 
+    memcpy(packet_data + cursor, &head, sizeof(NetHeader)); cursor += sizeof(NetHeader);
+    unsigned char count = 1;
+    memcpy(packet_data + cursor, &count, 1); cursor += 1;
+    memcpy(packet_data + cursor, &cmd, sizeof(UserCmd)); cursor += sizeof(UserCmd);
+    sendto(sock, packet_data, cursor, 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
+}
+
 void net_init() {
     #ifdef _WIN32
     WSADATA wsa; WSAStartup(MAKEWORD(2,2), &wsa);
@@ -155,20 +164,17 @@ void net_init() {
     #endif
     struct hostent *he = gethostbyname("s.farthq.com");
     if (he) {
-        server_addr.sin_family = AF_INET;
-        server_addr.sin_port = htons(5314); 
+        server_addr.sin_family = AF_INET; server_addr.sin_port = htons(5314); 
         memcpy(&server_addr.sin_addr, he->h_addr_list[0], he->h_length);
     } else {
-        server_addr.sin_family = AF_INET;
-        server_addr.sin_port = htons(6969);
+        server_addr.sin_family = AF_INET; server_addr.sin_port = htons(6969);
         server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
     }
 }
 
-// Drawing Functions (Reused)
+// --- RENDERING ---
 void draw_grid() {
-    glBegin(GL_LINES);
-    glColor3f(0.0f, 1.0f, 1.0f);
+    glBegin(GL_LINES); glColor3f(0.0f, 1.0f, 1.0f);
     for(int i=-100; i<=900; i+=5) {
         glVertex3f(i, 0, -100); glVertex3f(i, 0, 100);
         glVertex3f(-100, 0, i); glVertex3f(100, 0, i);
@@ -179,19 +185,15 @@ void draw_grid() {
 void draw_map() {
     for(int i=1; i<map_count; i++) {
         Box b = map_geo[i];
-        glPushMatrix();
-        glTranslatef(b.x, b.y, b.z);
-        glScalef(b.w, b.h, b.d);
-        glBegin(GL_QUADS);
-        glColor3f(0.2f, 0.2f, 0.2f); 
+        glPushMatrix(); glTranslatef(b.x, b.y, b.z); glScalef(b.w, b.h, b.d);
+        glBegin(GL_QUADS); glColor3f(0.2f, 0.2f, 0.2f); 
         glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(-0.5,0.5,0.5);
         glVertex3f(-0.5,0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
         glVertex3f(-0.5,-0.5,-0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
         glVertex3f(-0.5,-0.5,-0.5); glVertex3f(-0.5,-0.5,0.5); glVertex3f(-0.5,0.5,0.5); glVertex3f(-0.5,0.5,-0.5);
         glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(0.5,0.5,0.5);
         glEnd();
-        glLineWidth(2.0f);
-        glColor3f(1.0f, 0.0f, 1.0f); 
+        glLineWidth(2.0f); glColor3f(1.0f, 0.0f, 1.0f); 
         glBegin(GL_LINE_LOOP);
         glVertex3f(-0.5, 0.5, 0.5); glVertex3f(0.5, 0.5, 0.5); glVertex3f(0.5, 0.5, -0.5); glVertex3f(-0.5, 0.5, -0.5);
         glEnd();
@@ -217,8 +219,7 @@ void draw_gun_model(int weapon_id) {
 }
 
 void draw_weapon_p(PlayerState *p) {
-    glPushMatrix();
-    glLoadIdentity();
+    glPushMatrix(); glLoadIdentity();
     float kick = p->recoil_anim * 0.2f;
     float reload_dip = (p->reload_timer > 0) ? sinf(p->reload_timer * 0.2f) * 0.5f - 0.5f : 0.0f;
     float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
@@ -230,8 +231,26 @@ void draw_weapon_p(PlayerState *p) {
     glPopMatrix();
 }
 
-void draw_head(int weapon_id) {
-    switch(weapon_id) {
+void draw_player_3rd(PlayerState *p) {
+    glPushMatrix();
+    glTranslatef(p->x, p->y + 2.0f, p->z);
+    glRotatef(-p->yaw, 0, 1, 0); 
+    if(p->health <= 0) glColor3f(0.2, 0, 0); else glColor3f(1, 0, 0); 
+    
+    // BODY
+    glPushMatrix(); glScalef(1.2f, 3.8f, 1.2f);
+    glBegin(GL_QUADS);
+    glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(-0.5,0.5,0.5);
+    glVertex3f(-0.5,0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
+    glVertex3f(-0.5,-0.5,-0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
+    glVertex3f(-0.5,-0.5,-0.5); glVertex3f(-0.5,-0.5,0.5); glVertex3f(-0.5,0.5,0.5); glVertex3f(-0.5,0.5,-0.5);
+    glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(0.5,0.5,0.5);
+    glEnd(); glPopMatrix();
+    
+    // HEAD
+    glPushMatrix(); glTranslatef(0, 0.95f, 0);
+    // Draw Head
+    switch(p->current_weapon) {
         case WPN_KNIFE:   glColor3f(0.8f, 0.8f, 0.9f); break;
         case WPN_MAGNUM:  glColor3f(0.4f, 0.4f, 0.4f); break;
         case WPN_AR:      glColor3f(0.2f, 0.3f, 0.2f); break;
@@ -245,33 +264,12 @@ void draw_head(int weapon_id) {
     glVertex3f(-0.4, 0, 0.4); glVertex3f(0.4, 0, 0.4); glVertex3f(0.4, 0, -0.4); glVertex3f(-0.4, 0, -0.4);
     glVertex3f(-0.4, 0.8, 0.4); glVertex3f(-0.4, 0, 0.4); glVertex3f(-0.4, 0, -0.4); glVertex3f(-0.4, 0.8, -0.4);
     glVertex3f(0.4, 0.8, 0.4); glVertex3f(0.4, 0, 0.4); glVertex3f(0.4, 0, -0.4); glVertex3f(0.4, 0.8, -0.4);
-    glEnd();
-}
-
-void draw_player_3rd(PlayerState *p) {
-    glPushMatrix();
-    glTranslatef(p->x, p->y + 2.0f, p->z);
-    glRotatef(-p->yaw, 0, 1, 0); 
-    if(p->health <= 0) glColor3f(0.2, 0, 0); 
-    else glColor3f(1, 0, 0); 
-    glPushMatrix();
-    glScalef(1.2f, 3.8f, 1.2f);
-    glBegin(GL_QUADS);
-    // (Body Box Geometry - Simplified for brevity in script, but assumed present)
-    glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(-0.5,0.5,0.5);
-    glVertex3f(-0.5,0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
-    glVertex3f(-0.5,-0.5,-0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
-    glVertex3f(-0.5,-0.5,-0.5); glVertex3f(-0.5,-0.5,0.5); glVertex3f(-0.5,0.5,0.5); glVertex3f(-0.5,0.5,-0.5);
-    glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(0.5,0.5,0.5);
-    glEnd();
-    glPopMatrix();
+    glEnd(); glPopMatrix();
     
-    // DRAW HEAD (Fixed Offset)
-    glPushMatrix();
-    glTranslatef(0, 0.95f, 0); // Corrected from 2.0f
-    draw_head(p->current_weapon);
-    glPopMatrix();
-    glPopMatrix();
+    // WEAPON
+    glPushMatrix(); glTranslatef(0.5f, 1.0f, 0.5f); glRotatef(p->pitch, 1, 0, 0);   
+    glScalef(0.8f, 0.8f, 0.8f); draw_gun_model(p->current_weapon);
+    glPopMatrix(); glPopMatrix();
 }
 
 void draw_hud(PlayerState *p) {
@@ -279,48 +277,71 @@ void draw_hud(PlayerState *p) {
     glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
     glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
     
-    // CROSSHAIR
+    // Crosshair
     glColor3f(0, 1, 0);
     if (current_fov < 50.0f) {
         glBegin(GL_LINES); glVertex2f(0, 360); glVertex2f(1280, 360); glVertex2f(640, 0); glVertex2f(640, 720); glEnd();
     } else {
-        glLineWidth(2.0f);
-        glBegin(GL_LINES); glVertex2f(630, 360); glVertex2f(650, 360); glVertex2f(640, 350); glVertex2f(640, 370); glEnd();
+        glLineWidth(2.0f); glBegin(GL_LINES); glVertex2f(630, 360); glVertex2f(650, 360); glVertex2f(640, 350); glVertex2f(640, 370); glEnd();
     }
     
-    // HIT MARKER
+    // Hit Marker
     if (p->hit_feedback > 0) {
-        if (p->hit_feedback == 20) glColor3f(1, 0, 1); 
-        else glColor3f(0, 1, 1);
-        glBegin(GL_TRIANGLE_FAN);
-        glVertex2f(640, 360); 
+        if (p->hit_feedback == 20) glColor3f(1, 0, 1); else glColor3f(0, 1, 1);
+        glBegin(GL_TRIANGLE_FAN); glVertex2f(640, 360); 
         for(int i=0; i<=20; i++) {
-            float ang = (float)i / 20.0f * 6.28318f;
-            glVertex2f(640 + cosf(ang)*15, 360 + sinf(ang)*15);
+            float ang = (float)i / 20.0f * 6.28318f; glVertex2f(640 + cosf(ang)*15, 360 + sinf(ang)*15);
         }
         glEnd();
     }
 
-    // HEALTH & SHIELD
+    // Bars
     glColor3f(0.2f, 0, 0); glRectf(50, 50, 250, 70);
     glColor3f(1.0f, 0, 0); glRectf(50, 50, 50 + (p->health * 2), 70);
     glColor3f(0, 0, 0.2f); glRectf(50, 80, 250, 100);
     glColor3f(0.2f, 0.2f, 1.0f); glRectf(50, 80, 50 + (p->shield * 2), 100);
 
-    // AMMO
+    // Ammo
     int w = p->current_weapon;
     int ammo = (w == WPN_KNIFE) ? 99 : p->ammo[w];
     glColor3f(1, 1, 0);
-    for(int i=0; i<ammo; i++) {
-        glRectf(1200 - (i*10), 50, 1205 - (i*10), 80);
-    }
+    for(int i=0; i<ammo; i++) glRectf(1200 - (i*10), 50, 1205 - (i*10), 80);
+    
     glEnable(GL_DEPTH_TEST);
     glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW); glPopMatrix();
 }
 
+void draw_projectiles() {}
+
+// --- THE MISSING LINK ---
+void draw_scene(PlayerState *render_p) {
+    glClearColor(0.05f, 0.05f, 0.1f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glLoadIdentity();
+
+    float cam_h = render_p->crouching ? 2.5f : EYE_HEIGHT;
+    glRotatef(-cam_pitch, 1, 0, 0);
+    glRotatef(-cam_yaw, 0, 1, 0);
+    glTranslatef(-render_p->x, -(render_p->y + cam_h), -render_p->z);
+
+    draw_grid();
+    draw_map();
+    draw_projectiles();
+    
+    for(int i=1; i<MAX_CLIENTS; i++) {
+        if(local_state.players[i].active) {
+            draw_player_3rd(&local_state.players[i]);
+        }
+    }
+
+    draw_weapon_p(render_p);
+    draw_hud(render_p);
+}
+
+// --- MAIN ENTRY ---
 int main(int argc, char* argv[]) {
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *win = SDL_CreateWindow("SHANKPIT [BUILD 104 HARMONIZED]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
+    SDL_Window *win = SDL_CreateWindow("SHANKPIT [BUILD 105 - DEFINITIVE]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
     SDL_GL_CreateContext(win);
     net_init();
     
@@ -338,8 +359,17 @@ int main(int argc, char* argv[]) {
                     if (e.key.keysym.sym == SDLK_0) { 
                         app_state = STATE_LISTEN_SERVER; 
                         local_init_match(8, MODE_DEATHMATCH); 
+                        
+                        // Bind Server
+                        #ifdef _WIN32
+                        WSADATA wsa; WSAStartup(MAKEWORD(2,2), &wsa);
+                        #endif
                         sv_sock = socket(AF_INET, SOCK_DGRAM, 0);
+                        #ifdef _WIN32
                         u_long mode = 1; ioctlsocket(sv_sock, FIONBIO, &mode);
+                        #else
+                        int flags = fcntl(sv_sock, F_GETFL, 0); fcntl(sv_sock, F_SETFL, flags | O_NONBLOCK);
+                        #endif
                         struct sockaddr_in bind_addr;
                         bind_addr.sin_family = AF_INET; bind_addr.sin_port = htons(6969); bind_addr.sin_addr.s_addr = INADDR_ANY;
                         bind(sv_sock, (struct sockaddr*)&bind_addr, sizeof(bind_addr));
