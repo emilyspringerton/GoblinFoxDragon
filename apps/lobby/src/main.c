@@ -31,7 +31,7 @@
 #define STATE_LISTEN_SERVER 99
 
 // --- CONFIG ---
-char SERVER_HOST[64] = "127.0.0.1"; // Default Host
+char SERVER_HOST[64] = "s.farthq.com"; // <--- TARGET LOCKED
 int SERVER_PORT = 6969;
 
 int app_state = STATE_LOBBY;
@@ -47,22 +47,27 @@ struct sockaddr_in server_addr;
 // --- RENDER FUNCTIONS ---
 void draw_scene(PlayerState *render_p); 
 
+// --- TEXT RENDERER (FLIPPED Y) ---
+// Note: In standard GL ortho (0,0 bottom-left), y+s is higher.
+// If text was upside down, it meant we were drawing 'top' at y and 'bottom' at y+s.
+// We swap them here to flip it back.
 void draw_char(char c, float x, float y, float s) {
     glLineWidth(1.0f);
     glBegin(GL_LINES);
-    if(c>='0'&&c<='9'){ glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x,y); }
-    else if(c=='A'){glVertex2f(x,y+s);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s/2);}
-    else if(c=='B'){glVertex2f(x,y+s);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x+s*0.8,y);glVertex2f(x+s*0.8,y);glVertex2f(x+s,y+s/4);glVertex2f(x+s,y+s/4);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s*0.75);glVertex2f(x+s,y+s*0.75);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x,y+s);}
-    else if(c=='D'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y);glVertex2f(x+s*0.8,y);glVertex2f(x+s*0.8,y);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x,y+s);}
+    // 0-9
+    if(c>='0'&&c<='9'){ glVertex2f(x,y+s);glVertex2f(x+s,y+s);glVertex2f(x+s,y);glVertex2f(x,y);glVertex2f(x,y+s); }
+    // Letters (Manually Flipped Coords)
+    else if(c=='A'){glVertex2f(x,y);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y);glVertex2f(x,y+s/2);glVertex2f(x+s/2,y+s);glVertex2f(x+s/2,y+s);glVertex2f(x+s,y+s/2);}
+    else if(c=='B'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s,y+s*0.75);glVertex2f(x+s,y+s*0.75);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x+s,y+s/4);glVertex2f(x+s,y+s/4);glVertex2f(x+s*0.8,y);glVertex2f(x+s*0.8,y);glVertex2f(x,y);}
+    else if(c=='D'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s*0.8,y);glVertex2f(x+s*0.8,y);glVertex2f(x,y);}
     else if(c=='J'){glVertex2f(x+s,y+s);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x,y+s/2);}
     else if(c=='O'){glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x,y);}
     else if(c=='I'){glVertex2f(x+s/2,y);glVertex2f(x+s/2,y+s);glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x,y+s);glVertex2f(x+s,y+s);}
-    else if(c=='N'){glVertex2f(x,y+s);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x+s,y);}
-    else if(c=='S'){glVertex2f(x+s,y);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x,y+s);}
+    else if(c=='N'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);}
+    else if(c=='S'){glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x,y);}
     else if(c=='E'){glVertex2f(x+s,y);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s,y+s);glVertex2f(x,y+s/2);glVertex2f(x+s*0.8,y+s/2);}
-    else if(c=='R'){glVertex2f(x,y+s);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s);}
+    else if(c=='R'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y);}
     else if(c=='V'){glVertex2f(x,y+s);glVertex2f(x+s/2,y);glVertex2f(x+s/2,y);glVertex2f(x+s,y+s);}
-    else if(c==':'){glVertex2f(x+s/2,y+s*0.2);glVertex2f(x+s/2,y+s*0.3);glVertex2f(x+s/2,y+s*0.7);glVertex2f(x+s/2,y+s*0.8);}
     else if(c==' '){} 
     else { glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x,y); }
     glEnd();
@@ -127,31 +132,12 @@ void draw_weapon_p(PlayerState *p) {
     glPopMatrix();
 }
 
-void draw_head(int weapon_id) {
-    switch(weapon_id) {
-        case WPN_KNIFE:   glColor3f(0.8f, 0.8f, 0.9f); break;
-        case WPN_MAGNUM:  glColor3f(0.4f, 0.4f, 0.4f); break;
-        case WPN_AR:      glColor3f(0.2f, 0.3f, 0.2f); break;
-        case WPN_SHOTGUN: glColor3f(0.5f, 0.3f, 0.2f); break;
-        case WPN_SNIPER:  glColor3f(0.1f, 0.1f, 0.15f); break;
-    }
-    glBegin(GL_QUADS);
-    glVertex3f(-0.4, 0.8, 0.4); glVertex3f(0.4, 0.8, 0.4); glVertex3f(0.4, 0, 0.4); glVertex3f(-0.4, 0, 0.4);
-    glVertex3f(-0.4, 0.8, -0.4); glVertex3f(0.4, 0.8, -0.4); glVertex3f(0.4, 0, -0.4); glVertex3f(-0.4, 0, -0.4);
-    glVertex3f(-0.4, 0.8, 0.4); glVertex3f(0.4, 0.8, 0.4); glVertex3f(0.4, 0.8, -0.4); glVertex3f(-0.4, 0.8, -0.4);
-    glVertex3f(-0.4, 0, 0.4); glVertex3f(0.4, 0, 0.4); glVertex3f(0.4, 0, -0.4); glVertex3f(-0.4, 0, -0.4);
-    glVertex3f(-0.4, 0.8, 0.4); glVertex3f(-0.4, 0, 0.4); glVertex3f(-0.4, 0, -0.4); glVertex3f(-0.4, 0.8, -0.4);
-    glVertex3f(0.4, 0.8, 0.4); glVertex3f(0.4, 0, 0.4); glVertex3f(0.4, 0, -0.4); glVertex3f(0.4, 0.8, -0.4);
-    glEnd();
-}
-
 void draw_player_3rd(PlayerState *p) {
     glPushMatrix();
     glTranslatef(p->x, p->y + 2.0f, p->z);
     glRotatef(-p->yaw, 0, 1, 0); 
     if(p->health <= 0) glColor3f(0.2, 0, 0); else glColor3f(1, 0, 0); 
     
-    // GOLDEN RATIO SCALE (1.618x)
     glPushMatrix(); glScalef(0.97f, 2.91f, 0.97f); 
     glBegin(GL_QUADS);
     glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(-0.5,0.5,0.5);
@@ -160,19 +146,16 @@ void draw_player_3rd(PlayerState *p) {
     glVertex3f(-0.5,-0.5,-0.5); glVertex3f(-0.5,-0.5,0.5); glVertex3f(-0.5,0.5,0.5); glVertex3f(-0.5,0.5,-0.5);
     glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(0.5,0.5,0.5);
     glEnd(); glPopMatrix();
-    
-    glPushMatrix(); glTranslatef(0, 1.54f, 0); draw_head(p->current_weapon); glPopMatrix();
-    glPushMatrix(); glTranslatef(0.5f, 1.0f, 0.5f); glRotatef(p->pitch, 1, 0, 0);   
-    glScalef(0.8f, 0.8f, 0.8f); draw_gun_model(p->current_weapon); glPopMatrix(); glPopMatrix();
+    glPopMatrix();
 }
-
-void draw_projectiles() { }
 
 void draw_hud(PlayerState *p) {
     glDisable(GL_DEPTH_TEST);
     glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
     glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
     glColor3f(0, 1, 0);
+    
+    // Crosshair
     if (current_fov < 50.0f) { glBegin(GL_LINES); glVertex2f(0, 360); glVertex2f(1280, 360); glVertex2f(640, 0); glVertex2f(640, 720); glEnd(); } 
     else { glLineWidth(2.0f); glBegin(GL_LINES); glVertex2f(630, 360); glVertex2f(650, 360); glVertex2f(640, 350); glVertex2f(640, 370); glEnd(); }
     
@@ -181,6 +164,7 @@ void draw_hud(PlayerState *p) {
         glBegin(GL_TRIANGLE_FAN); glVertex2f(640, 360); for(int i=0; i<=20; i++) { float ang = (float)i/20.0f*6.283f; glVertex2f(640+cosf(ang)*15, 360+sinf(ang)*15); } glEnd();
     }
     
+    // Bars
     glColor3f(0.2f, 0, 0); glRectf(50, 50, 250, 70); glColor3f(1.0f, 0, 0); glRectf(50, 50, 50 + (p->health * 2), 70);
     glColor3f(0, 0, 0.2f); glRectf(50, 80, 250, 100); glColor3f(0.2f, 0.2f, 1.0f); glRectf(50, 80, 50 + (p->shield * 2), 100);
     int w = p->current_weapon; int ammo = (w == WPN_KNIFE) ? 99 : p->ammo[w];
@@ -197,12 +181,11 @@ void draw_scene(PlayerState *render_p) {
     glClearColor(0.05f, 0.05f, 0.1f, 1.0f); glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); glLoadIdentity();
     float cam_h = render_p->crouching ? 2.5f : EYE_HEIGHT;
     glRotatef(-cam_pitch, 1, 0, 0); glRotatef(-cam_yaw, 0, 1, 0); glTranslatef(-render_p->x, -(render_p->y + cam_h), -render_p->z);
-    draw_grid(); draw_map(); draw_projectiles();
+    draw_grid(); draw_map(); 
     for(int i=1; i<MAX_CLIENTS; i++) if(local_state.players[i].active && i != 0) draw_player_3rd(&local_state.players[i]);
     draw_weapon_p(render_p); draw_hud(render_p);
 }
 
-// --- NETWORKING ---
 void net_init() {
     #ifdef _WIN32
     WSADATA wsa; WSAStartup(MAKEWORD(2,2), &wsa);
@@ -221,7 +204,6 @@ void net_connect() {
         server_addr.sin_family = AF_INET; 
         server_addr.sin_port = htons(SERVER_PORT); 
         memcpy(&server_addr.sin_addr, he->h_addr_list[0], he->h_length);
-        
         char buffer[128];
         NetHeader *h = (NetHeader*)buffer;
         h->type = PACKET_CONNECT;
@@ -255,11 +237,9 @@ void net_send_cmd(UserCmd cmd) {
 void net_process_snapshot(char *buffer, int len) {
     int cursor = sizeof(NetHeader);
     unsigned char count = *(unsigned char*)(buffer + cursor); cursor++;
-    
     for(int i=0; i<count; i++) {
         NetPlayer *np = (NetPlayer*)(buffer + cursor);
         cursor += sizeof(NetPlayer);
-        
         int id = np->id;
         if (id > 0 && id < MAX_CLIENTS) {
             PlayerState *p = &local_state.players[id];
@@ -267,10 +247,7 @@ void net_process_snapshot(char *buffer, int len) {
             p->x = np->x; p->y = np->y; p->z = np->z;
             p->yaw = np->yaw; p->pitch = np->pitch;
             p->health = np->health;
-            // Sync Ammo for other players? Not needed visual yet.
         } else if (id == 0) {
-            // Local Player Corrections (Optional, usually we predict)
-            // But we NEED Ammo sync from server
             local_state.players[0].ammo[local_state.players[0].current_weapon] = np->ammo;
         }
     }
@@ -291,7 +268,6 @@ void net_tick() {
 }
 
 int main(int argc, char* argv[]) {
-    // --- CLI ARGS ---
     for(int i=1; i<argc; i++) {
         if(strcmp(argv[i], "--host") == 0 && i+1<argc) {
             strncpy(SERVER_HOST, argv[++i], 63);
@@ -299,7 +275,7 @@ int main(int argc, char* argv[]) {
     }
 
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *win = SDL_CreateWindow("SHANKPIT [BUILD 139 - J TO JOIN]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
+    SDL_Window *win = SDL_CreateWindow("SHANKPIT [BUILD 154 - S.FARTHQ.COM]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
     SDL_GL_CreateContext(win);
     net_init();
     
@@ -311,16 +287,29 @@ int main(int argc, char* argv[]) {
         while(SDL_PollEvent(&e)) {
             if(e.type == SDL_QUIT) running = 0;
             
+            // --- MOUSE SAFETY ---
+            if (e.type == SDL_WINDOWEVENT) {
+                if (e.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
+                    if (app_state != STATE_LOBBY) SDL_SetRelativeMouseMode(SDL_TRUE);
+                }
+            }
+            if (e.type == SDL_MOUSEBUTTONDOWN) {
+                if (app_state != STATE_LOBBY) SDL_SetRelativeMouseMode(SDL_TRUE);
+            }
+            
             if (app_state == STATE_LOBBY) {
                 if(e.type == SDL_KEYDOWN) {
                     if (e.key.keysym.sym == SDLK_d) { app_state = STATE_GAME_LOCAL; local_init_match(1, MODE_DEATHMATCH); }
                     if (e.key.keysym.sym == SDLK_b) { app_state = STATE_GAME_LOCAL; local_init_match(8, MODE_DEATHMATCH); }
                     if (e.key.keysym.sym == SDLK_k) { app_state = STATE_GAME_LOCAL; local_init_match(8, MODE_EVOLUTION); }
                     
-                    // --- J TO JOIN ---
+                    // J TO JOIN
                     if (e.key.keysym.sym == SDLK_j) { 
                         app_state = STATE_GAME_NET; 
                         net_connect(); 
+                    }
+                    
+                    if (app_state != STATE_LOBBY) {
                         SDL_SetRelativeMouseMode(SDL_TRUE);
                         glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
                         glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
@@ -347,7 +336,7 @@ int main(int argc, char* argv[]) {
              draw_string("SHANKPIT", 400, 500, 20);
              draw_string("D: DEMO", 400, 400, 10);
              draw_string("B: BATTLE", 400, 350, 10);
-             draw_string("J: JOIN SERVER", 400, 300, 10);
+             draw_string("J: JOIN S.FARTHQ.COM", 400, 300, 10);
              SDL_GL_SwapWindow(win);
         } 
         else {
@@ -366,12 +355,9 @@ int main(int argc, char* argv[]) {
             glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(current_fov, 1280.0/720.0, 0.1, 1000.0); glMatrixMode(GL_MODELVIEW);
 
             if (app_state == STATE_GAME_NET) {
-                // Client-Side Prediction: Move Self
                 local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn_req, jump, crouch, reload, NULL, 0);
-                // Send Inputs
                 UserCmd cmd = client_create_cmd(fwd, str, cam_yaw, cam_pitch, shoot, jump, crouch, reload, wpn_req);
                 net_send_cmd(cmd);
-                // Receive Server State (Bot Positions + My Ammo)
                 net_tick();
             } else {
                 local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn_req, jump, crouch, reload, NULL, 0);
