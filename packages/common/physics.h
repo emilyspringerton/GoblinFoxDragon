@@ -5,14 +5,14 @@
 #include <stdio.h>
 #include "protocol.h"
 
-// --- TURBO TUNING (PHASE 440) ---
-#define GRAVITY 0.04f       // Floaty (Was 0.05)
-#define JUMP_FORCE 0.65f    // High Hop
-#define MAX_SPEED 0.85f     // Fast (Was 0.8)
-#define FRICTION 3.5f       // SLIPPERY (Was 8.0)
-#define ACCEL 12.0f         // SNAPPY (Was 6.5) - Overpowers friction easily
-#define STOP_SPEED 0.1f     // Let it slide to a halt
-#define SLIDE_FRICTION 0.2f // Zero-G feel when sliding
+// --- TURBO TUNING (PHASE 441 - UNGLUED) ---
+#define GRAVITY 0.04f       
+#define JUMP_FORCE 0.65f    
+#define MAX_SPEED 0.85f     
+#define FRICTION 4.0f       // Good grip
+#define ACCEL 10.0f         // Fast start
+#define STOP_SPEED 0.1f     // <--- FIXED: Was 1.0f (The Glue), now 0.1f
+#define SLIDE_FRICTION 0.1f // Super slick slide
 #define EYE_HEIGHT 1.6f 
 #define HEAD_SIZE 1.2f
 #define HEAD_OFFSET 1.5f 
@@ -76,23 +76,20 @@ int check_hit_location(float ox, float oy, float oz, float dx, float dy, float d
     return 0;
 }
 
-// THE SLIDE LOGIC
 void apply_friction(PlayerState *p) {
     float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
     if (speed < 0.001f) { p->vx = 0; p->vz = 0; return; }
     
     float drop = 0;
     if (p->on_ground) {
-        // If Crouching and moving fast, apply LESS friction (SLIDE)
         if (p->crouching && speed > 0.3f) {
             drop = speed * SLIDE_FRICTION; 
         } else {
-            // Normal Friction
             float control = (speed < STOP_SPEED) ? STOP_SPEED : speed;
             drop = control * FRICTION;
         }
     } else {
-        drop = 0; // ZERO AIR DRAG (Momentum preserved)
+        drop = 0; // No air drag
     }
     
     float newspeed = speed - drop;
