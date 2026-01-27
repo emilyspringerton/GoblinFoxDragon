@@ -5,13 +5,13 @@
 #include <stdio.h>
 #include "protocol.h"
 
-// --- VELOCITY TUNING (PHASE 437) ---
-#define GRAVITY 0.05f       // Tuned for good arcs
-#define JUMP_FORCE 0.8f     // Powerful jump
-#define MAX_SPEED 0.8f      // Fast run
-#define FRICTION 8.0f       // SLIPPERY (Was 8.0)
-#define ACCEL 6.5f          // Smooth buildup
-#define STOP_SPEED 1.0f     // Allow micro-sliding
+// --- VELOCITY TUNING (PHASE 439) ---
+#define GRAVITY 0.05f       
+#define JUMP_FORCE 0.8f     
+#define MAX_SPEED 0.8f      
+#define FRICTION 8.0f       // Snap stop
+#define ACCEL 6.5f          
+#define STOP_SPEED 1.0f     
 #define MAX_AIR_SPEED 0.2f
 #define EYE_HEIGHT 1.6f 
 #define HEAD_SIZE 1.2f
@@ -47,6 +47,14 @@ static int map_count = sizeof(map_geo) / sizeof(Box);
 
 float phys_rand_f() { return ((float)(rand()%1000)/500.0f) - 1.0f; }
 
+// HELPER: Angle Diff (static inline to prevent redefinition errors)
+static inline float angle_diff(float a, float b) {
+    float d = a - b;
+    while (d < -180) d += 360;
+    while (d > 180) d -= 360;
+    return d;
+}
+
 int check_hit_location(float ox, float oy, float oz, float dx, float dy, float dz, PlayerState *target) {
     if (!target->active) return 0;
     float tx = target->x; float tz = target->z;
@@ -69,37 +77,27 @@ int check_hit_location(float ox, float oy, float oz, float dx, float dy, float d
     return 0;
 }
 
-
-
 void apply_friction(PlayerState *p) {
     float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
     if (speed < 0.001f) { p->vx = 0; p->vz = 0; return; }
-    
     float drop = 0;
-    
-    // GROUND: Snappy Stop
     if (p->on_ground) {
         float control = (speed < STOP_SPEED) ? STOP_SPEED : speed;
         drop = control * FRICTION;
-    } 
-    // AIR: Slight Drag (Prevents Infinite Glide)
-    else {
-        drop = speed * 0.2f; 
+    } else {
+        drop = speed * 0.2f; // Slight Air Drag
     }
-    
     float newspeed = speed - drop;
     if (newspeed < 0) newspeed = 0;
     newspeed /= speed;
-    
-    p->vx *= newspeed;
-    p->vz *= newspeed;
+    p->vx *= newspeed; p->vz *= newspeed;
 }
 
 void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, float accel) {
     float current_speed = (p->vx * wish_x) + (p->vz * wish_z);
     float add_speed = wish_speed - current_speed;
     if (add_speed <= 0) return;
-    float acc_speed = accel * wish_speed; // Removed delta time for simple scaling
+    float acc_speed = accel * wish_speed; 
     if (acc_speed > add_speed) acc_speed = add_speed;
     p->vx += acc_speed * wish_x; p->vz += acc_speed * wish_z;
 }
@@ -202,7 +200,6 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
     }
 }
 
-// RESTORE HISTORY FUNCTIONS (Required for Server)
 void phys_store_history(ServerState *server, int client_id, unsigned int now) {
     if (client_id < 0 || client_id >= MAX_CLIENTS) return;
     int slot = (now / 16) % LAG_HISTORY; 
@@ -224,12 +221,4 @@ int phys_resolve_rewind(ServerState *server, int client_id, unsigned int target_
     }
     return 0; 
 }
-
 #endif
-
-float angle_diff(float a, float b) {
-    float d = a - b;
-    while (d < -180) d += 360;
-    while (d > 180) d -= 360;
-    return d;
-}
