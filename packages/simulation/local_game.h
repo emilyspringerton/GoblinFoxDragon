@@ -7,12 +7,10 @@
 
 ServerState local_state;
 
-// --- PROTOTYPES ---
 void local_update(float fwd, float str, float yaw, float pitch, int shoot, int weapon_req, int jump, int crouch, int reload, void *server_context, unsigned int cmd_time);
 void update_entity(PlayerState *p, float dt, void *server_context, unsigned int cmd_time);
 void local_init_match(int num_players, int mode);
 
-// --- BOT AI ---
 void bot_think(int bot_idx, PlayerState *players, float *out_fwd, float *out_yaw, int *out_buttons) {
     PlayerState *me = &players[bot_idx];
     if (me->state == STATE_DEAD) { *out_buttons = 0; return; }
@@ -32,13 +30,11 @@ void bot_think(int bot_idx, PlayerState *players, float *out_fwd, float *out_yaw
     }
 
     if (target_idx != -1) {
-        // SMOOTH AIM LOGIC
         PlayerState *t = &players[target_idx];
         float dx = t->x - me->x;
         float dz = t->z - me->z;
         float target_yaw = atan2f(dx, dz) * (180.0f / 3.14159f);
         
-        // Smooth rotate (10 degrees limit)
         float diff = angle_diff(target_yaw, *out_yaw);
         if (diff > 10.0f) diff = 10.0f;
         if (diff < -10.0f) diff = -10.0f;
@@ -46,25 +42,27 @@ void bot_think(int bot_idx, PlayerState *players, float *out_fwd, float *out_yaw
         
         *out_buttons |= BTN_ATTACK;
         
-        if (min_dist > 8.0f) *out_fwd = 1.0f; // Chase
-        else if (min_dist < 5.0f) *out_fwd = -1.0f; // Back up
+        if (min_dist > 8.0f) *out_fwd = 1.0f; 
+        else if (min_dist < 5.0f) *out_fwd = -1.0f; 
         else *out_fwd = 0.2f; 
+        
+        // JUMP LOGIC: Random hops when aggressive
+        if (me->on_ground && (rand()%100 < 5)) *out_buttons |= BTN_JUMP;
         
     } else {
         *out_yaw += 2.0f;
         *out_fwd = 0.5f;
+        // JUMP LOGIC: Random hops when patrolling to clear obstacles
+        if (me->on_ground && (rand()%100 < 2)) *out_buttons |= BTN_JUMP;
     }
 }
 
-// --- UPDATE ENTITY ---
 void update_entity(PlayerState *p, float dt, void *server_context, unsigned int cmd_time) {
     if (!p->active) return;
     if (p->state == STATE_DEAD) return;
 
-    // Apply Physics
     apply_friction(p);
     
-    // Gravity Momentum
     p->vy -= GRAVITY; 
     p->y += p->vy;
     
@@ -72,17 +70,14 @@ void update_entity(PlayerState *p, float dt, void *server_context, unsigned int 
     p->x += p->vx;
     p->z += p->vz;
 
-    // Animation Decay
     if (p->recoil_anim > 0) p->recoil_anim -= 0.1f;
     if (p->recoil_anim < 0) p->recoil_anim = 0;
 
     update_weapons(p, local_state.players, p->in_shoot > 0, p->in_reload > 0);
 }
 
-// --- LOCAL UPDATE LOOP ---
 void local_update(float fwd, float str, float yaw, float pitch, int shoot, int weapon_req, int jump, int crouch, int reload, void *server_context, unsigned int cmd_time) {
     
-    // 1. Update Local Player (Index 0)
     PlayerState *p0 = &local_state.players[0];
     p0->yaw = yaw;
     p0->pitch = pitch;
@@ -107,7 +102,6 @@ void local_update(float fwd, float str, float yaw, float pitch, int shoot, int w
     p0->in_reload = reload;
     p0->crouching = crouch;
     
-    // 2. Update Bots / All Entities
     for(int i=0; i<MAX_CLIENTS; i++) {
         PlayerState *p = &local_state.players[i];
         if (!p->active) continue;
@@ -122,6 +116,7 @@ void local_update(float fwd, float str, float yaw, float pitch, int shoot, int w
             float bz = cosf(brad) * b_fwd;
             accelerate(p, bx, bz, MAX_SPEED, ACCEL);
             p->in_shoot = (b_btns & BTN_ATTACK);
+            if ((b_btns & BTN_JUMP) && p->on_ground) { p->y += 0.1f; p->vy += JUMP_FORCE; }
         }
         
         update_entity(p, 0.016f, server_context, cmd_time);
@@ -138,5 +133,4 @@ void local_init_match(int num_players, int mode) {
         phys_respawn(&local_state.players[i], i*100);
     }
 }
-
 #endif
