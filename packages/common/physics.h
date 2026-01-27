@@ -1,3 +1,4 @@
+#include <stdio.h>
 #ifndef PHYSICS_H
 #define PHYSICS_H
 #include <math.h>
@@ -5,7 +6,7 @@
 #include "protocol.h"
 
 // --- TURBO TUNING ---
-#define GRAVITY 0.018f
+#define GRAVITY 0.08f
 #define JUMP_FORCE 0.61f
 #define MAX_SPEED 0.5f
 #define FRICTION 5.0f
@@ -13,7 +14,7 @@
 #define STOP_SPEED 1.0f
 #define MAX_AIR_SPEED 0.2f
 #define EYE_HEIGHT 1.6f 
-#define HEAD_SIZE 0.8f
+#define HEAD_SIZE 1.2f
 #define HEAD_OFFSET 1.5f 
 
 // --- SLIDE MECHANICS (Phase 429) ---
@@ -219,7 +220,10 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
 
                 int hit_type = check_hit_location(p->x, p->y + EYE_HEIGHT, p->z, dx, dy, dz, &targets[i]);
                 
+                
                 if (hit_type > 0) {
+                    printf("🔫 HIT! Dmg: %d on Target %d\n", WPN_STATS[w].dmg, i);
+    
                     int damage = WPN_STATS[w].dmg;
                     targets[i].shield_regen_timer = SHIELD_REGEN_DELAY;
                     

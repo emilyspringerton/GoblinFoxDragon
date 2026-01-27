@@ -65,7 +65,7 @@ void update_entity(PlayerState *p, float dt, void *server_context, unsigned int 
     apply_friction(p);
     
     // Apply Gravity
-    p->y -= GRAVITY;
+    p->vy -= GRAVITY; p->y += p->vy;
     if (p->y < 0) p->y = 0; // Simple floor clamp if map doesn't catch it
     
     // Resolve Collisions

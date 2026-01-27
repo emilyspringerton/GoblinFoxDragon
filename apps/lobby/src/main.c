@@ -41,40 +41,28 @@ int sv_sock = -1;
 unsigned int sv_client_last_seq[MAX_CLIENTS];
 
 // --- SERVER LOGIC (Local) ---
+
+// --- LISTEN SERVER LOGIC (Unified Phase 430) ---
 void sv_process_cmd(int client_id, UserCmd *cmd) {
     if (cmd->sequence <= sv_client_last_seq[client_id]) return;
-    PlayerState *p = &local_state.players[client_id];
     
-    // 1. Inputs
-    if (!isnan(cmd->yaw)) p->yaw = cmd->yaw;
-    if (!isnan(cmd->pitch)) p->pitch = cmd->pitch;
-    p->current_weapon = cmd->weapon_idx;
+    // We map the packet directly to the simulation function
+    // This ensures Server Physics == Local Physics
     
-    // 2. Physics (Quake-style)
-    float rad = p->yaw * 0.0174533f;
-    float wish_x = sinf(rad) * cmd->fwd + cosf(rad) * cmd->str;
-    float wish_z = cosf(rad) * cmd->fwd - sinf(rad) * cmd->str;
+    int shoot = (cmd->buttons & BTN_ATTACK);
+    int jump = (cmd->buttons & BTN_JUMP);
+    int crouch = (cmd->buttons & BTN_CROUCH);
+    int reload = (cmd->buttons & BTN_RELOAD);
     
-    // Normalize wish direction
-    float wish_speed = sqrtf(wish_x*wish_x + wish_z*wish_z);
-    if (wish_speed > 1.0f) {
-        wish_speed = 1.0f;
-        wish_x /= wish_speed; wish_z /= wish_speed;
+    // Hack: We need to set the specific player index context for local_update
+    // But local_update usually updates player 0 + bots.
+    // In Listen Server, Player 0 IS the client, so calling local_update works perfectly for Client 0.
+    // For other clients (future), we'd need to adapt local_update.
+    
+    // Apply inputs to Player 0 (The Host)
+    if (client_id == 0) {
+        local_update(cmd->fwd, cmd->str, cmd->yaw, cmd->pitch, shoot, cmd->weapon_idx, jump, crouch, reload, NULL, 0);
     }
-    wish_speed *= MAX_SPEED;
-    
-    accelerate(p, wish_x, wish_z, wish_speed, ACCEL);
-    
-    // Jump
-    if ((cmd->buttons & BTN_JUMP) && p->on_ground) {
-        p->y += 0.1f; p->vy += JUMP_FORCE;
-    }
-    
-    // Crouch
-    p->crouching = (cmd->buttons & BTN_CROUCH);
-    
-    // Update Entity (Gravity, Collision, Move)
-    update_entity(p, 0.016f, NULL, cmd->timestamp);
     
     sv_client_last_seq[client_id] = cmd->sequence;
 }
