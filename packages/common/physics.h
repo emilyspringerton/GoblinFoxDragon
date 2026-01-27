@@ -5,19 +5,25 @@
 #include <stdio.h>
 #include "protocol.h"
 
-// --- FLOAT & FLOW TUNING (PHASE 450) ---
-#define GRAVITY 0.035f      // <--- FLOATIER (Was 0.04)
-#define JUMP_FORCE 0.70f    // <--- STRONGER (Was 0.65)
-#define MAX_SPEED 0.92f     // <--- FASTER (Was 0.85)
+// --- TITAN & FEATHER TUNING (PHASE 451) ---
+// Gravity is now dynamic (See local_game.h)
+#define GRAVITY_FLOAT 0.03f  // Holding Space (Glide)
+#define GRAVITY_DROP 0.08f   // Release Space (Anchor)
+#define JUMP_FORCE 0.85f     // Stronger launch for bigger body
+#define MAX_SPEED 0.95f      // Faster to match scale
 #define FRICTION 0.15f      
 #define ACCEL 0.6f          
 #define STOP_SPEED 0.1f     
 #define SLIDE_FRICTION 0.01f 
 #define CROUCH_SPEED 0.35f  
-#define EYE_HEIGHT 1.6f 
-#define HEAD_SIZE 1.2f
-#define HEAD_OFFSET 1.5f 
-#define MELEE_RANGE_SQ 100.0f 
+
+// --- SCALE UPDATE (1.5x) ---
+#define EYE_HEIGHT 2.4f     // Was 1.6
+#define PLAYER_WIDTH 0.9f   // Was 0.6
+#define PLAYER_HEIGHT 6.0f  // Was 4.0
+#define HEAD_SIZE 1.8f      // Was 1.2
+#define HEAD_OFFSET 2.25f   // Was 1.5
+#define MELEE_RANGE_SQ 225.0f // Scaled range
 
 typedef struct { float x, y, z, w, h, d; } Box;
 
@@ -105,10 +111,8 @@ void apply_friction(PlayerState *p) {
 
 void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, float accel) {
     float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
-    // 1. Sliding: No accel allowed (Momentum only)
     if (p->crouching && speed > 0.5f && p->on_ground) return;
 
-    // 2. Cap Wish Speed for Crouch Walking
     if (p->crouching && p->on_ground && speed < 0.5f) {
         if (wish_speed > CROUCH_SPEED) wish_speed = CROUCH_SPEED;
     }
@@ -117,10 +121,7 @@ void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, fl
     float add_speed = wish_speed - current_speed;
     
     if (add_speed <= 0) return;
-    
-    // FIX: Multiply accel by MAX_SPEED (0.92) for consistent torque
     float acc_speed = accel * MAX_SPEED; 
-    
     if (acc_speed > add_speed) acc_speed = add_speed;
     
     p->vx += acc_speed * wish_x; 
@@ -128,7 +129,10 @@ void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, fl
 }
 
 void resolve_collision(PlayerState *p) {
-    float pw = 0.6f; float ph = p->crouching ? 2.0f : 4.0f; 
+    // SCALED COLLISION BOX
+    float pw = PLAYER_WIDTH; 
+    float ph = p->crouching ? (PLAYER_HEIGHT / 2.0f) : PLAYER_HEIGHT; 
+    
     p->on_ground = 0;
     if (p->y < 0) { p->y = 0; p->vy = 0; p->on_ground = 1; }
     for(int i=1; i<map_count; i++) {

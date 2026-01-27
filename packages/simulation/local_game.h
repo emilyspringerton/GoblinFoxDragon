@@ -7,6 +7,9 @@
 
 ServerState local_state;
 
+// Track previous jump state to nerf auto-hops
+int was_holding_jump = 0;
+
 void local_update(float fwd, float str, float yaw, float pitch, int shoot, int weapon_req, int jump, int crouch, int reload, void *server_context, unsigned int cmd_time);
 void update_entity(PlayerState *p, float dt, void *server_context, unsigned int cmd_time);
 void local_init_match(int num_players, int mode);
@@ -61,7 +64,12 @@ void update_entity(PlayerState *p, float dt, void *server_context, unsigned int 
 
     apply_friction(p);
     
-    p->vy -= GRAVITY; 
+    // --- FEATHER GRAVITY LOGIC ---
+    // If Holding Jump -> Low Gravity (Float)
+    // If Released Jump -> High Gravity (Drop)
+    float g = (p->in_jump) ? GRAVITY_FLOAT : GRAVITY_DROP;
+    
+    p->vy -= g; 
     p->y += p->vy;
     
     resolve_collision(p);
@@ -92,14 +100,24 @@ void local_update(float fwd, float str, float yaw, float pitch, int shoot, int w
     
     accelerate(p0, wish_x, wish_z, wish_speed, ACCEL);
     
-    // --- SUPERGLIDE JUMP LOGIC ---
+    // --- JUMP LOGIC (With Nerf) ---
+    // Only boost if we are NOT holding jump from the previous frame (fresh press)
+    // OR if we were already on the ground (to allow rapid hops if timed well)
+    // BUT user said: "if holding jump when landing -> ineligible"
+    // So we check: If we just landed this frame, were we holding jump?
+    
+    int fresh_jump_press = (jump && !was_holding_jump);
+    
     if (jump && p0->on_ground) {
         float speed = sqrtf(p0->vx*p0->vx + p0->vz*p0->vz);
-        // If Sliding (Crouch + Speed) -> BOOST!
-        if (p0->crouching && speed > 0.5f) {
-            // Apply 50% Momentum Boost
+        
+        // SUPERGLIDE CHECK: 
+        // 1. Must be sliding (Crouch + Speed)
+        // 2. Must be a FRESH jump press (Cannot hold space through landing)
+        if (p0->crouching && speed > 0.5f && fresh_jump_press) {
             p0->vx *= 1.5f;
             p0->vz *= 1.5f;
+            // printf("SUPERGLIDE!\n");
         }
         
         p0->y += 0.1f; 
@@ -109,6 +127,9 @@ void local_update(float fwd, float str, float yaw, float pitch, int shoot, int w
     p0->in_shoot = shoot;
     p0->in_reload = reload;
     p0->crouching = crouch;
+    p0->in_jump = jump; // Store for gravity logic
+    
+    was_holding_jump = jump; // Update history
     
     for(int i=0; i<MAX_CLIENTS; i++) {
         PlayerState *p = &local_state.players[i];
@@ -124,6 +145,7 @@ void local_update(float fwd, float str, float yaw, float pitch, int shoot, int w
             float bz = cosf(brad) * b_fwd;
             accelerate(p, bx, bz, MAX_SPEED, ACCEL);
             p->in_shoot = (b_btns & BTN_ATTACK);
+            p->in_jump = (b_btns & BTN_JUMP);
             if ((b_btns & BTN_JUMP) && p->on_ground) { p->y += 0.1f; p->vy += JUMP_FORCE; }
         }
         

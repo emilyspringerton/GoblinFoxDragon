@@ -151,7 +151,7 @@ void draw_player_3rd(PlayerState *p) {
     glRotatef(-p->yaw, 0, 1, 0); 
     if(p->health <= 0) glColor3f(0.2, 0, 0); else glColor3f(1, 0, 0); 
     
-    glPushMatrix(); glScalef(0.6f, 1.8f, 0.6f); // HUMAN SCALE
+    glPushMatrix();     glPushMatrix(); glScalef(0.9f, 2.7f, 0.9f); // TITAN SCALE // HUMAN SCALE
     glBegin(GL_QUADS);
     glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(-0.5,0.5,0.5);
     glVertex3f(-0.5,0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
@@ -160,7 +160,7 @@ void draw_player_3rd(PlayerState *p) {
     glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(0.5,0.5,0.5);
     glEnd(); glPopMatrix();
     
-    glPushMatrix(); glTranslatef(0, 0.95f, 0); draw_head(p->current_weapon); glPopMatrix();
+    glPushMatrix(); glTranslatef(0, 1.4f, 0); draw_head(p->current_weapon); glPopMatrix();
     glPushMatrix(); glTranslatef(0.5f, 1.0f, 0.5f); glRotatef(p->pitch, 1, 0, 0);   
     glScalef(0.8f, 0.8f, 0.8f); draw_gun_model(p->current_weapon); glPopMatrix(); glPopMatrix();
 }
