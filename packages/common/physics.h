@@ -7,10 +7,10 @@
 // --- TURBO TUNING ---
 #define GRAVITY 0.018f
 #define JUMP_FORCE 0.61f
-#define MAX_SPEED 0.75f
-#define FRICTION 0.42f
-#define ACCEL 1.618f
-#define STOP_SPEED 0.1f
+#define MAX_SPEED 0.5f
+#define FRICTION 5.0f
+#define ACCEL 6.0f
+#define STOP_SPEED 1.0f
 #define MAX_AIR_SPEED 0.2f
 #define EYE_HEIGHT 1.6f 
 #define HEAD_SIZE 0.8f

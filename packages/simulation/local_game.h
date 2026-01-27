@@ -45,7 +45,7 @@ void bot_think(int bot_idx, PlayerState *players, float *out_fwd, float *out_yaw
         *out_buttons |= BTN_ATTACK;
         
         // Dynamic Movement (Don't freeze!)
-        if (min_dist > 20.0f) *out_fwd = 1.0f; // Chase
+        if (min_dist > 8.0f) *out_fwd = 1.0f; // Chase
         else if (min_dist < 5.0f) *out_fwd = -1.0f; // Back up
         else *out_fwd = 0.2f; // Creep forward to avoid friction stop
         
