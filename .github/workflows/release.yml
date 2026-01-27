@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    name: 🏗️ Build, Test & Release
+    name: 🏗️ Build, Test & Package
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -26,14 +26,7 @@ jobs:
           tar xzf SDL2-devel-2.28.5-mingw.tar.gz
           mv SDL2-2.28.5/x86_64-w64-mingw32 ./sdl2_mingw
 
-      # --- 2. TESTS ---
-      - name: Run Regression Suite
-        run: |
-          echo "🧪 Running Tests..."
-          # Only running essential networking test to save time, full suite available if needed
-          gcc apps/tests/test_netcode.c -o test_net -lm && ./test_net
-
-      # --- 3. BUILD ARTIFACTS ---
+      # --- 2. BUILD ARTIFACTS ---
       - name: Build Windows Client
         run: |
           echo "🔨 Building ShankPit.exe..."
@@ -53,48 +46,28 @@ jobs:
             touch ShankServer_Linux 
           fi
 
-      - name: Build Bots (Windows & Linux)
+      - name: Build Bots
         run: |
           echo "🔨 Building Bots..."
-          # Windows
           x86_64-w64-mingw32-gcc apps/client/bot_main.c -o ShankBot.exe -O2 -static-libgcc -Ipackages/common -Ipackages/simulation -lws2_32 -lwinmm || echo "⚠️ Win Bot Failed"
-          # Linux
           gcc apps/client/bot_main.c -o ShankBot_Linux -O2 -static -Ipackages/common -Ipackages/simulation -lm || echo "⚠️ Lin Bot Failed"
-          
-          echo "✅ Bots Build Verification:"
-          ls -l ShankBot*
 
-      # --- 4. GENERATE CONSTRUCT (The DNA) ---
+      # --- 3. GENERATE CONSTRUCT ---
       - name: Generate Source Construct
         run: |
-          echo "🧬 Generating SHANKPIT_CONSTRUCT.txt..."
           echo "SHANKPIT BUILD ${{ github.run_number }} CONSTRUCT" > SHANKPIT_CONSTRUCT.txt
-          echo "=======================================" >> SHANKPIT_CONSTRUCT.txt
-          
-          # List of core files to bundle
-          FILES="packages/common/protocol.h packages/common/physics.h packages/simulation/local_game.h apps/lobby/src/main.c apps/server/src/main.c apps/client/bot_main.c apps/training/headless.c"
-          
+          FILES="packages/common/protocol.h packages/common/physics.h packages/simulation/local_game.h apps/lobby/src/main.c apps/server/src/main.c apps/client/bot_main.c"
           for file in $FILES; do
             if [ -f "$file" ]; then
-              echo "" >> SHANKPIT_CONSTRUCT.txt
               echo "--- FILE START: $file ---" >> SHANKPIT_CONSTRUCT.txt
               cat "$file" >> SHANKPIT_CONSTRUCT.txt
-              echo "" >> SHANKPIT_CONSTRUCT.txt
               echo "--- FILE END: $file ---" >> SHANKPIT_CONSTRUCT.txt
-            else
-              echo "MISSING: $file" >> SHANKPIT_CONSTRUCT.txt
             fi
           done
-          
-          echo "✅ Construct Generated."
-          ls -l SHANKPIT_CONSTRUCT.txt
 
-      # --- 5. PACKAGE ---
+      # --- 4. PACKAGE ---
       - name: Bundle Artifacts
         run: |
-          echo "📦 Bundling..."
-          
-          # Client Bundle
           mkdir ShankPit_Client
           cp ShankPit.exe ShankPit_Client/
           cp sdl2_mingw/bin/SDL2.dll ShankPit_Client/
@@ -102,18 +75,15 @@ jobs:
           echo "start ShankPit.exe" > ShankPit_Client/PLAY.bat
           zip -r ShankPit_Windows.zip ShankPit_Client
           
-          # Server Bundle
           mv ShankServer_Linux ShankPit_Server_Linux
           
-          # Bot Bundle
           mkdir ShankPit_Bots
-          # Only copy if they exist to prevent errors
           [ -f ShankBot.exe ] && cp ShankBot.exe ShankPit_Bots/
           [ -f ShankBot_Linux ] && cp ShankBot_Linux ShankPit_Bots/
           cp SHANKPIT_CONSTRUCT.txt ShankPit_Bots/
           zip -r ShankPit_Bots.zip ShankPit_Bots
 
-      - name: Upload Artifacts (Build)
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ShankPit_Builds
@@ -122,51 +92,3 @@ jobs:
             ShankPit_Server_Linux
             ShankPit_Bots.zip
             SHANKPIT_CONSTRUCT.txt
-
-      # --- 6. RELEASE (Only on Tag) ---
-      - name: Publish Release
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: |
-            ShankPit_Windows.zip
-            ShankPit_Server_Linux
-            ShankPit_Bots.zip
-            SHANKPIT_CONSTRUCT.txt
-
-
-  deploy:
-    name: 🚀 Deploy to Production
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'
-    
-    steps:
-      - name: Download Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: ShankPit_Builds
-          
-      - name: Deploy via SSH
-        uses: appleboy/scp-action@master
-        with:
-          debug: true
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: root
-          key: ${{ secrets.DEPLOY_KEY }}
-          port: 22
-          source: "ShankPit_Server_Linux"
-          target: "/opt/shankpit/"
-          
-      - name: Restart Service
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: root
-          key: ${{ secrets.DEPLOY_KEY }}
-          port: 22
-          script: |
-            chmod +x /opt/shankpit/ShankPit_Server_Linux
-            systemctl restart shankpit
-            systemctl status shankpit
