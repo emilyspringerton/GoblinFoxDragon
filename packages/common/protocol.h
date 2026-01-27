@@ -9,7 +9,7 @@
 #define PACKET_USERCMD 1
 #define PACKET_SNAPSHOT 2
 
-// --- STATES (Critical for Physics) ---
+// --- STATES ---
 #define STATE_ALIVE 0
 #define STATE_DEAD  1
 #define STATE_SPECTATOR 2
@@ -22,6 +22,9 @@
 
 #define RELOAD_TIME 60
 #define SHIELD_REGEN_DELAY 180 
+
+// --- LAG COMPENSATION SETTINGS ---
+#define LAG_HISTORY 64  // Fixed: Added back for physics.h
 
 // --- NETWORK STRUCTURES ---
 typedef struct {
@@ -67,6 +70,14 @@ typedef struct {
     int owner_id;
 } Projectile;
 
+// --- TIME MACHINE STRUCT ---
+typedef struct {
+    int active;
+    unsigned int timestamp;
+    float x, y, z;
+    float vx, vy, vz;
+} LagRecord;
+
 typedef struct {
     int id;
     int active;
@@ -98,7 +109,7 @@ typedef struct {
     int health;
     int shield;             
     int shield_regen_timer; 
-    int state; // <--- FIXED: ADDED BACK
+    int state; 
     
     // Stats
     int kills;
@@ -127,6 +138,10 @@ typedef enum {
 typedef struct {
     PlayerState players[MAX_CLIENTS];
     Projectile projectiles[MAX_PROJECTILES];
+    
+    // --- LAG COMPENSATION STORAGE ---
+    LagRecord history[MAX_CLIENTS][LAG_HISTORY]; // Fixed: Added back
+    
     int server_tick;
     int game_mode;
 } ServerState;
