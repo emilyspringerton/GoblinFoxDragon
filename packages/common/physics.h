@@ -12,16 +12,21 @@
 #define ACCEL 1.618f
 #define STOP_SPEED 0.1f
 #define MAX_AIR_SPEED 0.2f
-#define EYE_HEIGHT 1.6f // Fixed to Human Scale
+#define EYE_HEIGHT 1.6f 
 #define HEAD_SIZE 0.8f
-#define HEAD_OFFSET 1.5f // Fixed to Human Scale
+#define HEAD_OFFSET 1.5f 
+
+// --- SLIDE MECHANICS (Phase 429) ---
+#define SLIDE_BOOST 1.6f       // Speed multiplier on perfect land
+#define SLIDE_FRICTION 0.02f   // Almost zero friction while sliding
+#define SLIDE_THRESHOLD 0.4f   // Minimum speed to maintain a slide
 
 // KNIFE RANGE LIMIT
 #define MELEE_RANGE_SQ 100.0f 
 
 typedef struct { float x, y, z, w, h, d; } Box;
 
-// MAP GEOMETRY (Standard 40-count map + auto-calc)
+// MAP GEOMETRY 
 static Box map_geo[] = {
     {0, -1, 0, 900, 2, 300}, // Floor
     {0, 2.0, 0, 24, 4, 24}, {0, 5.0, 0, 14, 2, 14}, {0, 8.0, 0, 6, 4, 6}, // Zig
@@ -60,11 +65,10 @@ int check_hit_location(float ox, float oy, float oz, float dx, float dy, float d
     
     float tx = target->x; 
     float tz = target->z;
-    
-    // 1. Check Head
     float head_y = target->y + HEAD_OFFSET;
     float h_size = HEAD_SIZE;
     
+    // 1. Head
     float vx = tx - ox, vy = head_y - oy, vz = tz - oz;
     float t = vx*dx + vy*dy + vz*dz;
     if (t > 0) {
@@ -73,7 +77,7 @@ int check_hit_location(float ox, float oy, float oz, float dx, float dy, float d
         if (dist_sq < (h_size*h_size)) return 2; 
     }
 
-    // 2. Check Body
+    // 2. Body
     float body_y = target->y + 2.0f;
     vx = tx - ox; vy = body_y - oy; vz = tz - oz;
     t = vx*dx + vy*dy + vz*dz;
@@ -82,7 +86,6 @@ int check_hit_location(float ox, float oy, float oz, float dx, float dy, float d
         float dist_sq = (tx-cx)*(tx-cx) + (body_y-cy)*(body_y-cy) + (tz-cz)*(tz-cz);
         if (dist_sq < 7.2f) return 1; 
     }
-    
     return 0;
 }
 
@@ -90,8 +93,17 @@ void apply_friction(PlayerState *p) {
     float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
     if (speed < 0.001f) { p->vx = 0; p->vz = 0; return; }
     if (!p->on_ground) return; 
+    
+    // --- SLIDE LOGIC ---
+    float applied_friction = FRICTION;
+    
+    // If crouching and moving fast, use Slide Friction
+    if (p->crouching && speed > SLIDE_THRESHOLD) {
+        applied_friction = SLIDE_FRICTION; // Greased lightning
+    }
+    
     float control = (speed < STOP_SPEED) ? STOP_SPEED : speed;
-    float drop = control * FRICTION;
+    float drop = control * applied_friction;
     float newspeed = speed - drop;
     if (newspeed < 0) newspeed = 0;
     newspeed /= speed;
@@ -109,6 +121,8 @@ void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, fl
 
 void resolve_collision(PlayerState *p) {
     float pw = 0.6f; float ph = p->crouching ? 2.0f : 4.0f; 
+    int was_in_air = !p->on_ground; // Snapshot previous state
+    
     p->on_ground = 0;
     if (p->y < 0) { p->y = 0; p->vy = 0; p->on_ground = 1; }
     for(int i=1; i<map_count; i++) {
@@ -134,6 +148,14 @@ void resolve_collision(PlayerState *p) {
             }
         }
     }
+    
+    // --- SLIDE BOOST TRIGGER ---
+    // If we just landed (was_in_air && now on_ground) AND we are holding crouch
+    if (was_in_air && p->on_ground && p->crouching) {
+        // Boost!
+        p->vx *= SLIDE_BOOST;
+        p->vz *= SLIDE_BOOST;
+    }
 }
 
 void phys_respawn(PlayerState *p, unsigned int now) {
@@ -143,7 +165,6 @@ void phys_respawn(PlayerState *p, unsigned int now) {
     p->shield = 100;
     p->respawn_time = 0;
     
-    // Golden Spawn
     float n_x = ((float)(rand()%1000)/1000.0f) * 800.0f - 400.0f;
     float n_z = ((float)(rand()%1000)/1000.0f) * 200.0f - 100.0f;
     
@@ -151,7 +172,6 @@ void phys_respawn(PlayerState *p, unsigned int now) {
     p->z = n_z;
     p->y = 10;
     
-    // Default Loadout (Magnum)
     p->current_weapon = WPN_MAGNUM;
     p->ammo[WPN_MAGNUM] = WPN_STATS[WPN_MAGNUM].ammo_max;
 }
@@ -189,13 +209,12 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
                 if (p == &targets[i]) continue;
                 if (!targets[i].active) continue;
 
-                // --- FIX: KNIFE RANGE CHECK ---
                 if (w == WPN_KNIFE) {
                     float kx = p->x - targets[i].x;
                     float ky = p->y - targets[i].y;
                     float kz = p->z - targets[i].z;
                     float kdist = kx*kx + ky*ky + kz*kz;
-                    if (kdist > MELEE_RANGE_SQ + 22.0f ) continue; // Too far!
+                    if (kdist > MELEE_RANGE_SQ + 22.0f ) continue; 
                 }
 
                 int hit_type = check_hit_location(p->x, p->y + EYE_HEIGHT, p->z, dx, dy, dz, &targets[i]);
