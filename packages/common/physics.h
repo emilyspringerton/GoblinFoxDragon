@@ -6,9 +6,9 @@
 #include "protocol.h"
 
 // --- MOON TUNING (PHASE 455) ---
-#define GRAVITY_FLOAT 0.025f // <--- FLOATIER (Was 0.03)
-#define GRAVITY_DROP 0.075f  // <--- SOFTER DROP (Was 0.08)
-#define JUMP_FORCE 0.95f     // <--- POWERFUL (Was 0.88)
+#define GRAVITY_FLOAT 0.025f 
+#define GRAVITY_DROP 0.075f  
+#define JUMP_FORCE 0.95f     
 #define MAX_SPEED 0.95f      
 #define FRICTION 0.15f      
 #define ACCEL 0.6f          
@@ -23,6 +23,10 @@
 #define HEAD_SIZE 1.94f     
 #define HEAD_OFFSET 2.42f   
 #define MELEE_RANGE_SQ 250.0f 
+
+// Forward decl
+void evolve_bot(PlayerState *loser, PlayerState *winner);
+PlayerState* get_best_bot();
 
 typedef struct { float x, y, z, w, h, d; } Box;
 
@@ -88,11 +92,14 @@ void apply_friction(PlayerState *p) {
     
     float drop = 0;
     
-    int is_sliding = (p->crouching && speed > 0.5f);
-    
+    // SLIDE LOGIC (Phase 462)
     if (p->on_ground) {
-        if (is_sliding) {
-            drop = speed * SLIDE_FRICTION; 
+        if (p->crouching) {
+            if (speed > 0.75f) {
+                drop = speed * SLIDE_FRICTION; // Ice Slide
+            } else {
+                drop = speed * (FRICTION * 3.0f); // Hard Brake
+            }
         } else {
             float control = (speed < STOP_SPEED) ? STOP_SPEED : speed;
             drop = control * FRICTION; 
@@ -109,9 +116,10 @@ void apply_friction(PlayerState *p) {
 
 void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, float accel) {
     float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
-    if (p->crouching && speed > 0.5f && p->on_ground) return;
+    
+    if (p->crouching && speed > 0.75f && p->on_ground) return;
 
-    if (p->crouching && p->on_ground && speed < 0.5f) {
+    if (p->crouching && p->on_ground && speed < 0.75f) {
         if (wish_speed > CROUCH_SPEED) wish_speed = CROUCH_SPEED;
     }
 
@@ -129,7 +137,6 @@ void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, fl
 void resolve_collision(PlayerState *p) {
     float pw = PLAYER_WIDTH; 
     float ph = p->crouching ? (PLAYER_HEIGHT / 2.0f) : PLAYER_HEIGHT; 
-    
     p->on_ground = 0;
     if (p->y < 0) { p->y = 0; p->vy = 0; p->on_ground = 1; }
     for(int i=1; i<map_count; i++) {
@@ -167,7 +174,18 @@ void phys_respawn(PlayerState *p, unsigned int now) {
     float n_z = ((float)(rand()%1000)/1000.0f) * 200.0f - 100.0f;
     p->x = n_x; p->z = n_z; p->y = 10;
     p->current_weapon = WPN_MAGNUM;
-    p->ammo[WPN_MAGNUM] = WPN_STATS[WPN_MAGNUM].ammo_max;
+    
+    // SPAWN FULLY LOADED (Phase 467)
+    for(int i=0; i<MAX_WEAPONS; i++) {
+        p->ammo[i] = WPN_STATS[i].ammo_max;
+    }
+    
+    if (p->is_bot) {
+        PlayerState *winner = get_best_bot();
+        if (winner && winner != p) {
+            evolve_bot(p, winner);
+        }
+    }
 }
 
 void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload) {
@@ -176,13 +194,26 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
     if (p->is_shooting > 0) p->is_shooting--;
 
     int w = p->current_weapon;
+    
+    // --- TACTICAL RELOAD LOGIC (Phase 467) ---
+    // 1. Manual Reload
     if (reload && p->reload_timer == 0 && w != WPN_KNIFE) {
-        if (p->ammo[w] < WPN_STATS[w].ammo_max) p->reload_timer = RELOAD_TIME;
+        if (p->ammo[w] < WPN_STATS[w].ammo_max) {
+            if (p->ammo[w] > 0) p->reload_timer = RELOAD_TIME_TACTICAL; // Bonus (42)
+            else p->reload_timer = RELOAD_TIME_FULL; // Penalty (60)
+        }
     }
+    
+    // 2. Finish Reload
     if (p->reload_timer == 1) p->ammo[w] = WPN_STATS[w].ammo_max;
 
     if (shoot && p->attack_cooldown == 0 && p->reload_timer == 0) {
-        if (w == WPN_KNIFE || p->ammo[w] > 0) {
+        // --- AUTO RELOAD ON EMPTY ---
+        if (w != WPN_KNIFE && p->ammo[w] <= 0) {
+            p->reload_timer = RELOAD_TIME_FULL; // Force dry reload
+        }
+        else {
+            // Fire Logic
             p->is_shooting = 5; p->recoil_anim = 1.0f;
             p->attack_cooldown = WPN_STATS[w].rof;
             if (w != WPN_KNIFE) p->ammo[w]--;
@@ -210,6 +241,9 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
                 if (hit_type > 0) {
                     printf("🔫 HIT! Dmg: %d on Target %d\n", WPN_STATS[w].dmg, i);
                     int damage = WPN_STATS[w].dmg;
+                    
+                    p->accumulated_reward += 10.0f;
+                    
                     targets[i].shield_regen_timer = SHIELD_REGEN_DELAY;
                     if (hit_type == 2 && targets[i].shield <= 0) { damage *= 3; p->hit_feedback = 20; } else { p->hit_feedback = 10; }
                     if (targets[i].shield > 0) {
@@ -218,12 +252,14 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
                     }
                     targets[i].health -= damage;
                     if(targets[i].health <= 0) {
-                        p->kills++; targets[i].deaths++; phys_respawn(&targets[i], 0);
+                        p->kills++; targets[i].deaths++; 
+                        p->accumulated_reward += 1000.0f;
+                        phys_respawn(&targets[i], 0);
                     }
                 }
             }
-        } else { p->attack_cooldown = 10; }
-    }
+        }
+    } else { p->attack_cooldown = 10; }
 }
 
 void phys_store_history(ServerState *server, int client_id, unsigned int now) {

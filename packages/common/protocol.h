@@ -20,7 +20,9 @@
 #define WPN_SHOTGUN 3
 #define WPN_SNIPER 4
 
-#define RELOAD_TIME 60
+// --- RELOAD TIMINGS (PHASE 467) ---
+#define RELOAD_TIME_FULL 60      // Dry reload (Penalty)
+#define RELOAD_TIME_TACTICAL 42  // Partial reload (Bonus)
 #define SHIELD_REGEN_DELAY 180 
 
 typedef struct {
@@ -61,7 +63,6 @@ typedef struct {
     int active; float x, y, z; float vx, vy, vz; int owner_id;
 } Projectile;
 
-// NET PLAYER (Compressed Snapshot)
 typedef struct {
     unsigned char id; 
     float x, y, z; float yaw, pitch;
@@ -72,7 +73,7 @@ typedef struct {
     unsigned char is_shooting;
     unsigned char crouching;
     float reward_feedback; 
-    unsigned char ammo; // <--- NEW: Bot needs to know this!
+    unsigned char ammo; 
 } NetPlayer;
 
 typedef struct {
@@ -101,7 +102,7 @@ typedef struct {
     LagRecord history[MAX_CLIENTS][LAG_HISTORY];
     int server_tick;
     int game_mode;
-    struct sockaddr_in clients[MAX_CLIENTS]; // Address cache
+    struct sockaddr_in clients[MAX_CLIENTS];
     int client_active[MAX_CLIENTS];
 } ServerState;
 
