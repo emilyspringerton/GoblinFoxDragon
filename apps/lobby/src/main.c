@@ -25,7 +25,6 @@
 #include "../../../packages/common/physics.h"
 #include "../../../packages/simulation/local_game.h"
 
-// --- CONSTANTS & STATE ---
 #define STATE_LOBBY 0
 #define STATE_GAME_NET 1
 #define STATE_GAME_LOCAL 2
@@ -38,44 +37,23 @@ float cam_yaw = 0.0f;
 float cam_pitch = 0.0f;
 float current_fov = 75.0f;
 
-// --- NETWORKING ---
 int sock = -1;
 struct sockaddr_in server_addr;
-
 int sv_sock = -1;
 unsigned int sv_client_last_seq[MAX_CLIENTS];
 
-// --- FORWARD DECLARATIONS ---
-void draw_scene(PlayerState *render_p);
+void draw_scene(PlayerState *render_p); // Forward decl
 
-// --- LISTEN SERVER LOGIC ---
+// --- LISTEN SERVER ---
 void sv_process_cmd(int client_id, UserCmd *cmd) {
     if (cmd->sequence <= sv_client_last_seq[client_id]) return;
-    PlayerState *p = &local_state.players[client_id];
-    
-    if (!isnan(cmd->yaw)) p->yaw = cmd->yaw;
-    if (!isnan(cmd->pitch)) p->pitch = cmd->pitch;
-    p->current_weapon = cmd->weapon_idx;
-    
-    float rad = p->yaw * 0.0174533f;
-    float wish_x = sinf(rad) * cmd->fwd + cosf(rad) * cmd->str;
-    float wish_z = cosf(rad) * cmd->fwd - sinf(rad) * cmd->str;
-    
-    float wish_speed = sqrtf(wish_x*wish_x + wish_z*wish_z);
-    if (wish_speed > 1.0f) { wish_speed = 1.0f; wish_x/=wish_speed; wish_z/=wish_speed; }
-    wish_speed *= MAX_SPEED;
-
-    accelerate(p, wish_x, wish_z, wish_speed, ACCEL);
-    
-    if ((cmd->buttons & BTN_JUMP) && p->on_ground) {
-        p->y += 0.1f; p->vy += JUMP_FORCE;
+    if (client_id == 0) {
+        int shoot = (cmd->buttons & BTN_ATTACK);
+        int jump = (cmd->buttons & BTN_JUMP);
+        int crouch = (cmd->buttons & BTN_CROUCH);
+        int reload = (cmd->buttons & BTN_RELOAD);
+        local_update(cmd->fwd, cmd->str, cmd->yaw, cmd->pitch, shoot, cmd->weapon_idx, jump, crouch, reload, NULL, 0);
     }
-    
-    p->in_shoot = (cmd->buttons & BTN_ATTACK);
-    p->in_reload = (cmd->buttons & BTN_RELOAD);
-    p->crouching = (cmd->buttons & BTN_CROUCH);
-    
-    update_entity(p, 0.016f, NULL, cmd->timestamp);
     sv_client_last_seq[client_id] = cmd->sequence;
 }
 
@@ -83,7 +61,6 @@ void sv_tick() {
     char buffer[1024];
     struct sockaddr_in sender;
     socklen_t slen = sizeof(sender);
-    
     if (sv_sock != -1) {
         int len = recvfrom(sv_sock, buffer, 1024, 0, (struct sockaddr*)&sender, &slen);
         while (len > 0) {
@@ -99,7 +76,7 @@ void sv_tick() {
             len = recvfrom(sv_sock, buffer, 1024, 0, (struct sockaddr*)&sender, &slen);
         }
     }
-    
+    // Bots
     for(int i=1; i<MAX_CLIENTS; i++) {
         PlayerState *p = &local_state.players[i];
         if (!p->active) continue;
@@ -115,7 +92,6 @@ void sv_tick() {
     }
 }
 
-// --- CLIENT NETWORKING ---
 UserCmd client_create_cmd(float fwd, float str, float yaw, float pitch, int shoot, int jump, int crouch, int reload, int wpn_idx) {
     UserCmd cmd;
     memset(&cmd, 0, sizeof(UserCmd));
@@ -164,7 +140,6 @@ void net_init() {
     }
 }
 
-// --- UI / FONT RENDERING ---
 void draw_char(char c, float x, float y, float s) {
     glLineWidth(2.0f);
     glBegin(GL_LINES);
@@ -181,6 +156,10 @@ void draw_char(char c, float x, float y, float s) {
     else if(c=='M'){glVertex2f(x,y+s);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x+s/2,y+s/2);glVertex2f(x+s/2,y+s/2);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);}
     else if(c=='O'){glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x,y);}
     else if(c=='B'){glVertex2f(x,y+s);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x+s*0.8,y);glVertex2f(x+s*0.8,y);glVertex2f(x+s,y+s/4);glVertex2f(x+s,y+s/4);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s*0.75);glVertex2f(x+s,y+s*0.75);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x,y+s);}
+    else if(c==':'){glVertex2f(x+s/2,y+s*0.2);glVertex2f(x+s/2,y+s*0.3);glVertex2f(x+s/2,y+s*0.7);glVertex2f(x+s/2,y+s*0.8);}
+    else if(c>='0'&&c<='9'){
+        glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x,y); // Box
+    }
     else { glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x,y); }
     glEnd();
 }
@@ -189,7 +168,6 @@ void draw_string(const char* str, float x, float y, float size) {
     while(*str) { draw_char(*str, x, y, size); x += size * 1.5f; str++; }
 }
 
-// --- SCENE RENDERING ---
 void draw_grid() {
     glBegin(GL_LINES); glColor3f(0.0f, 1.0f, 1.0f);
     for(int i=-100; i<=900; i+=5) { glVertex3f(i, 0, -100); glVertex3f(i, 0, 100); glVertex3f(-100, 0, i); glVertex3f(100, 0, i); }
@@ -264,9 +242,12 @@ void draw_head(int weapon_id) {
 }
 
 void draw_player_3rd(PlayerState *p) {
-    glPushMatrix(); glTranslatef(p->x, p->y + 2.0f, p->z); glRotatef(-p->yaw, 0, 1, 0); 
+    glPushMatrix();
+    glTranslatef(p->x, p->y + 2.0f, p->z);
+    glRotatef(-p->yaw, 0, 1, 0); 
     if(p->health <= 0) glColor3f(0.2, 0, 0); else glColor3f(1, 0, 0); 
-    glPushMatrix(); glScalef(1.2f, 3.8f, 1.2f);
+    
+    glPushMatrix(); glScalef(0.6f, 1.8f, 0.6f); // HUMAN SCALE
     glBegin(GL_QUADS);
     glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(-0.5,0.5,0.5);
     glVertex3f(-0.5,0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
@@ -274,12 +255,13 @@ void draw_player_3rd(PlayerState *p) {
     glVertex3f(-0.5,-0.5,-0.5); glVertex3f(-0.5,-0.5,0.5); glVertex3f(-0.5,0.5,0.5); glVertex3f(-0.5,0.5,-0.5);
     glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(0.5,0.5,0.5);
     glEnd(); glPopMatrix();
+    
     glPushMatrix(); glTranslatef(0, 0.95f, 0); draw_head(p->current_weapon); glPopMatrix();
     glPushMatrix(); glTranslatef(0.5f, 1.0f, 0.5f); glRotatef(p->pitch, 1, 0, 0);   
     glScalef(0.8f, 0.8f, 0.8f); draw_gun_model(p->current_weapon); glPopMatrix(); glPopMatrix();
 }
 
-void draw_projectiles() { } // Empty for now, satisfies linker
+void draw_projectiles() { }
 
 void draw_hud(PlayerState *p) {
     glDisable(GL_DEPTH_TEST);
@@ -297,15 +279,12 @@ void draw_hud(PlayerState *p) {
     int w = p->current_weapon; int ammo = (w == WPN_KNIFE) ? 99 : p->ammo[w];
     glColor3f(1, 1, 0); for(int i=0; i<ammo; i++) glRectf(1200 - (i*10), 50, 1205 - (i*10), 80);
     
-    // Speedometer
+    // --- SPEEDOMETER ---
     float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
-    char speed_str[32]; sprintf(speed_str, "SPD: %d", (int)(speed * 100));
-    draw_string(speed_str, 50, 120, 10);
+    char buf[32]; sprintf(buf, "SPD: %d", (int)(speed * 100));
+    draw_string(buf, 50, 120, 10);
+    if(p->on_ground) draw_string("GND", 150, 120, 10); else draw_string("AIR", 150, 120, 10);
     
-    // Ground Status
-    if (p->on_ground) glColor3f(0,1,0); else glColor3f(1,0,0);
-    draw_string(p->on_ground ? "GND" : "AIR", 150, 120, 10);
-
     glEnable(GL_DEPTH_TEST); glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW); glPopMatrix();
 }
 
@@ -318,10 +297,9 @@ void draw_scene(PlayerState *render_p) {
     draw_weapon_p(render_p); draw_hud(render_p);
 }
 
-// --- MAIN ENTRY ---
 int main(int argc, char* argv[]) {
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *win = SDL_CreateWindow("SHANKPIT [BUILD 110 - LOBBY ONLINE]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
+    SDL_Window *win = SDL_CreateWindow("SHANKPIT [BUILD 112 - FIXED]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
     SDL_GL_CreateContext(win);
     net_init();
     
@@ -335,17 +313,10 @@ int main(int argc, char* argv[]) {
             
             if (app_state == STATE_LOBBY) {
                 if(e.type == SDL_KEYDOWN) {
-                    if (e.key.keysym.sym == SDLK_d) { 
-                        app_state = STATE_GAME_LOCAL; 
-                        local_init_match(1, MODE_DEATHMATCH); 
-                    }
-                    if (e.key.keysym.sym == SDLK_b) { 
-                        app_state = STATE_GAME_LOCAL; 
-                        local_init_match(8, MODE_DEATHMATCH); 
-                    }
+                    if (e.key.keysym.sym == SDLK_d) { app_state = STATE_GAME_LOCAL; local_init_match(1, MODE_DEATHMATCH); }
+                    if (e.key.keysym.sym == SDLK_b) { app_state = STATE_GAME_LOCAL; local_init_match(8, MODE_DEATHMATCH); }
                     if (e.key.keysym.sym == SDLK_n) { 
-                        app_state = STATE_LISTEN_SERVER; 
-                        local_init_match(8, MODE_DEATHMATCH);
+                        app_state = STATE_LISTEN_SERVER; local_init_match(8, MODE_DEATHMATCH);
                         #ifdef _WIN32
                         WSADATA wsa; WSAStartup(MAKEWORD(2,2), &wsa);
                         #endif
@@ -363,17 +334,7 @@ int main(int argc, char* argv[]) {
                     if (app_state != STATE_LOBBY) {
                         SDL_SetRelativeMouseMode(SDL_TRUE);
                         glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
-                        glMatrixMode(GL_MODELVIEW); 
-    // Speedometer
-    float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
-    char speed_str[32]; sprintf(speed_str, "SPD: %d", (int)(speed * 100));
-    draw_string(speed_str, 50, 120, 10);
-    
-    // Ground Status
-    if (p->on_ground) glColor3f(0,1,0); else glColor3f(1,0,0);
-    draw_string(p->on_ground ? "GND" : "AIR", 150, 120, 10);
-
-    glEnable(GL_DEPTH_TEST);
+                        glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
                     }
                 }
             } else {

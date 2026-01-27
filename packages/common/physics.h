@@ -1,11 +1,11 @@
-#include <stdio.h>
 #ifndef PHYSICS_H
 #define PHYSICS_H
 #include <math.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include "protocol.h"
 
-// --- TURBO TUNING ---
+// --- TURBO TUNING (PHASE 435) ---
 #define GRAVITY 0.08f
 #define JUMP_FORCE 0.61f
 #define MAX_SPEED 0.5f
@@ -16,43 +16,30 @@
 #define EYE_HEIGHT 1.6f 
 #define HEAD_SIZE 1.2f
 #define HEAD_OFFSET 1.5f 
-
-// --- SLIDE MECHANICS (Phase 429) ---
-#define SLIDE_BOOST 1.6f       // Speed multiplier on perfect land
-#define SLIDE_FRICTION 0.02f   // Almost zero friction while sliding
-#define SLIDE_THRESHOLD 0.4f   // Minimum speed to maintain a slide
-
-// KNIFE RANGE LIMIT
 #define MELEE_RANGE_SQ 100.0f 
 
 typedef struct { float x, y, z, w, h, d; } Box;
 
-// MAP GEOMETRY 
 static Box map_geo[] = {
-    {0, -1, 0, 900, 2, 300}, // Floor
-    {0, 2.0, 0, 24, 4, 24}, {0, 5.0, 0, 14, 2, 14}, {0, 8.0, 0, 6, 4, 6}, // Zig
-    {300, 10, 0, 10, 20, 10}, {310, 2, 0, 4, 2, 4}, {308, 5, 5, 4, 2, 4}, // East Spire
-    {-300, 10, 0, 10, 20, 10}, {-310, 2, 0, 4, 2, 4}, {-308, 5, -5, 4, 2, 4}, // West Spire
-    {100, 2, 0, 40, 4, 2}, {-100, 2, 0, 40, 4, 2}, // Spine
-    {150, 2, 40, 6, 4, 6}, {160, 2, 35, 2, 4, 10}, {140, 1, 45, 4, 2, 4}, // E Ruins
+    {0, -1, 0, 900, 2, 300}, 
+    {0, 2.0, 0, 24, 4, 24}, {0, 5.0, 0, 14, 2, 14}, {0, 8.0, 0, 6, 4, 6}, 
+    {300, 10, 0, 10, 20, 10}, {310, 2, 0, 4, 2, 4}, {308, 5, 5, 4, 2, 4}, 
+    {-300, 10, 0, 10, 20, 10}, {-310, 2, 0, 4, 2, 4}, {-308, 5, -5, 4, 2, 4}, 
+    {100, 2, 0, 40, 4, 2}, {-100, 2, 0, 40, 4, 2}, 
+    {150, 2, 40, 6, 4, 6}, {160, 2, 35, 2, 4, 10}, {140, 1, 45, 4, 2, 4}, 
     {150, 2, -40, 6, 4, 6}, {160, 2, -35, 2, 4, 10}, {180, 4, 0, 8, 8, 8},
-    {-150, 2, 40, 6, 4, 6}, {-160, 2, 35, 2, 4, 10}, {-140, 1, 45, 4, 2, 4}, // W Ruins
+    {-150, 2, 40, 6, 4, 6}, {-160, 2, 35, 2, 4, 10}, {-140, 1, 45, 4, 2, 4}, 
     {-150, 2, -40, 6, 4, 6}, {-160, 2, -35, 2, 4, 10}, {-180, 4, 0, 8, 8, 8},
-    {250, 5, 0, 4, 1, 4}, {200, 7, 10, 4, 1, 4}, {150, 9, -10, 4, 1, 4}, // E Parkour
-    {-250, 5, 0, 4, 1, 4}, {-200, 7, -10, 4, 1, 4}, {-150, 9, 10, 4, 1, 4}, // W Parkour
+    {250, 5, 0, 4, 1, 4}, {200, 7, 10, 4, 1, 4}, {150, 9, -10, 4, 1, 4}, 
+    {-250, 5, 0, 4, 1, 4}, {-200, 7, -10, 4, 1, 4}, {-150, 9, 10, 4, 1, 4}, 
     {50, 2, 80, 4, 4, 4}, {50, 2, -80, 4, 4, 4}, {-50, 2, 80, 4, 4, 4}, {-50, 2, -80, 4, 4, 4}, 
-    {220, 1, 50, 4, 2, 8}, {-220, 1, -50, 4, 2, 8}, // Cover
-    
-    // BASES
+    {220, 1, 50, 4, 2, 8}, {-220, 1, -50, 4, 2, 8}, 
     {350, 5, 20, 40, 10, 2}, {350, 5, -20, 40, 10, 2}, {370, 5, 0, 2, 10, 40}, {330, 5, 12, 2, 10, 16}, {330, 5, -12, 2, 10, 16},
     {350, 10, 15, 40, 1, 10}, {350, 10, -15, 40, 1, 10}, {365, 10, 0, 10, 1, 20}, {335, 10, 0, 10, 1, 20},
     {325, 2, 25, 6, 2, 6}, {328, 4, 25, 6, 2, 6}, {331, 6, 25, 6, 2, 6}, {335, 8, 25, 6, 2, 6}, {360, 1, 0, 4, 2, 4},
-    
     {-350, 5, 20, 40, 10, 2}, {-350, 5, -20, 40, 10, 2}, {-370, 5, 0, 2, 10, 40}, {-330, 5, 12, 2, 10, 16}, {-330, 5, -12, 2, 10, 16},
     {-350, 10, 15, 40, 1, 10}, {-350, 10, -15, 40, 1, 10}, {-365, 10, 0, 10, 1, 20}, {-335, 10, 0, 10, 1, 20},
     {-325, 2, -25, 6, 2, 6}, {-328, 4, -25, 6, 2, 6}, {-331, 6, -25, 6, 2, 6}, {-335, 8, -25, 6, 2, 6}, {-360, 1, 0, 4, 2, 4},
-
-    // WALLS
     {0, 25, 250, 1200, 50, 200}, {0, 25, -250, 1200, 50, 200}, 
     {550, 25, 0, 200, 50, 800}, {-550, 25, 0, 200, 50, 800}
 };
@@ -60,16 +47,10 @@ static int map_count = sizeof(map_geo) / sizeof(Box);
 
 float phys_rand_f() { return ((float)(rand()%1000)/500.0f) - 1.0f; }
 
-// Return: 0=Miss, 1=Body, 2=Head
 int check_hit_location(float ox, float oy, float oz, float dx, float dy, float dz, PlayerState *target) {
     if (!target->active) return 0;
-    
-    float tx = target->x; 
-    float tz = target->z;
-    float head_y = target->y + HEAD_OFFSET;
-    float h_size = HEAD_SIZE;
-    
-    // 1. Head
+    float tx = target->x; float tz = target->z;
+    float head_y = target->y + HEAD_OFFSET; float h_size = HEAD_SIZE;
     float vx = tx - ox, vy = head_y - oy, vz = tz - oz;
     float t = vx*dx + vy*dy + vz*dz;
     if (t > 0) {
@@ -77,8 +58,6 @@ int check_hit_location(float ox, float oy, float oz, float dx, float dy, float d
         float dist_sq = (tx-cx)*(tx-cx) + (head_y-cy)*(head_y-cy) + (tz-cz)*(tz-cz);
         if (dist_sq < (h_size*h_size)) return 2; 
     }
-
-    // 2. Body
     float body_y = target->y + 2.0f;
     vx = tx - ox; vy = body_y - oy; vz = tz - oz;
     t = vx*dx + vy*dy + vz*dz;
@@ -90,31 +69,21 @@ int check_hit_location(float ox, float oy, float oz, float dx, float dy, float d
     return 0;
 }
 
-
 void apply_friction(PlayerState *p) {
     float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
     if (speed < 0.001f) { p->vx = 0; p->vz = 0; return; }
-    
     float drop = 0;
-    
-    // Ground Friction
     if (p->on_ground) {
         float control = (speed < STOP_SPEED) ? STOP_SPEED : speed;
         drop = control * FRICTION;
-    } 
-    // Air Resistance (New: Prevents infinite float)
-    else {
-        drop = speed * 0.5f; // Small drag in air
+    } else {
+        drop = speed * 0.5f; 
     }
-    
     float newspeed = speed - drop;
     if (newspeed < 0) newspeed = 0;
     newspeed /= speed;
-    
-    p->vx *= newspeed;
-    p->vz *= newspeed;
+    p->vx *= newspeed; p->vz *= newspeed;
 }
-
 
 void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, float accel) {
     float current_speed = (p->vx * wish_x) + (p->vz * wish_z);
@@ -127,8 +96,6 @@ void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, fl
 
 void resolve_collision(PlayerState *p) {
     float pw = 0.6f; float ph = p->crouching ? 2.0f : 4.0f; 
-    int was_in_air = !p->on_ground; // Snapshot previous state
-    
     p->on_ground = 0;
     if (p->y < 0) { p->y = 0; p->vy = 0; p->on_ground = 1; }
     for(int i=1; i<map_count; i++) {
@@ -154,14 +121,6 @@ void resolve_collision(PlayerState *p) {
             }
         }
     }
-    
-    // --- SLIDE BOOST TRIGGER ---
-    // If we just landed (was_in_air && now on_ground) AND we are holding crouch
-    if (was_in_air && p->on_ground && p->crouching) {
-        // Boost!
-        p->vx *= SLIDE_BOOST;
-        p->vz *= SLIDE_BOOST;
-    }
 }
 
 void phys_respawn(PlayerState *p, unsigned int now) {
@@ -170,14 +129,9 @@ void phys_respawn(PlayerState *p, unsigned int now) {
     p->health = 100;
     p->shield = 100;
     p->respawn_time = 0;
-    
     float n_x = ((float)(rand()%1000)/1000.0f) * 800.0f - 400.0f;
     float n_z = ((float)(rand()%1000)/1000.0f) * 200.0f - 100.0f;
-    
-    p->x = n_x;
-    p->z = n_z;
-    p->y = 10;
-    
+    p->x = n_x; p->z = n_z; p->y = 10;
     p->current_weapon = WPN_MAGNUM;
     p->ammo[WPN_MAGNUM] = WPN_STATS[WPN_MAGNUM].ammo_max;
 }
@@ -214,73 +168,27 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
             for(int i=0; i<MAX_CLIENTS; i++) {
                 if (p == &targets[i]) continue;
                 if (!targets[i].active) continue;
-
                 if (w == WPN_KNIFE) {
-                    float kx = p->x - targets[i].x;
-                    float ky = p->y - targets[i].y;
-                    float kz = p->z - targets[i].z;
-                    float kdist = kx*kx + ky*ky + kz*kz;
-                    if (kdist > MELEE_RANGE_SQ + 22.0f ) continue; 
+                    float kx = p->x - targets[i].x; float ky = p->y - targets[i].y; float kz = p->z - targets[i].z;
+                    if ((kx*kx + ky*ky + kz*kz) > MELEE_RANGE_SQ + 22.0f ) continue; 
                 }
-
                 int hit_type = check_hit_location(p->x, p->y + EYE_HEIGHT, p->z, dx, dy, dz, &targets[i]);
-                
-                
                 if (hit_type > 0) {
                     printf("🔫 HIT! Dmg: %d on Target %d\n", WPN_STATS[w].dmg, i);
-    
                     int damage = WPN_STATS[w].dmg;
                     targets[i].shield_regen_timer = SHIELD_REGEN_DELAY;
-                    
-                    if (hit_type == 2 && targets[i].shield <= 0) {
-                        damage *= 3; 
-                        p->hit_feedback = 20; 
-                    } else {
-                        p->hit_feedback = 10; 
-                    }
-                    
+                    if (hit_type == 2 && targets[i].shield <= 0) { damage *= 3; p->hit_feedback = 20; } else { p->hit_feedback = 10; }
                     if (targets[i].shield > 0) {
-                        if (targets[i].shield >= damage) {
-                            targets[i].shield -= damage;
-                            damage = 0;
-                        } else {
-                            damage -= targets[i].shield;
-                            targets[i].shield = 0;
-                        }
+                        if (targets[i].shield >= damage) { targets[i].shield -= damage; damage = 0; } 
+                        else { damage -= targets[i].shield; targets[i].shield = 0; }
                     }
-                    
                     targets[i].health -= damage;
-                    
                     if(targets[i].health <= 0) {
-                        p->kills++;
-                        targets[i].deaths++;
-                        phys_respawn(&targets[i], 0);
+                        p->kills++; targets[i].deaths++; phys_respawn(&targets[i], 0);
                     }
                 }
             }
-        } else {
-            p->attack_cooldown = 10; 
-        }
+        } else { p->attack_cooldown = 10; }
     }
 }
-
-// --- HISTORY STORE (Restored Phase 430) ---
-void phys_store_history(ServerState *server, int client_id, unsigned int now) {
-    if (client_id < 0 || client_id >= MAX_CLIENTS) return;
-    int slot = (now / 16) % LAG_HISTORY; // Simple tick map
-    
-    server->history[client_id][slot].active = 1;
-    server->history[client_id][slot].timestamp = now;
-    
-    // Store Transform
-    server->history[client_id][slot].x = server->players[client_id].x;
-    server->history[client_id][slot].y = server->players[client_id].y;
-    server->history[client_id][slot].z = server->players[client_id].z;
-    
-    // Store Velocity (Good for prediction)
-    server->history[client_id][slot].vx = server->players[client_id].vx;
-    server->history[client_id][slot].vy = server->players[client_id].vy;
-    server->history[client_id][slot].vz = server->players[client_id].vz;
-}
-
 #endif
