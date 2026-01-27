@@ -46,24 +46,17 @@ unsigned int sv_client_last_seq[MAX_CLIENTS];
 void draw_scene(PlayerState *render_p); 
 
 void draw_char(char c, float x, float y, float s) {
-    glLineWidth(2.0f);
+    glLineWidth(1.0f); // Thinner line for small text
     glBegin(GL_LINES);
-    // Simple font logic
+    // Standard block font
     if(c>='0'&&c<='9'){ glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x,y); }
-    else if(c=='S'){glVertex2f(x+s,y);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x,y+s);}
-    else if(c=='H'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x+s,y);glVertex2f(x+s,y+s);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s/2);}
-    else if(c=='A'){glVertex2f(x,y+s);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s/2);}
-    else if(c=='N'){glVertex2f(x,y+s);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x+s,y);}
-    else if(c=='K'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s/2);glVertex2f(x+s,y);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s);}
-    else if(c=='P'){glVertex2f(x,y+s);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x,y+s/2);}
-    else if(c=='I'){glVertex2f(x+s/2,y);glVertex2f(x+s/2,y+s);glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x,y+s);glVertex2f(x+s,y+s);}
-    else if(c=='T'){glVertex2f(x+s/2,y);glVertex2f(x+s/2,y+s);glVertex2f(x,y);glVertex2f(x+s,y);}
-    else if(c=='D'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y);glVertex2f(x+s*0.8,y);glVertex2f(x+s*0.8,y);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x,y+s);}
+    else if(c=='.'){ glVertex2f(x+s/2,y);glVertex2f(x+s/2,y+s*0.2); }
+    else if(c=='V'){glVertex2f(x,y+s);glVertex2f(x+s/2,y);glVertex2f(x+s/2,y);glVertex2f(x+s,y+s);}
     else if(c=='E'){glVertex2f(x+s,y);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s,y+s);glVertex2f(x,y+s/2);glVertex2f(x+s*0.8,y+s/2);}
-    else if(c=='M'){glVertex2f(x,y+s);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x+s/2,y+s/2);glVertex2f(x+s/2,y+s/2);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);}
-    else if(c=='O'){glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x,y);}
-    else if(c=='B'){glVertex2f(x,y+s);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x+s*0.8,y);glVertex2f(x+s*0.8,y);glVertex2f(x+s,y+s/4);glVertex2f(x+s,y+s/4);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s*0.75);glVertex2f(x+s,y+s*0.75);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x,y+s);}
+    else if(c=='L'){glVertex2f(x,y+s);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x+s,y);}
     else if(c==':'){glVertex2f(x+s/2,y+s*0.2);glVertex2f(x+s/2,y+s*0.3);glVertex2f(x+s/2,y+s*0.7);glVertex2f(x+s/2,y+s*0.8);}
+    // Fallback box for others
+    else if(c==' '){} 
     else { glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x,y); }
     glEnd();
 }
@@ -151,7 +144,8 @@ void draw_player_3rd(PlayerState *p) {
     glRotatef(-p->yaw, 0, 1, 0); 
     if(p->health <= 0) glColor3f(0.2, 0, 0); else glColor3f(1, 0, 0); 
     
-    glPushMatrix();     glPushMatrix();     glPushMatrix(); glScalef(0.97f, 2.91f, 0.97f); // PHI SCALE (1.618x) // TITAN SCALE // HUMAN SCALE
+    // GOLDEN RATIO SCALE (1.618x)
+    glPushMatrix(); glScalef(0.97f, 2.91f, 0.97f); 
     glBegin(GL_QUADS);
     glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(-0.5,0.5,0.5);
     glVertex3f(-0.5,0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
@@ -183,12 +177,18 @@ void draw_hud(PlayerState *p) {
     int w = p->current_weapon; int ammo = (w == WPN_KNIFE) ? 99 : p->ammo[w];
     glColor3f(1, 1, 0); for(int i=0; i<ammo; i++) glRectf(1200 - (i*10), 50, 1205 - (i*10), 80);
     
-    // --- SPEEDOMETER ---
-    float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
-    char buf[32]; sprintf(buf, "SPD: %d", (int)(speed * 100));
-    draw_string(buf, 50, 120, 10);
-    if(p->on_ground) draw_string("GND", 150, 120, 10); else draw_string("AIR", 150, 120, 10);
+    // --- OLD SPEEDOMETER (LEFT) ---
+    // float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
+    // char buf[32]; sprintf(buf, "SPD: %d", (int)(speed * 100));
+    // draw_string(buf, 50, 120, 10);
     
+    // --- NEW TELEMETRY (BOTTOM RIGHT, YELLOW) ---
+    float raw_speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
+    char vel_buf[32]; sprintf(vel_buf, "VEL: %.2f", raw_speed);
+    glColor3f(1.0f, 1.0f, 0.0f); // Yellow
+    // Right align approx: 1280 - (Chars * 15)
+    draw_string(vel_buf, 1100, 50, 8); // Size 8 (Small-ish)
+
     glEnable(GL_DEPTH_TEST); glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW); glPopMatrix();
 }
 
@@ -216,7 +216,7 @@ void net_send_cmd(UserCmd cmd) {}
 
 int main(int argc, char* argv[]) {
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *win = SDL_CreateWindow("SHANKPIT [BUILD 125 - GOLDEN]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
+    SDL_Window *win = SDL_CreateWindow("SHANKPIT [BUILD 129 - TELEMETRY]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
     SDL_GL_CreateContext(win);
     net_init();
     
