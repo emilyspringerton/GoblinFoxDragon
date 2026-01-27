@@ -27,12 +27,12 @@
 
 // --- CONSTANTS & STATE ---
 #define STATE_LOBBY 0
-#define STATE_GAME_LOCAL 1
-#define STATE_LISTEN_SERVER 2
-#define STATE_GAME_CLIENT 3
+#define STATE_GAME_NET 1
+#define STATE_GAME_LOCAL 2
+#define STATE_LISTEN_SERVER 99
 
 int app_state = STATE_LOBBY;
-int wpn_req = 1; // Persistent Weapon request
+int wpn_req = 1; 
 
 float cam_yaw = 0.0f;
 float cam_pitch = 0.0f;
@@ -53,40 +53,33 @@ void sv_process_cmd(int client_id, UserCmd *cmd) {
     if (cmd->sequence <= sv_client_last_seq[client_id]) return;
     PlayerState *p = &local_state.players[client_id];
     
-    // Inputs
     if (!isnan(cmd->yaw)) p->yaw = cmd->yaw;
     if (!isnan(cmd->pitch)) p->pitch = cmd->pitch;
     p->current_weapon = cmd->weapon_idx;
     
-    // Physics (Unified with Physics.h logic)
     float rad = p->yaw * 0.0174533f;
     float wish_x = sinf(rad) * cmd->fwd + cosf(rad) * cmd->str;
     float wish_z = cosf(rad) * cmd->fwd - sinf(rad) * cmd->str;
     
-    // Normalize wish dir
     float wish_speed = sqrtf(wish_x*wish_x + wish_z*wish_z);
     if (wish_speed > 1.0f) { wish_speed = 1.0f; wish_x/=wish_speed; wish_z/=wish_speed; }
     wish_speed *= MAX_SPEED;
 
     accelerate(p, wish_x, wish_z, wish_speed, ACCEL);
     
-    // Jump
     if ((cmd->buttons & BTN_JUMP) && p->on_ground) {
         p->y += 0.1f; p->vy += JUMP_FORCE;
     }
     
-    // State
     p->in_shoot = (cmd->buttons & BTN_ATTACK);
     p->in_reload = (cmd->buttons & BTN_RELOAD);
     p->crouching = (cmd->buttons & BTN_CROUCH);
     
     update_entity(p, 0.016f, NULL, cmd->timestamp);
-    
     sv_client_last_seq[client_id] = cmd->sequence;
 }
 
 void sv_tick() {
-    // 1. Process Network
     char buffer[1024];
     struct sockaddr_in sender;
     socklen_t slen = sizeof(sender);
@@ -107,20 +100,16 @@ void sv_tick() {
         }
     }
     
-    // 2. Process Bots
     for(int i=1; i<MAX_CLIENTS; i++) {
         PlayerState *p = &local_state.players[i];
         if (!p->active) continue;
-        
         float bfwd=0, byaw=p->yaw; int bbtns=0;
         bot_think(i, local_state.players, &bfwd, &byaw, &bbtns);
-        
         p->yaw = byaw;
         float brad = byaw * 0.0174533f;
         float bx = sinf(brad) * bfwd;
         float bz = cosf(brad) * bfwd;
         accelerate(p, bx, bz, MAX_SPEED, ACCEL);
-        
         p->in_shoot = (bbtns & BTN_ATTACK);
         update_entity(p, 0.016f, NULL, 0);
     }
@@ -179,7 +168,6 @@ void net_init() {
 void draw_char(char c, float x, float y, float s) {
     glLineWidth(2.0f);
     glBegin(GL_LINES);
-    // Minimal Vector Font
     if(c=='S'){glVertex2f(x+s,y);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x,y+s);}
     else if(c=='H'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x+s,y);glVertex2f(x+s,y+s);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s/2);}
     else if(c=='A'){glVertex2f(x,y+s);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s/2);}
@@ -193,10 +181,7 @@ void draw_char(char c, float x, float y, float s) {
     else if(c=='M'){glVertex2f(x,y+s);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x+s/2,y+s/2);glVertex2f(x+s/2,y+s/2);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);}
     else if(c=='O'){glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x,y);}
     else if(c=='B'){glVertex2f(x,y+s);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x+s*0.8,y);glVertex2f(x+s*0.8,y);glVertex2f(x+s,y+s/4);glVertex2f(x+s,y+s/4);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s*0.75);glVertex2f(x+s,y+s*0.75);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x,y+s);}
-    else { // Box for others
-        glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);
-        glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x,y);
-    }
+    else { glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x,y); }
     glEnd();
 }
 
@@ -207,10 +192,7 @@ void draw_string(const char* str, float x, float y, float size) {
 // --- SCENE RENDERING ---
 void draw_grid() {
     glBegin(GL_LINES); glColor3f(0.0f, 1.0f, 1.0f);
-    for(int i=-100; i<=900; i+=5) {
-        glVertex3f(i, 0, -100); glVertex3f(i, 0, 100);
-        glVertex3f(-100, 0, i); glVertex3f(100, 0, i);
-    }
+    for(int i=-100; i<=900; i+=5) { glVertex3f(i, 0, -100); glVertex3f(i, 0, 100); glVertex3f(-100, 0, i); glVertex3f(100, 0, i); }
     glEnd();
 }
 
@@ -282,9 +264,7 @@ void draw_head(int weapon_id) {
 }
 
 void draw_player_3rd(PlayerState *p) {
-    glPushMatrix();
-    glTranslatef(p->x, p->y + 2.0f, p->z);
-    glRotatef(-p->yaw, 0, 1, 0); 
+    glPushMatrix(); glTranslatef(p->x, p->y + 2.0f, p->z); glRotatef(-p->yaw, 0, 1, 0); 
     if(p->health <= 0) glColor3f(0.2, 0, 0); else glColor3f(1, 0, 0); 
     glPushMatrix(); glScalef(1.2f, 3.8f, 1.2f);
     glBegin(GL_QUADS);
@@ -298,6 +278,8 @@ void draw_player_3rd(PlayerState *p) {
     glPushMatrix(); glTranslatef(0.5f, 1.0f, 0.5f); glRotatef(p->pitch, 1, 0, 0);   
     glScalef(0.8f, 0.8f, 0.8f); draw_gun_model(p->current_weapon); glPopMatrix(); glPopMatrix();
 }
+
+void draw_projectiles() { } // Empty for now, satisfies linker
 
 void draw_hud(PlayerState *p) {
     glDisable(GL_DEPTH_TEST);
@@ -326,10 +308,10 @@ void draw_scene(PlayerState *render_p) {
     draw_weapon_p(render_p); draw_hud(render_p);
 }
 
-// --- MAIN LOOP ---
+// --- MAIN ENTRY ---
 int main(int argc, char* argv[]) {
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *win = SDL_CreateWindow("SHANKPIT [BUILD 109 - RESTORED]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
+    SDL_Window *win = SDL_CreateWindow("SHANKPIT [BUILD 110 - LOBBY ONLINE]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
     SDL_GL_CreateContext(win);
     net_init();
     
@@ -343,37 +325,31 @@ int main(int argc, char* argv[]) {
             
             if (app_state == STATE_LOBBY) {
                 if(e.type == SDL_KEYDOWN) {
-                    // D: Demo (1 Player, 0 Bots)
                     if (e.key.keysym.sym == SDLK_d) { 
                         app_state = STATE_GAME_LOCAL; 
-                        local_init_match(1, MODE_DEATHMATCH); // 1 Total = Just Player
+                        local_init_match(1, MODE_DEATHMATCH); 
                     }
-                    // B: Bots (8 Players: 1 Human, 7 Bots)
                     if (e.key.keysym.sym == SDLK_b) { 
                         app_state = STATE_GAME_LOCAL; 
                         local_init_match(8, MODE_DEATHMATCH); 
                     }
-                    // N: Network/Listen Server (8 Players: 1 Human Host, 7 Bots)
                     if (e.key.keysym.sym == SDLK_n) { 
                         app_state = STATE_LISTEN_SERVER; 
                         local_init_match(8, MODE_DEATHMATCH);
-                        // Init Server Socket
                         #ifdef _WIN32
                         WSADATA wsa; WSAStartup(MAKEWORD(2,2), &wsa);
                         #endif
                         sv_sock = socket(AF_INET, SOCK_DGRAM, 0);
-                        u_long mode = 1; 
                         #ifdef _WIN32
-                        ioctlsocket(sv_sock, FIONBIO, &mode);
+                        u_long mode = 1; ioctlsocket(sv_sock, FIONBIO, &mode);
                         #else
-                        fcntl(sv_sock, F_SETFL, O_NONBLOCK);
+                        int flags = fcntl(sv_sock, F_GETFL, 0); fcntl(sv_sock, F_SETFL, flags | O_NONBLOCK);
                         #endif
                         struct sockaddr_in bind_addr;
                         bind_addr.sin_family = AF_INET; bind_addr.sin_port = htons(6969); bind_addr.sin_addr.s_addr = INADDR_ANY;
                         bind(sv_sock, (struct sockaddr*)&bind_addr, sizeof(bind_addr));
                         server_addr.sin_port = htons(6969); server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
                     }
-                    // Lock Mouse if entering game
                     if (app_state != STATE_LOBBY) {
                         SDL_SetRelativeMouseMode(SDL_TRUE);
                         glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
@@ -384,7 +360,7 @@ int main(int argc, char* argv[]) {
                 if(e.type == SDL_KEYDOWN) {
                     if (e.key.keysym.sym == SDLK_ESCAPE) {
                         app_state = STATE_LOBBY;
-                        SDL_SetRelativeMouseMode(SDL_FALSE); // Release Mouse!
+                        SDL_SetRelativeMouseMode(SDL_FALSE);
                         glDisable(GL_DEPTH_TEST);
                         glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
                         glMatrixMode(GL_MODELVIEW); glLoadIdentity();
@@ -404,9 +380,9 @@ int main(int argc, char* argv[]) {
              glClearColor(0.1f, 0.1f, 0.2f, 1.0f); glClear(GL_COLOR_BUFFER_BIT);
              glLoadIdentity(); glColor3f(1, 1, 0);
              draw_string("SHANKPIT", 400, 500, 20);
-             draw_string("D: DEMO (SOLO)", 400, 400, 10);
-             draw_string("B: BOTS (LOCAL)", 400, 350, 10);
-             draw_string("N: NET/LISTEN", 400, 300, 10);
+             draw_string("D: DEMO", 400, 400, 10);
+             draw_string("B: BATTLE", 400, 350, 10);
+             draw_string("N: NETWORK", 400, 300, 10);
              SDL_GL_SwapWindow(win);
         } 
         else if (app_state == STATE_LISTEN_SERVER) {
