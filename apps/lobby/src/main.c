@@ -45,6 +45,7 @@ void init_map() {
 #define STATE_GAME_NET 1
 #define STATE_GAME_LOCAL 2
 int app_state = STATE_LOBBY;
+int wpn_req = 1; // Persistent selection
 
 float cam_yaw = 0.0f;
 float cam_pitch = 0.0f;
@@ -286,7 +287,7 @@ void draw_player_3rd(PlayerState *p) {
     
     // DRAW HEAD
     glPushMatrix();
-    glTranslatef(0, 2.0f, 0); // On top of body
+    glTranslatef(0, 0.95f, 0); // On top of body
     draw_head(p->current_weapon);
     glPopMatrix();
     

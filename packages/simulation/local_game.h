@@ -48,7 +48,7 @@ void bot_think(int bot_idx, PlayerState *players, float *out_fwd, float *out_yaw
         // Move to engage range (keep distance 5-10 units)
         if (min_dist > 8.0f) *out_fwd = 1.0f;
         else if (min_dist < 4.0f) *out_fwd = -1.0f; // Back up
-        else *out_fwd = 0.0f;
+        else { *out_fwd = 0.0f; *out_buttons |= (bot_idx % 2 == 0) ? 0 : 0; } /* Strafe logic needs axis support */
         
         *out_buttons |= BTN_ATTACK;
     } else {
