@@ -5,10 +5,10 @@
 #include <stdio.h>
 #include "protocol.h"
 
-// --- TORQUE TUNING (PHASE 447) ---
-#define GRAVITY 0.04f       
-#define JUMP_FORCE 0.65f    
-#define MAX_SPEED 0.85f     
+// --- FLOAT & FLOW TUNING (PHASE 450) ---
+#define GRAVITY 0.035f      // <--- FLOATIER (Was 0.04)
+#define JUMP_FORCE 0.70f    // <--- STRONGER (Was 0.65)
+#define MAX_SPEED 0.92f     // <--- FASTER (Was 0.85)
 #define FRICTION 0.15f      
 #define ACCEL 0.6f          
 #define STOP_SPEED 0.1f     
@@ -103,10 +103,9 @@ void apply_friction(PlayerState *p) {
     p->vx *= newspeed; p->vz *= newspeed;
 }
 
-// --- FIXED ACCELERATION LOGIC ---
 void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, float accel) {
-    // 1. Sliding: No accel allowed (Momentum only)
     float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
+    // 1. Sliding: No accel allowed (Momentum only)
     if (p->crouching && speed > 0.5f && p->on_ground) return;
 
     // 2. Cap Wish Speed for Crouch Walking
@@ -114,14 +113,12 @@ void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, fl
         if (wish_speed > CROUCH_SPEED) wish_speed = CROUCH_SPEED;
     }
 
-    // 3. Apply Forces (Quake Style - Dot Product)
     float current_speed = (p->vx * wish_x) + (p->vz * wish_z);
     float add_speed = wish_speed - current_speed;
     
     if (add_speed <= 0) return;
     
-    // FIX: Multiply accel by MAX_SPEED (0.85) instead of wish_speed
-    // This gives consistently strong "Torque" regardless of the target limit.
+    // FIX: Multiply accel by MAX_SPEED (0.92) for consistent torque
     float acc_speed = accel * MAX_SPEED; 
     
     if (acc_speed > add_speed) acc_speed = add_speed;
