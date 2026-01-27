@@ -9,6 +9,11 @@
 #define PACKET_USERCMD 1
 #define PACKET_SNAPSHOT 2
 
+// --- STATES (Critical for Physics) ---
+#define STATE_ALIVE 0
+#define STATE_DEAD  1
+#define STATE_SPECTATOR 2
+
 #define WPN_KNIFE 0
 #define WPN_MAGNUM 1
 #define WPN_AR 2
@@ -18,6 +23,7 @@
 #define RELOAD_TIME 60
 #define SHIELD_REGEN_DELAY 180 
 
+// --- NETWORK STRUCTURES ---
 typedef struct {
     unsigned char type;
     unsigned char client_id;
@@ -66,11 +72,13 @@ typedef struct {
     int active;
     int is_bot;
     
+    // Transform
     float x, y, z;
     float vx, vy, vz;
     float yaw, pitch;
     int on_ground;
     
+    // Input
     float in_fwd;
     float in_strafe;
     int in_jump;
@@ -78,6 +86,7 @@ typedef struct {
     int in_reload;
     int crouching;
     
+    // Combat
     int current_weapon;
     int ammo[MAX_WEAPONS];
     int reload_timer;
@@ -85,18 +94,21 @@ typedef struct {
     int is_shooting;
     int jump_timer;
     
+    // Vitals
     int health;
     int shield;             
     int shield_regen_timer; 
+    int state; // <--- FIXED: ADDED BACK
     
+    // Stats
     int kills;
-    int deaths; // Added for scoreboard
+    int deaths;
     int hit_feedback;       
     float recoil_anim;
     
     float accumulated_reward; 
     
-    // Legacy support fields to prevent breakages
+    // Legacy
     unsigned int last_hit_time;
     unsigned int respawn_time;
 } PlayerState;

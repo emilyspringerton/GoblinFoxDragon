@@ -28,7 +28,10 @@
 #define STATE_LOBBY 0
 #define STATE_GAME_NET 1
 #define STATE_GAME_LOCAL 2
-#define STATE_LISTEN_SERVER 99 // Added
+#define STATE_LISTEN_SERVER 99
+
+// Forward Declaration
+void draw_scene(PlayerState *render_p); // Added
 
 int app_state = STATE_LOBBY;
 int wpn_req = 1; // Persistent Weapon
