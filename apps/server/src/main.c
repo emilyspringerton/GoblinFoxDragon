@@ -32,7 +32,7 @@ unsigned int get_server_time() {
 }
 
 void server_net_init() {
-    // DISABLE BUFFERING (Fix for SSH logs)
+    // DISABLE BUFFERING
     setbuf(stdout, NULL);
 
     #ifdef _WIN32
@@ -52,14 +52,11 @@ void server_net_init() {
     bind_addr.sin_addr.s_addr = INADDR_ANY;
     
     if (bind(sock, (struct sockaddr*)&bind_addr, sizeof(bind_addr)) < 0) {
-        printf("❌ FAILED TO BIND PORT 6969 (Is another server running?)
-");
+        printf("FAILED TO BIND PORT 6969 (Is another server running?)\n");
         exit(1);
     } else {
-        printf("✅ SERVER LISTENING ON PORT 6969
-");
-        printf("👉 Waiting for connections...
-");
+        printf("SERVER LISTENING ON PORT 6969\n");
+        printf("Waiting for connections...\n");
     }
 }
 
@@ -87,7 +84,7 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
     
     int client_id = -1;
     
-    // 1. Identify Client by IP/Port
+    // 1. Identify Client
     for(int i=1; i<MAX_CLIENTS; i++) {
         if (local_state.client_active[i] && 
             memcmp(&local_state.clients[i].sin_addr, &sender->sin_addr, sizeof(struct in_addr)) == 0 &&
@@ -97,14 +94,11 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
         }
     }
     
-    // 2. New Connection Handling
+    // 2. New Connection
     if (client_id == -1) {
-        // Log the attempt
         char *ip_str = inet_ntoa(sender->sin_addr);
-        printf("📡 PACKET FROM NEW IP: %s:%d (Type: %d)
-", ip_str, ntohs(sender->sin_port), head->type);
+        printf("PACKET FROM NEW IP: %s:%d (Type: %d)\n", ip_str, ntohs(sender->sin_port), head->type);
 
-        // Assign Slot
         for(int i=1; i<MAX_CLIENTS; i++) {
             if (!local_state.client_active[i]) {
                 client_id = i;
@@ -112,14 +106,10 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
                 local_state.clients[i] = *sender;
                 local_state.players[i].active = 1;
                 
-                // Init Player
                 phys_respawn(&local_state.players[i], get_server_time());
-                
-                // IMPORTANT: Init Ammo for new player
                 for(int w=0; w<MAX_WEAPONS; w++) local_state.players[i].ammo[w] = WPN_STATS[w].ammo_max;
 
-                printf("👋 CLIENT %d ASSIGNED to %s
-", client_id, ip_str);
+                printf("CLIENT %d ASSIGNED to %s\n", client_id, ip_str);
                 break;
             }
         }
@@ -130,13 +120,12 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
         int cursor = sizeof(NetHeader);
         unsigned char count = *(unsigned char*)(buffer + cursor); cursor += 1;
         
-        // Safety check size
         if (size >= cursor + (count * sizeof(UserCmd))) {
             UserCmd *cmds = (UserCmd*)(buffer + cursor);
             for (int i = count - 1; i >= 0; i--) {
                 process_user_cmd(client_id, &cmds[i]);
             }
-            local_state.players[client_id].active = 1; // Keep alive
+            local_state.players[client_id].active = 1; 
         }
     }
 }
@@ -193,7 +182,6 @@ int main() {
     unsigned int tick = 0;
     
     while(running) {
-        // 1. RECV
         char buffer[1024];
         struct sockaddr_in sender; socklen_t slen = sizeof(sender);
         int len = recvfrom(sock, buffer, 1024, 0, (struct sockaddr*)&sender, &slen);
@@ -202,7 +190,6 @@ int main() {
             len = recvfrom(sock, buffer, 1024, 0, (struct sockaddr*)&sender, &slen);
         }
         
-        // 2. SIMULATE
         unsigned int now = get_server_time();
         int active_count = 0;
         
@@ -213,20 +200,16 @@ int main() {
             if (p->state == STATE_DEAD) {
                if (local_state.game_mode != MODE_SURVIVAL && now > p->respawn_time) {
                    phys_respawn(p, now);
-                   printf("👼 Client %d Respawned
-", i);
+                   printf("Client %d Respawned\n", i);
                }
             }
             update_entity(p, 0.016f, NULL, now);
         }
         
-        // 3. BROADCAST
         server_broadcast();
         
-        // 4. PERIODIC LOG (Every ~5 seconds)
         if (tick % 300 == 0) {
-            printf("[STATUS] Tick: %d | Active Entities: %d
-", tick, active_count);
+            printf("[STATUS] Tick: %d | Active Entities: %d\n", tick, active_count);
         }
         
         local_state.server_tick++;
