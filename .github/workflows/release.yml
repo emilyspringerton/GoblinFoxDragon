@@ -133,3 +133,38 @@ jobs:
             ShankPit_Server_Linux
             ShankPit_Bots.zip
             SHANKPIT_CONSTRUCT.txt
+
+
+  deploy:
+    name: 🚀 Deploy to Production
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+    
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ShankPit_Builds
+          
+      - name: Deploy via SSH
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          port: 22
+          source: "ShankPit_Server_Linux"
+          target: "/opt/shankpit/"
+          
+      - name: Restart Service
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          port: 22
+          script: |
+            chmod +x /opt/shankpit/ShankPit_Server_Linux
+            systemctl restart shankpit
+            systemctl status shankpit
