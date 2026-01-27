@@ -70,12 +70,32 @@ jobs:
           # Linux Bot
           gcc apps/client/bot_main.c -o ShankBot_Linux             -O2 -static             -Ipackages/common -Ipackages/simulation -lm
 
+      
+      # --- 3.5 GENERATE CONSTRUCT (The Black Box) ---
+      - name: Generate Source Construct
+        run: |
+          echo "SHANKPIT BUILD ${{ github.run_number }} CONSTRUCT" > SHANKPIT_CONSTRUCT.txt
+          echo "=======================================" >> SHANKPIT_CONSTRUCT.txt
+          
+          for file in packages/common/protocol.h packages/common/physics.h packages/simulation/local_game.h apps/lobby/src/main.c apps/server/src/main.c apps/client/bot_main.c apps/training/headless.c; do
+            if [ -f "$file" ]; then
+              echo "" >> SHANKPIT_CONSTRUCT.txt
+              echo "--- FILE START: $file ---" >> SHANKPIT_CONSTRUCT.txt
+              cat "$file" >> SHANKPIT_CONSTRUCT.txt
+              echo "" >> SHANKPIT_CONSTRUCT.txt
+              echo "--- FILE END: $file ---" >> SHANKPIT_CONSTRUCT.txt
+            else
+              echo "MISSING: $file" >> SHANKPIT_CONSTRUCT.txt
+            fi
+          done
+
       # --- 4. PACKAGE ---
       - name: Bundle Artifacts
         run: |
           # Client Bundle
           mkdir ShankPit_Client
           cp ShankPit.exe ShankPit_Client/
+          cp SHANKPIT_CONSTRUCT.txt ShankPit_Client/
           cp sdl2_mingw/bin/SDL2.dll ShankPit_Client/
           echo "start ShankPit.exe" > ShankPit_Client/PLAY.bat
           zip -r ShankPit_Windows.zip ShankPit_Client
@@ -87,7 +107,8 @@ jobs:
           mkdir ShankPit_Bots
           cp ShankBot.exe ShankPit_Bots/
           cp ShankBot_Linux ShankPit_Bots/
-          zip -r ShankPit_Bots.zip ShankPit_Bots
+          zip -r ShankPit_Bots.zip
+            SHANKPIT_CONSTRUCT.txt ShankPit_Bots
 
       - name: Upload Artifacts (Build)
         uses: actions/upload-artifact@v4
@@ -97,6 +118,7 @@ jobs:
             ShankPit_Windows.zip
             ShankPit_Server_Linux
             ShankPit_Bots.zip
+            SHANKPIT_CONSTRUCT.txt
 
       # --- 5. RELEASE (Only on Tag) ---
       - name: Publish Release
@@ -107,3 +129,4 @@ jobs:
             ShankPit_Windows.zip
             ShankPit_Server_Linux
             ShankPit_Bots.zip
+            SHANKPIT_CONSTRUCT.txt
