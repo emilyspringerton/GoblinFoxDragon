@@ -254,4 +254,24 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
         }
     }
 }
+
+// --- HISTORY STORE (Restored Phase 430) ---
+void phys_store_history(ServerState *server, int client_id, unsigned int now) {
+    if (client_id < 0 || client_id >= MAX_CLIENTS) return;
+    int slot = (now / 16) % LAG_HISTORY; // Simple tick map
+    
+    server->history[client_id][slot].active = 1;
+    server->history[client_id][slot].timestamp = now;
+    
+    // Store Transform
+    server->history[client_id][slot].x = server->players[client_id].x;
+    server->history[client_id][slot].y = server->players[client_id].y;
+    server->history[client_id][slot].z = server->players[client_id].z;
+    
+    // Store Velocity (Good for prediction)
+    server->history[client_id][slot].vx = server->players[client_id].vx;
+    server->history[client_id][slot].vy = server->players[client_id].vy;
+    server->history[client_id][slot].vz = server->players[client_id].vz;
+}
+
 #endif
