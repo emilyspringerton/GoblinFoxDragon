@@ -7,9 +7,7 @@
 
 ServerState local_state;
 
-// --- BOT AI (Internal Definition to avoid Conflicts) ---
-
-// --- BOT AI (Restored Phase 418) ---
+// --- BOT AI (Phase 418 Hunter + Phase 421 Anti-Stuck) ---
 void bot_think(int bot_idx, PlayerState *players, float *out_fwd, float *out_yaw, int *out_buttons) {
     PlayerState *me = &players[bot_idx];
     if (me->state == STATE_DEAD) {
@@ -20,7 +18,7 @@ void bot_think(int bot_idx, PlayerState *players, float *out_fwd, float *out_yaw
     int target_idx = -1;
     float min_dist = 9999.0f;
 
-    // Find Closest Enemy
+    // Find Enemy
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (i == bot_idx) continue;
         if (!players[i].active) continue;
@@ -37,37 +35,48 @@ void bot_think(int bot_idx, PlayerState *players, float *out_fwd, float *out_yaw
     }
 
     if (target_idx != -1) {
-        // ENGAGE
+        // Aim and Attack
         PlayerState *t = &players[target_idx];
         float dx = t->x - me->x;
         float dz = t->z - me->z;
         float target_yaw = atan2f(dx, dz) * (180.0f / 3.14159f);
         
-        *out_yaw = target_yaw; // Aimbot
-        
-        // Move to engage range (keep distance 5-10 units)
-        if (min_dist > 8.0f) *out_fwd = 1.0f;
-        else if (min_dist < 4.0f) *out_fwd = -1.0f; // Back up
-        else { *out_fwd = 0.0f; *out_buttons |= (bot_idx % 2 == 0) ? 0 : 0; } /* Strafe logic needs axis support */
-        
+        *out_yaw = target_yaw;
         *out_buttons |= BTN_ATTACK;
+        
+        // Dynamic Movement (Don't freeze!)
+        if (min_dist > 20.0f) *out_fwd = 1.0f; // Chase
+        else if (min_dist < 5.0f) *out_fwd = -1.0f; // Back up
+        else *out_fwd = 0.2f; // Creep forward to avoid friction stop
+        
     } else {
-        // PATROL
+        // Patrol
         *out_yaw += 2.0f;
         *out_fwd = 0.5f;
     }
 }
 
+// --- UPDATE ENTITY (Rewired to use physics.h) ---
 void update_entity(PlayerState *p, float dt, void *server_context, unsigned int cmd_time) {
     if (!p->active) return;
     if (p->state == STATE_DEAD) return;
 
-    // Physics
-    p->y -= GRAVITY * dt;
-    if (p->y < 0) p->y = 0; // Floor collision
+    // Apply Friction
+    apply_friction(p);
+    
+    // Apply Gravity
+    p->y -= GRAVITY;
+    if (p->y < 0) p->y = 0; // Simple floor clamp if map doesn't catch it
+    
+    // Resolve Collisions
+    resolve_collision(p);
+    
+    // Update Position
+    p->x += p->vx;
+    p->z += p->vz;
 
     // Weapons
-    update_weapons(p, local_state.players, p->in_shoot > 0, 0, server_context, cmd_time);
+    update_weapons(p, local_state.players, p->in_shoot > 0, p->in_reload > 0);
 }
 
 // --- LOCAL UPDATE LOOP ---
@@ -78,12 +87,34 @@ void local_update(float fwd, float str, float yaw, float pitch, int shoot, int w
     p0->yaw = yaw;
     p0->pitch = pitch;
     
-    // Simple Movement
-    float rad = yaw * 3.14159f / 180.0f;
-    p0->vx = sinf(rad) * fwd * MOVE_SPEED; p0->x += p0->vx;
-    p0->vz = cosf(rad) * fwd * MOVE_SPEED; p0->z += p0->vz;
+    // Weapon Switch
+    if (weapon_req >= 0 && weapon_req < MAX_WEAPONS) p0->current_weapon = weapon_req;
     
-    if (shoot) p0->in_shoot = 1; // Trigger
+    // Movement Physics (Quake Style)
+    float rad = yaw * 3.14159f / 180.0f;
+    float wish_x = sinf(rad) * fwd + cosf(rad) * str;
+    float wish_z = cosf(rad) * fwd - sinf(rad) * str;
+    
+    // Normalize wish dir
+    float wish_speed = sqrtf(wish_x*wish_x + wish_z*wish_z);
+    if (wish_speed > 1.0f) {
+        wish_speed = 1.0f;
+        wish_x /= wish_speed;
+        wish_z /= wish_speed;
+    }
+    wish_speed *= MAX_SPEED;
+    
+    accelerate(p0, wish_x, wish_z, wish_speed, ACCEL);
+    
+    if (jump && p0->on_ground) {
+        p0->y += 0.1f; // Lift off ground
+        p0->vy += JUMP_FORCE;
+    }
+    p0->y += p0->vy;
+    
+    p0->in_shoot = shoot;
+    p0->in_reload = reload;
+    p0->crouching = crouch;
     
     // 2. Update Bots / All Entities
     for(int i=0; i<MAX_CLIENTS; i++) {
@@ -98,11 +129,13 @@ void local_update(float fwd, float str, float yaw, float pitch, int shoot, int w
             bot_think(i, local_state.players, &b_fwd, &b_yaw, &b_btns);
             
             p->yaw = b_yaw;
+            // Bot Physics
             float brad = b_yaw * 3.14159f / 180.0f;
-            p->x += sinf(brad) * b_fwd * MOVE_SPEED * 0.5f;
-            p->z += cosf(brad) * b_fwd * MOVE_SPEED * 0.5f;
+            float bx = sinf(brad) * b_fwd;
+            float bz = cosf(brad) * b_fwd;
+            accelerate(p, bx, bz, MAX_SPEED, ACCEL);
             
-            if (b_btns & BTN_ATTACK) p->in_shoot = 1;
+            p->in_shoot = (b_btns & BTN_ATTACK);
         }
         
         // Physics & Resolve
@@ -116,20 +149,12 @@ void local_init_match(int num_players, int mode) {
     
     // Spawn Player
     local_state.players[0].active = 1;
-    
     phys_respawn(&local_state.players[0], 0);
-    local_state.players[0].current_weapon = 1; // WPN_MAGNUM
-    local_state.players[0].ammo[1] = 6;
-    
     
     // Spawn Bots
     for(int i=1; i<num_players; i++) {
         local_state.players[i].active = 1;
-        
         phys_respawn(&local_state.players[i], i*100);
-        local_state.players[i].current_weapon = 1; // WPN_MAGNUM
-        local_state.players[i].ammo[1] = 999; // Infinite ammo for bots
-    
     }
 }
 
