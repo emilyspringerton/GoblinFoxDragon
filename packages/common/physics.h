@@ -5,14 +5,15 @@
 #include <stdio.h>
 #include "protocol.h"
 
-// --- TURBO TUNING (PHASE 441 - UNGLUED) ---
+// --- TURBO TUNING (PHASE 442) ---
 #define GRAVITY 0.04f       
 #define JUMP_FORCE 0.65f    
 #define MAX_SPEED 0.85f     
-#define FRICTION 4.0f       // Good grip
-#define ACCEL 10.0f         // Fast start
-#define STOP_SPEED 0.1f     // <--- FIXED: Was 1.0f (The Glue), now 0.1f
-#define SLIDE_FRICTION 0.1f // Super slick slide
+#define FRICTION 4.0f       // Grip for stopping
+#define ACCEL 15.0f         // <--- BOOSTED: Overpowers friction easily
+#define STOP_SPEED 0.1f     
+#define SLIDE_FRICTION 0.05f // Ice-like slide
+#define CROUCH_SPEED 0.4f   // Slow walk when crouching
 #define EYE_HEIGHT 1.6f 
 #define HEAD_SIZE 1.2f
 #define HEAD_OFFSET 1.5f 
@@ -76,20 +77,27 @@ int check_hit_location(float ox, float oy, float oz, float dx, float dy, float d
     return 0;
 }
 
+// --- HYBRID SLIDE LOGIC ---
 void apply_friction(PlayerState *p) {
     float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
     if (speed < 0.001f) { p->vx = 0; p->vz = 0; return; }
     
     float drop = 0;
+    
+    // 1. Sliding Logic (Apex Style)
+    // If holding Crouch AND moving fast (>0.5), we are sliding. Low friction.
+    int is_sliding = (p->crouching && speed > 0.5f);
+    
     if (p->on_ground) {
-        if (p->crouching && speed > 0.3f) {
-            drop = speed * SLIDE_FRICTION; 
+        if (is_sliding) {
+            drop = speed * SLIDE_FRICTION; // 0.05 (Glide)
         } else {
+            // Normal Walking or Slow Crouch Walk
             float control = (speed < STOP_SPEED) ? STOP_SPEED : speed;
-            drop = control * FRICTION;
+            drop = control * FRICTION; // 4.0 (Stop fast)
         }
     } else {
-        drop = 0; // No air drag
+        drop = 0; // Air: No friction
     }
     
     float newspeed = speed - drop;
@@ -99,6 +107,15 @@ void apply_friction(PlayerState *p) {
 }
 
 void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, float accel) {
+    // If sliding, you lose control! (Cannot accelerate while sliding)
+    float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
+    if (p->crouching && speed > 0.5f && p->on_ground) return;
+
+    // Cap speed for Crouch Walking
+    if (p->crouching && p->on_ground) {
+        if (wish_speed > CROUCH_SPEED) wish_speed = CROUCH_SPEED;
+    }
+
     float current_speed = (p->vx * wish_x) + (p->vz * wish_z);
     float add_speed = wish_speed - current_speed;
     if (add_speed <= 0) return;
@@ -205,6 +222,7 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
     }
 }
 
+// RESTORE HISTORY FUNCTIONS
 void phys_store_history(ServerState *server, int client_id, unsigned int now) {
     if (client_id < 0 || client_id >= MAX_CLIENTS) return;
     int slot = (now / 16) % LAG_HISTORY; 
