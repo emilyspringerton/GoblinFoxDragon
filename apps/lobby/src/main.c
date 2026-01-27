@@ -296,6 +296,16 @@ void draw_hud(PlayerState *p) {
     glColor3f(0, 0, 0.2f); glRectf(50, 80, 250, 100); glColor3f(0.2f, 0.2f, 1.0f); glRectf(50, 80, 50 + (p->shield * 2), 100);
     int w = p->current_weapon; int ammo = (w == WPN_KNIFE) ? 99 : p->ammo[w];
     glColor3f(1, 1, 0); for(int i=0; i<ammo; i++) glRectf(1200 - (i*10), 50, 1205 - (i*10), 80);
+    
+    // Speedometer
+    float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
+    char speed_str[32]; sprintf(speed_str, "SPD: %d", (int)(speed * 100));
+    draw_string(speed_str, 50, 120, 10);
+    
+    // Ground Status
+    if (p->on_ground) glColor3f(0,1,0); else glColor3f(1,0,0);
+    draw_string(p->on_ground ? "GND" : "AIR", 150, 120, 10);
+
     glEnable(GL_DEPTH_TEST); glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW); glPopMatrix();
 }
 
@@ -353,7 +363,17 @@ int main(int argc, char* argv[]) {
                     if (app_state != STATE_LOBBY) {
                         SDL_SetRelativeMouseMode(SDL_TRUE);
                         glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, 1000.0);
-                        glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
+                        glMatrixMode(GL_MODELVIEW); 
+    // Speedometer
+    float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
+    char speed_str[32]; sprintf(speed_str, "SPD: %d", (int)(speed * 100));
+    draw_string(speed_str, 50, 120, 10);
+    
+    // Ground Status
+    if (p->on_ground) glColor3f(0,1,0); else glColor3f(1,0,0);
+    draw_string(p->on_ground ? "GND" : "AIR", 150, 120, 10);
+
+    glEnable(GL_DEPTH_TEST);
                     }
                 }
             } else {

@@ -9,7 +9,7 @@
 #define GRAVITY 0.08f
 #define JUMP_FORCE 0.61f
 #define MAX_SPEED 0.5f
-#define FRICTION 5.0f
+#define FRICTION 8.0f
 #define ACCEL 6.0f
 #define STOP_SPEED 1.0f
 #define MAX_AIR_SPEED 0.2f
@@ -90,26 +90,31 @@ int check_hit_location(float ox, float oy, float oz, float dx, float dy, float d
     return 0;
 }
 
+
 void apply_friction(PlayerState *p) {
     float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
     if (speed < 0.001f) { p->vx = 0; p->vz = 0; return; }
-    if (!p->on_ground) return; 
     
-    // --- SLIDE LOGIC ---
-    float applied_friction = FRICTION;
+    float drop = 0;
     
-    // If crouching and moving fast, use Slide Friction
-    if (p->crouching && speed > SLIDE_THRESHOLD) {
-        applied_friction = SLIDE_FRICTION; // Greased lightning
+    // Ground Friction
+    if (p->on_ground) {
+        float control = (speed < STOP_SPEED) ? STOP_SPEED : speed;
+        drop = control * FRICTION;
+    } 
+    // Air Resistance (New: Prevents infinite float)
+    else {
+        drop = speed * 0.5f; // Small drag in air
     }
     
-    float control = (speed < STOP_SPEED) ? STOP_SPEED : speed;
-    float drop = control * applied_friction;
     float newspeed = speed - drop;
     if (newspeed < 0) newspeed = 0;
     newspeed /= speed;
-    p->vx *= newspeed; p->vz *= newspeed;
+    
+    p->vx *= newspeed;
+    p->vz *= newspeed;
 }
+
 
 void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, float accel) {
     float current_speed = (p->vx * wish_x) + (p->vz * wish_z);
