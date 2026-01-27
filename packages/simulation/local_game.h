@@ -46,13 +46,11 @@ void bot_think(int bot_idx, PlayerState *players, float *out_fwd, float *out_yaw
         else if (min_dist < 5.0f) *out_fwd = -1.0f; 
         else *out_fwd = 0.2f; 
         
-        // JUMP LOGIC: Random hops when aggressive
         if (me->on_ground && (rand()%100 < 5)) *out_buttons |= BTN_JUMP;
         
     } else {
         *out_yaw += 2.0f;
         *out_fwd = 0.5f;
-        // JUMP LOGIC: Random hops when patrolling to clear obstacles
         if (me->on_ground && (rand()%100 < 2)) *out_buttons |= BTN_JUMP;
     }
 }
@@ -94,8 +92,18 @@ void local_update(float fwd, float str, float yaw, float pitch, int shoot, int w
     
     accelerate(p0, wish_x, wish_z, wish_speed, ACCEL);
     
+    // --- SUPERGLIDE JUMP LOGIC ---
     if (jump && p0->on_ground) {
-        p0->y += 0.1f; p0->vy += JUMP_FORCE;
+        float speed = sqrtf(p0->vx*p0->vx + p0->vz*p0->vz);
+        // If Sliding (Crouch + Speed) -> BOOST!
+        if (p0->crouching && speed > 0.5f) {
+            // Apply 50% Momentum Boost
+            p0->vx *= 1.5f;
+            p0->vz *= 1.5f;
+        }
+        
+        p0->y += 0.1f; 
+        p0->vy += JUMP_FORCE;
     }
     
     p0->in_shoot = shoot;
