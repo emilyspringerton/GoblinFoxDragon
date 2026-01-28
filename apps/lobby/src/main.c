@@ -88,12 +88,26 @@ int main(int argc, char* argv[]) {
         SDL_Event e;
         while(SDL_PollEvent(&e)) {
             if(e.type == SDL_QUIT) running = 0;
+            
             if (app_state == STATE_LOBBY) {
                 if(e.type == SDL_KEYDOWN) {
+                    // --- ARROW NAVIGATION ---
                     if (e.key.keysym.sym == SDLK_UP) menu_selection = (menu_selection - 1 + 4) % 4;
                     if (e.key.keysym.sym == SDLK_DOWN) menu_selection = (menu_selection + 1) % 4;
+                    
+                    // --- LEGACY SHORTCUTS (RE-ADDED) ---
+                    if (e.key.keysym.sym == SDLK_b) { app_state = STATE_GAME_LOCAL; local_init_match(12, MODE_DEATHMATCH); }
+                    if (e.key.keysym.sym == SDLK_d) { app_state = STATE_GAME_LOCAL; local_init_match(8, MODE_DEATHMATCH); }
+                    
+                    // --- SELECTION CONFIRM ---
                     if (e.key.keysym.sym == SDLK_RETURN) {
                         if (menu_selection == 0) { app_state = STATE_GAME_LOCAL; local_init_match(12, MODE_DEATHMATCH); }
+                        if (menu_selection == 1) { app_state = STATE_GAME_LOCAL; local_init_match(8, MODE_DEATHMATCH); }
+                        if (menu_selection == 3) { app_state = STATE_GAME_NET; net_connect(); }
+                    }
+                }
+            }
+
                         if (menu_selection == 1) { app_state = STATE_GAME_LOCAL; local_init_match(8, MODE_DEATHMATCH); }
                         if (menu_selection == 3) { app_state = STATE_GAME_NET; }
                     }
@@ -102,9 +116,26 @@ int main(int argc, char* argv[]) {
                 app_state = STATE_LOBBY;
             }
         }
-        if (app_state == STATE_LOBBY) {
-            draw_menu();
-        } else {
+        
+            if (app_state == STATE_LOBBY) {
+                if(e.type == SDL_KEYDOWN) {
+                    // --- ARROW NAVIGATION ---
+                    if (e.key.keysym.sym == SDLK_UP) menu_selection = (menu_selection - 1 + 4) % 4;
+                    if (e.key.keysym.sym == SDLK_DOWN) menu_selection = (menu_selection + 1) % 4;
+                    
+                    // --- LEGACY SHORTCUTS (RE-ADDED) ---
+                    if (e.key.keysym.sym == SDLK_b) { app_state = STATE_GAME_LOCAL; local_init_match(12, MODE_DEATHMATCH); }
+                    if (e.key.keysym.sym == SDLK_d) { app_state = STATE_GAME_LOCAL; local_init_match(8, MODE_DEATHMATCH); }
+                    
+                    // --- SELECTION CONFIRM ---
+                    if (e.key.keysym.sym == SDLK_RETURN) {
+                        if (menu_selection == 0) { app_state = STATE_GAME_LOCAL; local_init_match(12, MODE_DEATHMATCH); }
+                        if (menu_selection == 1) { app_state = STATE_GAME_LOCAL; local_init_match(8, MODE_DEATHMATCH); }
+                        if (menu_selection == 3) { app_state = STATE_GAME_NET; net_connect(); }
+                    }
+                }
+            }
+ else {
             // ACOG Logic
             float target_fov = 75.0f;
             int rmb = (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT));

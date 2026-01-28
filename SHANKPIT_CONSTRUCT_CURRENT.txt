@@ -1,106 +1,4 @@
-=== SHANKPIT CONSTRUCT: PHASE 502 (SERVER BOTS) ===\n.
-./release_monolith
-./release_monolith/config.ini
-./release_monolith/PLAY_DEBUG.bat
-./tools
-./tools/skateboard-cli
-./tools/skateboard-cli/schema.sql
-./tools/skateboard-cli/internal
-./tools/skateboard-cli/internal/parser
-./ops
-./ops/genesis
-./ops/genesis/genesis.json
-./SHANKPIT_CONSTRUCT_CURRENT.txt
-./shank_brain_horde.pth
-./README.md
-./deploy_linux.sh
-./shank_ai_v1.pth
-./README_RUN.txt
-./Makefile
-./run_lag_test
-./run_integration
-./build_win.bat
-./run_stuffing
-./utils
-./utils/cli
-./utils/cli/build_server.py
-./utils/cli/bot_patrol.py
-./utils/cli/reset_server.py
-./utils/cli/nuclear_deploy.py
-./utils/cli/git_sync.py
-./utils/cli/deploy_hybrid.py
-./utils/cli/deploy_server.py
-./run_server_test
-./run_input_test
-./run_tests
-./packages
-./packages/map
-./packages/map/map.h
-./packages/map/map.c
-./packages/protocol
-./packages/protocol/protocol.h
-./packages/common
-./packages/common/config_loader.h
-./packages/common/protocol.h
-./packages/common/physics.h
-./packages/simulation
-./packages/simulation/game_physics.h
-./packages/simulation/local_game.h
-./packages/simulation/brain_weights.h
-./packages/simulation/neural_net.h
-./packages/simulation/bot_ai.h
-./apps
-./apps/tests
-./apps/tests/test_lag_comp.c
-./apps/tests/test_netcode.c
-./apps/tests/test_inputs.c
-./apps/tests/test_server_logic.c
-./apps/tests/test_integration.c
-./apps/tests/test_stuffing.c
-./apps/training
-./apps/training/headless.c
-./apps/shank-fps
-./apps/shank-fps/src
-./apps/shank-fps/src/net.h
-./apps/shank-fps/src/input.c
-./apps/shank-fps/src/shank.h
-./apps/shank-fps/src/particles.h
-./apps/shank-fps/src/input.h
-./apps/shank-fps/src/net.c
-./apps/shank-fps/src/main.c
-./apps/shank-fps/src/font.h
-./apps/client
-./apps/client/bot_main.c
-./apps/lobby
-./apps/lobby/src
-./apps/lobby/src/main.c
-./apps/bot_client
-./apps/bot_client/swarm_launcher.py
-./apps/bot_client/bot_runner.py
-./apps/bot_client/src
-./apps/bot_client/src/main.c
-./apps/server
-./apps/server/src
-./apps/server/src/main.c
-./services
-./services/game-server
-./services/game-server/src
-./services/game-server/src/heartbeat.h
-./services/game-server/src/server.c
-./services/skate-node
-./services/skate-node/bridge
-./services/skate-node/bridge/bridge.go
-./services/skate-node/consensus
-./services/skate-node/consensus/pow
-./services/skate-node/consensus/pol
-./services/skate-node/chain
-./services/skate-node/chain/engine.go
-./services/skate-node/chain/types.go
-./services/master-server
-./services/master-server/main.go
-./release_temp
-./release_temp/config.ini
-./release_temp/PLAY_SHANK.bat\n\n=== BEGIN FILE: apps/lobby/src/main.c ===\n#define SDL_MAIN_HANDLED
+=== SHANKPIT CONSTRUCT: PHASE 503 (EMERGENCY RECOVERY) ===\n\n\n=== BEGIN FILE: apps/lobby/src/main.c ===\n#define SDL_MAIN_HANDLED
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -190,12 +88,26 @@ int main(int argc, char* argv[]) {
         SDL_Event e;
         while(SDL_PollEvent(&e)) {
             if(e.type == SDL_QUIT) running = 0;
+            
             if (app_state == STATE_LOBBY) {
                 if(e.type == SDL_KEYDOWN) {
+                    // --- ARROW NAVIGATION ---
                     if (e.key.keysym.sym == SDLK_UP) menu_selection = (menu_selection - 1 + 4) % 4;
                     if (e.key.keysym.sym == SDLK_DOWN) menu_selection = (menu_selection + 1) % 4;
+                    
+                    // --- LEGACY SHORTCUTS (RE-ADDED) ---
+                    if (e.key.keysym.sym == SDLK_b) { app_state = STATE_GAME_LOCAL; local_init_match(12, MODE_DEATHMATCH); }
+                    if (e.key.keysym.sym == SDLK_d) { app_state = STATE_GAME_LOCAL; local_init_match(8, MODE_DEATHMATCH); }
+                    
+                    // --- SELECTION CONFIRM ---
                     if (e.key.keysym.sym == SDLK_RETURN) {
                         if (menu_selection == 0) { app_state = STATE_GAME_LOCAL; local_init_match(12, MODE_DEATHMATCH); }
+                        if (menu_selection == 1) { app_state = STATE_GAME_LOCAL; local_init_match(8, MODE_DEATHMATCH); }
+                        if (menu_selection == 3) { app_state = STATE_GAME_NET; net_connect(); }
+                    }
+                }
+            }
+
                         if (menu_selection == 1) { app_state = STATE_GAME_LOCAL; local_init_match(8, MODE_DEATHMATCH); }
                         if (menu_selection == 3) { app_state = STATE_GAME_NET; }
                     }
@@ -204,9 +116,26 @@ int main(int argc, char* argv[]) {
                 app_state = STATE_LOBBY;
             }
         }
-        if (app_state == STATE_LOBBY) {
-            draw_menu();
-        } else {
+        
+            if (app_state == STATE_LOBBY) {
+                if(e.type == SDL_KEYDOWN) {
+                    // --- ARROW NAVIGATION ---
+                    if (e.key.keysym.sym == SDLK_UP) menu_selection = (menu_selection - 1 + 4) % 4;
+                    if (e.key.keysym.sym == SDLK_DOWN) menu_selection = (menu_selection + 1) % 4;
+                    
+                    // --- LEGACY SHORTCUTS (RE-ADDED) ---
+                    if (e.key.keysym.sym == SDLK_b) { app_state = STATE_GAME_LOCAL; local_init_match(12, MODE_DEATHMATCH); }
+                    if (e.key.keysym.sym == SDLK_d) { app_state = STATE_GAME_LOCAL; local_init_match(8, MODE_DEATHMATCH); }
+                    
+                    // --- SELECTION CONFIRM ---
+                    if (e.key.keysym.sym == SDLK_RETURN) {
+                        if (menu_selection == 0) { app_state = STATE_GAME_LOCAL; local_init_match(12, MODE_DEATHMATCH); }
+                        if (menu_selection == 1) { app_state = STATE_GAME_LOCAL; local_init_match(8, MODE_DEATHMATCH); }
+                        if (menu_selection == 3) { app_state = STATE_GAME_NET; net_connect(); }
+                    }
+                }
+            }
+ else {
             // ACOG Logic
             float target_fov = 75.0f;
             int rmb = (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT));
@@ -763,317 +692,4 @@ int phys_resolve_rewind(ServerState *server, int client_id, unsigned int target_
     return 0;
 }
 #endif
-\n=== END FILE: packages/common/physics.h ===\n\n\n=== BEGIN FILE: packages/common/protocol.h ===\n#ifndef PROTOCOL_H
-#define PROTOCOL_H
-
-#define MAX_CLIENTS 70
-#define MAX_WEAPONS 5
-#define MAX_PROJECTILES 1024
-#define LAG_HISTORY 64
-
-#define PACKET_CONNECT 0
-#define PACKET_USERCMD 1
-#define PACKET_SNAPSHOT 2
-#define PACKET_WELCOME  3
-
-#define STATE_ALIVE 0
-#define STATE_DEAD  1
-#define STATE_SPECTATOR 2
-
-#define WPN_KNIFE 0
-#define WPN_MAGNUM 1
-#define WPN_AR 2
-#define WPN_SHOTGUN 3
-#define WPN_SNIPER 4
-
-#define RELOAD_TIME_FULL 60      
-#define RELOAD_TIME_TACTICAL 42  
-#define SHIELD_REGEN_DELAY 180 
-
-typedef struct {
-    unsigned char type;
-    unsigned char client_id;
-    unsigned short sequence;
-    unsigned int timestamp;
-    unsigned char entity_count; 
-} NetHeader;
-
-typedef struct {
-    unsigned int sequence;
-    unsigned int timestamp;
-    unsigned short msec;
-    float fwd; float str;
-    float yaw; float pitch;    
-    unsigned int buttons;
-    int weapon_idx;
-} UserCmd;
-
-#define BTN_JUMP   1
-#define BTN_ATTACK 2
-#define BTN_CROUCH 4
-#define BTN_RELOAD 8
-#define BTN_USE    16 
-
-typedef struct {
-    int id;
-    int dmg; int rof; int cnt; float spr; int ammo_max;
-} WeaponStats;
-
-static const WeaponStats WPN_STATS[MAX_WEAPONS] = {
-    {WPN_KNIFE,   200, 20, 1, 0.0f,  0},   
-    {WPN_MAGNUM,  45, 25, 1, 0.0f,  6},   
-    {WPN_AR,      20, 6,  1, 0.04f, 30},  
-    {WPN_SHOTGUN, 128, 17, 8, 0.15f, 8},   
-    {WPN_SNIPER,  101, 70, 1, 0.0f,  5}    
-};
-
-typedef struct {
-    int active; float x, y, z; float vx, vy, vz; int owner_id;
-} Projectile;
-
-typedef struct {
-    unsigned char id; 
-    float x, y, z; float yaw, pitch;
-    unsigned char current_weapon;
-    unsigned char state;
-    unsigned char health;
-    unsigned char shield;
-    unsigned char is_shooting;
-    unsigned char crouching;
-    float reward_feedback; 
-    unsigned char ammo;
-    unsigned char in_vehicle;
-    unsigned char hit_feedback; 
-} NetPlayer;
-
-typedef struct {
-    int version;
-    float w_aggro;
-    float w_strafe; float w_jump; float w_slide; float w_turret; float w_repel;      
-} BotGenome;
-
-typedef struct {
-    int id;
-    int active; int is_bot;
-    float x, y, z; float vx, vy, vz; float yaw, pitch; int on_ground;
-    float in_fwd;
-    float in_strafe;
-    int in_jump; int in_shoot; int in_reload; int crouching; int in_use;
-    int current_weapon; int ammo[MAX_WEAPONS];
-    int reload_timer; int attack_cooldown;
-    int is_shooting; int jump_timer;
-    int health; int shield; int shield_regen_timer; int state;
-    int kills; int deaths; int hit_feedback; float recoil_anim;
-    int in_vehicle;     
-    int vehicle_cooldown;
-    float accumulated_reward; 
-    BotGenome brain;
-    unsigned int last_hit_time;
-    unsigned int respawn_time;
-} PlayerState;
-
-typedef struct {
-    int active; unsigned int timestamp;
-    float x, y, z;
-    float vx, vy, vz;
-} LagRecord;
-
-typedef enum { MODE_DEATHMATCH=0, MODE_TDM=1, MODE_SURVIVAL=2, MODE_CTF=3, MODE_ODDBALL=4, MODE_LOCAL=98, MODE_NET=99, MODE_EVOLUTION=100 } GameMode;
-
-typedef struct {
-    PlayerState players[MAX_CLIENTS];
-    Projectile projectiles[MAX_PROJECTILES];
-    LagRecord history[MAX_CLIENTS][LAG_HISTORY];
-    int server_tick;
-    int game_mode;
-    struct sockaddr_in clients[MAX_CLIENTS];
-    int client_active[MAX_CLIENTS];
-} ServerState;
-
-#endif
-\n=== END FILE: packages/common/protocol.h ===\n\n\n=== BEGIN FILE: packages/simulation/local_game.h ===\n#ifndef LOCAL_GAME_H
-#define LOCAL_GAME_H
-
-#include "../common/protocol.h"
-#include "../common/physics.h"
-#include <string.h>
-
-ServerState local_state;
-int was_holding_jump = 0;
-
-void local_update(float fwd, float str, float yaw, float pitch, int shoot, int weapon_req, int jump, int crouch, int reload, void *server_context, unsigned int cmd_time);
-void update_entity(PlayerState *p, float dt, void *server_context, unsigned int cmd_time);
-void local_init_match(int num_players, int mode);
-
-float rand_weight() { return ((float)(rand()%2000)/1000.0f) - 1.0f; } 
-float rand_pos() { return ((float)(rand()%1000)/1000.0f); } 
-
-void init_genome(BotGenome *g) {
-    g->version = 1;
-    g->w_aggro = 0.5f + rand_weight() * 0.5f;
-    g->w_strafe = rand_weight();
-    g->w_jump = 0.05f + rand_pos() * 0.1f; 
-    g->w_slide = 0.01f + rand_pos() * 0.05f;
-    g->w_turret = 5.0f + rand_pos() * 10.0f;
-    g->w_repel = 1.0f + rand_pos();
-}
-
-void evolve_bot(PlayerState *loser, PlayerState *winner) {
-    loser->brain = winner->brain;
-    loser->brain.w_aggro += rand_weight() * 0.1f;
-    loser->brain.w_strafe += rand_weight() * 0.1f;
-    loser->brain.w_jump += rand_weight() * 0.01f;
-    loser->brain.w_slide += rand_weight() * 0.01f;
-}
-
-PlayerState* get_best_bot() {
-    PlayerState *best = NULL;
-    float max_score = -99999.0f;
-    for(int i=1; i<MAX_CLIENTS; i++) {
-        if (!local_state.players[i].active) continue;
-        if (local_state.players[i].accumulated_reward > max_score) {
-            max_score = local_state.players[i].accumulated_reward;
-            best = &local_state.players[i];
-        }
-    }
-    return best;
-}
-
-// --- BOT AI ---
-void bot_think(int bot_idx, PlayerState *players, float *out_fwd, float *out_yaw, int *out_buttons) {
-    PlayerState *me = &players[bot_idx];
-    if (me->state == STATE_DEAD) { *out_buttons = 0; return; }
-
-    int target_idx = -1;
-    float min_dist = 9999.0f;
-
-    for (int i = 0; i < MAX_CLIENTS; i++) {
-        if (i == bot_idx) continue;
-        if (!players[i].active) continue;
-        if (players[i].state == STATE_DEAD) continue;
-        
-        float dx = players[i].x - me->x;
-        float dz = players[i].z - me->z;
-        float dist = sqrtf(dx*dx + dz*dz);
-        
-        if (i == 0 || dist < min_dist) { 
-            if (i == 0) dist *= 0.5f;
-            if (dist < min_dist) { min_dist = dist; target_idx = i; }
-        }
-    }
-
-    if (target_idx != -1) {
-        PlayerState *t = &players[target_idx];
-        float dx = t->x - me->x;
-        float dz = t->z - me->z;
-        float target_yaw = atan2f(dx, dz) * (180.0f / 3.14159f);
-        
-        float turn_speed = (me->brain.w_turret > 1.0f) ? me->brain.w_turret : 10.0f;
-        float diff = angle_diff(target_yaw, *out_yaw);
-        if (diff > turn_speed) diff = turn_speed;
-        if (diff < -turn_speed) diff = -turn_speed;
-        *out_yaw += diff;
-        
-        *out_buttons |= BTN_ATTACK;
-        
-        if (min_dist > 15.0f) *out_fwd = me->brain.w_aggro;
-        else if (min_dist < 5.0f) *out_fwd = -me->brain.w_aggro; 
-        else *out_fwd = 0.2f; 
-        
-        *out_yaw += me->brain.w_strafe * 10.0f;
-        if (me->on_ground && (rand()%1000 < (me->brain.w_jump * 1000.0f))) *out_buttons |= BTN_JUMP;
-        if (me->on_ground && (rand()%1000 < (me->brain.w_slide * 1000.0f))) *out_buttons |= BTN_CROUCH;
-        if (me->ammo[me->current_weapon] <= 0) *out_buttons |= BTN_RELOAD;
-    } else {
-        *out_yaw += 2.0f;
-        *out_fwd = 0.5f;
-    }
-}
-
-// --- UPDATE LOOP ---
-void update_entity(PlayerState *p, float dt, void *server_context, unsigned int cmd_time) {
-    if (!p->active) return;
-    if (p->state == STATE_DEAD) return;
-
-    apply_friction(p);
-    float g = (p->in_jump) ? GRAVITY_FLOAT : GRAVITY_DROP;
-    p->vy -= g; 
-    p->y += p->vy;
-    
-    resolve_collision(p);
-    p->x += p->vx;
-    p->z += p->vz;
-
-    if (p->recoil_anim > 0) p->recoil_anim -= 0.1f;
-    if (p->recoil_anim < 0) p->recoil_anim = 0;
-    if (p->hit_feedback > 0) p->hit_feedback--;
-
-    update_weapons(p, local_state.players, p->in_shoot > 0, p->in_reload > 0);
-}
-
-void local_update(float fwd, float str, float yaw, float pitch, int shoot, int weapon_req, int jump, int crouch, int reload, void *server_context, unsigned int cmd_time) {
-    PlayerState *p0 = &local_state.players[0];
-    p0->yaw = yaw; p0->pitch = pitch;
-    if (weapon_req >= 0 && weapon_req < MAX_WEAPONS) p0->current_weapon = weapon_req;
-    float rad = yaw * 3.14159f / 180.0f;
-    float wish_x = sinf(rad) * fwd + cosf(rad) * str;
-    float wish_z = cosf(rad) * fwd - sinf(rad) * str;
-    
-    float wish_speed = sqrtf(wish_x*wish_x + wish_z*wish_z);
-    if (wish_speed > 1.0f) { wish_speed = 1.0f; wish_x/=wish_speed; wish_z/=wish_speed; }
-    wish_speed *= MAX_SPEED;
-    accelerate(p0, wish_x, wish_z, wish_speed, ACCEL);
-    
-    int fresh_jump_press = (jump && !was_holding_jump);
-    // --- PHASE 485: TUNED SLIDE JUMP ---
-    if (jump && p0->on_ground) {
-        float speed = sqrtf(p0->vx*p0->vx + p0->vz*p0->vz);
-        if (p0->crouching && speed > 0.5f && fresh_jump_press) {
-            float boost_mult = 1.0f + (0.25f / speed);
-            if (boost_mult > 1.3f) boost_mult = 1.3f;
-            if (boost_mult < 1.02f) boost_mult = 1.02f;
-            p0->vx *= boost_mult;
-            p0->vz *= boost_mult;
-        }
-        p0->y += 0.1f;
-        p0->vy += JUMP_FORCE;
-    }
-    p0->in_shoot = shoot; p0->in_reload = reload; p0->crouching = crouch;
-    p0->in_jump = jump; 
-    was_holding_jump = jump;
-    
-    for(int i=0; i<MAX_CLIENTS; i++) {
-        PlayerState *p = &local_state.players[i];
-        if (!p->active) continue;
-        if (i > 0 && p->active && p->state != STATE_DEAD) {
-            float b_fwd=0, b_yaw=p->yaw;
-            int b_btns=0;
-            bot_think(i, local_state.players, &b_fwd, &b_yaw, &b_btns);
-            p->yaw = b_yaw;
-            float brad = b_yaw * 3.14159f / 180.0f;
-            float bx = sinf(brad) * b_fwd;
-            float bz = cosf(brad) * b_fwd;
-            accelerate(p, bx, bz, MAX_SPEED, ACCEL);
-            p->in_shoot = (b_btns & BTN_ATTACK);
-            p->in_jump = (b_btns & BTN_JUMP);
-            p->in_reload = (b_btns & BTN_RELOAD);
-            p->crouching = (b_btns & BTN_CROUCH);
-            if ((b_btns & BTN_JUMP) && p->on_ground) { p->y += 0.1f; p->vy += JUMP_FORCE; }
-        }
-        update_entity(p, 0.016f, server_context, cmd_time);
-    }
-}
-
-void local_init_match(int num_players, int mode) {
-    memset(&local_state, 0, sizeof(ServerState));
-    local_state.game_mode = mode;
-    local_state.players[0].active = 1;
-    phys_respawn(&local_state.players[0], 0);
-    for(int i=1; i<num_players; i++) {
-        local_state.players[i].active = 1;
-        phys_respawn(&local_state.players[i], i*100);
-        init_genome(&local_state.players[i].brain);
-    }
-}
-#endif
-\n=== END FILE: packages/simulation/local_game.h ===\n
+\n=== END FILE: packages/common/physics.h ===\n
