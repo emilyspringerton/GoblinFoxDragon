@@ -531,7 +531,7 @@ int main(int argc, char* argv[]) {
             
             if (app_state == STATE_LOBBY) {
                 if(e.type == SDL_KEYDOWN) {
-                    if (e.key.keysym.sym == SDLK_d) { app_state = STATE_GAME_LOCAL; local_init_match(1, MODE_DEATHMATCH); }
+                    if (e.key.keysym.sym == SDLK_d) { app_state = STATE_GAME_LOCAL; local_init_match(8, MODE_DEATHMATCH); }
                     if (e.key.keysym.sym == SDLK_b) { app_state = STATE_GAME_LOCAL; local_init_match(12, MODE_DEATHMATCH); }
                     if (e.key.keysym.sym == SDLK_k) { app_state = STATE_GAME_LOCAL; local_init_match(8, MODE_EVOLUTION); }
                     
@@ -569,10 +569,12 @@ int main(int argc, char* argv[]) {
              glClearColor(0.02f, 0.02f, 0.05f, 1.0f); // Dark Lobby
              glClear(GL_COLOR_BUFFER_BIT);
              glLoadIdentity(); glColor3f(0, 1, 1); // CYAN TEXT
+             
              draw_string("SHANKPIT", 400, 500, 20);
-             draw_string("D: DEMO", 400, 400, 10);
-             draw_string("B: BATTLE", 400, 350, 10);
-             draw_string("J: JOIN S.FARTHQ.COM", 400, 300, 10);
+             draw_string("B: BOT BATTLE (12 BOTS)", 400, 400, 10);
+             draw_string("D: MICRO DEMO (300u - 8 BOTS)", 400, 350, 10);
+             draw_string("J: JOIN NET GAME", 400, 300, 10);
+
              SDL_GL_SwapWindow(win);
         } 
         else {

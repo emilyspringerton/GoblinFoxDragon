@@ -193,7 +193,7 @@ void phys_respawn(PlayerState *p, unsigned int now) {
     p->health = 100; p->shield = 100; p->respawn_time = 0; p->in_vehicle = 0;
     if (rand()%2 == 0) { p->x = 0; p->z = 0; p->y = 80; } 
     else { float ang = phys_rand_f() * 6.28f;
-        p->x = sinf(ang) * 500; p->z = cosf(ang) * 500; p->y = 20;
+        p->x = sinf(ang) * 120; p->z = cosf(ang) * 120; p->y = 20;
     }
     p->current_weapon = WPN_MAGNUM;
     for(int i=0; i<MAX_WEAPONS; i++) p->ammo[i] = WPN_STATS[i].ammo_max;
