@@ -530,7 +530,7 @@ int main(int argc, char* argv[]) {
             if (app_state == STATE_LOBBY) {
                 if(e.type == SDL_KEYDOWN) {
                     if (e.key.keysym.sym == SDLK_d) { app_state = STATE_GAME_LOCAL; local_init_match(1, MODE_DEATHMATCH); }
-                    if (e.key.keysym.sym == SDLK_b) { app_state = STATE_GAME_LOCAL; local_init_match(8, MODE_DEATHMATCH); }
+                    if (e.key.keysym.sym == SDLK_b) { app_state = STATE_GAME_LOCAL; local_init_match(12, MODE_DEATHMATCH); }
                     if (e.key.keysym.sym == SDLK_k) { app_state = STATE_GAME_LOCAL; local_init_match(8, MODE_EVOLUTION); }
                     
                     if (e.key.keysym.sym == SDLK_j) { 

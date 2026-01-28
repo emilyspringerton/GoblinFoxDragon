@@ -137,7 +137,7 @@ void local_update(float fwd, float str, float yaw, float pitch, int shoot, int w
         float speed = sqrtf(p0->vx*p0->vx + p0->vz*p0->vz);
         if (p0->crouching && speed > 0.5f && fresh_jump_press) {
             float boost_mult = 1.0f + (0.25f / speed);
-            if (boost_mult > 1.4f) boost_mult = 1.4f;
+            if (boost_mult > 1.3f) boost_mult = 1.3f;
             if (boost_mult < 1.02f) boost_mult = 1.02f;
             p0->vx *= boost_mult;
             p0->vz *= boost_mult;
