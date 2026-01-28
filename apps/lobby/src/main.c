@@ -46,6 +46,14 @@ float current_fov = 75.0f;
 int sock = -1;
 struct sockaddr_in server_addr;
 
+// --- UTILS ---
+float lerp_angle(float a, float b, float t) {
+    float d = b - a;
+    if (d > 180) d -= 360;
+    if (d < -180) d += 360;
+    return a + d * t;
+}
+
 // --- RENDER ---
 void draw_char(char c, float x, float y, float s) {
     glLineWidth(1.0f); glBegin(GL_LINES);
@@ -134,10 +142,8 @@ void draw_map() {
     }
 }
 
-// --- DRAW BUGGY ---
 void draw_buggy_model() {
-    // Chassis
-    glColor3f(0.3f, 0.5f, 0.3f); // Military Green
+    glColor3f(0.3f, 0.5f, 0.3f); 
     glPushMatrix(); glScalef(2.0f, 1.0f, 3.5f); 
     glBegin(GL_QUADS); 
     glVertex3f(-1,1,1); glVertex3f(1,1,1); glVertex3f(1,1,-1); glVertex3f(-1,1,-1); 
@@ -147,7 +153,6 @@ void draw_buggy_model() {
     glVertex3f(-1,-1,1); glVertex3f(-1,1,1); glVertex3f(-1,1,-1); glVertex3f(-1,-1,-1); 
     glEnd(); glPopMatrix();
     
-    // Wheels
     glColor3f(0.1f, 0.1f, 0.1f);
     float wx[] = {-2.2, 2.2, -2.2, 2.2};
     float wz[] = {2.5, 2.5, -2.5, -2.5};
@@ -182,7 +187,7 @@ void draw_gun_model(int weapon_id) {
 }
 
 void draw_weapon_p(PlayerState *p) {
-    if (p->in_vehicle) return; // No gun model inside car
+    if (p->in_vehicle) return;
     glPushMatrix(); glLoadIdentity();
     float kick = p->recoil_anim * 0.2f;
     float reload_dip = (p->reload_timer > 0) ? sinf(p->reload_timer * 0.2f) * 0.5f - 0.5f : 0.0f;
@@ -216,11 +221,21 @@ void draw_head(int weapon_id) {
 void draw_player_3rd(PlayerState *p) {
     glPushMatrix();
     glTranslatef(p->x, p->y + 2.0f, p->z);
-    glRotatef(-p->yaw, 0, 1, 0); 
     
+    // --- ROTATION LOGIC (Phase 488) ---
     if (p->in_vehicle) {
+        // Drift Physics: Face the direction of travel (Momentum), not the camera
+        float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
+        float car_yaw = 0.0f;
+        if (speed > 0.1f) {
+            car_yaw = atan2f(p->vx, p->vz) * (180.0f / 3.14159f); // Radians to Degrees
+        } else {
+            car_yaw = -p->yaw; // Fallback to camera input if still
+        }
+        glRotatef(car_yaw, 0, 1, 0);
         draw_buggy_model();
     } else {
+        glRotatef(-p->yaw, 0, 1, 0); 
         if(p->health <= 0) glColor3f(0.2, 0, 0); else glColor3f(1, 0, 0); 
         glPushMatrix(); glScalef(0.97f, 2.91f, 0.97f); 
         glBegin(GL_QUADS);
@@ -248,7 +263,6 @@ void draw_hud(PlayerState *p) {
     glColor3f(0.2f, 0, 0); glRectf(50, 50, 250, 70); glColor3f(1.0f, 0, 0); glRectf(50, 50, 50 + (p->health * 2), 70);
     glColor3f(0, 0, 0.2f); glRectf(50, 80, 250, 100); glColor3f(0.2f, 0.2f, 1.0f); glRectf(50, 80, 50 + (p->shield * 2), 100);
     
-    // VEHICLE INDICATOR
     if (p->in_vehicle) {
         glColor3f(0.0f, 1.0f, 0.0f);
         draw_string("BUGGY ONLINE", 50, 120, 12);
@@ -264,11 +278,10 @@ void draw_hud(PlayerState *p) {
 void draw_scene(PlayerState *render_p) {
     glClearColor(0.05f, 0.05f, 0.1f, 1.0f); glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); glLoadIdentity();
     
-    // CHASE CAM IF DRIVING
-    float cam_y = render_p->in_vehicle ? 8.0f : (render_p->crouching ? 2.5f : EYE_HEIGHT);
-    float cam_z_off = render_p->in_vehicle ? 10.0f : 0.0f;
+    // --- IMPROVED CHASE CAM (Phase 488) ---
+    float cam_y = render_p->in_vehicle ? 12.0f : (render_p->crouching ? 2.5f : EYE_HEIGHT);
+    float cam_z_off = render_p->in_vehicle ? 25.0f : 0.0f;
     
-    // Simple 3rd person chase math (Opposite to yaw)
     float rad = -cam_yaw * 0.01745f;
     float cx = sinf(rad) * cam_z_off;
     float cz = cosf(rad) * cam_z_off;
@@ -280,7 +293,6 @@ void draw_scene(PlayerState *render_p) {
     update_and_draw_trails();
     draw_map(); 
     
-    // DRAW SELF IF DRIVING (So we see the car)
     if (render_p->in_vehicle) draw_player_3rd(render_p);
     
     for(int i=1; i<MAX_CLIENTS; i++) if(local_state.players[i].active && i != my_client_id) draw_player_3rd(&local_state.players[i]);
@@ -358,7 +370,7 @@ void net_process_snapshot(char *buffer, int len) {
             
         } else if (id == 0) {
             local_state.players[0].ammo[local_state.players[0].current_weapon] = np->ammo;
-            local_state.players[0].in_vehicle = np->in_vehicle; // Server auth vehicle state
+            local_state.players[0].in_vehicle = np->in_vehicle; 
         }
     }
 }
@@ -389,7 +401,7 @@ int main(int argc, char* argv[]) {
     }
 
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *win = SDL_CreateWindow("SHANKPIT [BUILD 165 - WARTHOG]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
+    SDL_Window *win = SDL_CreateWindow("SHANKPIT [BUILD 168 - DRIFT CAM]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
     SDL_GL_CreateContext(win);
     net_init();
     
@@ -467,18 +479,11 @@ int main(int argc, char* argv[]) {
             glMatrixMode(GL_MODELVIEW); 
 
             if (app_state == STATE_GAME_NET) {
-                // Client side pred
                 local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn_req, jump, crouch, reload, NULL, 0); 
                 UserCmd cmd = client_create_cmd(fwd, str, cam_yaw, cam_pitch, shoot, jump, crouch, reload, use, wpn_req);
                 net_send_cmd(cmd);
                 net_tick();
             } else {
-                local_state.players[0].in_use = use;
-                // Local toggle logic needs to be inside local_update or mirrored here
-                // For simplicity, we just send inputs to local_update and let it handle
-                // But local_update needs the 'use' flag passed down.
-                // Hack: We rely on the server logic for net, but local logic is missing the toggle.
-                // Let's add it briefly:
                 if (use && local_state.players[0].vehicle_cooldown == 0) {
                      local_state.players[0].in_vehicle = !local_state.players[0].in_vehicle;
                      local_state.players[0].vehicle_cooldown = 30;
