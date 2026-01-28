@@ -3,7 +3,7 @@
 
 #define MAX_CLIENTS 70
 #define MAX_WEAPONS 5
-#define MAX_PROJECTILES 1024
+#define MAX_PROJECTILES 1024\n#define MAX_SPRAYS 256
 #define LAG_HISTORY 64
 
 #define PACKET_CONNECT 0
@@ -78,7 +78,7 @@ typedef struct {
     float reward_feedback; 
     unsigned char ammo;
     unsigned char in_vehicle;
-    unsigned char hit_feedback; 
+    unsigned char hit_feedback;\n    unsigned char texture_id; // For Knife Skins 
 } NetPlayer;
 
 typedef struct {
