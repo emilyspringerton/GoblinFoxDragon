@@ -130,9 +130,11 @@ void draw_map() {
         // 1. PROCEDURAL NEON COLOR
         // Generate a color based on world position. 
         // This creates gradients across the city.
-        float nr = 0.5f + 0.5f * sinf(b.x * 0.005f + b.y * 0.01f);
-        float ng = 0.5f + 0.5f * sinf(b.z * 0.005f + 2.0f);
-        float nb = 0.5f + 0.5f * sinf(b.x * 0.005f + 4.0f);
+        
+        float nr = 0.3f + 0.7f * (0.5f + 0.5f * sinf(b.y * 0.1f)); 
+        float ng = 0.0f; 
+        float nb = 0.6f + 0.4f * (0.5f + 0.5f * cosf(b.x * 0.01f));
+
         
         // Boost brightness for the "Neon" effect
         if(nr > 0.8f) nr = 1.0f;
