@@ -32,53 +32,50 @@ typedef struct { float x, y, z, w, h, d; } Box;
 
 // --- THE GIGAPLEX MAP (Phase 479) ---
 static Box map_geo[] = {
-    // 1. THE INFINITE FLOOR (2000x2000)
-    {0, -2, 0, 2000, 4, 2000}, 
-
-    // 2. THE TITAN SPIRE (Center)
-    {0, 30, 0, 40, 60, 40},       // Main Shaft
-    {0, 62, 0, 60, 4, 60},        // Observation Deck
-    {0, 10, 0, 60, 20, 60},       // Base Fortification
-
-    // 3. NORTH QUADRANT: THE STEPPES (Giant Stairs)
+    {0, -2, 0, 2000, 4, 2000}, // Floor
+    {0, 30, 0, 40, 60, 40},    // Spire
+    {0, 62, 0, 60, 4, 60},     // Deck
+    {0, 10, 0, 60, 20, 60},    // Base
+    
+    // North Steppes
     {0, 5, 200, 100, 10, 100},
     {0, 15, 250, 80, 30, 80},
     {0, 25, 300, 60, 50, 60},
-    {0, 40, 350, 40, 80, 40},     // Sniper Perch
+    {0, 40, 350, 40, 80, 40},
 
-    // 4. SOUTH QUADRANT: THE MAZE (Close Quarters)
-    {0, 10, -200, 200, 20, 20},   // Wall 1
-    {-50, 10, -250, 20, 20, 100}, // Wall 2
-    {50, 10, -250, 20, 20, 100},  // Wall 3
-    {0, 20, -250, 80, 2, 80},     // Roof / Upper Deck
+    // South Maze
+    {0, 10, -200, 200, 20, 20},
+    {-50, 10, -250, 20, 20, 100},
+    {50, 10, -250, 20, 20, 100},
+    {0, 20, -250, 80, 2, 80},
 
-    // 5. EAST QUADRANT: SKY ISLANDS (Floaty Jump Training)
-    {300, 20, 0, 20, 2, 20},      // Island 1
-    {350, 30, 50, 20, 2, 20},     // Island 2
-    {400, 40, 0, 20, 2, 20},      // Island 3
-    {350, 50, -50, 20, 2, 20},    // Island 4
-    {300, 60, 0, 10, 1, 10},      // Peak
+    // East Sky Islands
+    {300, 20, 0, 20, 2, 20},
+    {350, 30, 50, 20, 2, 20},
+    {400, 40, 0, 20, 2, 20},
+    {350, 50, -50, 20, 2, 20},
+    {300, 60, 0, 10, 1, 10},
 
-    // 6. WEST QUADRANT: THE SLIDE RAMPS (Stair-Slope approximation)
-    {-300, 2, 0, 100, 4, 200},    // Low
-    {-320, 6, 0, 100, 4, 200},    // Mid
-    {-340, 10, 0, 100, 4, 200},   // High
-    {-360, 14, 0, 100, 4, 200},   // Higher
-    {-400, 30, 0, 50, 60, 50},    // Tower
+    // West Ramps
+    {-300, 2, 0, 100, 4, 200},
+    {-320, 6, 0, 100, 4, 200},
+    {-340, 10, 0, 100, 4, 200},
+    {-360, 14, 0, 100, 4, 200},
+    {-400, 30, 0, 50, 60, 50},
 
-    // 7. THE OUTER RIM (Boundaries)
+    // Outer Rim
     {1000, 50, 0, 20, 100, 2000},
     {-1000, 50, 0, 20, 100, 2000},
     {0, 50, 1000, 2000, 100, 20},
     {0, 50, -1000, 2000, 100, 20},
 
-    // 8. SCATTERED COVER (Random Blocks)
+    // Cover
     {100, 4, 100, 10, 8, 10},
     {-100, 4, -100, 10, 8, 10},
     {100, 4, -100, 10, 8, 10},
     {-100, 4, 100, 10, 8, 10},
     
-    // 9. THE BRIDGE (Connecting Spire to East Islands)
+    // Bridge
     {150, 62, 0, 300, 2, 10} 
 };
 static int map_count = sizeof(map_geo) / sizeof(Box);
@@ -120,13 +117,12 @@ void apply_friction(PlayerState *p) {
     
     float drop = 0;
     
-    // SLIDE LOGIC (Phase 462)
     if (p->on_ground) {
         if (p->crouching) {
             if (speed > 0.75f) {
-                drop = speed * SLIDE_FRICTION; // Ice Slide
+                drop = speed * SLIDE_FRICTION; 
             } else {
-                drop = speed * (FRICTION * 3.0f); // Hard Brake
+                drop = speed * (FRICTION * 3.0f); 
             }
         } else {
             float control = (speed < STOP_SPEED) ? STOP_SPEED : speed;
@@ -199,14 +195,13 @@ void phys_respawn(PlayerState *p, unsigned int now) {
     p->shield = 100;
     p->respawn_time = 0;
     
-    // SPAWN LOGIC (Random Dispersion)
+    // Spawn
     float n_x = ((float)(rand()%2000)/2000.0f) * 1800.0f - 900.0f;
     float n_z = ((float)(rand()%2000)/2000.0f) * 1800.0f - 900.0f;
-    p->x = n_x; p->z = n_z; p->y = 20; // High spawn
+    p->x = n_x; p->z = n_z; p->y = 20; 
     
     p->current_weapon = WPN_MAGNUM;
     
-    // SPAWN FULLY LOADED (Phase 467)
     for(int i=0; i<MAX_WEAPONS; i++) {
         p->ammo[i] = WPN_STATS[i].ammo_max;
     }
@@ -220,31 +215,29 @@ void phys_respawn(PlayerState *p, unsigned int now) {
 }
 
 void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload) {
+    // 1. Decay Timers
     if (p->reload_timer > 0) p->reload_timer--;
     if (p->attack_cooldown > 0) p->attack_cooldown--;
     if (p->is_shooting > 0) p->is_shooting--;
 
     int w = p->current_weapon;
     
-    // --- TACTICAL RELOAD LOGIC (Phase 467) ---
-    // 1. Manual Reload
+    // 2. Reload Logic
     if (reload && p->reload_timer == 0 && w != WPN_KNIFE) {
         if (p->ammo[w] < WPN_STATS[w].ammo_max) {
-            if (p->ammo[w] > 0) p->reload_timer = RELOAD_TIME_TACTICAL; // Bonus (42)
-            else p->reload_timer = RELOAD_TIME_FULL; // Penalty (60)
+            if (p->ammo[w] > 0) p->reload_timer = RELOAD_TIME_TACTICAL; 
+            else p->reload_timer = RELOAD_TIME_FULL; 
         }
     }
-    
-    // 2. Finish Reload
     if (p->reload_timer == 1) p->ammo[w] = WPN_STATS[w].ammo_max;
 
+    // 3. Fire Logic
     if (shoot && p->attack_cooldown == 0 && p->reload_timer == 0) {
-        // --- AUTO RELOAD ON EMPTY ---
         if (w != WPN_KNIFE && p->ammo[w] <= 0) {
-            p->reload_timer = RELOAD_TIME_FULL; // Force dry reload
+            p->reload_timer = RELOAD_TIME_FULL; // Auto-Reload
         }
         else {
-            // Fire Logic
+            // FIRE!
             p->is_shooting = 5; p->recoil_anim = 1.0f;
             p->attack_cooldown = WPN_STATS[w].rof;
             if (w != WPN_KNIFE) p->ammo[w]--;
@@ -272,9 +265,7 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
                 if (hit_type > 0) {
                     printf("🔫 HIT! Dmg: %d on Target %d\n", WPN_STATS[w].dmg, i);
                     int damage = WPN_STATS[w].dmg;
-                    
                     p->accumulated_reward += 10.0f;
-                    
                     targets[i].shield_regen_timer = SHIELD_REGEN_DELAY;
                     if (hit_type == 2 && targets[i].shield <= 0) { damage *= 3; p->hit_feedback = 20; } else { p->hit_feedback = 10; }
                     if (targets[i].shield > 0) {
@@ -290,7 +281,8 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
                 }
             }
         }
-    } else { p->attack_cooldown = 10; }
+    } 
+    // REMOVED THE EVIL ELSE BLOCK HERE
 }
 
 void phys_store_history(ServerState *server, int client_id, unsigned int now) {
