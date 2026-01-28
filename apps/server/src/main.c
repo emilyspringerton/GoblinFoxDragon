@@ -45,7 +45,8 @@ void server_net_init() {
     bind_addr.sin_port = htons(6969); 
     bind_addr.sin_addr.s_addr = INADDR_ANY;
     if (bind(sock, (struct sockaddr*)&bind_addr, sizeof(bind_addr)) < 0) {
-        printf("FAILED TO BIND PORT 6969\n"); exit(1);
+        printf("FAILED TO BIND PORT 6969\n");
+        exit(1);
     } else {
         printf("SERVER LISTENING ON PORT 6969\nWaiting...\n");
     }
@@ -54,7 +55,6 @@ void server_net_init() {
 void process_user_cmd(int client_id, UserCmd *cmd) {
     if (cmd->sequence <= client_last_seq[client_id]) return; 
     PlayerState *p = &local_state.players[client_id];
-    
     p->yaw = cmd->yaw;
     p->pitch = cmd->pitch;
     p->in_fwd = cmd->fwd;
@@ -64,9 +64,7 @@ void process_user_cmd(int client_id, UserCmd *cmd) {
     p->crouching = (cmd->buttons & BTN_CROUCH);
     p->in_reload = (cmd->buttons & BTN_RELOAD);
     p->in_use = (cmd->buttons & BTN_USE);
-    
     if (cmd->weapon_idx >= 0 && cmd->weapon_idx < MAX_WEAPONS) p->current_weapon = cmd->weapon_idx;
-    
     client_last_seq[client_id] = cmd->sequence;
 }
 
@@ -93,10 +91,10 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
                     local_state.client_active[i] = 1;
                     local_state.clients[i] = *sender;
                     local_state.players[i].active = 1;
-                    local_state.players[i].id = i; // Assign ID
                     phys_respawn(&local_state.players[i], get_server_time());
                     printf("CLIENT %d CONNECTED (%s)\n", client_id, ip_str);
-                    NetHeader h; h.type = PACKET_WELCOME; h.client_id = client_id; 
+                    NetHeader h;
+                    h.type = PACKET_WELCOME; h.client_id = client_id; 
                     h.sequence = 0; h.timestamp = get_server_time(); h.entity_count = 0;
                     sendto(sock, (char*)&h, sizeof(NetHeader), 0, (struct sockaddr*)sender, sizeof(struct sockaddr_in));
                     break;
@@ -111,7 +109,7 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
         if (size >= cursor + (count * sizeof(UserCmd))) {
             UserCmd *cmds = (UserCmd*)(buffer + cursor);
             for (int i = count - 1; i >= 0; i--) process_user_cmd(client_id, &cmds[i]);
-            local_state.players[client_id].active = 1; 
+            local_state.players[client_id].active = 1;
         }
     }
 }
@@ -119,7 +117,8 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
 void server_broadcast() {
     char buffer[4096];
     int cursor = 0;
-    NetHeader head; head.type = PACKET_SNAPSHOT; head.client_id = 0; 
+    NetHeader head;
+    head.type = PACKET_SNAPSHOT; head.client_id = 0; 
     head.sequence = local_state.server_tick; head.timestamp = get_server_time();
     
     unsigned char count = 0;
@@ -144,11 +143,8 @@ void server_broadcast() {
             np.crouching = (unsigned char)p->crouching;
             np.reward_feedback = p->accumulated_reward;
             np.ammo = (unsigned char)p->ammo[p->current_weapon];
-            np.in_vehicle = (unsigned char)((p->in_vehicle != -1) ? 1 : 0);
-            np.carrying_flag = (unsigned char)((p->carrying_flag != -1) ? 
-                (local_state.entities[p->carrying_flag].type == ENT_FLAG_RED ? 1 : 2) : 0);
-            
-            p->accumulated_reward = 0; 
+            np.in_vehicle = (unsigned char)p->in_vehicle;
+            p->accumulated_reward = 0;
             memcpy(buffer + cursor, &np, sizeof(NetPlayer)); cursor += sizeof(NetPlayer);
         }
     }
@@ -162,13 +158,14 @@ void server_broadcast() {
 
 int main() {
     server_net_init();
-    local_init_match(1, MODE_CTF); // Enable CTF
+    local_init_match(1, 0); 
     int running = 1;
     unsigned int tick = 0;
     
     while(running) {
         char buffer[1024];
-        struct sockaddr_in sender; socklen_t slen = sizeof(sender);
+        struct sockaddr_in sender;
+        socklen_t slen = sizeof(sender);
         int len = recvfrom(sock, buffer, 1024, 0, (struct sockaddr*)&sender, &slen);
         while (len > 0) {
             server_handle_packet(&sender, buffer, len);
@@ -188,15 +185,23 @@ int main() {
                }
             }
             
-            // Server needs to execute simulation logic to handle interactions
             if (p->active && p->state != STATE_DEAD) {
+                if (p->in_use && p->vehicle_cooldown == 0) {
+                    p->in_vehicle = !p->in_vehicle;
+                    p->vehicle_cooldown = 30; 
+                    printf("Client %d Toggle Vehicle: %d\n", i, p->in_vehicle);
+                }
+                if (p->vehicle_cooldown > 0) p->vehicle_cooldown--;
                 float rad = p->yaw * 3.14159f / 180.0f;
                 float wish_x = 0, wish_z = 0;
-                float max_spd = MAX_SPEED; float acc = ACCEL;
+                float max_spd = MAX_SPEED;
+                float acc = ACCEL;
 
-                if (p->in_vehicle != -1) {
-                    wish_x = sinf(rad) * p->in_fwd; wish_z = cosf(rad) * p->in_fwd;
-                    max_spd = BUGGY_MAX_SPEED; acc = BUGGY_ACCEL;
+                if (p->in_vehicle) {
+                    wish_x = sinf(rad) * p->in_fwd;
+                    wish_z = cosf(rad) * p->in_fwd;
+                    max_spd = BUGGY_MAX_SPEED;
+                    acc = BUGGY_ACCEL;
                 } else {
                     wish_x = sinf(rad) * p->in_fwd + cosf(rad) * p->in_strafe;
                     wish_z = cosf(rad) * p->in_fwd - sinf(rad) * p->in_strafe;
@@ -205,19 +210,18 @@ int main() {
                 float wish_speed = sqrtf(wish_x*wish_x + wish_z*wish_z);
                 if (wish_speed > 1.0f) { wish_speed = 1.0f; wish_x/=wish_speed; wish_z/=wish_speed; }
                 wish_speed *= max_spd;
-                
                 accelerate(p, wish_x, wish_z, wish_speed, acc);
                 
+                float g = p->in_vehicle ? BUGGY_GRAVITY : (p->in_jump ? GRAVITY_FLOAT : GRAVITY_DROP);
+                p->vy -= g;
                 if (p->in_jump && p->on_ground) { 
-                     p->y += 0.1f; p->vy += JUMP_FORCE; 
+                     p->y += 0.1f;
+                     p->vy += JUMP_FORCE; 
                 }
             }
-            
             update_entity(p, 0.016f, NULL, now);
         }
-        
         server_broadcast();
-        
         if (tick % 300 == 0) printf("[STATUS] Tick: %d | Clients: %d\n", tick, active_count);
         local_state.server_tick++;
         #ifdef _WIN32

@@ -8,7 +8,7 @@
 // --- TUNING ---
 #define GRAVITY_FLOAT 0.025f 
 #define GRAVITY_DROP 0.075f  
-#define JUMP_FORCE 1.10f     
+#define JUMP_FORCE 0.95f     
 #define MAX_SPEED 0.95f      
 #define FRICTION 0.15f      
 #define ACCEL 0.6f          
@@ -16,6 +16,7 @@
 #define SLIDE_FRICTION 0.01f 
 #define CROUCH_SPEED 0.35f  
 
+// --- BUGGY TUNING ---
 #define BUGGY_MAX_SPEED 2.5f    
 #define BUGGY_ACCEL 0.08f       
 #define BUGGY_FRICTION 0.03f    
@@ -26,13 +27,14 @@
 #define PLAYER_HEIGHT 6.47f 
 #define HEAD_SIZE 1.94f     
 #define HEAD_OFFSET 2.42f   
-#define INTERACT_RANGE 8.0f // GTA Style
+#define MELEE_RANGE_SQ 250.0f 
 
 void evolve_bot(PlayerState *loser, PlayerState *winner);
 PlayerState* get_best_bot();
 
 typedef struct { float x, y, z, w, h, d; } Box;
 
+// --- THE PHI-FORTRESS (Procedural) ---
 static Box map_geo[] = {
     {0, -2, 0, 3000, 4, 3000}, // Floor
     {0, 30, 0, 40, 60, 40},    // Spire
@@ -52,11 +54,7 @@ static Box map_geo[] = {
     {-340, 10, 0, 100, 4, 200},
     {-360, 14, 0, 100, 4, 200},
     {-400, 30, 0, 50, 60, 50},
-    {150, 62, 0, 300, 2, 10},   // Bridge
-    
-    // CTF BASES
-    {0, 0, 800, 40, 2, 40}, // RED BASE (North)
-    {0, 0, -800, 40, 2, 40} // BLUE BASE (South)
+    {150, 62, 0, 300, 2, 10}   // Bridge
 };
 static int map_count = sizeof(map_geo) / sizeof(Box);
 
@@ -72,16 +70,20 @@ static inline float angle_diff(float a, float b) {
 int check_hit_location(float ox, float oy, float oz, float dx, float dy, float dz, PlayerState *target) {
     if (!target->active) return 0;
     float tx = target->x; float tz = target->z;
-    float h_size = (target->in_vehicle != -1) ? 4.0f : HEAD_SIZE;
-    float h_off = (target->in_vehicle != -1) ? 2.0f : HEAD_OFFSET;
-    float head_y = target->y + h_off; 
+    
+    // Buggy Hitbox (Larger)
+    float h_size = target->in_vehicle ? 4.0f : HEAD_SIZE;
+    float h_off = target->in_vehicle ? 2.0f : HEAD_OFFSET;
+    
+    float head_y = target->y + h_off;
     float vx = tx - ox, vy = head_y - oy, vz = tz - oz;
     float t = vx*dx + vy*dy + vz*dz;
     if (t > 0) {
         float cx = ox + dx*t, cy = oy + dy*t, cz = oz + dz*t;
         float dist_sq = (tx-cx)*(tx-cx) + (head_y-cy)*(head_y-cy) + (tz-cz)*(tz-cz);
-        if (dist_sq < (h_size*h_size)) return 2; 
+        if (dist_sq < (h_size*h_size)) return 2;
     }
+    // Body Hitbox
     float body_y = target->y + 2.0f;
     vx = tx - ox; vy = body_y - oy; vz = tz - oz;
     t = vx*dx + vy*dy + vz*dz;
@@ -96,19 +98,21 @@ int check_hit_location(float ox, float oy, float oz, float dx, float dy, float d
 void apply_friction(PlayerState *p) {
     float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
     if (speed < 0.001f) { p->vx = 0; p->vz = 0; return; }
+    
     float drop = 0;
-    if (p->in_vehicle != -1) {
+    if (p->in_vehicle) {
         drop = speed * BUGGY_FRICTION;
     } 
     else if (p->on_ground) {
         if (p->crouching) {
-            if (speed > 0.75f) drop = speed * SLIDE_FRICTION; 
+            if (speed > 0.75f) drop = speed * SLIDE_FRICTION;
             else drop = speed * (FRICTION * 3.0f); 
         } else {
             float control = (speed < STOP_SPEED) ? STOP_SPEED : speed;
             drop = control * FRICTION; 
         }
     }
+    
     float newspeed = speed - drop;
     if (newspeed < 0) newspeed = 0;
     newspeed /= speed;
@@ -116,16 +120,19 @@ void apply_friction(PlayerState *p) {
 }
 
 void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, float accel) {
-    if (p->in_vehicle != -1) {
+    if (p->in_vehicle) {
         float current_speed = (p->vx * wish_x) + (p->vz * wish_z);
         float add_speed = wish_speed - current_speed;
         if (add_speed <= 0) return;
+        
         float acc_speed = accel * BUGGY_MAX_SPEED;
         if (acc_speed > add_speed) acc_speed = add_speed;
+        
         p->vx += acc_speed * wish_x; 
         p->vz += acc_speed * wish_z;
         return;
     }
+
     float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
     if (p->crouching && speed > 0.75f && p->on_ground) return;
     if (p->crouching && p->on_ground && speed < 0.75f && wish_speed > CROUCH_SPEED) wish_speed = CROUCH_SPEED;
@@ -138,12 +145,10 @@ void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, fl
     p->vz += acc_speed * wish_z;
 }
 
-void resolve_collision(PlayerState *p, Entity *entities) {
-    float pw = (p->in_vehicle != -1) ? 3.0f : PLAYER_WIDTH; 
-    float ph = (p->in_vehicle != -1) ? 3.0f : (p->crouching ? (PLAYER_HEIGHT / 2.0f) : PLAYER_HEIGHT);
+void resolve_collision(PlayerState *p) {
+    float pw = p->in_vehicle ? 3.0f : PLAYER_WIDTH;
+    float ph = p->in_vehicle ? 3.0f : (p->crouching ? (PLAYER_HEIGHT / 2.0f) : PLAYER_HEIGHT);
     p->on_ground = 0;
-    
-    // 1. Map Geometry
     if (p->y < 0) { p->y = 0; p->vy = 0; p->on_ground = 1; }
     for(int i=1; i<map_count; i++) {
         Box b = map_geo[i];
@@ -151,34 +156,20 @@ void resolve_collision(PlayerState *p, Entity *entities) {
             p->z + pw > b.z - b.d/2 && p->z - pw < b.z + b.d/2) {
             if (p->y < b.y + b.h/2 && p->y + ph > b.y - b.h/2) {
                 float prev_y = p->y - p->vy;
-                if (prev_y >= b.y + b.h/2) { p->y = b.y + b.h/2; p->vy = 0; p->on_ground = 1; } 
-                else {
-                    float dx = p->x - b.x; float dz = p->z - b.z;
-                    float w = (b.w > 0.1f) ? b.w : 1.0f; float d = (b.d > 0.1f) ? b.d : 1.0f;
-                    if (fabs(dx)/w > fabs(dz)/d) { p->vx = 0; p->x = (dx > 0) ? b.x + b.w/2 + pw : b.x - b.w/2 - pw; } 
-                    else { p->vz = 0; p->z = (dz > 0) ? b.z + b.d/2 + pw : b.z - b.d/2 - pw; }
-                }
-            }
-        }
-    }
-    
-    // 2. Entity Collision (Jump on buggies/crates)
-    if (entities) {
-        for (int i=0; i<MAX_ENTITIES; i++) {
-            if (!entities[i].active || entities[i].owner_id == p->id) continue; // Don't collide with self vehicle
-            if (entities[i].type == ENT_FLAG_RED || entities[i].type == ENT_FLAG_BLUE) continue; // Walk through flags
-            
-            Box b = {entities[i].x, entities[i].y, entities[i].z, entities[i].w, entities[i].h, entities[i].d};
-            if (p->x + pw > b.x - b.w/2 && p->x - pw < b.x + b.w/2 &&
-                p->z + pw > b.z - b.d/2 && p->z - pw < b.z + b.d/2) {
-                if (p->y < b.y + b.h/2 && p->y + ph > b.y - b.h/2) {
-                    float prev_y = p->y - p->vy;
-                    if (prev_y >= b.y + b.h/2) { p->y = b.y + b.h/2; p->vy = 0; p->on_ground = 1; }
-                    else {
-                        float dx = p->x - b.x; float dz = p->z - b.z;
-                        float w = (b.w > 0.1f) ? b.w : 1.0f; float d = (b.d > 0.1f) ? b.d : 1.0f;
-                        if (fabs(dx)/w > fabs(dz)/d) { p->vx = 0; p->x = (dx > 0) ? b.x + b.w/2 + pw : b.x - b.w/2 - pw; }
-                        else { p->vz = 0; p->z = (dz > 0) ? b.z + b.d/2 + pw : b.z - b.d/2 - pw; }
+                if (prev_y >= b.y + b.h/2) {
+                    p->y = b.y + b.h/2;
+                    p->vy = 0; p->on_ground = 1;
+                } else {
+                    float dx = p->x - b.x;
+                    float dz = p->z - b.z;
+                    float w = (b.w > 0.1f) ? b.w : 1.0f;
+                    float d = (b.d > 0.1f) ? b.d : 1.0f;
+                    if (fabs(dx)/w > fabs(dz)/d) { 
+                        p->vx = 0;
+                        p->x = (dx > 0) ? b.x + b.w/2 + pw : b.x - b.w/2 - pw;
+                    } else { 
+                        p->vz = 0;
+                        p->z = (dz > 0) ? b.z + b.d/2 + pw : b.z - b.d/2 - pw;
                     }
                 }
             }
@@ -192,17 +183,15 @@ void phys_respawn(PlayerState *p, unsigned int now) {
     p->health = 100;
     p->shield = 100;
     p->respawn_time = 0;
-    p->in_vehicle = -1; 
-    p->carrying_flag = -1;
+    p->in_vehicle = 0;
     
-    // Team Spawn Logic (Simple split)
-    if (p->id % 2 == 0) { p->x = 0; p->z = -800; } // Blue Side
-    else { p->x = 0; p->z = 800; } // Red Side
-    p->y = 20;
+    if (rand()%2 == 0) { p->x = 0; p->z = 0; p->y = 80; } 
+    else { float ang = phys_rand_f() * 6.28f;
+        p->x = sinf(ang) * 500; p->z = cosf(ang) * 500; p->y = 20;
+    }
     
     p->current_weapon = WPN_MAGNUM;
     for(int i=0; i<MAX_WEAPONS; i++) p->ammo[i] = WPN_STATS[i].ammo_max;
-    
     if (p->is_bot) {
         PlayerState *winner = get_best_bot();
         if (winner && winner != p) evolve_bot(p, winner);
@@ -210,7 +199,7 @@ void phys_respawn(PlayerState *p, unsigned int now) {
 }
 
 void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload) {
-    if (p->in_vehicle != -1) return; 
+    if (p->in_vehicle) return; 
     if (p->reload_timer > 0) p->reload_timer--;
     if (p->attack_cooldown > 0) p->attack_cooldown--;
     if (p->is_shooting > 0) p->is_shooting--;
@@ -218,14 +207,13 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
     int w = p->current_weapon;
     if (reload && p->reload_timer == 0 && w != WPN_KNIFE) {
         if (p->ammo[w] < WPN_STATS[w].ammo_max) {
-            if (p->ammo[w] > 0) p->reload_timer = RELOAD_TIME_TACTICAL; 
+            if (p->ammo[w] > 0) p->reload_timer = RELOAD_TIME_TACTICAL;
             else p->reload_timer = RELOAD_TIME_FULL; 
         }
     }
     if (p->reload_timer == 1) p->ammo[w] = WPN_STATS[w].ammo_max;
-
     if (shoot && p->attack_cooldown == 0 && p->reload_timer == 0) {
-        if (w != WPN_KNIFE && p->ammo[w] <= 0) p->reload_timer = RELOAD_TIME_FULL; 
+        if (w != WPN_KNIFE && p->ammo[w] <= 0) p->reload_timer = RELOAD_TIME_FULL;
         else {
             p->is_shooting = 5; p->recoil_anim = 1.0f;
             p->attack_cooldown = WPN_STATS[w].rof;
@@ -236,7 +224,6 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
             float dx = sinf(r) * cosf(rp);
             float dy = sinf(rp);
             float dz = -cosf(r) * cosf(rp);
-            
             if (WPN_STATS[w].spr > 0) {
                 dx += phys_rand_f() * WPN_STATS[w].spr;
                 dy += phys_rand_f() * WPN_STATS[w].spr;
@@ -247,22 +234,26 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
                 if (p == &targets[i]) continue;
                 if (!targets[i].active) continue;
                 if (w == WPN_KNIFE) {
-                    float kx = p->x - targets[i].x; float ky = p->y - targets[i].y; float kz = p->z - targets[i].z;
-                    if ((kx*kx + ky*ky + kz*kz) > MELEE_RANGE_SQ + 22.0f ) continue; 
+                    float kx = p->x - targets[i].x;
+                    float ky = p->y - targets[i].y; float kz = p->z - targets[i].z;
+                    if ((kx*kx + ky*ky + kz*kz) > MELEE_RANGE_SQ + 22.0f ) continue;
                 }
                 int hit_type = check_hit_location(p->x, p->y + EYE_HEIGHT, p->z, dx, dy, dz, &targets[i]);
                 if (hit_type > 0) {
+                    printf("🔫 HIT! Dmg: %d on Target %d\n", WPN_STATS[w].dmg, i);
                     int damage = WPN_STATS[w].dmg;
                     p->accumulated_reward += 10.0f;
                     targets[i].shield_regen_timer = SHIELD_REGEN_DELAY;
-                    if (hit_type == 2 && targets[i].shield <= 0) { damage *= 3; p->hit_feedback = 20; } else { p->hit_feedback = 10; }
+                    if (hit_type == 2 && targets[i].shield <= 0) { damage *= 3; p->hit_feedback = 20;
+                    } else { p->hit_feedback = 10; }
                     if (targets[i].shield > 0) {
                         if (targets[i].shield >= damage) { targets[i].shield -= damage; damage = 0; } 
                         else { damage -= targets[i].shield; targets[i].shield = 0; }
                     }
                     targets[i].health -= damage;
                     if(targets[i].health <= 0) {
-                        p->kills++; targets[i].deaths++; 
+                        p->kills++;
+                        targets[i].deaths++; 
                         p->accumulated_reward += 1000.0f;
                         phys_respawn(&targets[i], 0);
                     }
@@ -287,10 +278,11 @@ int phys_resolve_rewind(ServerState *server, int client_id, unsigned int target_
     for(int i=0; i<LAG_HISTORY; i++) {
         if (!hist[i].active) continue;
         if (hist[i].timestamp == target_time) { 
-            out_pos[0] = hist[i].x; out_pos[1] = hist[i].y; out_pos[2] = hist[i].z;
+            out_pos[0] = hist[i].x;
+            out_pos[1] = hist[i].y; out_pos[2] = hist[i].z;
             return 1;
         }
     }
-    return 0; 
+    return 0;
 }
 #endif
