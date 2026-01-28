@@ -63,7 +63,7 @@ void process_user_cmd(int client_id, UserCmd *cmd) {
     p->in_shoot = (cmd->buttons & BTN_ATTACK);
     p->crouching = (cmd->buttons & BTN_CROUCH);
     p->in_reload = (cmd->buttons & BTN_RELOAD);
-    p->in_use = (cmd->buttons & BTN_USE); // Key E
+    p->in_use = (cmd->buttons & BTN_USE);
     
     if (cmd->weapon_idx >= 0 && cmd->weapon_idx < MAX_WEAPONS) p->current_weapon = cmd->weapon_idx;
     
@@ -93,6 +93,7 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
                     local_state.client_active[i] = 1;
                     local_state.clients[i] = *sender;
                     local_state.players[i].active = 1;
+                    local_state.players[i].id = i; // Assign ID
                     phys_respawn(&local_state.players[i], get_server_time());
                     printf("CLIENT %d CONNECTED (%s)\n", client_id, ip_str);
                     NetHeader h; h.type = PACKET_WELCOME; h.client_id = client_id; 
@@ -143,7 +144,10 @@ void server_broadcast() {
             np.crouching = (unsigned char)p->crouching;
             np.reward_feedback = p->accumulated_reward;
             np.ammo = (unsigned char)p->ammo[p->current_weapon];
-            np.in_vehicle = (unsigned char)p->in_vehicle; // Sync Vehicle
+            np.in_vehicle = (unsigned char)((p->in_vehicle != -1) ? 1 : 0);
+            np.carrying_flag = (unsigned char)((p->carrying_flag != -1) ? 
+                (local_state.entities[p->carrying_flag].type == ENT_FLAG_RED ? 1 : 2) : 0);
+            
             p->accumulated_reward = 0; 
             memcpy(buffer + cursor, &np, sizeof(NetPlayer)); cursor += sizeof(NetPlayer);
         }
@@ -158,7 +162,7 @@ void server_broadcast() {
 
 int main() {
     server_net_init();
-    local_init_match(1, 0); 
+    local_init_match(1, MODE_CTF); // Enable CTF
     int running = 1;
     unsigned int tick = 0;
     
@@ -184,28 +188,15 @@ int main() {
                }
             }
             
-            // --- MOVEMENT & VEHICLE LOGIC ---
+            // Server needs to execute simulation logic to handle interactions
             if (p->active && p->state != STATE_DEAD) {
-                // Toggle Vehicle (Debounced)
-                if (p->in_use && p->vehicle_cooldown == 0) {
-                    p->in_vehicle = !p->in_vehicle;
-                    p->vehicle_cooldown = 30; // 0.5s cooldown
-                    printf("Client %d Toggle Vehicle: %d\n", i, p->in_vehicle);
-                }
-                if (p->vehicle_cooldown > 0) p->vehicle_cooldown--;
-
                 float rad = p->yaw * 3.14159f / 180.0f;
                 float wish_x = 0, wish_z = 0;
-                float max_spd = MAX_SPEED;
-                float acc = ACCEL;
+                float max_spd = MAX_SPEED; float acc = ACCEL;
 
-                if (p->in_vehicle) {
-                    // Halo Steering: Accelerate towards Camera Look
-                    // Strafing is disabled for car
-                    wish_x = sinf(rad) * p->in_fwd;
-                    wish_z = cosf(rad) * p->in_fwd;
-                    max_spd = BUGGY_MAX_SPEED;
-                    acc = BUGGY_ACCEL;
+                if (p->in_vehicle != -1) {
+                    wish_x = sinf(rad) * p->in_fwd; wish_z = cosf(rad) * p->in_fwd;
+                    max_spd = BUGGY_MAX_SPEED; acc = BUGGY_ACCEL;
                 } else {
                     wish_x = sinf(rad) * p->in_fwd + cosf(rad) * p->in_strafe;
                     wish_z = cosf(rad) * p->in_fwd - sinf(rad) * p->in_strafe;
@@ -217,11 +208,6 @@ int main() {
                 
                 accelerate(p, wish_x, wish_z, wish_speed, acc);
                 
-                // Gravity
-                float g = p->in_vehicle ? BUGGY_GRAVITY : (p->in_jump ? GRAVITY_FLOAT : GRAVITY_DROP);
-                p->vy -= g;
-                
-                // Jump
                 if (p->in_jump && p->on_ground) { 
                      p->y += 0.1f; p->vy += JUMP_FORCE; 
                 }
