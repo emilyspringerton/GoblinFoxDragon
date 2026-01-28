@@ -1,8 +1,8 @@
 #ifndef LOCAL_GAME_H
 #define LOCAL_GAME_H
 
-#include "protocol.h"
-#include "physics.h"
+#include "../common/protocol.h"
+#include "../common/physics.h"
 #include <string.h>
 
 ServerState local_state;
@@ -12,7 +12,7 @@ void local_update(float fwd, float str, float yaw, float pitch, int shoot, int w
 void update_entity(PlayerState *p, float dt, void *server_context, unsigned int cmd_time);
 void local_init_match(int num_players, int mode);
 
-// --- GENETIC FUNCTIONS (Restored) ---
+// --- GENETICS (Restored Phase 470) ---
 float rand_weight() { return ((float)(rand()%2000)/1000.0f) - 1.0f; } 
 float rand_pos() { return ((float)(rand()%1000)/1000.0f); } 
 
@@ -26,18 +26,14 @@ void init_genome(BotGenome *g) {
     g->w_repel = 1.0f + rand_pos();
 }
 
-// DEFINITION: evolve_bot (Required by physics.h)
 void evolve_bot(PlayerState *loser, PlayerState *winner) {
     loser->brain = winner->brain;
-    // Mutate
     loser->brain.w_aggro += rand_weight() * 0.1f;
     loser->brain.w_strafe += rand_weight() * 0.1f;
     loser->brain.w_jump += rand_weight() * 0.01f;
     loser->brain.w_slide += rand_weight() * 0.01f;
-    // printf("🧬 Bot %d evolved from Bot %d\n", loser->id, winner->id);
 }
 
-// DEFINITION: get_best_bot (Required by physics.h)
 PlayerState* get_best_bot() {
     PlayerState *best = NULL;
     float max_score = -99999.0f;
@@ -58,7 +54,6 @@ void bot_think(int bot_idx, PlayerState *players, float *out_fwd, float *out_yaw
 
     int target_idx = -1;
     float min_dist = 9999.0f;
-    float closest_friend_dist = 9999.0f;
 
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (i == bot_idx) continue;
@@ -73,10 +68,6 @@ void bot_think(int bot_idx, PlayerState *players, float *out_fwd, float *out_yaw
             if (i == 0) dist *= 0.5f; 
             if (dist < min_dist) { min_dist = dist; target_idx = i; }
         }
-        
-        if (dist < 3.0f && dist < closest_friend_dist) {
-            closest_friend_dist = dist;
-        }
     }
 
     if (target_idx != -1) {
@@ -86,7 +77,6 @@ void bot_think(int bot_idx, PlayerState *players, float *out_fwd, float *out_yaw
         float target_yaw = atan2f(dx, dz) * (180.0f / 3.14159f);
         
         float turn_speed = (me->brain.w_turret > 1.0f) ? me->brain.w_turret : 10.0f;
-        
         float diff = angle_diff(target_yaw, *out_yaw);
         if (diff > turn_speed) diff = turn_speed;
         if (diff < -turn_speed) diff = -turn_speed;
@@ -99,12 +89,9 @@ void bot_think(int bot_idx, PlayerState *players, float *out_fwd, float *out_yaw
         else *out_fwd = 0.2f; 
         
         *out_yaw += me->brain.w_strafe * 10.0f; 
-        
-        if (closest_friend_dist < 3.0f) *out_fwd *= 0.5f; 
 
         if (me->on_ground && (rand()%1000 < (me->brain.w_jump * 1000.0f))) *out_buttons |= BTN_JUMP;
         if (me->on_ground && (rand()%1000 < (me->brain.w_slide * 1000.0f))) *out_buttons |= BTN_CROUCH;
-        
         if (me->ammo[me->current_weapon] <= 0) *out_buttons |= BTN_RELOAD;
         
     } else {
@@ -129,16 +116,9 @@ void update_entity(PlayerState *p, float dt, void *server_context, unsigned int 
     p->x += p->vx;
     p->z += p->vz;
 
-    // Decay
     if (p->recoil_anim > 0) p->recoil_anim -= 0.1f;
     if (p->recoil_anim < 0) p->recoil_anim = 0;
     if (p->hit_feedback > 0) p->hit_feedback--;
-
-    // Reward: Slide
-    float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
-    if (p->crouching && speed > 0.6f && p->on_ground) {
-        p->accumulated_reward += 0.1f;
-    }
 
     update_weapons(p, local_state.players, p->in_shoot > 0, p->in_reload > 0);
 }
@@ -160,11 +140,29 @@ void local_update(float fwd, float str, float yaw, float pitch, int shoot, int w
     accelerate(p0, wish_x, wish_z, wish_speed, ACCEL);
     
     int fresh_jump_press = (jump && !was_holding_jump);
+    
+    // --- PHASE 485: TUNED SLIDE JUMP ---
     if (jump && p0->on_ground) {
         float speed = sqrtf(p0->vx*p0->vx + p0->vz*p0->vz);
+        
         if (p0->crouching && speed > 0.5f && fresh_jump_press) {
-            p0->vx *= 1.5f; p0->vz *= 1.5f;
+            // New Formula: Diminishing Returns
+            // Base multiplier: 1.25 (was 1.5)
+            // Decay: Adds (0.25 / Speed). 
+            // - At Speed 1.0 -> 1.0 + 0.25 = 1.25x
+            // - At Speed 2.0 -> 1.0 + 0.125 = 1.125x
+            // - At Speed 3.0 -> 1.0 + 0.08 = 1.08x
+            
+            float boost_mult = 1.0f + (0.25f / speed);
+            
+            // Hard clamp just in case
+            if (boost_mult > 1.4f) boost_mult = 1.4f; 
+            if (boost_mult < 1.02f) boost_mult = 1.02f;
+            
+            p0->vx *= boost_mult;
+            p0->vz *= boost_mult;
         }
+        
         p0->y += 0.1f; p0->vy += JUMP_FORCE;
     }
     
