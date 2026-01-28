@@ -159,8 +159,22 @@ void server_broadcast() {
 }
 
 int main() {
+    
     server_net_init();
     local_init_match(1, 0); 
+    
+    // --- PHASE 502: SERVER-SIDE BOT STRESS TEST ---
+    printf("[STRESS-TEST] Spawning 26 bots for netcode validation...
+");
+    for(int i = 1; i <= 26; i++) {
+        local_state.client_active[i] = 1;
+        local_state.players[i].active = 1;
+        local_state.players[i].is_bot = 1; // Flag as bot for server simulation
+        phys_respawn(&local_state.players[i], get_server_time());
+        printf("  > CLIENT %d: CONNECTED (VIRTUAL_BOT_NET)
+", i);
+    }
+ 
     int running = 1;
     unsigned int tick = 0;
     
