@@ -30,7 +30,6 @@
 #define STATE_GAME_LOCAL 2
 #define STATE_LISTEN_SERVER 99
 
-// --- CONFIG ---
 char SERVER_HOST[64] = "s.farthq.com"; 
 int SERVER_PORT = 6969;
 
@@ -42,31 +41,14 @@ float cam_yaw = 0.0f;
 float cam_pitch = 0.0f;
 float current_fov = 75.0f;
 
-// DRAW DISTANCE (Phase 484)
-#define Z_NEAR 0.1f
-#define Z_FAR 8000.0f // <--- 8K VISIBILITY
+#define Z_FAR 8000.0f
 
 int sock = -1;
 struct sockaddr_in server_addr;
 
-// --- TRAIL SYSTEM ---
-#define MAX_TRAILS 4096 // Increased for larger map
-#define GRID_SIZE 50.0f
-typedef struct { int cx, cz; float life; } Trail;
-Trail trails[MAX_TRAILS];
-int trail_head = 0;
-
-void add_trail(int x, int z) {
-    int prev = (trail_head - 1 + MAX_TRAILS) % MAX_TRAILS;
-    if (trails[prev].cx == x && trails[prev].cz == z && trails[prev].life > 0.9f) return;
-    trails[trail_head].cx = x; trails[trail_head].cz = z; trails[trail_head].life = 1.0f;
-    trail_head = (trail_head + 1) % MAX_TRAILS;
-}
-
-// --- RENDER FUNCTIONS ---
+// --- RENDER ---
 void draw_char(char c, float x, float y, float s) {
-    glLineWidth(1.0f);
-    glBegin(GL_LINES);
+    glLineWidth(1.0f); glBegin(GL_LINES);
     if(c>='0'&&c<='9'){ glVertex2f(x,y+s);glVertex2f(x+s,y+s);glVertex2f(x+s,y);glVertex2f(x,y);glVertex2f(x,y+s); }
     else if(c=='A'){glVertex2f(x,y);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y);glVertex2f(x,y+s/2);glVertex2f(x+s/2,y+s);glVertex2f(x+s/2,y+s);glVertex2f(x+s,y+s/2);}
     else if(c=='B'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s,y+s*0.75);glVertex2f(x+s,y+s*0.75);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x+s,y+s/4);glVertex2f(x+s,y+s/4);glVertex2f(x+s*0.8,y);glVertex2f(x+s*0.8,y);glVertex2f(x,y);}
@@ -84,6 +66,19 @@ void draw_char(char c, float x, float y, float s) {
     glEnd();
 }
 void draw_string(const char* str, float x, float y, float size) { while(*str) { draw_char(*str, x, y, size); x += size * 1.5f; str++; } }
+
+#define MAX_TRAILS 4096 
+#define GRID_SIZE 50.0f
+typedef struct { int cx, cz; float life; } Trail;
+Trail trails[MAX_TRAILS];
+int trail_head = 0;
+
+void add_trail(int x, int z) {
+    int prev = (trail_head - 1 + MAX_TRAILS) % MAX_TRAILS;
+    if (trails[prev].cx == x && trails[prev].cz == z && trails[prev].life > 0.9f) return;
+    trails[trail_head].cx = x; trails[trail_head].cz = z; trails[trail_head].life = 1.0f;
+    trail_head = (trail_head + 1) % MAX_TRAILS;
+}
 
 void update_and_draw_trails() {
     glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -114,7 +109,6 @@ void update_and_draw_trails() {
 
 void draw_grid() {
     glLineWidth(1.0f); glBegin(GL_LINES); glColor3f(1.0f, 0.0f, 1.0f); 
-    // EXPANDED GRID FOR 8K VIEW (+/- 4000)
     for(int i=-4000; i<=4000; i+=50) { 
         glVertex3f(i, 0.1f, -4000); glVertex3f(i, 0.1f, 4000); 
         glVertex3f(-4000, 0.1f, i); glVertex3f(4000, 0.1f, i); 
@@ -140,6 +134,36 @@ void draw_map() {
     }
 }
 
+// --- DRAW BUGGY ---
+void draw_buggy_model() {
+    // Chassis
+    glColor3f(0.3f, 0.5f, 0.3f); // Military Green
+    glPushMatrix(); glScalef(2.0f, 1.0f, 3.5f); 
+    glBegin(GL_QUADS); 
+    glVertex3f(-1,1,1); glVertex3f(1,1,1); glVertex3f(1,1,-1); glVertex3f(-1,1,-1); 
+    glVertex3f(-1,-1,1); glVertex3f(1,-1,1); glVertex3f(1,1,1); glVertex3f(-1,1,1); 
+    glVertex3f(-1,-1,-1); glVertex3f(-1,1,-1); glVertex3f(1,1,-1); glVertex3f(1,-1,-1); 
+    glVertex3f(1,-1,-1); glVertex3f(1,1,-1); glVertex3f(1,1,1); glVertex3f(1,-1,1); 
+    glVertex3f(-1,-1,1); glVertex3f(-1,1,1); glVertex3f(-1,1,-1); glVertex3f(-1,-1,-1); 
+    glEnd(); glPopMatrix();
+    
+    // Wheels
+    glColor3f(0.1f, 0.1f, 0.1f);
+    float wx[] = {-2.2, 2.2, -2.2, 2.2};
+    float wz[] = {2.5, 2.5, -2.5, -2.5};
+    for(int i=0; i<4; i++) {
+        glPushMatrix(); glTranslatef(wx[i], -0.5f, wz[i]); glScalef(0.8f, 1.5f, 1.5f);
+        glBegin(GL_QUADS); 
+        glVertex3f(-0.5,0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
+        glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
+        glVertex3f(-0.5,-0.5,-0.5); glVertex3f(-0.5,0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(0.5,-0.5,-0.5);
+        glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,-0.5,0.5);
+        glVertex3f(-0.5,-0.5,0.5); glVertex3f(-0.5,0.5,0.5); glVertex3f(-0.5,0.5,-0.5); glVertex3f(-0.5,-0.5,-0.5);
+        glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(-0.5,-0.5,0.5); glVertex3f(-0.5,0.5,0.5);
+        glEnd(); glPopMatrix();
+    }
+}
+
 void draw_gun_model(int weapon_id) {
     switch(weapon_id) {
         case WPN_KNIFE:   glColor3f(0.8f, 0.8f, 0.9f); glScalef(0.05f, 0.05f, 0.8f); break;
@@ -158,6 +182,7 @@ void draw_gun_model(int weapon_id) {
 }
 
 void draw_weapon_p(PlayerState *p) {
+    if (p->in_vehicle) return; // No gun model inside car
     glPushMatrix(); glLoadIdentity();
     float kick = p->recoil_anim * 0.2f;
     float reload_dip = (p->reload_timer > 0) ? sinf(p->reload_timer * 0.2f) * 0.5f - 0.5f : 0.0f;
@@ -192,18 +217,24 @@ void draw_player_3rd(PlayerState *p) {
     glPushMatrix();
     glTranslatef(p->x, p->y + 2.0f, p->z);
     glRotatef(-p->yaw, 0, 1, 0); 
-    if(p->health <= 0) glColor3f(0.2, 0, 0); else glColor3f(1, 0, 0); 
-    glPushMatrix(); glScalef(0.97f, 2.91f, 0.97f); 
-    glBegin(GL_QUADS);
-    glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(-0.5,0.5,0.5);
-    glVertex3f(-0.5,0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
-    glVertex3f(-0.5,-0.5,-0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
-    glVertex3f(-0.5,-0.5,-0.5); glVertex3f(-0.5,-0.5,0.5); glVertex3f(-0.5,0.5,0.5); glVertex3f(-0.5,0.5,-0.5);
-    glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(0.5,0.5,0.5);
-    glEnd(); glPopMatrix();
-    glPushMatrix(); glTranslatef(0, 1.54f, 0); draw_head(p->current_weapon); glPopMatrix();
-    glPushMatrix(); glTranslatef(0.5f, 1.0f, 0.5f); glRotatef(p->pitch, 1, 0, 0);   
-    glScalef(0.8f, 0.8f, 0.8f); draw_gun_model(p->current_weapon); glPopMatrix(); glPopMatrix();
+    
+    if (p->in_vehicle) {
+        draw_buggy_model();
+    } else {
+        if(p->health <= 0) glColor3f(0.2, 0, 0); else glColor3f(1, 0, 0); 
+        glPushMatrix(); glScalef(0.97f, 2.91f, 0.97f); 
+        glBegin(GL_QUADS);
+        glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(-0.5,0.5,0.5);
+        glVertex3f(-0.5,0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
+        glVertex3f(-0.5,-0.5,-0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
+        glVertex3f(-0.5,-0.5,-0.5); glVertex3f(-0.5,-0.5,0.5); glVertex3f(-0.5,0.5,0.5); glVertex3f(-0.5,0.5,-0.5);
+        glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(0.5,0.5,0.5);
+        glEnd(); glPopMatrix();
+        glPushMatrix(); glTranslatef(0, 1.54f, 0); draw_head(p->current_weapon); glPopMatrix();
+        glPushMatrix(); glTranslatef(0.5f, 1.0f, 0.5f); glRotatef(p->pitch, 1, 0, 0);   
+        glScalef(0.8f, 0.8f, 0.8f); draw_gun_model(p->current_weapon); glPopMatrix(); 
+    }
+    glPopMatrix();
 }
 
 void draw_hud(PlayerState *p) {
@@ -214,15 +245,14 @@ void draw_hud(PlayerState *p) {
     if (current_fov < 50.0f) { glBegin(GL_LINES); glVertex2f(0, 360); glVertex2f(1280, 360); glVertex2f(640, 0); glVertex2f(640, 720); glEnd(); } 
     else { glLineWidth(2.0f); glBegin(GL_LINES); glVertex2f(630, 360); glVertex2f(650, 360); glVertex2f(640, 350); glVertex2f(640, 370); glEnd(); }
     
-    if (p->hit_feedback > 0) {
-        if (p->hit_feedback == 20) glColor3f(1, 0, 1); else glColor3f(0, 1, 1);
-        glBegin(GL_TRIANGLE_FAN); glVertex2f(640, 360); for(int i=0; i<=20; i++) { float ang = (float)i/20.0f*6.283f; glVertex2f(640+cosf(ang)*15, 360+sinf(ang)*15); } glEnd();
-    }
-    
     glColor3f(0.2f, 0, 0); glRectf(50, 50, 250, 70); glColor3f(1.0f, 0, 0); glRectf(50, 50, 50 + (p->health * 2), 70);
     glColor3f(0, 0, 0.2f); glRectf(50, 80, 250, 100); glColor3f(0.2f, 0.2f, 1.0f); glRectf(50, 80, 50 + (p->shield * 2), 100);
-    int w = p->current_weapon; int ammo = (w == WPN_KNIFE) ? 99 : p->ammo[w];
-    glColor3f(1, 1, 0); for(int i=0; i<ammo; i++) glRectf(1200 - (i*10), 50, 1205 - (i*10), 80);
+    
+    // VEHICLE INDICATOR
+    if (p->in_vehicle) {
+        glColor3f(0.0f, 1.0f, 0.0f);
+        draw_string("BUGGY ONLINE", 50, 120, 12);
+    }
     
     float raw_speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
     char vel_buf[32]; sprintf(vel_buf, "VEL: %.2f", raw_speed);
@@ -233,12 +263,25 @@ void draw_hud(PlayerState *p) {
 
 void draw_scene(PlayerState *render_p) {
     glClearColor(0.05f, 0.05f, 0.1f, 1.0f); glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); glLoadIdentity();
-    float cam_h = render_p->crouching ? 2.5f : EYE_HEIGHT;
-    glRotatef(-cam_pitch, 1, 0, 0); glRotatef(-cam_yaw, 0, 1, 0); glTranslatef(-render_p->x, -(render_p->y + cam_h), -render_p->z);
+    
+    // CHASE CAM IF DRIVING
+    float cam_y = render_p->in_vehicle ? 8.0f : (render_p->crouching ? 2.5f : EYE_HEIGHT);
+    float cam_z_off = render_p->in_vehicle ? 10.0f : 0.0f;
+    
+    // Simple 3rd person chase math (Opposite to yaw)
+    float rad = -cam_yaw * 0.01745f;
+    float cx = sinf(rad) * cam_z_off;
+    float cz = cosf(rad) * cam_z_off;
+    
+    glRotatef(-cam_pitch, 1, 0, 0); glRotatef(-cam_yaw, 0, 1, 0); 
+    glTranslatef(-(render_p->x - cx), -(render_p->y + cam_y), -(render_p->z - cz));
     
     draw_grid(); 
     update_and_draw_trails();
     draw_map(); 
+    
+    // DRAW SELF IF DRIVING (So we see the car)
+    if (render_p->in_vehicle) draw_player_3rd(render_p);
     
     for(int i=1; i<MAX_CLIENTS; i++) if(local_state.players[i].active && i != my_client_id) draw_player_3rd(&local_state.players[i]);
     draw_weapon_p(render_p); draw_hud(render_p);
@@ -272,12 +315,13 @@ void net_connect() {
     }
 }
 
-UserCmd client_create_cmd(float fwd, float str, float yaw, float pitch, int shoot, int jump, int crouch, int reload, int wpn_idx) {
+UserCmd client_create_cmd(float fwd, float str, float yaw, float pitch, int shoot, int jump, int crouch, int reload, int use, int wpn_idx) {
     UserCmd cmd; memset(&cmd, 0, sizeof(UserCmd));
     static int seq = 0; cmd.sequence = ++seq; cmd.timestamp = SDL_GetTicks();
     cmd.yaw = yaw; cmd.pitch = pitch; cmd.fwd = fwd; cmd.str = str;
     if(shoot) cmd.buttons |= BTN_ATTACK; if(jump) cmd.buttons |= BTN_JUMP;
     if(crouch) cmd.buttons |= BTN_CROUCH; if(reload) cmd.buttons |= BTN_RELOAD;
+    if(use) cmd.buttons |= BTN_USE;
     cmd.weapon_idx = wpn_idx; return cmd;
 }
 
@@ -309,10 +353,12 @@ void net_process_snapshot(char *buffer, int len) {
             p->health = np->health;
             p->current_weapon = np->current_weapon;
             p->is_shooting = np->is_shooting;
+            p->in_vehicle = np->in_vehicle;
             if (p->is_shooting) p->recoil_anim = 1.0f;
             
         } else if (id == 0) {
             local_state.players[0].ammo[local_state.players[0].current_weapon] = np->ammo;
+            local_state.players[0].in_vehicle = np->in_vehicle; // Server auth vehicle state
         }
     }
 }
@@ -343,7 +389,7 @@ int main(int argc, char* argv[]) {
     }
 
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *win = SDL_CreateWindow("SHANKPIT [BUILD 164 - 8K VIEW]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
+    SDL_Window *win = SDL_CreateWindow("SHANKPIT [BUILD 165 - WARTHOG]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
     SDL_GL_CreateContext(win);
     net_init();
     
@@ -411,6 +457,7 @@ int main(int argc, char* argv[]) {
             int jump = k[SDL_SCANCODE_SPACE]; int crouch = k[SDL_SCANCODE_LCTRL];
             int shoot = (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT));
             int reload = k[SDL_SCANCODE_R];
+            int use = k[SDL_SCANCODE_E];
             if(k[SDL_SCANCODE_1]) wpn_req=0; if(k[SDL_SCANCODE_2]) wpn_req=1; 
             if(k[SDL_SCANCODE_3]) wpn_req=2; if(k[SDL_SCANCODE_4]) wpn_req=3; if(k[SDL_SCANCODE_5]) wpn_req=4;
 
@@ -420,11 +467,24 @@ int main(int argc, char* argv[]) {
             glMatrixMode(GL_MODELVIEW); 
 
             if (app_state == STATE_GAME_NET) {
-                local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn_req, jump, crouch, reload, NULL, 0);
-                UserCmd cmd = client_create_cmd(fwd, str, cam_yaw, cam_pitch, shoot, jump, crouch, reload, wpn_req);
+                // Client side pred
+                local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn_req, jump, crouch, reload, NULL, 0); 
+                UserCmd cmd = client_create_cmd(fwd, str, cam_yaw, cam_pitch, shoot, jump, crouch, reload, use, wpn_req);
                 net_send_cmd(cmd);
                 net_tick();
             } else {
+                local_state.players[0].in_use = use;
+                // Local toggle logic needs to be inside local_update or mirrored here
+                // For simplicity, we just send inputs to local_update and let it handle
+                // But local_update needs the 'use' flag passed down.
+                // Hack: We rely on the server logic for net, but local logic is missing the toggle.
+                // Let's add it briefly:
+                if (use && local_state.players[0].vehicle_cooldown == 0) {
+                     local_state.players[0].in_vehicle = !local_state.players[0].in_vehicle;
+                     local_state.players[0].vehicle_cooldown = 30;
+                }
+                if(local_state.players[0].vehicle_cooldown > 0) local_state.players[0].vehicle_cooldown--;
+                
                 local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn_req, jump, crouch, reload, NULL, 0);
             }
             

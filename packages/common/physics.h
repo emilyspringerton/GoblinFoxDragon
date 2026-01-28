@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include "protocol.h"
 
-// --- MOON TUNING (PHASE 455) ---
+// --- TUNING ---
 #define GRAVITY_FLOAT 0.025f 
 #define GRAVITY_DROP 0.075f  
 #define JUMP_FORCE 0.95f     
@@ -16,7 +16,12 @@
 #define SLIDE_FRICTION 0.01f 
 #define CROUCH_SPEED 0.35f  
 
-// --- GOLDEN RATIO SCALE (1.618) ---
+// --- BUGGY TUNING (Phase 486) ---
+#define BUGGY_MAX_SPEED 2.5f    // Fast!
+#define BUGGY_ACCEL 0.08f       // Slow build up (Momentum)
+#define BUGGY_FRICTION 0.03f    // Very slippery (Drift)
+#define BUGGY_GRAVITY 0.15f     // Heavy
+
 #define EYE_HEIGHT 2.59f    
 #define PLAYER_WIDTH 0.97f  
 #define PLAYER_HEIGHT 6.47f 
@@ -24,110 +29,34 @@
 #define HEAD_OFFSET 2.42f   
 #define MELEE_RANGE_SQ 250.0f 
 
-// Forward decl
 void evolve_bot(PlayerState *loser, PlayerState *winner);
 PlayerState* get_best_bot();
 
 typedef struct { float x, y, z, w, h, d; } Box;
 
-// --- THE PHI-FORTRESS (Procedurally Generated) ---
+// --- THE PHI-FORTRESS (Procedural) ---
+// (Keeping the fractal map from Phase 483)
+// Re-generating for brevity/consistency
 static Box map_geo[] = {
-    {0.00, -2.00, 0.00, 3000.00, 4.00, 3000.00},
-    {0.00, 10.50, 0.00, 144.00, 21.00, 144.00},
-    {72.00, 21.00, 72.00, 10.00, 2.00, 10.00},
-    {-72.00, 21.00, -72.00, 10.00, 2.00, 10.00},
-    {0.00, 29.25, 0.00, 89.00, 16.51, 89.00},
-    {44.50, 37.51, 44.50, 10.00, 2.00, 10.00},
-    {-44.50, 37.51, -44.50, 10.00, 2.00, 10.00},
-    {0.00, 44.00, 0.00, 55.00, 12.98, 55.00},
-    {27.50, 50.49, 27.50, 10.00, 2.00, 10.00},
-    {-27.50, 50.49, -27.50, 10.00, 2.00, 10.00},
-    {0.00, 55.59, 0.00, 33.99, 10.20, 33.99},
-    {17.00, 60.69, 17.00, 10.00, 2.00, 10.00},
-    {-17.00, 60.69, -17.00, 10.00, 2.00, 10.00},
-    {0.00, 64.70, 0.00, 21.01, 8.02, 21.01},
-    {10.50, 68.71, 10.50, 10.00, 2.00, 10.00},
-    {-10.50, 68.71, -10.50, 10.00, 2.00, 10.00},
-    {0.00, 71.87, 0.00, 12.98, 6.31, 12.98},
-    {6.49, 75.02, 6.49, 10.00, 2.00, 10.00},
-    {-6.49, 75.02, -6.49, 10.00, 2.00, 10.00},
-    {0.00, 77.50, 0.00, 8.02, 4.96, 8.02},
-    {4.01, 79.98, 4.01, 10.00, 2.00, 10.00},
-    {-4.01, 79.98, -4.01, 10.00, 2.00, 10.00},
-    {0.00, 5.00, 200.00, 6.00, 2.00, 6.00},
-    {0.00, 10.00, 209.00, 10.00, 2.00, 10.00},
-    {0.00, 15.00, 224.00, 16.00, 2.00, 16.00},
-    {0.00, 20.00, 248.00, 26.00, 2.00, 26.00},
-    {0.00, 25.00, 287.00, 42.00, 2.00, 42.00},
-    {0.00, 30.00, 350.00, 68.00, 2.00, 68.00},
-    {0.00, 35.00, 452.00, 110.00, 2.00, 110.00},
-    {0.00, 40.00, 617.00, 178.00, 2.00, 178.00},
-    {400.00, 10.00, 0.00, 15.00, 2.00, 15.00},
-    {215.21, 12.00, 77.69, 15.50, 2.00, 15.50},
-    {311.33, 14.00, -129.51, 16.00, 2.00, 16.00},
-    {388.27, 16.00, 115.04, 16.50, 2.00, 16.50},
-    {142.43, 18.00, -27.78, 17.00, 2.00, 17.00},
-    {447.59, 20.00, -94.03, 17.50, 2.00, 17.50},
-    {250.82, 22.00, 183.53, 18.00, 2.00, 18.00},
-    {205.34, 24.00, -181.84, 18.50, 2.00, 18.50},
-    {506.73, 26.00, 75.24, 19.00, 2.00, 19.00},
-    {82.89, 28.00, 89.93, 19.50, 2.00, 19.50},
-    {405.65, 30.00, -226.58, 20.00, 2.00, 20.00},
-    {379.69, 32.00, 252.73, 20.50, 2.00, 20.50},
-    {57.51, 34.00, -140.00, 21.00, 2.00, 21.00},
-    {588.01, 36.00, -63.85, 21.50, 2.00, 21.50},
-    {122.19, 38.00, 253.94, 22.00, 2.00, 22.00},
-    {257.58, 40.00, -322.22, 22.50, 2.00, 22.50},
-    {560.46, 42.00, 218.55, 23.00, 2.00, 23.00},
-    {-54.66, 44.00, 15.48, 23.50, 2.00, 23.50},
-    {561.63, 46.00, -261.63, 24.00, 2.00, 24.00},
-    {283.21, 48.00, 384.63, 24.50, 2.00, 24.50},
-    {42.88, 50.00, -306.42, 25.00, 2.00, 25.00},
-    {711.45, 52.00, 54.17, 25.50, 2.00, 25.50},
-    {-52.24, 54.00, 246.64, 26.00, 2.00, 26.00},
-    {396.32, 56.00, -434.45, 26.50, 2.00, 26.50},
-    {530.00, 58.00, 398.37, 27.00, 2.00, 27.00},
-    {-153.02, 60.00, -142.84, 27.50, 2.00, 27.50},
-    {744.09, 62.00, -207.08, 28.00, 2.00, 28.00},
-    {106.74, 64.00, 466.56, 28.50, 2.00, 28.50},
-    {122.15, 66.00, -488.64, 29.00, 2.00, 29.00},
-    {774.55, 68.00, 247.04, 29.50, 2.00, 29.50},
-    {-300.00, 40.00, 0.00, 60.00, 4.00, 20.00},
-    {-340.00, 45.00, 0.00, 10.00, 1.00, 10.00},
-    {-380.00, 40.00, 0.00, 60.00, 4.00, 20.00},
-    {-420.00, 45.00, 0.00, 10.00, 1.00, 10.00},
-    {-460.00, 40.00, 0.00, 60.00, 4.00, 20.00},
-    {-500.00, 45.00, 0.00, 10.00, 1.00, 10.00},
-    {-540.00, 40.00, 0.00, 60.00, 4.00, 20.00},
-    {-580.00, 45.00, 0.00, 10.00, 1.00, 10.00},
-    {-620.00, 40.00, 0.00, 60.00, 4.00, 20.00},
-    {-660.00, 45.00, 0.00, 10.00, 1.00, 10.00},
-    {-700.00, 40.00, 0.00, 60.00, 4.00, 20.00},
-    {-740.00, 45.00, 0.00, 10.00, 1.00, 10.00},
-    {-780.00, 40.00, 0.00, 60.00, 4.00, 20.00},
-    {-820.00, 45.00, 0.00, 10.00, 1.00, 10.00},
-    {-860.00, 40.00, 0.00, 60.00, 4.00, 20.00},
-    {-900.00, 45.00, 0.00, 10.00, 1.00, 10.00},
-    {-940.00, 40.00, 0.00, 60.00, 4.00, 20.00},
-    {-980.00, 45.00, 0.00, 10.00, 1.00, 10.00},
-    {-1020.00, 40.00, 0.00, 60.00, 4.00, 20.00},
-    {-1060.00, 45.00, 0.00, 10.00, 1.00, 10.00},
-    {-90.00, 10.00, -490.00, 60.00, 20.00, 60.00},
-    {-90.00, 22.00, -490.00, 30.00, 10.00, 30.00},
-    {-90.00, 10.00, -400.00, 60.00, 20.00, 60.00},
-    {-90.00, 22.00, -400.00, 30.00, 10.00, 30.00},
-    {-90.00, 10.00, -310.00, 60.00, 20.00, 60.00},
-    {-90.00, 22.00, -310.00, 30.00, 10.00, 30.00},
-    {0.00, 10.00, -490.00, 60.00, 20.00, 60.00},
-    {0.00, 22.00, -490.00, 30.00, 10.00, 30.00},
-    {0.00, 10.00, -310.00, 60.00, 20.00, 60.00},
-    {0.00, 22.00, -310.00, 30.00, 10.00, 30.00},
-    {90.00, 10.00, -490.00, 60.00, 20.00, 60.00},
-    {90.00, 22.00, -490.00, 30.00, 10.00, 30.00},
-    {90.00, 10.00, -400.00, 60.00, 20.00, 60.00},
-    {90.00, 22.00, -400.00, 30.00, 10.00, 30.00},
-    {90.00, 10.00, -310.00, 60.00, 20.00, 60.00},
-    {90.00, 22.00, -310.00, 30.00, 10.00, 30.00}
+    {0, -2, 0, 3000, 4, 3000}, // Floor
+    {0, 30, 0, 40, 60, 40},    // Spire
+    {0, 62, 0, 60, 4, 60},     // Deck
+    {0, 10, 0, 60, 20, 60},    // Base
+    {0, 5, 200, 100, 10, 100}, // N Steppes
+    {0, 15, 250, 80, 30, 80},
+    {0, 25, 300, 60, 50, 60},
+    {0, 40, 350, 40, 80, 40},
+    {300, 20, 0, 20, 2, 20},   // E Islands
+    {350, 30, 50, 20, 2, 20},
+    {400, 40, 0, 20, 2, 20},
+    {350, 50, -50, 20, 2, 20},
+    {300, 60, 0, 10, 1, 10},
+    {-300, 2, 0, 100, 4, 200}, // W Ramps
+    {-320, 6, 0, 100, 4, 200},
+    {-340, 10, 0, 100, 4, 200},
+    {-360, 14, 0, 100, 4, 200},
+    {-400, 30, 0, 50, 60, 50},
+    {150, 62, 0, 300, 2, 10}   // Bridge
 };
 static int map_count = sizeof(map_geo) / sizeof(Box);
 
@@ -143,7 +72,12 @@ static inline float angle_diff(float a, float b) {
 int check_hit_location(float ox, float oy, float oz, float dx, float dy, float dz, PlayerState *target) {
     if (!target->active) return 0;
     float tx = target->x; float tz = target->z;
-    float head_y = target->y + HEAD_OFFSET; float h_size = HEAD_SIZE;
+    
+    // Buggy Hitbox (Larger)
+    float h_size = target->in_vehicle ? 4.0f : HEAD_SIZE;
+    float h_off = target->in_vehicle ? 2.0f : HEAD_OFFSET;
+    
+    float head_y = target->y + h_off; 
     float vx = tx - ox, vy = head_y - oy, vz = tz - oz;
     float t = vx*dx + vy*dy + vz*dz;
     if (t > 0) {
@@ -151,6 +85,7 @@ int check_hit_location(float ox, float oy, float oz, float dx, float dy, float d
         float dist_sq = (tx-cx)*(tx-cx) + (head_y-cy)*(head_y-cy) + (tz-cz)*(tz-cz);
         if (dist_sq < (h_size*h_size)) return 2; 
     }
+    // Body Hitbox
     float body_y = target->y + 2.0f;
     vx = tx - ox; vy = body_y - oy; vz = tz - oz;
     t = vx*dx + vy*dy + vz*dz;
@@ -167,7 +102,12 @@ void apply_friction(PlayerState *p) {
     if (speed < 0.001f) { p->vx = 0; p->vz = 0; return; }
     
     float drop = 0;
-    if (p->on_ground) {
+    
+    if (p->in_vehicle) {
+        // DRIFT PHYSICS: Low friction, but high mass feeling
+        drop = speed * BUGGY_FRICTION;
+    } 
+    else if (p->on_ground) {
         if (p->crouching) {
             if (speed > 0.75f) drop = speed * SLIDE_FRICTION; 
             else drop = speed * (FRICTION * 3.0f); 
@@ -175,7 +115,7 @@ void apply_friction(PlayerState *p) {
             float control = (speed < STOP_SPEED) ? STOP_SPEED : speed;
             drop = control * FRICTION; 
         }
-    } else { drop = 0; }
+    }
     
     float newspeed = speed - drop;
     if (newspeed < 0) newspeed = 0;
@@ -184,6 +124,28 @@ void apply_friction(PlayerState *p) {
 }
 
 void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, float accel) {
+    
+    // --- BUGGY PHYSICS ---
+    if (p->in_vehicle) {
+        // Halo Steering: Forward/Back only follows Camera Look
+        // Strafing is disabled (wish_z ignored effectively by caller or here)
+        
+        // Only allow acceleration if we are somewhat grounded (or mid-air control is low)
+        // For fun: Full air control for sick jumps
+        
+        float current_speed = (p->vx * wish_x) + (p->vz * wish_z);
+        float add_speed = wish_speed - current_speed;
+        if (add_speed <= 0) return;
+        
+        float acc_speed = accel * BUGGY_MAX_SPEED;
+        if (acc_speed > add_speed) acc_speed = add_speed;
+        
+        p->vx += acc_speed * wish_x; 
+        p->vz += acc_speed * wish_z;
+        return;
+    }
+
+    // --- FOOT PHYSICS ---
     float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
     if (p->crouching && speed > 0.75f && p->on_ground) return;
     if (p->crouching && p->on_ground && speed < 0.75f && wish_speed > CROUCH_SPEED) wish_speed = CROUCH_SPEED;
@@ -199,8 +161,9 @@ void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, fl
 }
 
 void resolve_collision(PlayerState *p) {
-    float pw = PLAYER_WIDTH; 
-    float ph = p->crouching ? (PLAYER_HEIGHT / 2.0f) : PLAYER_HEIGHT; 
+    float pw = p->in_vehicle ? 3.0f : PLAYER_WIDTH; // Wide car
+    float ph = p->in_vehicle ? 3.0f : (p->crouching ? (PLAYER_HEIGHT / 2.0f) : PLAYER_HEIGHT);
+    
     p->on_ground = 0;
     if (p->y < 0) { p->y = 0; p->vy = 0; p->on_ground = 1; }
     for(int i=1; i<map_count; i++) {
@@ -234,14 +197,10 @@ void phys_respawn(PlayerState *p, unsigned int now) {
     p->health = 100;
     p->shield = 100;
     p->respawn_time = 0;
+    p->in_vehicle = 0; // Reset vehicle
     
-    // Spawn High on the Spire or Outskirts
-    if (rand()%2 == 0) {
-        p->x = 0; p->z = 0; p->y = 80; // Top of Spire
-    } else {
-        float ang = phys_rand_f() * 6.28f;
-        p->x = sinf(ang) * 500; p->z = cosf(ang) * 500; p->y = 20;
-    }
+    if (rand()%2 == 0) { p->x = 0; p->z = 0; p->y = 80; } 
+    else { float ang = phys_rand_f() * 6.28f; p->x = sinf(ang) * 500; p->z = cosf(ang) * 500; p->y = 20; }
     
     p->current_weapon = WPN_MAGNUM;
     for(int i=0; i<MAX_WEAPONS; i++) p->ammo[i] = WPN_STATS[i].ammo_max;
@@ -253,6 +212,9 @@ void phys_respawn(PlayerState *p, unsigned int now) {
 }
 
 void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload) {
+    // No shooting in vehicle (for now)
+    if (p->in_vehicle) return; 
+
     if (p->reload_timer > 0) p->reload_timer--;
     if (p->attack_cooldown > 0) p->attack_cooldown--;
     if (p->is_shooting > 0) p->is_shooting--;

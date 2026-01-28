@@ -55,15 +55,16 @@ void process_user_cmd(int client_id, UserCmd *cmd) {
     if (cmd->sequence <= client_last_seq[client_id]) return; 
     PlayerState *p = &local_state.players[client_id];
     
-    // Direct Input Mapping
     p->yaw = cmd->yaw;
     p->pitch = cmd->pitch;
-    p->in_fwd = cmd->fwd; // Used in simulation step
+    p->in_fwd = cmd->fwd;
     p->in_strafe = cmd->str;
     p->in_jump = (cmd->buttons & BTN_JUMP);
     p->in_shoot = (cmd->buttons & BTN_ATTACK);
     p->crouching = (cmd->buttons & BTN_CROUCH);
     p->in_reload = (cmd->buttons & BTN_RELOAD);
+    p->in_use = (cmd->buttons & BTN_USE); // Key E
+    
     if (cmd->weapon_idx >= 0 && cmd->weapon_idx < MAX_WEAPONS) p->current_weapon = cmd->weapon_idx;
     
     client_last_seq[client_id] = cmd->sequence;
@@ -94,8 +95,6 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
                     local_state.players[i].active = 1;
                     phys_respawn(&local_state.players[i], get_server_time());
                     printf("CLIENT %d CONNECTED (%s)\n", client_id, ip_str);
-                    
-                    // SEND WELCOME (Assignment)
                     NetHeader h; h.type = PACKET_WELCOME; h.client_id = client_id; 
                     h.sequence = 0; h.timestamp = get_server_time(); h.entity_count = 0;
                     sendto(sock, (char*)&h, sizeof(NetHeader), 0, (struct sockaddr*)sender, sizeof(struct sockaddr_in));
@@ -144,6 +143,7 @@ void server_broadcast() {
             np.crouching = (unsigned char)p->crouching;
             np.reward_feedback = p->accumulated_reward;
             np.ammo = (unsigned char)p->ammo[p->current_weapon];
+            np.in_vehicle = (unsigned char)p->in_vehicle; // Sync Vehicle
             p->accumulated_reward = 0; 
             memcpy(buffer + cursor, &np, sizeof(NetPlayer)); cursor += sizeof(NetPlayer);
         }
@@ -184,20 +184,44 @@ int main() {
                }
             }
             
-            // --- FIX MOVEMENT: CALCULATE VELOCITY FROM INPUTS ---
-            // This was missing! The server knew inputs but didn't apply them to physics.
+            // --- MOVEMENT & VEHICLE LOGIC ---
             if (p->active && p->state != STATE_DEAD) {
+                // Toggle Vehicle (Debounced)
+                if (p->in_use && p->vehicle_cooldown == 0) {
+                    p->in_vehicle = !p->in_vehicle;
+                    p->vehicle_cooldown = 30; // 0.5s cooldown
+                    printf("Client %d Toggle Vehicle: %d\n", i, p->in_vehicle);
+                }
+                if (p->vehicle_cooldown > 0) p->vehicle_cooldown--;
+
                 float rad = p->yaw * 3.14159f / 180.0f;
-                float wish_x = sinf(rad) * p->in_fwd + cosf(rad) * p->in_strafe;
-                float wish_z = cosf(rad) * p->in_fwd - sinf(rad) * p->in_strafe;
+                float wish_x = 0, wish_z = 0;
+                float max_spd = MAX_SPEED;
+                float acc = ACCEL;
+
+                if (p->in_vehicle) {
+                    // Halo Steering: Accelerate towards Camera Look
+                    // Strafing is disabled for car
+                    wish_x = sinf(rad) * p->in_fwd;
+                    wish_z = cosf(rad) * p->in_fwd;
+                    max_spd = BUGGY_MAX_SPEED;
+                    acc = BUGGY_ACCEL;
+                } else {
+                    wish_x = sinf(rad) * p->in_fwd + cosf(rad) * p->in_strafe;
+                    wish_z = cosf(rad) * p->in_fwd - sinf(rad) * p->in_strafe;
+                }
                 
                 float wish_speed = sqrtf(wish_x*wish_x + wish_z*wish_z);
                 if (wish_speed > 1.0f) { wish_speed = 1.0f; wish_x/=wish_speed; wish_z/=wish_speed; }
-                wish_speed *= MAX_SPEED;
+                wish_speed *= max_spd;
                 
-                accelerate(p, wish_x, wish_z, wish_speed, ACCEL);
+                accelerate(p, wish_x, wish_z, wish_speed, acc);
                 
-                // JUMP LOGIC
+                // Gravity
+                float g = p->in_vehicle ? BUGGY_GRAVITY : (p->in_jump ? GRAVITY_FLOAT : GRAVITY_DROP);
+                p->vy -= g;
+                
+                // Jump
                 if (p->in_jump && p->on_ground) { 
                      p->y += 0.1f; p->vy += JUMP_FORCE; 
                 }

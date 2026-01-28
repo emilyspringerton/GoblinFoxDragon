@@ -9,7 +9,7 @@
 #define PACKET_CONNECT 0
 #define PACKET_USERCMD 1
 #define PACKET_SNAPSHOT 2
-#define PACKET_WELCOME  3 // <--- NEW: Handshake
+#define PACKET_WELCOME  3
 
 #define STATE_ALIVE 0
 #define STATE_DEAD  1
@@ -46,6 +46,7 @@ typedef struct {
 #define BTN_ATTACK 2
 #define BTN_CROUCH 4
 #define BTN_RELOAD 8
+#define BTN_USE    16 // <--- NEW: Enter/Exit Vehicle
 
 typedef struct {
     int id; int dmg; int rof; int cnt; float spr; int ammo_max;
@@ -74,6 +75,7 @@ typedef struct {
     unsigned char crouching;
     float reward_feedback; 
     unsigned char ammo; 
+    unsigned char in_vehicle; // <--- NEW: Sync Vehicle State
 } NetPlayer;
 
 typedef struct {
@@ -85,11 +87,16 @@ typedef struct {
     int id; int active; int is_bot;
     float x, y, z; float vx, vy, vz; float yaw, pitch; int on_ground;
     float in_fwd; float in_strafe;
-    int in_jump; int in_shoot; int in_reload; int crouching;
+    int in_jump; int in_shoot; int in_reload; int crouching; int in_use;
     int current_weapon; int ammo[MAX_WEAPONS];
     int reload_timer; int attack_cooldown; int is_shooting; int jump_timer;
     int health; int shield; int shield_regen_timer; int state;
     int kills; int deaths; int hit_feedback; float recoil_anim;
+    
+    // VEHICLE STATE
+    int in_vehicle;     // 0=Foot, 1=Driving
+    int vehicle_cooldown; // Prevent toggle spam
+    
     float accumulated_reward; 
     BotGenome brain;
     unsigned int last_hit_time; unsigned int respawn_time;
