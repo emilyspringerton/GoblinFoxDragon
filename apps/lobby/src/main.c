@@ -42,16 +42,28 @@ float cam_yaw = 0.0f;
 float cam_pitch = 0.0f;
 float current_fov = 75.0f;
 
-// DRAW DISTANCE (Phase 481)
+// DRAW DISTANCE (Phase 484)
 #define Z_NEAR 0.1f
-#define Z_FAR 4000.0f
+#define Z_FAR 8000.0f // <--- 8K VISIBILITY
 
 int sock = -1;
 struct sockaddr_in server_addr;
 
-// --- RENDER FUNCTIONS ---
-void draw_scene(PlayerState *render_p); 
+// --- TRAIL SYSTEM ---
+#define MAX_TRAILS 4096 // Increased for larger map
+#define GRID_SIZE 50.0f
+typedef struct { int cx, cz; float life; } Trail;
+Trail trails[MAX_TRAILS];
+int trail_head = 0;
 
+void add_trail(int x, int z) {
+    int prev = (trail_head - 1 + MAX_TRAILS) % MAX_TRAILS;
+    if (trails[prev].cx == x && trails[prev].cz == z && trails[prev].life > 0.9f) return;
+    trails[trail_head].cx = x; trails[trail_head].cz = z; trails[trail_head].life = 1.0f;
+    trail_head = (trail_head + 1) % MAX_TRAILS;
+}
+
+// --- RENDER FUNCTIONS ---
 void draw_char(char c, float x, float y, float s) {
     glLineWidth(1.0f);
     glBegin(GL_LINES);
@@ -65,27 +77,13 @@ void draw_char(char c, float x, float y, float s) {
     else if(c=='N'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);}
     else if(c=='S'){glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x,y);}
     else if(c=='E'){glVertex2f(x+s,y);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s,y+s);glVertex2f(x,y+s/2);glVertex2f(x+s*0.8,y+s/2);}
-    else if(c=='R'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y);}
+    else if(c=='R'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y);}
     else if(c=='V'){glVertex2f(x,y+s);glVertex2f(x+s/2,y);glVertex2f(x+s/2,y);glVertex2f(x+s,y+s);}
     else if(c==' '){} 
     else { glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x,y); }
     glEnd();
 }
 void draw_string(const char* str, float x, float y, float size) { while(*str) { draw_char(*str, x, y, size); x += size * 1.5f; str++; } }
-
-// --- THE TRAIL SYSTEM ---
-#define MAX_TRAILS 2048
-#define GRID_SIZE 50.0f
-typedef struct { int cx, cz; float life; } Trail;
-Trail trails[MAX_TRAILS];
-int trail_head = 0;
-
-void add_trail(int x, int z) {
-    int prev = (trail_head - 1 + MAX_TRAILS) % MAX_TRAILS;
-    if (trails[prev].cx == x && trails[prev].cz == z && trails[prev].life > 0.9f) return;
-    trails[trail_head].cx = x; trails[trail_head].cz = z; trails[trail_head].life = 1.0f;
-    trail_head = (trail_head + 1) % MAX_TRAILS;
-}
 
 void update_and_draw_trails() {
     glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -116,9 +114,10 @@ void update_and_draw_trails() {
 
 void draw_grid() {
     glLineWidth(1.0f); glBegin(GL_LINES); glColor3f(1.0f, 0.0f, 1.0f); 
-    for(int i=-1500; i<=1500; i+=50) { 
-        glVertex3f(i, 0.1f, -1500); glVertex3f(i, 0.1f, 1500); 
-        glVertex3f(-1500, 0.1f, i); glVertex3f(1500, 0.1f, i); 
+    // EXPANDED GRID FOR 8K VIEW (+/- 4000)
+    for(int i=-4000; i<=4000; i+=50) { 
+        glVertex3f(i, 0.1f, -4000); glVertex3f(i, 0.1f, 4000); 
+        glVertex3f(-4000, 0.1f, i); glVertex3f(4000, 0.1f, i); 
     }
     glEnd();
 }
@@ -344,7 +343,7 @@ int main(int argc, char* argv[]) {
     }
 
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *win = SDL_CreateWindow("SHANKPIT [BUILD 161 - HORIZON]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
+    SDL_Window *win = SDL_CreateWindow("SHANKPIT [BUILD 164 - 8K VIEW]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
     SDL_GL_CreateContext(win);
     net_init();
     
@@ -369,14 +368,13 @@ int main(int argc, char* argv[]) {
                         app_state = STATE_GAME_NET; 
                         net_connect(); 
                         SDL_SetRelativeMouseMode(SDL_TRUE);
-                        glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, Z_FAR); // UPDATED Z_FAR
+                        glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, Z_FAR); 
                         glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
                     }
                     
-                    // --- TRANSITION HANDLER FOR LOCAL ---
                     if (app_state == STATE_GAME_LOCAL) {
                         SDL_SetRelativeMouseMode(SDL_TRUE);
-                        glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, Z_FAR); // UPDATED Z_FAR
+                        glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, Z_FAR); 
                         glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
                     }
                 }
@@ -418,7 +416,7 @@ int main(int argc, char* argv[]) {
 
             float target_fov = (local_state.players[0].current_weapon == WPN_SNIPER && (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT))) ? 20.0f : 75.0f;
             current_fov += (target_fov - current_fov) * 0.2f;
-            glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(current_fov, 1280.0/720.0, 0.1, Z_FAR); // Z_FAR HERE TOO
+            glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(current_fov, 1280.0/720.0, 0.1, Z_FAR); 
             glMatrixMode(GL_MODELVIEW); 
 
             if (app_state == STATE_GAME_NET) {
