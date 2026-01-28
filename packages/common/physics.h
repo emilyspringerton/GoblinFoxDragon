@@ -8,7 +8,7 @@
 // --- TUNING ---
 #define GRAVITY_FLOAT 0.025f 
 #define GRAVITY_DROP 0.075f  
-#define JUMP_FORCE 0.95f     
+#define JUMP_FORCE 1.10f     // <--- TUNED UP (Was 0.95)
 #define MAX_SPEED 0.95f      
 #define FRICTION 0.15f      
 #define ACCEL 0.6f          
@@ -16,11 +16,11 @@
 #define SLIDE_FRICTION 0.01f 
 #define CROUCH_SPEED 0.35f  
 
-// --- BUGGY TUNING (Phase 486) ---
-#define BUGGY_MAX_SPEED 2.5f    // Fast!
-#define BUGGY_ACCEL 0.08f       // Slow build up (Momentum)
-#define BUGGY_FRICTION 0.03f    // Very slippery (Drift)
-#define BUGGY_GRAVITY 0.15f     // Heavy
+// --- BUGGY TUNING ---
+#define BUGGY_MAX_SPEED 2.5f    
+#define BUGGY_ACCEL 0.08f       
+#define BUGGY_FRICTION 0.03f    
+#define BUGGY_GRAVITY 0.15f     
 
 #define EYE_HEIGHT 2.59f    
 #define PLAYER_WIDTH 0.97f  
@@ -35,8 +35,6 @@ PlayerState* get_best_bot();
 typedef struct { float x, y, z, w, h, d; } Box;
 
 // --- THE PHI-FORTRESS (Procedural) ---
-// (Keeping the fractal map from Phase 483)
-// Re-generating for brevity/consistency
 static Box map_geo[] = {
     {0, -2, 0, 3000, 4, 3000}, // Floor
     {0, 30, 0, 40, 60, 40},    // Spire
@@ -73,7 +71,7 @@ int check_hit_location(float ox, float oy, float oz, float dx, float dy, float d
     if (!target->active) return 0;
     float tx = target->x; float tz = target->z;
     
-    // Buggy Hitbox (Larger)
+    // Buggy Hitbox
     float h_size = target->in_vehicle ? 4.0f : HEAD_SIZE;
     float h_off = target->in_vehicle ? 2.0f : HEAD_OFFSET;
     
@@ -104,7 +102,6 @@ void apply_friction(PlayerState *p) {
     float drop = 0;
     
     if (p->in_vehicle) {
-        // DRIFT PHYSICS: Low friction, but high mass feeling
         drop = speed * BUGGY_FRICTION;
     } 
     else if (p->on_ground) {
@@ -124,15 +121,8 @@ void apply_friction(PlayerState *p) {
 }
 
 void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, float accel) {
-    
-    // --- BUGGY PHYSICS ---
+    // BUGGY
     if (p->in_vehicle) {
-        // Halo Steering: Forward/Back only follows Camera Look
-        // Strafing is disabled (wish_z ignored effectively by caller or here)
-        
-        // Only allow acceleration if we are somewhat grounded (or mid-air control is low)
-        // For fun: Full air control for sick jumps
-        
         float current_speed = (p->vx * wish_x) + (p->vz * wish_z);
         float add_speed = wish_speed - current_speed;
         if (add_speed <= 0) return;
@@ -145,7 +135,7 @@ void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, fl
         return;
     }
 
-    // --- FOOT PHYSICS ---
+    // FOOT
     float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
     if (p->crouching && speed > 0.75f && p->on_ground) return;
     if (p->crouching && p->on_ground && speed < 0.75f && wish_speed > CROUCH_SPEED) wish_speed = CROUCH_SPEED;
@@ -161,7 +151,7 @@ void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, fl
 }
 
 void resolve_collision(PlayerState *p) {
-    float pw = p->in_vehicle ? 3.0f : PLAYER_WIDTH; // Wide car
+    float pw = p->in_vehicle ? 3.0f : PLAYER_WIDTH; 
     float ph = p->in_vehicle ? 3.0f : (p->crouching ? (PLAYER_HEIGHT / 2.0f) : PLAYER_HEIGHT);
     
     p->on_ground = 0;
@@ -197,7 +187,7 @@ void phys_respawn(PlayerState *p, unsigned int now) {
     p->health = 100;
     p->shield = 100;
     p->respawn_time = 0;
-    p->in_vehicle = 0; // Reset vehicle
+    p->in_vehicle = 0; 
     
     if (rand()%2 == 0) { p->x = 0; p->z = 0; p->y = 80; } 
     else { float ang = phys_rand_f() * 6.28f; p->x = sinf(ang) * 500; p->z = cosf(ang) * 500; p->y = 20; }
@@ -212,7 +202,6 @@ void phys_respawn(PlayerState *p, unsigned int now) {
 }
 
 void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload) {
-    // No shooting in vehicle (for now)
     if (p->in_vehicle) return; 
 
     if (p->reload_timer > 0) p->reload_timer--;
