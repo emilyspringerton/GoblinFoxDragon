@@ -17,8 +17,11 @@
 #define STATE_PLAYING 2
 
 int app_state = STATE_MAIN_MENU;
+float cam_yaw = 0.0f;
+float cam_pitch = 0.0f;
+float current_fov = 75.0f;
 
-// Simplified drawing from Phase 511
+// Simplified drawing
 void draw_char(char c, float x, float y, float s) {
     glBegin(GL_LINES);
     glVertex2f(x, y); glVertex2f(x+s, y+s);
@@ -45,7 +48,7 @@ void setup_2d() {
 void setup_3d() {
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    gluPerspective(75.0, 1280.0/720.0, 0.1, 5000.0);
+    gluPerspective(current_fov, 1280.0/720.0, 0.1, 8000.0);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     glEnable(GL_DEPTH_TEST);
@@ -53,81 +56,85 @@ void setup_3d() {
 
 int main(int argc, char* argv[]) {
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *win = SDL_CreateWindow("SHANKPIT NAVIGATOR", 100, 100, 1280, 720, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
+    SDL_Window *win = SDL_CreateWindow("SHANKPIT KINETIC", 100, 100, 1280, 720, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
     SDL_GL_CreateContext(win);
     SDL_GL_SetSwapInterval(1);
+
+    local_init_match(1, 0);
 
     int running = 1;
     while(running) {
         SDL_Event e;
         while(SDL_PollEvent(&e)) {
             if(e.type == SDL_QUIT) running = 0;
+            
+            if(e.type == SDL_MOUSEMOTION && app_state == STATE_PLAYING) {
+                float sens = 0.15f;
+                cam_yaw -= e.motion.xrel * sens;
+                cam_pitch -= e.motion.yrel * sens;
+                if(cam_pitch > 89) cam_pitch = 89; if(cam_pitch < -89) cam_pitch = -89;
+            }
+
             if(e.type == SDL_KEYDOWN) {
-                // ESCAPE LOGIC (Double Handshake)
                 if(e.key.keysym.sym == SDLK_ESCAPE) {
                     if(app_state == STATE_PLAYING) {
                         app_state = STATE_B_MENU;
-                        // Mouse stays locked as per requirement
                     } else if (app_state == STATE_B_MENU) {
                         app_state = STATE_MAIN_MENU;
-                        SDL_SetRelativeMouseMode(SDL_FALSE); // Mouse released
+                        SDL_SetRelativeMouseMode(SDL_FALSE);
                     }
                 }
-
-                // NAVIGATION
                 if(app_state == STATE_MAIN_MENU && e.key.keysym.sym == SDLK_b) {
                     app_state = STATE_B_MENU;
                 }
-                
                 if(app_state == STATE_B_MENU && e.key.keysym.sym == SDLK_p) {
                     app_state = STATE_PLAYING;
-                    local_init_match(8, 0); // Init bots
+                    local_init_match(12, 0); 
                     SDL_SetRelativeMouseMode(SDL_TRUE);
                 }
             }
         }
 
-        // RENDER LOGIC
         glClearColor(0.01f, 0.01f, 0.02f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         if (app_state == STATE_MAIN_MENU) {
-            setup_2d();
-            glColor3f(0, 1, 1); // CYAN
+            setup_2d(); glColor3f(0, 1, 1);
             draw_string("SHANKPIT MAIN", 400, 500, 20);
             draw_string("PRESS B FOR STAGING", 400, 400, 10);
         } 
         else if (app_state == STATE_B_MENU) {
-            setup_2d();
-            glColor3f(1, 0, 0); // RED
+            setup_2d(); glColor3f(1, 0, 0);
             draw_string("STAGING AREA", 400, 500, 20);
             draw_string("HIT P TO PLAY", 400, 400, 15);
             draw_string("ESC TO BACK", 400, 300, 8);
         }
         else if (app_state == STATE_PLAYING) {
-            // BASIC INFINITY LEVEL
             setup_3d();
+            PlayerState *p = &local_state.players[0];
             
-            // Movement Update
             const Uint8 *k = SDL_GetKeyboardState(NULL);
             float fwd=0, str=0;
             if(k[SDL_SCANCODE_W]) fwd-=1; if(k[SDL_SCANCODE_S]) fwd+=1;
             if(k[SDL_SCANCODE_D]) str+=1; if(k[SDL_SCANCODE_A]) str-=1;
-            local_update(fwd, str, 0, 0, 0, 0, 0, 0, 0, NULL, 0);
+            int jump = k[SDL_SCANCODE_SPACE];
+            int crouch = k[SDL_SCANCODE_LCTRL];
+            
+            local_update(fwd, str, cam_yaw, cam_pitch, 0, 0, jump, crouch, 0, NULL, 0);
 
-            // Draw Infinite Grid
+            // Cam setup based on player position
+            glRotatef(-cam_pitch, 1, 0, 0);
+            glRotatef(-cam_yaw, 0, 1, 0);
+            glTranslatef(-p->x, -(p->y + EYE_HEIGHT), -p->z);
+
+            // Draw Matrix Grid
             glBegin(GL_LINES);
-            glColor3f(0.2f, 0.2f, 0.5f);
-            for(int i=-1000; i<=1000; i+=50) {
-                glVertex3f(i, 0, -1000); glVertex3f(i, 0, 1000);
-                glVertex3f(-1000, 0, i); glVertex3f(1000, 0, i);
+            glColor3f(0.0f, 1.0f, 0.5f);
+            for(int i=-2000; i<=2000; i+=100) {
+                glVertex3f(i, 0, -2000); glVertex3f(i, 0, 2000);
+                glVertex3f(-2000, 0, i); glVertex3f(2000, 0, i);
             }
             glEnd();
-
-            setup_2d();
-            glColor3f(1, 1, 1);
-            draw_string("LEVEL INFINITY", 50, 650, 10);
-            draw_string("ESC TO STAGING", 50, 600, 8);
         }
 
         SDL_GL_SwapWindow(win);
