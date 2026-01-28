@@ -33,7 +33,7 @@
 char SERVER_HOST[64] = "s.farthq.com";
 int SERVER_PORT = 6969;
 
-int app_state = STATE_LOBBY;
+int app_state = STATE_LOBBY; // Explicitly Lobby
 int wpn_req = 1; 
 int my_client_id = -1;
 
@@ -47,8 +47,28 @@ int sock = -1;
 struct sockaddr_in server_addr;
 
 void draw_char(char c, float x, float y, float s) {
-    glLineWidth(2.0f); glBegin(GL_LINES); // Thicker text for Cyberpunk feel
-    if(c>='0'&&c<='9'){ glVertex2f(x,y+s);glVertex2f(x+s,y+s);glVertex2f(x+s,y);glVertex2f(x,y);glVertex2f(x,y+s); }
+    glLineWidth(1.5f); glBegin(GL_LINES);
+    if(c >= '0' && c <= '9'){ glVertex2f(x,y); glVertex2f(x+s,y); glVertex2f(x+s,y); glVertex2f(x+s,y+s); glVertex2f(x+s,y+s); glVertex2f(x,y+s); glVertex2f(x,y+s); glVertex2f(x,y); }
+    else if(c == 'A'){ glVertex2f(x,y); glVertex2f(x+s/2,y+s); glVertex2f(x+s/2,y+s); glVertex2f(x+s,y); glVertex2f(x+s/4,y+s/2); glVertex2f(x+3*s/4,y+s/2); }
+    else if(c == 'B'){ glVertex2f(x,y); glVertex2f(x,y+s); glVertex2f(x,y+s); glVertex2f(x+s,y+s*0.75); glVertex2f(x+s,y+s*0.75); glVertex2f(x,y+s/2); glVertex2f(x,y+s/2); glVertex2f(x+s,y+s*0.25); glVertex2f(x+s,y+s*0.25); glVertex2f(x,y); }
+    else if(c == 'D'){ glVertex2f(x,y); glVertex2f(x,y+s); glVertex2f(x,y+s); glVertex2f(x+s,y+s/2); glVertex2f(x+s,y+s/2); glVertex2f(x,y); }
+    else if(c == 'J'){ glVertex2f(x,y+s/4); glVertex2f(x+s/2,y); glVertex2f(x+s/2,y); glVertex2f(x+s,y+s); }
+    else if(c == 'N'){ glVertex2f(x,y); glVertex2f(x,y+s); glVertex2f(x,y+s); glVertex2f(x+s,y); glVertex2f(x+s,y); glVertex2f(x+s,y+s); }
+    else if(c == 'S'){ glVertex2f(x+s,y+s); glVertex2f(x,y+s); glVertex2f(x,y+s); glVertex2f(x,y+s/2); glVertex2f(x,y+s/2); glVertex2f(x+s,y+s/2); glVertex2f(x+s,y+s/2); glVertex2f(x+s,y); glVertex2f(x+s,y); glVertex2f(x,y); }
+    else if(c == 'E'){ glVertex2f(x+s,y); glVertex2f(x,y); glVertex2f(x,y); glVertex2f(x,y+s); glVertex2f(x,y+s); glVertex2f(x+s,y+s); glVertex2f(x,y+s/2); glVertex2f(x+s*0.7,y+s/2); }
+    else if(c == 'K'){ glVertex2f(x,y); glVertex2f(x,y+s); glVertex2f(x,y+s/2); glVertex2f(x+s,y+s); glVertex2f(x,y+s/2); glVertex2f(x+s,y); }
+    else if(c == 'H'){ glVertex2f(x,y); glVertex2f(x,y+s); glVertex2f(x+s,y); glVertex2f(x+s,y+s); glVertex2f(x,y+s/2); glVertex2f(x+s,y+s/2); }
+    else if(c == 'P'){ glVertex2f(x,y); glVertex2f(x,y+s); glVertex2f(x,y+s); glVertex2f(x+s,y+s); glVertex2f(x+s,y+s); glVertex2f(x+s,y+s/2); glVertex2f(x+s,y+s/2); glVertex2f(x,y+s/2); }
+    else if(c == 'T'){ glVertex2f(x+s/2,y); glVertex2f(x+s/2,y+s); glVertex2f(x,y+s); glVertex2f(x+s,y+s); }
+    else if(c == 'M'){ glVertex2f(x,y); glVertex2f(x,y+s); glVertex2f(x,y+s); glVertex2f(x+s/2,y+s/2); glVertex2f(x+s/2,y+s/2); glVertex2f(x+s,y+s); glVertex2f(x+s,y+s); glVertex2f(x+s,y); }
+    else if(c == 'U'){ glVertex2f(x,y+s); glVertex2f(x,y); glVertex2f(x,y); glVertex2f(x+s,y); glVertex2f(x+s,y); glVertex2f(x+s,y+s); }
+    else if(c == ':'){ glVertex2f(x+s/2,y+s*0.3); glVertex2f(x+s/2,y+s*0.35); glVertex2f(x+s/2,y+s*0.65); glVertex2f(x+s/2,y+s*0.7); }
+    else if(c == '('){ glVertex2f(x+s,y+s); glVertex2f(x,y+s/2); glVertex2f(x,y+s/2); glVertex2f(x+s,y); }
+    else if(c == ')'){ glVertex2f(x,y+s); glVertex2f(x+s,y+s/2); glVertex2f(x+s,y+s/2); glVertex2f(x,y); }
+    else if(c == '-'){ glVertex2f(x,y+s/2); glVertex2f(x+s,y+s/2); }
+    else { glVertex2f(x,y); glVertex2f(x+s,y+s); glVertex2f(x,y+s); glVertex2f(x+s,y); }
+    glEnd();
+}
     else if(c=='A'){glVertex2f(x,y);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y);glVertex2f(x,y+s/2);glVertex2f(x+s/2,y+s);glVertex2f(x+s/2,y+s);glVertex2f(x+s,y+s/2);}
     else if(c=='B'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s,y+s*0.75);glVertex2f(x+s,y+s*0.75);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x+s,y+s/4);glVertex2f(x+s,y+s/4);glVertex2f(x+s*0.8,y);glVertex2f(x+s*0.8,y);glVertex2f(x,y);}
     else if(c=='D'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x,y);}

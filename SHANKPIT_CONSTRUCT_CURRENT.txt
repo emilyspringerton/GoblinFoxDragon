@@ -1,107 +1,5 @@
-=== SHANKPIT CONSTRUCT: PHASE 495 (UX REFRESH) ===
-.
-./release_monolith
-./release_monolith/config.ini
-./release_monolith/PLAY_DEBUG.bat
-./tools
-./tools/skateboard-cli
-./tools/skateboard-cli/schema.sql
-./tools/skateboard-cli/internal
-./tools/skateboard-cli/internal/parser
-./ops
-./ops/genesis
-./ops/genesis/genesis.json
-./SHANKPIT_CONSTRUCT_CURRENT.txt
-./shank_brain_horde.pth
-./README.md
-./deploy_linux.sh
-./shank_ai_v1.pth
-./README_RUN.txt
-./Makefile
-./run_lag_test
-./run_integration
-./build_win.bat
-./run_stuffing
-./utils
-./utils/cli
-./utils/cli/build_server.py
-./utils/cli/bot_patrol.py
-./utils/cli/reset_server.py
-./utils/cli/nuclear_deploy.py
-./utils/cli/git_sync.py
-./utils/cli/deploy_hybrid.py
-./utils/cli/deploy_server.py
-./run_server_test
-./run_input_test
-./run_tests
-./packages
-./packages/map
-./packages/map/map.h
-./packages/map/map.c
-./packages/protocol
-./packages/protocol/protocol.h
-./packages/common
-./packages/common/config_loader.h
-./packages/common/protocol.h
-./packages/common/physics.h
-./packages/simulation
-./packages/simulation/game_physics.h
-./packages/simulation/local_game.h
-./packages/simulation/brain_weights.h
-./packages/simulation/neural_net.h
-./packages/simulation/bot_ai.h
-./apps
-./apps/tests
-./apps/tests/test_lag_comp.c
-./apps/tests/test_netcode.c
-./apps/tests/test_inputs.c
-./apps/tests/test_server_logic.c
-./apps/tests/test_integration.c
-./apps/tests/test_stuffing.c
-./apps/training
-./apps/training/headless.c
-./apps/shank-fps
-./apps/shank-fps/src
-./apps/shank-fps/src/net.h
-./apps/shank-fps/src/input.c
-./apps/shank-fps/src/shank.h
-./apps/shank-fps/src/particles.h
-./apps/shank-fps/src/input.h
-./apps/shank-fps/src/net.c
-./apps/shank-fps/src/main.c
-./apps/shank-fps/src/font.h
-./apps/client
-./apps/client/bot_main.c
-./apps/lobby
-./apps/lobby/src
-./apps/lobby/src/main.c
-./apps/bot_client
-./apps/bot_client/swarm_launcher.py
-./apps/bot_client/bot_runner.py
-./apps/bot_client/src
-./apps/bot_client/src/main.c
-./apps/server
-./apps/server/src
-./apps/server/src/main.c
-./services
-./services/game-server
-./services/game-server/src
-./services/game-server/src/heartbeat.h
-./services/game-server/src/server.c
-./services/skate-node
-./services/skate-node/bridge
-./services/skate-node/bridge/bridge.go
-./services/skate-node/consensus
-./services/skate-node/consensus/pow
-./services/skate-node/consensus/pol
-./services/skate-node/chain
-./services/skate-node/chain/engine.go
-./services/skate-node/chain/types.go
-./services/master-server
-./services/master-server/main.go
-./release_temp
-./release_temp/config.ini
-./release_temp/PLAY_SHANK.bat
+=== SHANKPIT CONSTRUCT: PHASE 496 (FONT STABILITY) ===
+
 
 === BEGIN FILE: apps/lobby/src/main.c ===
 #define SDL_MAIN_HANDLED
@@ -139,7 +37,7 @@
 char SERVER_HOST[64] = "s.farthq.com";
 int SERVER_PORT = 6969;
 
-int app_state = STATE_LOBBY;
+int app_state = STATE_LOBBY; // Explicitly Lobby
 int wpn_req = 1; 
 int my_client_id = -1;
 
@@ -153,8 +51,28 @@ int sock = -1;
 struct sockaddr_in server_addr;
 
 void draw_char(char c, float x, float y, float s) {
-    glLineWidth(2.0f); glBegin(GL_LINES); // Thicker text for Cyberpunk feel
-    if(c>='0'&&c<='9'){ glVertex2f(x,y+s);glVertex2f(x+s,y+s);glVertex2f(x+s,y);glVertex2f(x,y);glVertex2f(x,y+s); }
+    glLineWidth(1.5f); glBegin(GL_LINES);
+    if(c >= '0' && c <= '9'){ glVertex2f(x,y); glVertex2f(x+s,y); glVertex2f(x+s,y); glVertex2f(x+s,y+s); glVertex2f(x+s,y+s); glVertex2f(x,y+s); glVertex2f(x,y+s); glVertex2f(x,y); }
+    else if(c == 'A'){ glVertex2f(x,y); glVertex2f(x+s/2,y+s); glVertex2f(x+s/2,y+s); glVertex2f(x+s,y); glVertex2f(x+s/4,y+s/2); glVertex2f(x+3*s/4,y+s/2); }
+    else if(c == 'B'){ glVertex2f(x,y); glVertex2f(x,y+s); glVertex2f(x,y+s); glVertex2f(x+s,y+s*0.75); glVertex2f(x+s,y+s*0.75); glVertex2f(x,y+s/2); glVertex2f(x,y+s/2); glVertex2f(x+s,y+s*0.25); glVertex2f(x+s,y+s*0.25); glVertex2f(x,y); }
+    else if(c == 'D'){ glVertex2f(x,y); glVertex2f(x,y+s); glVertex2f(x,y+s); glVertex2f(x+s,y+s/2); glVertex2f(x+s,y+s/2); glVertex2f(x,y); }
+    else if(c == 'J'){ glVertex2f(x,y+s/4); glVertex2f(x+s/2,y); glVertex2f(x+s/2,y); glVertex2f(x+s,y+s); }
+    else if(c == 'N'){ glVertex2f(x,y); glVertex2f(x,y+s); glVertex2f(x,y+s); glVertex2f(x+s,y); glVertex2f(x+s,y); glVertex2f(x+s,y+s); }
+    else if(c == 'S'){ glVertex2f(x+s,y+s); glVertex2f(x,y+s); glVertex2f(x,y+s); glVertex2f(x,y+s/2); glVertex2f(x,y+s/2); glVertex2f(x+s,y+s/2); glVertex2f(x+s,y+s/2); glVertex2f(x+s,y); glVertex2f(x+s,y); glVertex2f(x,y); }
+    else if(c == 'E'){ glVertex2f(x+s,y); glVertex2f(x,y); glVertex2f(x,y); glVertex2f(x,y+s); glVertex2f(x,y+s); glVertex2f(x+s,y+s); glVertex2f(x,y+s/2); glVertex2f(x+s*0.7,y+s/2); }
+    else if(c == 'K'){ glVertex2f(x,y); glVertex2f(x,y+s); glVertex2f(x,y+s/2); glVertex2f(x+s,y+s); glVertex2f(x,y+s/2); glVertex2f(x+s,y); }
+    else if(c == 'H'){ glVertex2f(x,y); glVertex2f(x,y+s); glVertex2f(x+s,y); glVertex2f(x+s,y+s); glVertex2f(x,y+s/2); glVertex2f(x+s,y+s/2); }
+    else if(c == 'P'){ glVertex2f(x,y); glVertex2f(x,y+s); glVertex2f(x,y+s); glVertex2f(x+s,y+s); glVertex2f(x+s,y+s); glVertex2f(x+s,y+s/2); glVertex2f(x+s,y+s/2); glVertex2f(x,y+s/2); }
+    else if(c == 'T'){ glVertex2f(x+s/2,y); glVertex2f(x+s/2,y+s); glVertex2f(x,y+s); glVertex2f(x+s,y+s); }
+    else if(c == 'M'){ glVertex2f(x,y); glVertex2f(x,y+s); glVertex2f(x,y+s); glVertex2f(x+s/2,y+s/2); glVertex2f(x+s/2,y+s/2); glVertex2f(x+s,y+s); glVertex2f(x+s,y+s); glVertex2f(x+s,y); }
+    else if(c == 'U'){ glVertex2f(x,y+s); glVertex2f(x,y); glVertex2f(x,y); glVertex2f(x+s,y); glVertex2f(x+s,y); glVertex2f(x+s,y+s); }
+    else if(c == ':'){ glVertex2f(x+s/2,y+s*0.3); glVertex2f(x+s/2,y+s*0.35); glVertex2f(x+s/2,y+s*0.65); glVertex2f(x+s/2,y+s*0.7); }
+    else if(c == '('){ glVertex2f(x+s,y+s); glVertex2f(x,y+s/2); glVertex2f(x,y+s/2); glVertex2f(x+s,y); }
+    else if(c == ')'){ glVertex2f(x,y+s); glVertex2f(x+s,y+s/2); glVertex2f(x+s,y+s/2); glVertex2f(x,y); }
+    else if(c == '-'){ glVertex2f(x,y+s/2); glVertex2f(x+s,y+s/2); }
+    else { glVertex2f(x,y); glVertex2f(x+s,y+s); glVertex2f(x,y+s); glVertex2f(x+s,y); }
+    glEnd();
+}
     else if(c=='A'){glVertex2f(x,y);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y);glVertex2f(x,y+s/2);glVertex2f(x+s/2,y+s);glVertex2f(x+s/2,y+s);glVertex2f(x+s,y+s/2);}
     else if(c=='B'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s,y+s*0.75);glVertex2f(x+s,y+s*0.75);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x+s,y+s/4);glVertex2f(x+s,y+s/4);glVertex2f(x+s*0.8,y);glVertex2f(x+s*0.8,y);glVertex2f(x,y);}
     else if(c=='D'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x,y);}
@@ -725,248 +643,6 @@ int main(int argc, char* argv[]) {
 === END FILE: apps/lobby/src/main.c ===
 
 
-=== BEGIN FILE: apps/server/src/main.c ===
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include <math.h>
-
-#ifdef _WIN32
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
-    #pragma comment(lib, "ws2_32.lib")
-#else
-    #include <sys/socket.h>
-    #include <netinet/in.h>
-    #include <arpa/inet.h>
-    #include <unistd.h>
-    #include <fcntl.h>
-#endif
-
-#include "../../../packages/common/protocol.h"
-#include "../../../packages/common/physics.h"
-#include "../../../packages/simulation/local_game.h"
-
-int sock = -1;
-struct sockaddr_in bind_addr;
-unsigned int client_last_seq[MAX_CLIENTS]; 
-
-unsigned int get_server_time() {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (unsigned int)(ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
-}
-
-void server_net_init() {
-    setbuf(stdout, NULL);
-    #ifdef _WIN32
-    WSADATA wsa; WSAStartup(MAKEWORD(2,2), &wsa);
-    #endif
-    sock = socket(AF_INET, SOCK_DGRAM, 0);
-    #ifdef _WIN32
-    u_long mode = 1; ioctlsocket(sock, FIONBIO, &mode);
-    #else
-    int flags = fcntl(sock, F_GETFL, 0); fcntl(sock, F_SETFL, flags | O_NONBLOCK);
-    #endif
-    bind_addr.sin_family = AF_INET;
-    bind_addr.sin_port = htons(6969); 
-    bind_addr.sin_addr.s_addr = INADDR_ANY;
-    if (bind(sock, (struct sockaddr*)&bind_addr, sizeof(bind_addr)) < 0) {
-        printf("FAILED TO BIND PORT 6969\n");
-        exit(1);
-    } else {
-        printf("SERVER LISTENING ON PORT 6969\nWaiting...\n");
-    }
-}
-
-void process_user_cmd(int client_id, UserCmd *cmd) {
-    if (cmd->sequence <= client_last_seq[client_id]) return; 
-    PlayerState *p = &local_state.players[client_id];
-    p->yaw = cmd->yaw;
-    p->pitch = cmd->pitch;
-    p->in_fwd = cmd->fwd;
-    p->in_strafe = cmd->str;
-    p->in_jump = (cmd->buttons & BTN_JUMP);
-    p->in_shoot = (cmd->buttons & BTN_ATTACK);
-    p->crouching = (cmd->buttons & BTN_CROUCH);
-    p->in_reload = (cmd->buttons & BTN_RELOAD);
-    p->in_use = (cmd->buttons & BTN_USE);
-    if (cmd->weapon_idx >= 0 && cmd->weapon_idx < MAX_WEAPONS) p->current_weapon = cmd->weapon_idx;
-    client_last_seq[client_id] = cmd->sequence;
-}
-
-void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
-    if (size < sizeof(NetHeader)) return;
-    NetHeader *head = (NetHeader*)buffer;
-    int client_id = -1;
-    
-    for(int i=1; i<MAX_CLIENTS; i++) {
-        if (local_state.client_active[i] && 
-            memcmp(&local_state.clients[i].sin_addr, &sender->sin_addr, sizeof(struct in_addr)) == 0 &&
-            local_state.clients[i].sin_port == sender->sin_port) {
-            client_id = i;
-            break;
-        }
-    }
-    
-    if (client_id == -1) {
-        if (head->type == PACKET_CONNECT) {
-            char *ip_str = inet_ntoa(sender->sin_addr);
-            for(int i=1; i<MAX_CLIENTS; i++) {
-                if (!local_state.client_active[i]) {
-                    client_id = i;
-                    local_state.client_active[i] = 1;
-                    local_state.clients[i] = *sender;
-                    local_state.players[i].active = 1;
-                    phys_respawn(&local_state.players[i], get_server_time());
-                    printf("CLIENT %d CONNECTED (%s)\n", client_id, ip_str);
-                    NetHeader h;
-                    h.type = PACKET_WELCOME; h.client_id = client_id; 
-                    h.sequence = 0; h.timestamp = get_server_time(); h.entity_count = 0;
-                    sendto(sock, (char*)&h, sizeof(NetHeader), 0, (struct sockaddr*)sender, sizeof(struct sockaddr_in));
-                    break;
-                }
-            }
-        }
-    }
-    
-    if (client_id != -1 && head->type == PACKET_USERCMD) {
-        int cursor = sizeof(NetHeader);
-        unsigned char count = *(unsigned char*)(buffer + cursor); cursor += 1;
-        if (size >= cursor + (count * sizeof(UserCmd))) {
-            UserCmd *cmds = (UserCmd*)(buffer + cursor);
-            for (int i = count - 1; i >= 0; i--) process_user_cmd(client_id, &cmds[i]);
-            local_state.players[client_id].active = 1;
-        }
-    }
-}
-
-void server_broadcast() {
-    char buffer[4096];
-    int cursor = 0;
-    NetHeader head;
-    head.type = PACKET_SNAPSHOT; head.client_id = 0; 
-    head.sequence = local_state.server_tick; head.timestamp = get_server_time();
-    
-    unsigned char count = 0;
-    for(int i=0; i<MAX_CLIENTS; i++) if (local_state.players[i].active) count++;
-    head.entity_count = count;
-    
-    memcpy(buffer + cursor, &head, sizeof(NetHeader)); cursor += sizeof(NetHeader);
-    memcpy(buffer + cursor, &count, 1); cursor += 1;
-    
-    for(int i=0; i<MAX_CLIENTS; i++) {
-        PlayerState *p = &local_state.players[i];
-        if (p->active) {
-            NetPlayer np;
-            np.id = (unsigned char)i;
-            np.x = p->x; np.y = p->y; np.z = p->z;
-            np.yaw = p->yaw; np.pitch = p->pitch;
-            np.current_weapon = (unsigned char)p->current_weapon;
-            np.state = (unsigned char)p->state;
-            np.health = (unsigned char)p->health;
-            np.shield = (unsigned char)p->shield;
-            np.is_shooting = (unsigned char)p->is_shooting;
-            np.crouching = (unsigned char)p->crouching;
-            np.reward_feedback = p->accumulated_reward;
-            np.ammo = (unsigned char)p->ammo[p->current_weapon];
-            np.in_vehicle = (unsigned char)p->in_vehicle;
-            np.hit_feedback = (unsigned char)p->hit_feedback; // <--- SYNC HIT
-            
-            p->accumulated_reward = 0;
-            memcpy(buffer + cursor, &np, sizeof(NetPlayer)); cursor += sizeof(NetPlayer);
-        }
-    }
-    
-    for(int i=1; i<MAX_CLIENTS; i++) {
-        if (local_state.client_active[i]) {
-            sendto(sock, buffer, cursor, 0, (struct sockaddr*)&local_state.clients[i], sizeof(struct sockaddr_in));
-        }
-    }
-}
-
-int main() {
-    server_net_init();
-    local_init_match(1, 0); 
-    int running = 1;
-    unsigned int tick = 0;
-    
-    while(running) {
-        char buffer[1024];
-        struct sockaddr_in sender;
-        socklen_t slen = sizeof(sender);
-        int len = recvfrom(sock, buffer, 1024, 0, (struct sockaddr*)&sender, &slen);
-        while (len > 0) {
-            server_handle_packet(&sender, buffer, len);
-            len = recvfrom(sock, buffer, 1024, 0, (struct sockaddr*)&sender, &slen);
-        }
-        
-        unsigned int now = get_server_time();
-        int active_count = 0;
-        
-        for(int i=0; i<MAX_CLIENTS; i++) {
-            PlayerState *p = &local_state.players[i];
-            if (p->active) active_count++;
-            
-            if (p->state == STATE_DEAD) {
-               if (local_state.game_mode != MODE_SURVIVAL && now > p->respawn_time) {
-                   phys_respawn(p, now);
-               }
-            }
-            
-            if (p->active && p->state != STATE_DEAD) {
-                if (p->in_use && p->vehicle_cooldown == 0) {
-                    p->in_vehicle = !p->in_vehicle;
-                    p->vehicle_cooldown = 30; 
-                    printf("Client %d Toggle Vehicle: %d\n", i, p->in_vehicle);
-                }
-                if (p->vehicle_cooldown > 0) p->vehicle_cooldown--;
-                float rad = p->yaw * 3.14159f / 180.0f;
-                float wish_x = 0, wish_z = 0;
-                float max_spd = MAX_SPEED;
-                float acc = ACCEL;
-
-                if (p->in_vehicle) {
-                    wish_x = sinf(rad) * p->in_fwd;
-                    wish_z = cosf(rad) * p->in_fwd;
-                    max_spd = BUGGY_MAX_SPEED;
-                    acc = BUGGY_ACCEL;
-                } else {
-                    wish_x = sinf(rad) * p->in_fwd + cosf(rad) * p->in_strafe;
-                    wish_z = cosf(rad) * p->in_fwd - sinf(rad) * p->in_strafe;
-                }
-                
-                float wish_speed = sqrtf(wish_x*wish_x + wish_z*wish_z);
-                if (wish_speed > 1.0f) { wish_speed = 1.0f; wish_x/=wish_speed; wish_z/=wish_speed; }
-                wish_speed *= max_spd;
-                accelerate(p, wish_x, wish_z, wish_speed, acc);
-                
-                float g = p->in_vehicle ? BUGGY_GRAVITY : (p->in_jump ? GRAVITY_FLOAT : GRAVITY_DROP);
-                p->vy -= g;
-                if (p->in_jump && p->on_ground) { 
-                     p->y += 0.1f;
-                     p->vy += JUMP_FORCE; 
-                }
-            }
-            update_entity(p, 0.016f, NULL, now);
-        }
-        server_broadcast();
-        if (tick % 300 == 0) printf("[STATUS] Tick: %d | Clients: %d\n", tick, active_count);
-        local_state.server_tick++;
-        #ifdef _WIN32
-        Sleep(16);
-        #else
-        usleep(16000);
-        #endif
-        tick++;
-    }
-    return 0;
-}
-
-=== END FILE: apps/server/src/main.c ===
-
-
 === BEGIN FILE: packages/common/physics.h ===
 #ifndef PHYSICS_H
 #define PHYSICS_H
@@ -1260,139 +936,6 @@ int phys_resolve_rewind(ServerState *server, int client_id, unsigned int target_
 #endif
 
 === END FILE: packages/common/physics.h ===
-
-
-=== BEGIN FILE: packages/common/protocol.h ===
-#ifndef PROTOCOL_H
-#define PROTOCOL_H
-
-#define MAX_CLIENTS 70
-#define MAX_WEAPONS 5
-#define MAX_PROJECTILES 1024
-#define LAG_HISTORY 64
-
-#define PACKET_CONNECT 0
-#define PACKET_USERCMD 1
-#define PACKET_SNAPSHOT 2
-#define PACKET_WELCOME  3
-
-#define STATE_ALIVE 0
-#define STATE_DEAD  1
-#define STATE_SPECTATOR 2
-
-#define WPN_KNIFE 0
-#define WPN_MAGNUM 1
-#define WPN_AR 2
-#define WPN_SHOTGUN 3
-#define WPN_SNIPER 4
-
-#define RELOAD_TIME_FULL 60      
-#define RELOAD_TIME_TACTICAL 42  
-#define SHIELD_REGEN_DELAY 180 
-
-typedef struct {
-    unsigned char type;
-    unsigned char client_id;
-    unsigned short sequence;
-    unsigned int timestamp;
-    unsigned char entity_count; 
-} NetHeader;
-
-typedef struct {
-    unsigned int sequence;
-    unsigned int timestamp;
-    unsigned short msec;
-    float fwd; float str;
-    float yaw; float pitch;    
-    unsigned int buttons;
-    int weapon_idx;
-} UserCmd;
-
-#define BTN_JUMP   1
-#define BTN_ATTACK 2
-#define BTN_CROUCH 4
-#define BTN_RELOAD 8
-#define BTN_USE    16 
-
-typedef struct {
-    int id;
-    int dmg; int rof; int cnt; float spr; int ammo_max;
-} WeaponStats;
-
-static const WeaponStats WPN_STATS[MAX_WEAPONS] = {
-    {WPN_KNIFE,   200, 20, 1, 0.0f,  0},   
-    {WPN_MAGNUM,  45, 25, 1, 0.0f,  6},   
-    {WPN_AR,      20, 6,  1, 0.04f, 30},  
-    {WPN_SHOTGUN, 128, 17, 8, 0.15f, 8},   
-    {WPN_SNIPER,  101, 70, 1, 0.0f,  5}    
-};
-
-typedef struct {
-    int active; float x, y, z; float vx, vy, vz; int owner_id;
-} Projectile;
-
-typedef struct {
-    unsigned char id; 
-    float x, y, z; float yaw, pitch;
-    unsigned char current_weapon;
-    unsigned char state;
-    unsigned char health;
-    unsigned char shield;
-    unsigned char is_shooting;
-    unsigned char crouching;
-    float reward_feedback; 
-    unsigned char ammo;
-    unsigned char in_vehicle;
-    unsigned char hit_feedback; 
-} NetPlayer;
-
-typedef struct {
-    int version;
-    float w_aggro;
-    float w_strafe; float w_jump; float w_slide; float w_turret; float w_repel;      
-} BotGenome;
-
-typedef struct {
-    int id;
-    int active; int is_bot;
-    float x, y, z; float vx, vy, vz; float yaw, pitch; int on_ground;
-    float in_fwd;
-    float in_strafe;
-    int in_jump; int in_shoot; int in_reload; int crouching; int in_use;
-    int current_weapon; int ammo[MAX_WEAPONS];
-    int reload_timer; int attack_cooldown;
-    int is_shooting; int jump_timer;
-    int health; int shield; int shield_regen_timer; int state;
-    int kills; int deaths; int hit_feedback; float recoil_anim;
-    int in_vehicle;     
-    int vehicle_cooldown;
-    float accumulated_reward; 
-    BotGenome brain;
-    unsigned int last_hit_time;
-    unsigned int respawn_time;
-} PlayerState;
-
-typedef struct {
-    int active; unsigned int timestamp;
-    float x, y, z;
-    float vx, vy, vz;
-} LagRecord;
-
-typedef enum { MODE_DEATHMATCH=0, MODE_TDM=1, MODE_SURVIVAL=2, MODE_CTF=3, MODE_ODDBALL=4, MODE_LOCAL=98, MODE_NET=99, MODE_EVOLUTION=100 } GameMode;
-
-typedef struct {
-    PlayerState players[MAX_CLIENTS];
-    Projectile projectiles[MAX_PROJECTILES];
-    LagRecord history[MAX_CLIENTS][LAG_HISTORY];
-    int server_tick;
-    int game_mode;
-    struct sockaddr_in clients[MAX_CLIENTS];
-    int client_active[MAX_CLIENTS];
-} ServerState;
-
-#endif
-
-=== END FILE: packages/common/protocol.h ===
 
 
 === BEGIN FILE: packages/simulation/local_game.h ===
