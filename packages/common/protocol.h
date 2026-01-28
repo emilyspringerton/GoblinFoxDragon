@@ -1,6 +1,12 @@
 #ifndef PROTOCOL_H
 #define PROTOCOL_H
 
+#ifdef _WIN32
+    #include <winsock2.h>
+#else
+    #include <netinet/in.h>
+#endif
+
 #define MAX_CLIENTS 70
 #define MAX_WEAPONS 5
 #define MAX_PROJECTILES 1024
@@ -45,12 +51,17 @@ typedef struct {
 
 typedef struct { int active; float x, y, z, vx, vy, vz; int owner_id; } Projectile;
 typedef struct { unsigned char id; float x, y, z, yaw, pitch; unsigned char current_weapon, state, health, shield, is_shooting, crouching; float reward_feedback; unsigned char ammo, in_vehicle, hit_feedback; } NetPlayer;
+typedef struct { int active; unsigned int timestamp; float x, y, z, vx, vy, vz; } LagRecord;
+
 typedef enum { MODE_DEATHMATCH=0, MODE_LOCAL=98, MODE_NET=99, MODE_EVOLUTION=100 } GameMode;
 
 typedef struct {
     PlayerState players[MAX_CLIENTS];
     Projectile projectiles[MAX_PROJECTILES];
+    LagRecord history[MAX_CLIENTS][LAG_HISTORY];
     int server_tick, game_mode;
+    struct sockaddr_in clients[MAX_CLIENTS]; // FIXED: Required for Server Build
+    int client_active[MAX_CLIENTS];          // FIXED: Required for Server Build
 } ServerState;
 
 #endif
