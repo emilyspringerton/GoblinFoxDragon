@@ -144,6 +144,8 @@ void server_broadcast() {
             np.reward_feedback = p->accumulated_reward;
             np.ammo = (unsigned char)p->ammo[p->current_weapon];
             np.in_vehicle = (unsigned char)p->in_vehicle;
+            np.hit_feedback = (unsigned char)p->hit_feedback; // <--- SYNC HIT
+            
             p->accumulated_reward = 0;
             memcpy(buffer + cursor, &np, sizeof(NetPlayer)); cursor += sizeof(NetPlayer);
         }

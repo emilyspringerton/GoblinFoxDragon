@@ -1,4 +1,4 @@
-=== SHANKPIT CONSTRUCT: PHASE 487 (YELLOW FLOOR) ===
+=== SHANKPIT CONSTRUCT: PHASE 488 (DOUBLE-RING KILL) ===
 
 --- FILE STRUCTURE ---
 .
@@ -164,7 +164,7 @@ void draw_char(char c, float x, float y, float s) {
     else if(c=='O'){glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x,y);}
     else if(c=='I'){glVertex2f(x+s/2,y);glVertex2f(x+s/2,y+s);glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x,y+s);glVertex2f(x+s,y+s);}
     else if(c=='N'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);}
-    else if(c=='S'){glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x,y);}
+    else if(c=='S'){glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x+s,y);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x,y);}
     else if(c=='E'){glVertex2f(x+s,y);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s,y+s);glVertex2f(x,y+s/2);glVertex2f(x+s*0.8,y+s/2);}
     else if(c=='R'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y);}
     else if(c=='V'){glVertex2f(x,y+s);glVertex2f(x+s/2,y);glVertex2f(x+s/2,y);glVertex2f(x+s,y+s);}
@@ -217,7 +217,7 @@ void update_and_draw_trails() {
 
 void draw_grid() {
     glLineWidth(1.0f); glBegin(GL_LINES); 
-    glColor3f(1.0f, 1.0f, 0.0f); // --- YELLOW FLOOR (Requested Exception) ---
+    glColor3f(1.0f, 1.0f, 0.0f); 
     for(int i=-4000; i<=4000; i+=50) { 
         glVertex3f(i, 0.1f, -4000); glVertex3f(i, 0.1f, 4000);
         glVertex3f(-4000, 0.1f, i); glVertex3f(4000, 0.1f, i); 
@@ -354,6 +354,18 @@ void draw_player_3rd(PlayerState *p) {
     glPopMatrix();
 }
 
+// --- NEW HELPER: Wireframe Circle ---
+void draw_circle(float x, float y, float r, int segments) {
+    glBegin(GL_LINE_LOOP);
+    for(int i=0; i<segments; i++) {
+        float theta = 2.0f * 3.1415926f * (float)i / (float)segments;
+        float cx = r * cosf(theta);
+        float cy = r * sinf(theta);
+        glVertex2f(x + cx, y + cy);
+    }
+    glEnd();
+}
+
 void draw_hud(PlayerState *p) {
     glDisable(GL_DEPTH_TEST);
     glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
@@ -362,6 +374,20 @@ void draw_hud(PlayerState *p) {
     if (current_fov < 50.0f) { glBegin(GL_LINES); glVertex2f(0, 360); glVertex2f(1280, 360); glVertex2f(640, 0); glVertex2f(640, 720); glEnd(); } 
     else { glLineWidth(2.0f); glBegin(GL_LINES); glVertex2f(630, 360); glVertex2f(650, 360); glVertex2f(640, 350); glVertex2f(640, 370); glEnd(); }
     
+    // --- HIT INDICATORS ---
+    if (p->hit_feedback > 0) {
+        if (p->hit_feedback >= 25) glColor3f(1.0f, 0.0f, 0.0f); // RED (Kill/High Dmg)
+        else glColor3f(0.0f, 1.0f, 0.0f); // GREEN (Normal)
+        
+        glLineWidth(2.0f);
+        draw_circle(640, 360, 20.0f, 16); // Hit Ring
+        
+        // DOUBLE RING FOR KILL
+        if (p->hit_feedback >= 25) {
+            draw_circle(640, 360, 28.0f, 16); // Outer Kill Ring
+        }
+    }
+
     glColor3f(0.2f, 0, 0); glRectf(50, 50, 250, 70); glColor3f(1.0f, 0, 0);
     glRectf(50, 50, 50 + (p->health * 2), 70);
     glColor3f(0, 0, 0.2f); glRectf(50, 80, 250, 100); glColor3f(0.2f, 0.2f, 1.0f);
@@ -471,6 +497,16 @@ void net_process_snapshot(char *buffer, int len) {
             p->current_weapon = np->current_weapon;
             p->is_shooting = np->is_shooting;
             p->in_vehicle = np->in_vehicle;
+            
+            // --- SYNC HIT MARKER ---
+            if (id == my_client_id) {
+                // We trust local prediction for movement, but server for hits
+                // If server says we have a hit feedback > 0, we take it
+                if (np->hit_feedback > p->hit_feedback) p->hit_feedback = np->hit_feedback;
+            } else {
+                 p->hit_feedback = np->hit_feedback;
+            }
+
             if (p->is_shooting) p->recoil_anim = 1.0f;
         } else if (id == 0) {
             local_state.players[0].ammo[local_state.players[0].current_weapon] = np->ammo;
@@ -505,7 +541,7 @@ int main(int argc, char* argv[]) {
     }
 
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *win = SDL_CreateWindow("SHANKPIT [BUILD 171 - REVERSION]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
+    SDL_Window *win = SDL_CreateWindow("SHANKPIT [BUILD 172 - KILL RINGS]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
     SDL_GL_CreateContext(win);
     net_init();
     
@@ -754,6 +790,8 @@ void server_broadcast() {
             np.reward_feedback = p->accumulated_reward;
             np.ammo = (unsigned char)p->ammo[p->current_weapon];
             np.in_vehicle = (unsigned char)p->in_vehicle;
+            np.hit_feedback = (unsigned char)p->hit_feedback; // <--- SYNC HIT
+            
             p->accumulated_reward = 0;
             memcpy(buffer + cursor, &np, sizeof(NetPlayer)); cursor += sizeof(NetPlayer);
         }
@@ -920,11 +958,8 @@ static inline float angle_diff(float a, float b) {
 int check_hit_location(float ox, float oy, float oz, float dx, float dy, float dz, PlayerState *target) {
     if (!target->active) return 0;
     float tx = target->x; float tz = target->z;
-    
-    // Buggy Hitbox (Larger)
     float h_size = target->in_vehicle ? 4.0f : HEAD_SIZE;
     float h_off = target->in_vehicle ? 2.0f : HEAD_OFFSET;
-    
     float head_y = target->y + h_off;
     float vx = tx - ox, vy = head_y - oy, vz = tz - oz;
     float t = vx*dx + vy*dy + vz*dz;
@@ -933,7 +968,6 @@ int check_hit_location(float ox, float oy, float oz, float dx, float dy, float d
         float dist_sq = (tx-cx)*(tx-cx) + (head_y-cy)*(head_y-cy) + (tz-cz)*(tz-cz);
         if (dist_sq < (h_size*h_size)) return 2;
     }
-    // Body Hitbox
     float body_y = target->y + 2.0f;
     vx = tx - ox; vy = body_y - oy; vz = tz - oz;
     t = vx*dx + vy*dy + vz*dz;
@@ -962,7 +996,6 @@ void apply_friction(PlayerState *p) {
             drop = control * FRICTION; 
         }
     }
-    
     float newspeed = speed - drop;
     if (newspeed < 0) newspeed = 0;
     newspeed /= speed;
@@ -974,15 +1007,11 @@ void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, fl
         float current_speed = (p->vx * wish_x) + (p->vz * wish_z);
         float add_speed = wish_speed - current_speed;
         if (add_speed <= 0) return;
-        
         float acc_speed = accel * BUGGY_MAX_SPEED;
         if (acc_speed > add_speed) acc_speed = add_speed;
-        
-        p->vx += acc_speed * wish_x; 
-        p->vz += acc_speed * wish_z;
+        p->vx += acc_speed * wish_x; p->vz += acc_speed * wish_z;
         return;
     }
-
     float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
     if (p->crouching && speed > 0.75f && p->on_ground) return;
     if (p->crouching && p->on_ground && speed < 0.75f && wish_speed > CROUCH_SPEED) wish_speed = CROUCH_SPEED;
@@ -991,8 +1020,7 @@ void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, fl
     if (add_speed <= 0) return;
     float acc_speed = accel * MAX_SPEED; 
     if (acc_speed > add_speed) acc_speed = add_speed;
-    p->vx += acc_speed * wish_x; 
-    p->vz += acc_speed * wish_z;
+    p->vx += acc_speed * wish_x; p->vz += acc_speed * wish_z;
 }
 
 void resolve_collision(PlayerState *p) {
@@ -1007,19 +1035,15 @@ void resolve_collision(PlayerState *p) {
             if (p->y < b.y + b.h/2 && p->y + ph > b.y - b.h/2) {
                 float prev_y = p->y - p->vy;
                 if (prev_y >= b.y + b.h/2) {
-                    p->y = b.y + b.h/2;
-                    p->vy = 0; p->on_ground = 1;
+                    p->y = b.y + b.h/2; p->vy = 0; p->on_ground = 1;
                 } else {
-                    float dx = p->x - b.x;
-                    float dz = p->z - b.z;
+                    float dx = p->x - b.x; float dz = p->z - b.z;
                     float w = (b.w > 0.1f) ? b.w : 1.0f;
                     float d = (b.d > 0.1f) ? b.d : 1.0f;
                     if (fabs(dx)/w > fabs(dz)/d) { 
-                        p->vx = 0;
-                        p->x = (dx > 0) ? b.x + b.w/2 + pw : b.x - b.w/2 - pw;
+                        p->vx = 0; p->x = (dx > 0) ? b.x + b.w/2 + pw : b.x - b.w/2 - pw;
                     } else { 
-                        p->vz = 0;
-                        p->z = (dz > 0) ? b.z + b.d/2 + pw : b.z - b.d/2 - pw;
+                        p->vz = 0; p->z = (dz > 0) ? b.z + b.d/2 + pw : b.z - b.d/2 - pw;
                     }
                 }
             }
@@ -1028,18 +1052,12 @@ void resolve_collision(PlayerState *p) {
 }
 
 void phys_respawn(PlayerState *p, unsigned int now) {
-    p->active = 1;
-    p->state = STATE_ALIVE;
-    p->health = 100;
-    p->shield = 100;
-    p->respawn_time = 0;
-    p->in_vehicle = 0;
-    
+    p->active = 1; p->state = STATE_ALIVE;
+    p->health = 100; p->shield = 100; p->respawn_time = 0; p->in_vehicle = 0;
     if (rand()%2 == 0) { p->x = 0; p->z = 0; p->y = 80; } 
     else { float ang = phys_rand_f() * 6.28f;
         p->x = sinf(ang) * 500; p->z = cosf(ang) * 500; p->y = 20;
     }
-    
     p->current_weapon = WPN_MAGNUM;
     for(int i=0; i<MAX_WEAPONS; i++) p->ammo[i] = WPN_STATS[i].ammo_max;
     if (p->is_bot) {
@@ -1069,11 +1087,8 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
             p->attack_cooldown = WPN_STATS[w].rof;
             if (w != WPN_KNIFE) p->ammo[w]--;
             
-            float r = -p->yaw * 0.0174533f;
-            float rp = p->pitch * 0.0174533f;
-            float dx = sinf(r) * cosf(rp);
-            float dy = sinf(rp);
-            float dz = -cosf(r) * cosf(rp);
+            float r = -p->yaw * 0.0174533f; float rp = p->pitch * 0.0174533f;
+            float dx = sinf(r) * cosf(rp); float dy = sinf(rp); float dz = -cosf(r) * cosf(rp);
             if (WPN_STATS[w].spr > 0) {
                 dx += phys_rand_f() * WPN_STATS[w].spr;
                 dy += phys_rand_f() * WPN_STATS[w].spr;
@@ -1095,16 +1110,17 @@ void update_weapons(PlayerState *p, PlayerState *targets, int shoot, int reload)
                     p->accumulated_reward += 10.0f;
                     targets[i].shield_regen_timer = SHIELD_REGEN_DELAY;
                     if (hit_type == 2 && targets[i].shield <= 0) { damage *= 3; p->hit_feedback = 20;
-                    } else { p->hit_feedback = 10; }
+                    } else { p->hit_feedback = 10; } // <--- STANDARD HIT
+                    
                     if (targets[i].shield > 0) {
                         if (targets[i].shield >= damage) { targets[i].shield -= damage; damage = 0; } 
                         else { damage -= targets[i].shield; targets[i].shield = 0; }
                     }
                     targets[i].health -= damage;
                     if(targets[i].health <= 0) {
-                        p->kills++;
-                        targets[i].deaths++; 
+                        p->kills++; targets[i].deaths++; 
                         p->accumulated_reward += 1000.0f;
+                        p->hit_feedback = 30; // <--- KILL CONFIRM (Triggers Double Ring)
                         phys_respawn(&targets[i], 0);
                     }
                 }
@@ -1128,8 +1144,7 @@ int phys_resolve_rewind(ServerState *server, int client_id, unsigned int target_
     for(int i=0; i<LAG_HISTORY; i++) {
         if (!hist[i].active) continue;
         if (hist[i].timestamp == target_time) { 
-            out_pos[0] = hist[i].x;
-            out_pos[1] = hist[i].y; out_pos[2] = hist[i].z;
+            out_pos[0] = hist[i].x; out_pos[1] = hist[i].y; out_pos[2] = hist[i].z;
             return 1;
         }
     }
@@ -1220,7 +1235,8 @@ typedef struct {
     unsigned char crouching;
     float reward_feedback; 
     unsigned char ammo;
-    unsigned char in_vehicle; 
+    unsigned char in_vehicle;
+    unsigned char hit_feedback; // <--- NEW: Sync Hit Marker
 } NetPlayer;
 
 typedef struct {

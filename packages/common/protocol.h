@@ -77,7 +77,8 @@ typedef struct {
     unsigned char crouching;
     float reward_feedback; 
     unsigned char ammo;
-    unsigned char in_vehicle; 
+    unsigned char in_vehicle;
+    unsigned char hit_feedback; // <--- NEW: Sync Hit Marker
 } NetPlayer;
 
 typedef struct {

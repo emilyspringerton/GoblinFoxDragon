@@ -56,7 +56,7 @@ void draw_char(char c, float x, float y, float s) {
     else if(c=='O'){glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x,y);}
     else if(c=='I'){glVertex2f(x+s/2,y);glVertex2f(x+s/2,y+s);glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x,y+s);glVertex2f(x+s,y+s);}
     else if(c=='N'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);}
-    else if(c=='S'){glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x,y);}
+    else if(c=='S'){glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x+s,y);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x,y);}
     else if(c=='E'){glVertex2f(x+s,y);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s,y+s);glVertex2f(x,y+s/2);glVertex2f(x+s*0.8,y+s/2);}
     else if(c=='R'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y);}
     else if(c=='V'){glVertex2f(x,y+s);glVertex2f(x+s/2,y);glVertex2f(x+s/2,y);glVertex2f(x+s,y+s);}
@@ -109,7 +109,7 @@ void update_and_draw_trails() {
 
 void draw_grid() {
     glLineWidth(1.0f); glBegin(GL_LINES); 
-    glColor3f(1.0f, 1.0f, 0.0f); // --- YELLOW FLOOR (Requested Exception) ---
+    glColor3f(1.0f, 1.0f, 0.0f); 
     for(int i=-4000; i<=4000; i+=50) { 
         glVertex3f(i, 0.1f, -4000); glVertex3f(i, 0.1f, 4000);
         glVertex3f(-4000, 0.1f, i); glVertex3f(4000, 0.1f, i); 
@@ -246,6 +246,18 @@ void draw_player_3rd(PlayerState *p) {
     glPopMatrix();
 }
 
+// --- NEW HELPER: Wireframe Circle ---
+void draw_circle(float x, float y, float r, int segments) {
+    glBegin(GL_LINE_LOOP);
+    for(int i=0; i<segments; i++) {
+        float theta = 2.0f * 3.1415926f * (float)i / (float)segments;
+        float cx = r * cosf(theta);
+        float cy = r * sinf(theta);
+        glVertex2f(x + cx, y + cy);
+    }
+    glEnd();
+}
+
 void draw_hud(PlayerState *p) {
     glDisable(GL_DEPTH_TEST);
     glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
@@ -254,6 +266,20 @@ void draw_hud(PlayerState *p) {
     if (current_fov < 50.0f) { glBegin(GL_LINES); glVertex2f(0, 360); glVertex2f(1280, 360); glVertex2f(640, 0); glVertex2f(640, 720); glEnd(); } 
     else { glLineWidth(2.0f); glBegin(GL_LINES); glVertex2f(630, 360); glVertex2f(650, 360); glVertex2f(640, 350); glVertex2f(640, 370); glEnd(); }
     
+    // --- HIT INDICATORS ---
+    if (p->hit_feedback > 0) {
+        if (p->hit_feedback >= 25) glColor3f(1.0f, 0.0f, 0.0f); // RED (Kill/High Dmg)
+        else glColor3f(0.0f, 1.0f, 0.0f); // GREEN (Normal)
+        
+        glLineWidth(2.0f);
+        draw_circle(640, 360, 20.0f, 16); // Hit Ring
+        
+        // DOUBLE RING FOR KILL
+        if (p->hit_feedback >= 25) {
+            draw_circle(640, 360, 28.0f, 16); // Outer Kill Ring
+        }
+    }
+
     glColor3f(0.2f, 0, 0); glRectf(50, 50, 250, 70); glColor3f(1.0f, 0, 0);
     glRectf(50, 50, 50 + (p->health * 2), 70);
     glColor3f(0, 0, 0.2f); glRectf(50, 80, 250, 100); glColor3f(0.2f, 0.2f, 1.0f);
@@ -363,6 +389,16 @@ void net_process_snapshot(char *buffer, int len) {
             p->current_weapon = np->current_weapon;
             p->is_shooting = np->is_shooting;
             p->in_vehicle = np->in_vehicle;
+            
+            // --- SYNC HIT MARKER ---
+            if (id == my_client_id) {
+                // We trust local prediction for movement, but server for hits
+                // If server says we have a hit feedback > 0, we take it
+                if (np->hit_feedback > p->hit_feedback) p->hit_feedback = np->hit_feedback;
+            } else {
+                 p->hit_feedback = np->hit_feedback;
+            }
+
             if (p->is_shooting) p->recoil_anim = 1.0f;
         } else if (id == 0) {
             local_state.players[0].ammo[local_state.players[0].current_weapon] = np->ammo;
@@ -397,7 +433,7 @@ int main(int argc, char* argv[]) {
     }
 
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *win = SDL_CreateWindow("SHANKPIT [BUILD 171 - REVERSION]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
+    SDL_Window *win = SDL_CreateWindow("SHANKPIT [BUILD 172 - KILL RINGS]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
     SDL_GL_CreateContext(win);
     net_init();
     
