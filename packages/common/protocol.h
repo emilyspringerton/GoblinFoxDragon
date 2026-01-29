@@ -22,6 +22,7 @@
 
 #define STATE_ALIVE 0
 #define STATE_DEAD  1
+#define STATE_SPECTATOR 2
 
 #define WPN_KNIFE 0
 #define WPN_MAGNUM 1
@@ -132,7 +133,8 @@ typedef struct {
     float vx, vy, vz;
 } LagRecord;
 
-typedef enum { MODE_DEATHMATCH=0, MODE_LOCAL=98, MODE_NET=99, MODE_EVOLUTION=100 } GameMode;
+// RE-ADDED MODE_SURVIVAL
+typedef enum { MODE_DEATHMATCH=0, MODE_TDM=1, MODE_SURVIVAL=2, MODE_CTF=3, MODE_ODDBALL=4, MODE_LOCAL=98, MODE_NET=99, MODE_EVOLUTION=100 } GameMode;
 
 typedef struct {
     PlayerState players[MAX_CLIENTS];
