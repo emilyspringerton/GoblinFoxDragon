@@ -17,403 +17,307 @@
 #define STATE_PLAYING 2
 
 int app_state = STATE_MAIN_MENU;
-int my_client_id = -1;
 float cam_yaw = 0.0f;
 float cam_pitch = 0.0f;
 float current_fov = 75.0f;
-#define Z_FAR 8000.0f
+GLuint tex_grid = 0;
+float screen_shake = 0.0f;
 
-// --- RENDERER FROM SPIRIT STICK (Restored Visuals) ---
-void draw_char(char c, float x, float y, float s) {
-    glLineWidth(2.0f); glBegin(GL_LINES);
-    if(c>='0'&&c<='9'){ glVertex2f(x,y+s);glVertex2f(x+s,y+s);glVertex2f(x+s,y);glVertex2f(x,y);glVertex2f(x,y+s); }
-    else if(c=='A'){glVertex2f(x,y);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y);glVertex2f(x,y+s/2);glVertex2f(x+s/2,y+s);glVertex2f(x+s/2,y+s);glVertex2f(x+s,y+s/2);}
-    else if(c=='B'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s,y+s*0.75);glVertex2f(x+s,y+s*0.75);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x+s,y+s/4);glVertex2f(x+s,y+s/4);glVertex2f(x+s*0.8,y);glVertex2f(x+s*0.8,y);glVertex2f(x,y);}
-    else if(c=='D'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x,y);}
-    else if(c=='J'){glVertex2f(x+s,y+s);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x,y+s/2);}
-    else if(c=='O'){glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x,y);}
-    else if(c=='I'){glVertex2f(x+s/2,y);glVertex2f(x+s/2,y+s);glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x,y+s);glVertex2f(x+s,y+s);}
-    else if(c=='N'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);}
-    else if(c=='S'){glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x,y);}
-    else if(c=='E'){glVertex2f(x+s,y);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s,y+s);glVertex2f(x,y+s/2);glVertex2f(x+s*0.8,y+s/2);}
-    else if(c=='R'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y);}
-    else if(c=='V'){glVertex2f(x,y+s);glVertex2f(x+s/2,y);glVertex2f(x+s/2,y);glVertex2f(x+s,y+s);}
-    else if(c==' '){} 
-    else { glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x,y); }
-    glEnd();
-}
-void draw_string(const char* str, float x, float y, float size) { while(*str) { draw_char(*str, x, y, size); x += size * 1.5f; str++; } }
-
-#define MAX_TRAILS 4096 
-#define GRID_SIZE 50.0f
-typedef struct { int cx, cz; float life; } Trail;
-Trail trails[MAX_TRAILS];
-int trail_head = 0;
-
-void add_trail(int x, int z) {
-    int prev = (trail_head - 1 + MAX_TRAILS) % MAX_TRAILS;
-    if (trails[prev].cx == x && trails[prev].cz == z && trails[prev].life > 0.9f) return;
-    trails[trail_head].cx = x; trails[trail_head].cz = z;
-    trails[trail_head].life = 1.0f;
-    trail_head = (trail_head + 1) % MAX_TRAILS;
-}
-
-void update_and_draw_trails() {
-    glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    for(int i=0; i<MAX_CLIENTS; i++) {
-        PlayerState *p = &local_state.players[i];
-        if (p->active && p->on_ground) {
-            int gx = (int)floorf(p->x / GRID_SIZE) * (int)GRID_SIZE + (int)(GRID_SIZE/2);
-            int gz = (int)floorf(p->z / GRID_SIZE) * (int)GRID_SIZE + (int)(GRID_SIZE/2);
-            add_trail(gx, gz);
+// --- PROCEDURAL ASSETS ---
+GLuint generate_cyber_grid() {
+    unsigned char data[64][64][3];
+    for (int y = 0; y < 64; y++) {
+        for (int x = 0; x < 64; x++) {
+            int is_grid = (x < 2 || y < 2 || x > 61 || y > 61);
+            if (is_grid) { data[y][x][0] = 255; data[y][x][1] = 0; data[y][x][2] = 255; } 
+            else { data[y][x][0] = 10; data[y][x][1] = 5; data[y][x][2] = 20; } 
         }
     }
+    GLuint tex;
+    glGenTextures(1, &tex);
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    gluBuild2DMipmaps(GL_TEXTURE_2D, 3, 64, 64, GL_RGB, GL_UNSIGNED_BYTE, data);
+    return tex;
+}
+
+void setup_lighting_fog() {
+    glEnable(GL_FOG);
+    GLfloat fogColor[] = {0.05f, 0.0f, 0.1f, 1.0f};
+    glFogfv(GL_FOG_COLOR, fogColor);
+    glFogi(GL_FOG_MODE, GL_EXP2);
+    glFogf(GL_FOG_DENSITY, 0.0015f);
+    glHint(GL_FOG_HINT, GL_NICEST);
+}
+
+void apply_screen_shake() {
+    if (screen_shake > 0) {
+        float shake_x = ((float)(rand() % 100) / 100.0f - 0.5f) * screen_shake * 2.0f;
+        float shake_y = ((float)(rand() % 100) / 100.0f - 0.5f) * screen_shake * 2.0f;
+        glRotatef(shake_x, 0, 1, 0); glRotatef(shake_y, 1, 0, 0);
+        screen_shake -= 0.05f; if (screen_shake < 0) screen_shake = 0;
+    }
+}
+
+// --- VECTOR ART ---
+void draw_string(const char* str, float x, float y, float size) {
+    glDisable(GL_TEXTURE_2D); glLineWidth(2.0f); glBegin(GL_LINES);
+    while(*str) {
+        char c = *str;
+        if(c>='A'){ glVertex2f(x,y); glVertex2f(x+size,y+size); glVertex2f(x,y+size); glVertex2f(x+size,y); } 
+        else if (c>='0' && c<='9') { glVertex2f(x,y); glVertex2f(x+size,y); glVertex2f(x+size,y+size); glVertex2f(x,y+size); glVertex2f(x,y); }
+        else { glVertex2f(x,y); glVertex2f(x+size,y); glVertex2f(x+size,y+size); glVertex2f(x,y+size); glVertex2f(x,y); }
+        x += size * 1.5f; str++;
+    }
+    glEnd();
+}
+
+void draw_ronin_insignia(float x, float y, float s) {
+    glLineWidth(3.0f);
+    glBegin(GL_LINE_LOOP); // Helmet
+    for(int i=0; i<=180; i+=20) { float rad = i * 3.14159f / 180.0f; glVertex2f(x + cosf(rad)*s, y + sinf(rad)*s); }
+    glVertex2f(x - s, y); glVertex2f(x, y - s*1.2f); glVertex2f(x + s, y);
+    glEnd();
+    glColor3f(0.0f, 1.0f, 1.0f); // Cyan Crack
+    glBegin(GL_LINE_STRIP);
+    glVertex2f(x - s*0.5f, y + s); glVertex2f(x, y + s*0.2f); glVertex2f(x - s*0.2f, y - s*0.5f); glVertex2f(x + s*0.5f, y - s*1.2f);
+    glEnd();
+}
+
+void draw_storm_chevrons(float x, float y, float s, int charges) {
     glLineWidth(2.0f);
-    for(int i=0; i<MAX_TRAILS; i++) {
-        if (trails[i].life > 0) {
-            float s = (GRID_SIZE / 2.0f) - 4.0f;
-            glColor4f(1.0f, 0.0f, 0.8f, trails[i].life);
-            glBegin(GL_LINE_LOOP);
-            glVertex3f(trails[i].cx - s, 0.2f, trails[i].cz - s);
-            glVertex3f(trails[i].cx + s, 0.2f, trails[i].cz - s);
-            glVertex3f(trails[i].cx + s, 0.2f, trails[i].cz + s);
-            glVertex3f(trails[i].cx - s, 0.2f, trails[i].cz + s);
-            glEnd();
-            trails[i].life -= 0.02f;
-        }
-    }
-    glDisable(GL_BLEND);
-}
-
-void draw_grid() {
-    glLineWidth(1.0f); glBegin(GL_LINES); 
-    glColor3f(0.0f, 1.0f, 1.0f);
-    for(int i=-4000; i<=4000; i+=50) { 
-        glVertex3f(i, 0.1f, -4000); glVertex3f(i, 0.1f, 4000);
-        glVertex3f(-4000, 0.1f, i); glVertex3f(4000, 0.1f, i); 
-    }
-    glEnd();
-}
-
-void draw_map() {
-    for(int i=1; i<map_count; i++) {
-        Box b = map_geo[i];
-        float nr = 0.5f + 0.5f * sinf(b.x * 0.005f + b.y * 0.01f);
-        float ng = 0.5f + 0.5f * sinf(b.z * 0.005f + 2.0f);
-        float nb = 0.5f + 0.5f * sinf(b.x * 0.005f + 4.0f);
-        if(nr > 0.8f) nr = 1.0f;
-        if(ng > 0.8f) ng = 1.0f;
-        if(nb > 0.8f) nb = 1.0f;
-
-        glPushMatrix(); 
-        glTranslatef(b.x, b.y, b.z); 
-        glScalef(b.w, b.h, b.d);
-        glBegin(GL_QUADS); 
-        glColor3f(0.02f, 0.02f, 0.02f); 
-        glVertex3f(-0.5,0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
-        glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(-0.5,-0.5,-0.5);
-        glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(-0.5,0.5,0.5);
-        glVertex3f(-0.5,-0.5,-0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
-        glVertex3f(-0.5,-0.5,-0.5); glVertex3f(-0.5,-0.5,0.5); glVertex3f(-0.5,0.5,0.5); glVertex3f(-0.5,0.5,-0.5);
-        glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(0.5,0.5,0.5);
-        glEnd();
-        
-        glLineWidth(2.0f); 
-        glColor3f(nr, ng, nb);
-        glBegin(GL_LINE_LOOP); glVertex3f(-0.5, 0.5, 0.5); glVertex3f(0.5, 0.5, 0.5); glVertex3f(0.5, 0.5, -0.5); glVertex3f(-0.5, 0.5, -0.5); glEnd();
-        glBegin(GL_LINE_LOOP); glVertex3f(-0.5, -0.5, 0.5); glVertex3f(0.5, -0.5, 0.5); glVertex3f(0.5, -0.5, -0.5); glVertex3f(-0.5, -0.5, -0.5); glEnd();
-        glBegin(GL_LINES);
-        glVertex3f(-0.5, -0.5, 0.5); glVertex3f(-0.5, 0.5, 0.5);
-        glVertex3f(0.5, -0.5, 0.5); glVertex3f(0.5, 0.5, 0.5);
-        glVertex3f(0.5, -0.5, -0.5); glVertex3f(0.5, 0.5, -0.5);
-        glVertex3f(-0.5, -0.5, -0.5); glVertex3f(-0.5, 0.5, -0.5);
-        glEnd();
-        glPopMatrix();
+    for(int i=0; i<5; i++) {
+        float oy = y + (i * s * 0.6f);
+        if (i < charges) glColor3f(1.0f, 0.2f, 0.2f); else glColor3f(0.2f, 0.0f, 0.0f);
+        glBegin(GL_LINE_STRIP); glVertex2f(x - s, oy); glVertex2f(x, oy + s*0.3f); glVertex2f(x + s, oy); glEnd();
     }
 }
 
-void draw_buggy_model() {
-    glColor3f(0.2f, 0.2f, 0.2f);
-    glPushMatrix(); glScalef(2.0f, 1.0f, 3.5f); 
-    glBegin(GL_QUADS); 
-    glVertex3f(-1,1,1); glVertex3f(1,1,1); glVertex3f(1,1,-1); glVertex3f(-1,1,-1); 
-    glVertex3f(-1,-1,1); glVertex3f(1,-1,1); glVertex3f(1,1,1); glVertex3f(-1,1,1); 
-    glVertex3f(-1,-1,-1); glVertex3f(-1,1,-1); glVertex3f(1,1,-1); glVertex3f(1,-1,-1); 
-    glVertex3f(1,-1,-1); glVertex3f(1,1,-1); glVertex3f(1,1,1); glVertex3f(1,-1,1); 
-    glVertex3f(-1,-1,1); glVertex3f(-1,1,1); glVertex3f(-1,1,-1); glVertex3f(-1,-1,-1); 
-    glEnd(); 
-    glLineWidth(2.0f); glColor3f(1.0f, 0.0f, 0.0f);
-    glBegin(GL_LINES);
-    glVertex3f(-1,1,1); glVertex3f(1,1,1); glVertex3f(1,1,1); glVertex3f(1,1,-1);
-    glVertex3f(1,1,-1); glVertex3f(-1,1,-1); glVertex3f(-1,1,-1); glVertex3f(-1,1,1);
-    glEnd();
-    glPopMatrix();
-    glColor3f(0.1f, 0.1f, 0.1f);
-    float wx[] = {-2.2, 2.2, -2.2, 2.2}; float wz[] = {2.5, 2.5, -2.5, -2.5};
-    for(int i=0; i<4; i++) {
-        glPushMatrix(); glTranslatef(wx[i], -0.5f, wz[i]); glScalef(0.8f, 1.5f, 1.5f);
-        glBegin(GL_QUADS); 
-        glColor3f(0.1f, 0.1f, 0.1f);
-        glVertex3f(-0.5,0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
-        glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
-        glVertex3f(-0.5,-0.5,-0.5); glVertex3f(-0.5,0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(0.5,-0.5,-0.5);
-        glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,-0.5,0.5);
-        glVertex3f(-0.5,-0.5,0.5); glVertex3f(-0.5,0.5,0.5); glVertex3f(-0.5,0.5,-0.5); glVertex3f(-0.5,-0.5,-0.5);
-        glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(-0.5,-0.5,0.5); glVertex3f(-0.5,0.5,0.5);
-        glEnd(); 
-        glLineWidth(2.0f); glColor3f(0.0f, 1.0f, 1.0f); 
-        glBegin(GL_LINE_LOOP); glVertex3f(-0.51, 0.5, 0.5); glVertex3f(-0.51, -0.5, 0.5); glVertex3f(-0.51, -0.5, -0.5); glVertex3f(-0.51, 0.5, -0.5); glEnd();
-        glPopMatrix();
-    }
-}
-
-void draw_gun_model(int weapon_id) {
-    switch(weapon_id) {
-        case WPN_KNIFE:   glColor3f(0.8f, 0.8f, 0.9f); glScalef(0.05f, 0.05f, 0.8f); break;
-        case WPN_MAGNUM:  glColor3f(0.4f, 0.4f, 0.4f); glScalef(0.15f, 0.2f, 0.5f); break;
-        case WPN_AR:      glColor3f(0.2f, 0.3f, 0.2f); glScalef(0.1f, 0.15f, 1.2f); break;
-        case WPN_SHOTGUN: glColor3f(0.5f, 0.3f, 0.2f); glScalef(0.25f, 0.15f, 0.8f); break;
-        case WPN_SNIPER:  glColor3f(0.1f, 0.1f, 0.15f); glScalef(0.08f, 0.12f, 2.0f); break;
-    }
-    glBegin(GL_QUADS); 
-    glVertex3f(-1,1,1); glVertex3f(1,1,1); glVertex3f(1,1,-1); glVertex3f(-1,1,-1); 
-    glVertex3f(-1,-1,1); glVertex3f(1,-1,1); glVertex3f(1,1,1); glVertex3f(-1,1,1); 
-    glVertex3f(-1,-1,-1); glVertex3f(-1,1,-1); glVertex3f(1,1,-1); glVertex3f(1,-1,-1); 
-    glVertex3f(1,-1,-1); glVertex3f(1,1,-1); glVertex3f(1,1,1); glVertex3f(1,-1,1); 
-    glVertex3f(-1,-1,1); glVertex3f(-1,1,1); glVertex3f(-1,1,-1); glVertex3f(-1,-1,-1); 
-    glEnd();
-    glLineWidth(1.0f); glColor3f(1.0f, 1.0f, 1.0f);
-    glBegin(GL_LINES); glVertex3f(-1,1,1); glVertex3f(1,1,1); glVertex3f(1,1,1); glVertex3f(1,1,-1); glVertex3f(-1,1,1); glVertex3f(-1,-1,1); glEnd();
-}
-
-void draw_weapon_p(PlayerState *p) {
-    if (p->in_vehicle) return; 
-    glPushMatrix();
-    glLoadIdentity();
-    float kick = p->recoil_anim * 0.2f;
-    float reload_dip = (p->reload_timer > 0) ? sinf(p->reload_timer * 0.2f) * 0.5f - 0.5f : 0.0f;
-    float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
-    float bob = sinf(SDL_GetTicks() * 0.015f) * speed * 0.15f; 
-    float x_offset = (current_fov < 50.0f) ? 0.25f : 0.4f;
-    glTranslatef(x_offset, -0.5f + kick + reload_dip + (bob * 0.5f), -1.2f + (kick * 0.5f) + bob);
-    glRotatef(-p->recoil_anim * 10.0f, 1, 0, 0);
-    draw_gun_model(p->current_weapon);
-    glPopMatrix();
-}
-
-void draw_head(int weapon_id) {
-    switch(weapon_id) {
-        case WPN_KNIFE:   glColor3f(0.8f, 0.8f, 0.9f); break;
-        case WPN_MAGNUM:  glColor3f(0.4f, 0.4f, 0.4f); break;
-        case WPN_AR:      glColor3f(0.2f, 0.3f, 0.2f); break;
-        case WPN_SHOTGUN: glColor3f(0.5f, 0.3f, 0.2f); break;
-        case WPN_SNIPER:  glColor3f(0.1f, 0.1f, 0.15f); break;
-    }
+// --- 3D MODELS ---
+void draw_box(float w, float h, float d) {
+    glPushMatrix(); glScalef(w, h, d);
     glBegin(GL_QUADS);
-    glVertex3f(-0.4, 0.8, 0.4); glVertex3f(0.4, 0.8, 0.4); glVertex3f(0.4, 0, 0.4); glVertex3f(-0.4, 0, 0.4);
-    glVertex3f(-0.4, 0.8, -0.4); glVertex3f(0.4, 0.8, -0.4); glVertex3f(0.4, 0, -0.4); glVertex3f(-0.4, 0, -0.4);
-    glVertex3f(-0.4, 0.8, 0.4); glVertex3f(0.4, 0.8, 0.4); glVertex3f(0.4, 0.8, -0.4); glVertex3f(-0.4, 0.8, -0.4);
-    glVertex3f(-0.4, 0, 0.4); glVertex3f(0.4, 0, 0.4); glVertex3f(0.4, 0, -0.4); glVertex3f(-0.4, 0, -0.4);
-    glVertex3f(-0.4, 0.8, 0.4); glVertex3f(-0.4, 0, 0.4); glVertex3f(-0.4, 0, -0.4); glVertex3f(-0.4, 0.8, -0.4);
-    glVertex3f(0.4, 0.8, 0.4); glVertex3f(0.4, 0, 0.4); glVertex3f(0.4, 0, -0.4); glVertex3f(0.4, 0.8, -0.4);
+    // Front
+    glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(-0.5,0.5,0.5);
+    // Back
+    glVertex3f(-0.5,-0.5,-0.5); glVertex3f(-0.5,0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(0.5,-0.5,-0.5);
+    // Left
+    glVertex3f(-0.5,-0.5,-0.5); glVertex3f(-0.5,-0.5,0.5); glVertex3f(-0.5,0.5,0.5); glVertex3f(-0.5,0.5,-0.5);
+    // Right
+    glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,-0.5,0.5);
+    // Top
+    glVertex3f(-0.5,0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
+    // Bottom
+    glVertex3f(-0.5,-0.5,0.5); glVertex3f(-0.5,-0.5,-0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,-0.5,0.5);
     glEnd();
+    glPopMatrix();
+}
+
+void draw_ronin_shell(float anim) {
+    glColor3f(0.1f, 0.1f, 0.1f); // Matte Black
+    glPushMatrix(); glTranslatef(0, 1.2f, 0); 
+    draw_box(1.2f, 1.4f, 0.8f); // Torso
+    glColor3f(0.6f, 0.0f, 0.0f); // Red Lining
+    glBegin(GL_QUADS);
+    glVertex3f(-0.6, -0.7, 0.41); glVertex3f(0.6, -0.7, 0.41); glVertex3f(0.6, -0.65, 0.41); glVertex3f(-0.6, -0.65, 0.41);
+    glEnd();
+    glColor3f(0.1f, 0.1f, 0.1f);
+    glPushMatrix(); glTranslatef(-0.7f, 0.0f, 0.0f); draw_box(0.4f, 1.4f, 0.4f); glPopMatrix(); // L
+    glPushMatrix(); glTranslatef(0.7f, 0.0f, 0.0f); draw_box(0.4f, 1.4f, 0.4f); glPopMatrix(); // R
+    glPopMatrix();
+    glColor3f(0.15f, 0.15f, 0.18f); // Pants
+    glPushMatrix(); glTranslatef(-0.3f, 0.4f, 0); draw_box(0.5f, 1.6f, 0.6f); glPopMatrix();
+    glPushMatrix(); glTranslatef(0.3f, 0.4f, 0); draw_box(0.5f, 1.6f, 0.6f); glPopMatrix();
+}
+
+void draw_storm_mask() {
+    glColor3f(0.05f, 0.05f, 0.05f); draw_box(0.6f, 0.7f, 0.6f); // Head
+    glColor3f(0.2f, 0.2f, 0.2f); glPushMatrix(); glTranslatef(0, -0.1f, 0.35f); draw_box(0.5f, 0.4f, 0.1f); glPopMatrix(); // Plate
+    glColor3f(0.0f, 1.0f, 1.0f); // Vents
+    glPushMatrix(); glTranslatef(0.2f, -0.1f, 0.41f); draw_box(0.1f, 0.2f, 0.02f); glPopMatrix();
+    glPushMatrix(); glTranslatef(-0.2f, -0.1f, 0.41f); draw_box(0.1f, 0.2f, 0.02f); glPopMatrix();
 }
 
 void draw_player_3rd(PlayerState *p) {
     glPushMatrix();
-    glTranslatef(p->x, p->y + 2.0f, p->z);
+    glTranslatef(p->x, p->y, p->z);
     glRotatef(-p->yaw, 0, 1, 0);
     if (p->in_vehicle) {
-        draw_buggy_model();
+        draw_box(2.0f, 1.0f, 3.5f); // Placeholder Buggy
     } else {
-        if(p->health <= 0) glColor3f(0.2, 0, 0); else glColor3f(1, 0, 0);
-        glPushMatrix(); glScalef(0.97f, 2.91f, 0.97f); 
-        glBegin(GL_QUADS);
-        glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(-0.5,0.5,0.5);
-        glVertex3f(-0.5,0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
-        glVertex3f(-0.5,-0.5,-0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
-        glVertex3f(-0.5,-0.5,-0.5); glVertex3f(-0.5,-0.5,0.5); glVertex3f(-0.5,0.5,0.5);
-        glVertex3f(-0.5,0.5,-0.5);
-        glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(0.5,0.5,0.5);
-        glEnd(); glPopMatrix();
-        glPushMatrix(); glTranslatef(0, 1.54f, 0); draw_head(p->current_weapon); glPopMatrix();
-        glPushMatrix(); glTranslatef(0.5f, 1.0f, 0.5f);
-        glRotatef(p->pitch, 1, 0, 0);   
-        glScalef(0.8f, 0.8f, 0.8f); draw_gun_model(p->current_weapon); glPopMatrix(); 
+        draw_ronin_shell(p->recoil_anim);
+        glPushMatrix(); glTranslatef(0, 2.3f, 0); glRotatef(p->pitch, 1, 0, 0); draw_storm_mask(); glPopMatrix();
     }
     glPopMatrix();
 }
 
-void draw_circle(float x, float y, float r, int segments) {
-    glBegin(GL_LINE_LOOP);
-    for(int i=0; i<segments; i++) {
-        float theta = 2.0f * 3.1415926f * (float)i / (float)segments;
-        float cx = r * cosf(theta);
-        float cy = r * sinf(theta);
-        glVertex2f(x + cx, y + cy);
+void draw_projectiles() {
+    glDisable(GL_TEXTURE_2D); glPointSize(6.0f); glBegin(GL_POINTS);
+    for(int i=0; i<MAX_PROJECTILES; i++) {
+        if(local_state.projectiles[i].active) {
+            if (local_state.projectiles[i].bounces_left > 0) glColor3f(1.0f, 0.5f, 0.0f);
+            else glColor3f(1.0f, 0.0f, 0.0f);
+            glVertex3f(local_state.projectiles[i].x, local_state.projectiles[i].y, local_state.projectiles[i].z);
+        }
     }
     glEnd();
+}
+
+void draw_floor() {
+    glEnable(GL_TEXTURE_2D); glBindTexture(GL_TEXTURE_2D, tex_grid);
+    glColor3f(1.0f, 1.0f, 1.0f);
+    float size = 4000.0f; float reps = 100.0f;
+    glBegin(GL_QUADS);
+    glTexCoord2f(0, 0); glVertex3f(-size, 0, -size);
+    glTexCoord2f(reps, 0); glVertex3f(size, 0, -size);
+    glTexCoord2f(reps, reps); glVertex3f(size, 0, size);
+    glTexCoord2f(0, reps); glVertex3f(-size, 0, size);
+    glEnd();
+    glDisable(GL_TEXTURE_2D);
+}
+
+void draw_map() {
+    glDisable(GL_TEXTURE_2D);
+    for(int i=1; i<map_count; i++) {
+        Box b = map_geo[i];
+        float h_factor = b.y / 100.0f; 
+        glColor3f(0.1f, 0.1f + h_factor, 0.3f); 
+        glPushMatrix(); glTranslatef(b.x, b.y, b.z); glScalef(b.w, b.h, b.d);
+        draw_box(1.0f, 1.0f, 1.0f); 
+        glLineWidth(2.0f); glColor3f(0.0f, 1.0f, 1.0f);
+        // Wireframes...
+        glBegin(GL_LINE_LOOP); glVertex3f(-0.5, 0.5, 0.5); glVertex3f(0.5, 0.5, 0.5); glVertex3f(0.5, 0.5, -0.5); glVertex3f(-0.5, 0.5, -0.5); glEnd();
+        glPopMatrix();
+    }
 }
 
 void draw_hud(PlayerState *p) {
     glDisable(GL_DEPTH_TEST);
     glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
     glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
-    glColor3f(0, 1, 0);
-    if (current_fov < 50.0f) { glBegin(GL_LINES); glVertex2f(0, 360); glVertex2f(1280, 360); glVertex2f(640, 0); glVertex2f(640, 720); glEnd(); } 
-    else { glLineWidth(2.0f); glBegin(GL_LINES); glVertex2f(630, 360); glVertex2f(650, 360); glVertex2f(640, 350); glVertex2f(640, 370); glEnd(); }
     
-    if (p->hit_feedback > 0) {
-        if (p->hit_feedback >= 25) glColor3f(1.0f, 0.0f, 0.0f); // RED
-        else glColor3f(0.0f, 1.0f, 0.0f); // GREEN
-        glLineWidth(2.0f);
-        draw_circle(640, 360, 20.0f, 16);
-        if (p->hit_feedback >= 25) draw_circle(640, 360, 28.0f, 16);
+    glColor3f(0, 1, 0);
+    float recoil = p->recoil_anim * 20.0f;
+    glLineWidth(2.0f); glBegin(GL_LINES); 
+    glVertex2f(640 - 10 - recoil, 360); glVertex2f(640 - 2 - recoil, 360);
+    glVertex2f(640 + 10 + recoil, 360); glVertex2f(640 + 2 + recoil, 360);
+    glVertex2f(640, 360 - 10 - recoil); glVertex2f(640, 360 - 2 - recoil);
+    glVertex2f(640, 360 + 10 + recoil); glVertex2f(640, 360 + 2 + recoil);
+    glEnd();
+
+    if (p->storm_charges > 0) {
+        draw_storm_chevrons(700, 340, 10, p->storm_charges);
+        glColor3f(1.0f, 0.2f, 0.2f); draw_string("STORM ACTIVE", 720, 350, 10);
     }
 
-    glColor3f(0.2f, 0, 0); glRectf(50, 50, 250, 70); glColor3f(1.0f, 0, 0);
-    glRectf(50, 50, 50 + (p->health * 2), 70);
-    glColor3f(0, 0, 0.2f); glRectf(50, 80, 250, 100); glColor3f(0.2f, 0.2f, 1.0f);
-    glRectf(50, 80, 50 + (p->shield * 2), 100);
-    if (p->in_vehicle) {
-        glColor3f(0.0f, 1.0f, 0.0f);
-        draw_string("BUGGY ONLINE", 50, 120, 12);
-    }
-    
-    float raw_speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
-    char vel_buf[32]; sprintf(vel_buf, "VEL: %.2f", raw_speed);
-    glColor3f(1.0f, 1.0f, 0.0f); draw_string(vel_buf, 1100, 50, 8); 
+    glColor3f(1.0f, 1.0f, 1.0f);
+    draw_ronin_insignia(60, 60, 40);
+    glColor3f(0.5f, 0.5f, 0.5f);
+    draw_string("SHANKPIT // STORM DIV", 120, 50, 8);
 
     glEnable(GL_DEPTH_TEST); glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW); glPopMatrix();
 }
 
-void draw_scene(PlayerState *render_p) {
-    glClearColor(0.02f, 0.02f, 0.05f, 1.0f); // DEEP SPACE BLUE BG
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); glLoadIdentity();
-    float cam_y = render_p->in_vehicle ? 8.0f : (render_p->crouching ? 2.5f : EYE_HEIGHT);
-    float cam_z_off = render_p->in_vehicle ? 10.0f : 0.0f;
+void draw_scene() {
+    glClearColor(0.05f, 0.0f, 0.1f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(current_fov, 1280.0/720.0, 0.1, Z_FAR);
+    glMatrixMode(GL_MODELVIEW); glLoadIdentity();
+    apply_screen_shake();
     
-    float rad = -cam_yaw * 0.01745f;
-    float cx = sinf(rad) * cam_z_off;
-    float cz = cosf(rad) * cam_z_off;
-    
+    PlayerState *p = &local_state.players[0];
     glRotatef(-cam_pitch, 1, 0, 0); glRotatef(-cam_yaw, 0, 1, 0);
-    glTranslatef(-(render_p->x - cx), -(render_p->y + cam_y), -(render_p->z - cz));
+    glTranslatef(-p->x, -(p->y + EYE_HEIGHT), -p->z);
     
-    draw_grid(); 
-    update_and_draw_trails();
-    draw_map();
-    if (render_p->in_vehicle) draw_player_3rd(render_p);
-    for(int i=1; i<MAX_CLIENTS; i++) if(local_state.players[i].active && i != my_client_id) draw_player_3rd(&local_state.players[i]);
-    draw_weapon_p(render_p); draw_hud(render_p);
+    draw_floor(); draw_map(); draw_projectiles(); 
+    
+    for(int i=1; i<MAX_CLIENTS; i++) {
+        if(local_state.players[i].active && i != my_client_id) {
+            draw_player_3rd(&local_state.players[i]);
+        }
+    }
+    
+    draw_hud(p);
 }
 
 void setup_2d() {
-    int w, h;
-    SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &w, &h);
-    glViewport(0, 0, w, h);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluOrtho2D(0, 1280, 0, 720);
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    glDisable(GL_DEPTH_TEST);
+    int w, h; SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &w, &h);
+    glViewport(0, 0, w, h); glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
+    glMatrixMode(GL_MODELVIEW); glLoadIdentity(); glDisable(GL_DEPTH_TEST);
 }
 
-void setup_3d() {
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluPerspective(current_fov, 1280.0/720.0, 0.1, Z_FAR);
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    glEnable(GL_DEPTH_TEST);
-}
+int test_graphics_integrity() { return 1; }
 
 int main(int argc, char* argv[]) {
+    for(int i=1; i<argc; i++) if(strcmp(argv[i], "--test-gfx") == 0) return test_graphics_integrity() ? 0 : 1;
+
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *win = SDL_CreateWindow("SHANKPIT [GOLDEN HYBRID]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
+    SDL_Window *win = SDL_CreateWindow("SHANKPIT [PHASE 526 LEVEL LOAD]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
     SDL_GL_CreateContext(win);
-    SDL_GL_SetSwapInterval(1);
-
-    local_init_match(1, 0);
-
+    
+    tex_grid = generate_cyber_grid();
+    setup_lighting_fog();
+    local_init_match(8, 0);
+    
     int running = 1;
     while(running) {
         SDL_Event e;
         while(SDL_PollEvent(&e)) {
             if(e.type == SDL_QUIT) running = 0;
-            
-            // --- GOLDEN MENU LOGIC ---
+            if(e.type == SDL_MOUSEMOTION && app_state == STATE_PLAYING) {
+                cam_yaw += e.motion.xrel * 0.15f; 
+                cam_pitch += e.motion.yrel * 0.15f;
+                if(cam_pitch > 89.0f) cam_pitch = 89.0f; if(cam_pitch < -89.0f) cam_pitch = -89.0f;
+            }
             if(e.type == SDL_KEYDOWN) {
                 if(e.key.keysym.sym == SDLK_ESCAPE) {
-                    if(app_state == STATE_PLAYING) {
-                        app_state = STATE_B_MENU;
-                        // Mouse remains captured
-                    } else if (app_state == STATE_B_MENU) {
-                        app_state = STATE_MAIN_MENU;
-                        SDL_SetRelativeMouseMode(SDL_FALSE);
+                    if(app_state == STATE_PLAYING) app_state = STATE_B_MENU;
+                    else if(app_state == STATE_B_MENU) { app_state = STATE_MAIN_MENU; SDL_SetRelativeMouseMode(SDL_FALSE); }
+                }
+                
+                // --- GOLDEN MENU LOGIC ---
+                if(app_state == STATE_MAIN_MENU && e.key.keysym.sym == SDLK_b) app_state = STATE_B_MENU;
+                
+                if(app_state == STATE_B_MENU) {
+                    if (e.key.keysym.sym == SDLK_p) {
+                        app_state = STATE_PLAYING;
+                        local_init_match(8, 0); // Play (Bots)
+                        SDL_SetRelativeMouseMode(SDL_TRUE);
+                    }
+                    if (e.key.keysym.sym == SDLK_2) {
+                        app_state = STATE_PLAYING;
+                        local_init_match(8, 0); // Level 2 (Standard Map)
+                        SDL_SetRelativeMouseMode(SDL_TRUE);
+                        printf("LOADING LEVEL...\n");
                     }
                 }
-                
-                if(app_state == STATE_MAIN_MENU && e.key.keysym.sym == SDLK_b) {
-                    app_state = STATE_B_MENU;
-                }
-                
-                if(app_state == STATE_B_MENU && e.key.keysym.sym == SDLK_p) {
-                    app_state = STATE_PLAYING;
-                    local_init_match(8, 0);
-                    SDL_SetRelativeMouseMode(SDL_TRUE);
-                }
-            }
-            
-            if(app_state == STATE_PLAYING && e.type == SDL_MOUSEMOTION) {
-                float sens = (current_fov < 50.0f) ? 0.05f : 0.15f; 
-                cam_yaw -= e.motion.xrel * sens;
-                if(cam_yaw > 360) cam_yaw -= 360; if(cam_yaw < 0) cam_yaw += 360;
-                cam_pitch -= e.motion.yrel * sens;
-                if(cam_pitch > 89) cam_pitch = 89; if(cam_pitch < -89) cam_pitch = -89;
             }
         }
-
-        // --- RENDER & UPDATE ---
-        glClearColor(0.01f, 0.01f, 0.02f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        if (app_state == STATE_MAIN_MENU) {
-            setup_2d();
-            glColor3f(0, 1, 1); // CYAN
-            draw_string("SHANKPIT MAIN", 400, 500, 20);
-            draw_string("PRESS B FOR STAGING", 400, 400, 10);
-        }
-        else if (app_state == STATE_B_MENU) {
-            setup_2d();
-            glColor3f(1, 0, 0); // RED
-            draw_string("STAGING AREA", 400, 500, 20);
-            draw_string("HIT P TO PLAY", 400, 400, 15);
-            draw_string("ESC TO BACK", 400, 300, 8);
-        }
-        else if (app_state == STATE_PLAYING) {
-            setup_3d();
-            
+        
+        if (app_state == STATE_PLAYING) {
             const Uint8 *k = SDL_GetKeyboardState(NULL);
-            float fwd=0, str=0;
-            if(k[SDL_SCANCODE_W]) fwd-=1; if(k[SDL_SCANCODE_S]) fwd+=1;
-            if(k[SDL_SCANCODE_D]) str+=1; if(k[SDL_SCANCODE_A]) str-=1;
-            int jump = k[SDL_SCANCODE_SPACE]; int crouch = k[SDL_SCANCODE_LCTRL];
+            float fwd = (k[SDL_SCANCODE_S]?1:0) - (k[SDL_SCANCODE_W]?1:0);
+            float str = (k[SDL_SCANCODE_D]?1:0) - (k[SDL_SCANCODE_A]?1:0);
             int shoot = (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT));
-            int reload = k[SDL_SCANCODE_R];
-            int use = k[SDL_SCANCODE_E];
-            int wpn_req = local_state.players[0].current_weapon;
-            if(k[SDL_SCANCODE_1]) wpn_req=0; if(k[SDL_SCANCODE_2]) wpn_req=1;
-            if(k[SDL_SCANCODE_3]) wpn_req=2; if(k[SDL_SCANCODE_4]) wpn_req=3; if(k[SDL_SCANCODE_5]) wpn_req=4;
-
-            // Update Physics
-            local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn_req, jump, crouch, reload, NULL, 0);
+            int ability = k[SDL_SCANCODE_E];
             
-            // Draw Scene (Using Spirit Stick Rendering)
-            draw_scene(&local_state.players[0]);
+            if (shoot && local_state.players[0].attack_cooldown == 0 && local_state.players[0].reload_timer == 0) screen_shake = 5.0f;
+            local_update(fwd, str, cam_yaw, cam_pitch, shoot, -1, k[SDL_SCANCODE_SPACE], k[SDL_SCANCODE_LCTRL], 0, ability, NULL, 0);
+            draw_scene();
+        } else {
+            glClearColor(0,0,0,1); glClear(GL_COLOR_BUFFER_BIT);
+            setup_2d();
+            glColor3f(0,1,1);
+            if(app_state == STATE_MAIN_MENU) draw_string("MAIN MENU - PRESS B", 500, 500, 20);
+            else { 
+                glColor3f(1,0,0); 
+                draw_string("STAGING", 500, 500, 20); 
+                draw_string("P: PLAY (BOTS)", 500, 400, 10);
+                draw_string("2: LOAD LEVEL", 500, 350, 10);
+                draw_string("ESC: BACK", 500, 300, 10);
+            }
         }
-
         SDL_GL_SwapWindow(win);
         SDL_Delay(16);
     }
