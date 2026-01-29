@@ -1,6 +1,15 @@
 #ifndef PROTOCOL_H
 #define PROTOCOL_H
 
+#ifdef _WIN32
+    #include <winsock2.h>
+    #include <ws2tcpip.h>
+#else
+    #include <sys/socket.h>
+    #include <netinet/in.h>
+    #include <arpa/inet.h>
+#endif
+
 #define MAX_CLIENTS 70
 #define MAX_WEAPONS 5
 #define MAX_PROJECTILES 1024
@@ -13,7 +22,6 @@
 
 #define STATE_ALIVE 0
 #define STATE_DEAD  1
-#define STATE_SPECTATOR 2
 
 #define WPN_KNIFE 0
 #define WPN_MAGNUM 1
@@ -47,7 +55,8 @@ typedef struct {
 #define BTN_ATTACK 2
 #define BTN_CROUCH 4
 #define BTN_RELOAD 8
-#define BTN_USE    16 
+#define BTN_USE    16
+#define BTN_ABILITY_1 32 // Hanzo E
 
 typedef struct {
     int id;
@@ -64,6 +73,8 @@ static const WeaponStats WPN_STATS[MAX_WEAPONS] = {
 
 typedef struct {
     int active; float x, y, z; float vx, vy, vz; int owner_id;
+    int bounces_left; // Storm Arrow Ricochet
+    int damage;       // Snapshot damage
 } Projectile;
 
 typedef struct {
@@ -78,7 +89,8 @@ typedef struct {
     float reward_feedback; 
     unsigned char ammo;
     unsigned char in_vehicle;
-    unsigned char hit_feedback; 
+    unsigned char hit_feedback;
+    unsigned char storm_charges; // Sync UI
 } NetPlayer;
 
 typedef struct {
@@ -108,6 +120,10 @@ typedef struct {
     BotGenome brain;
     unsigned int last_hit_time;
     unsigned int respawn_time;
+    
+    // ABILITY STATE
+    int storm_charges;
+    int ability_cooldown;
 } PlayerState;
 
 typedef struct {
@@ -116,7 +132,7 @@ typedef struct {
     float vx, vy, vz;
 } LagRecord;
 
-typedef enum { MODE_DEATHMATCH=0, MODE_TDM=1, MODE_SURVIVAL=2, MODE_CTF=3, MODE_ODDBALL=4, MODE_LOCAL=98, MODE_NET=99, MODE_EVOLUTION=100 } GameMode;
+typedef enum { MODE_DEATHMATCH=0, MODE_LOCAL=98, MODE_NET=99, MODE_EVOLUTION=100 } GameMode;
 
 typedef struct {
     PlayerState players[MAX_CLIENTS];
