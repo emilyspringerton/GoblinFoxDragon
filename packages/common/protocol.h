@@ -1,15 +1,6 @@
 #ifndef PROTOCOL_H
 #define PROTOCOL_H
 
-#ifdef _WIN32
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
-#else
-    #include <sys/socket.h>
-    #include <netinet/in.h>
-    #include <arpa/inet.h>
-#endif
-
 #define MAX_CLIENTS 70
 #define MAX_WEAPONS 5
 #define MAX_PROJECTILES 1024
@@ -56,8 +47,7 @@ typedef struct {
 #define BTN_ATTACK 2
 #define BTN_CROUCH 4
 #define BTN_RELOAD 8
-#define BTN_USE    16
-#define BTN_ABILITY_1 32 // Hanzo E
+#define BTN_USE    16 
 
 typedef struct {
     int id;
@@ -68,14 +58,12 @@ static const WeaponStats WPN_STATS[MAX_WEAPONS] = {
     {WPN_KNIFE,   200, 20, 1, 0.0f,  0},   
     {WPN_MAGNUM,  45, 25, 1, 0.0f,  6},   
     {WPN_AR,      20, 6,  1, 0.04f, 30},  
-    {WPN_SHOTGUN, 64,  50, 8, 0.15f, 8},   
+    {WPN_SHOTGUN, 128, 17, 8, 0.15f, 8},   
     {WPN_SNIPER,  101, 70, 1, 0.0f,  5}    
 };
 
 typedef struct {
     int active; float x, y, z; float vx, vy, vz; int owner_id;
-    int bounces_left; // Storm Arrow Ricochet
-    int damage;       // Snapshot damage
 } Projectile;
 
 typedef struct {
@@ -90,41 +78,33 @@ typedef struct {
     float reward_feedback; 
     unsigned char ammo;
     unsigned char in_vehicle;
-    unsigned char hit_feedback;
-    unsigned char storm_charges; // Sync UI
+    unsigned char hit_feedback; 
 } NetPlayer;
 
 typedef struct {
     int version;
     float w_aggro;
-    float w_strafe;
-    float w_jump; float w_slide; float w_turret; float w_repel;      
+    float w_strafe; float w_jump; float w_slide; float w_turret; float w_repel;      
 } BotGenome;
 
 typedef struct {
     int id;
-    int active;
-    int is_bot;
+    int active; int is_bot;
     float x, y, z; float vx, vy, vz; float yaw, pitch; int on_ground;
     float in_fwd;
     float in_strafe;
     int in_jump; int in_shoot; int in_reload; int crouching; int in_use;
     int current_weapon; int ammo[MAX_WEAPONS];
     int reload_timer; int attack_cooldown;
-    int is_shooting;
-    int jump_timer;
+    int is_shooting; int jump_timer;
     int health; int shield; int shield_regen_timer; int state;
     int kills; int deaths; int hit_feedback; float recoil_anim;
-    int in_vehicle;
+    int in_vehicle;      
     int vehicle_cooldown;
     float accumulated_reward; 
     BotGenome brain;
     unsigned int last_hit_time;
     unsigned int respawn_time;
-    
-    // ABILITY STATE
-    int storm_charges;
-    int ability_cooldown;
 } PlayerState;
 
 typedef struct {
@@ -133,7 +113,6 @@ typedef struct {
     float vx, vy, vz;
 } LagRecord;
 
-// RE-ADDED MODE_SURVIVAL
 typedef enum { MODE_DEATHMATCH=0, MODE_TDM=1, MODE_SURVIVAL=2, MODE_CTF=3, MODE_ODDBALL=4, MODE_LOCAL=98, MODE_NET=99, MODE_EVOLUTION=100 } GameMode;
 
 typedef struct {
