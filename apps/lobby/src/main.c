@@ -509,12 +509,36 @@ void draw_hud(PlayerState *p) {
         glColor3f(0.0f, 1.0f, 0.0f);
         draw_string("BUGGY ONLINE", 50, 120, 12);
     }
+
+    if (p->storm_charges > 0) {
+        char storm_buf[32];
+        sprintf(storm_buf, "STORM ARROWS: %d", p->storm_charges);
+        glColor3f(1.0f, 0.2f, 0.2f);
+        draw_string(storm_buf, 50, 140, 8);
+    } else if (p->ability_cooldown == 0) {
+        glColor3f(0.0f, 0.8f, 1.0f);
+        draw_string("E: STORM ARROWS READY", 50, 140, 8);
+    }
     
     float raw_speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
     char vel_buf[32]; sprintf(vel_buf, "VEL: %.2f", raw_speed);
     glColor3f(1.0f, 1.0f, 0.0f); draw_string(vel_buf, 1100, 50, 8); 
 
     glEnable(GL_DEPTH_TEST); glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW); glPopMatrix();
+}
+
+void draw_projectiles() {
+    glDisable(GL_TEXTURE_2D);
+    glPointSize(6.0f);
+    glBegin(GL_POINTS);
+    for (int i = 0; i < MAX_PROJECTILES; i++) {
+        Projectile *p = &local_state.projectiles[i];
+        if (!p->active) continue;
+        if (p->bounces_left > 0) glColor3f(1.0f, 0.4f, 0.1f);
+        else glColor3f(1.0f, 0.0f, 0.0f);
+        glVertex3f(p->x, p->y, p->z);
+    }
+    glEnd();
 }
 
 void draw_scene(PlayerState *render_p) {
@@ -533,6 +557,7 @@ void draw_scene(PlayerState *render_p) {
     draw_grid(); 
     update_and_draw_trails();
     draw_map();
+    draw_projectiles();
     if (render_p->in_vehicle) draw_player_3rd(render_p);
     for(int i=1; i<MAX_CLIENTS; i++) if(local_state.players[i].active && i != my_client_id) draw_player_3rd(&local_state.players[i]);
     draw_weapon_p(render_p); draw_hud(render_p);
@@ -567,7 +592,7 @@ void net_connect() {
     }
 }
 
-UserCmd client_create_cmd(float fwd, float str, float yaw, float pitch, int shoot, int jump, int crouch, int reload, int use, int wpn_idx) {
+UserCmd client_create_cmd(float fwd, float str, float yaw, float pitch, int shoot, int jump, int crouch, int reload, int use, int ability, int wpn_idx) {
     UserCmd cmd;
     memset(&cmd, 0, sizeof(UserCmd));
     static int seq = 0; cmd.sequence = ++seq; cmd.timestamp = SDL_GetTicks();
@@ -577,6 +602,7 @@ UserCmd client_create_cmd(float fwd, float str, float yaw, float pitch, int shoo
     if(crouch) cmd.buttons |= BTN_CROUCH;
     if(reload) cmd.buttons |= BTN_RELOAD;
     if(use) cmd.buttons |= BTN_USE;
+    if(ability) cmd.buttons |= BTN_ABILITY_1;
     cmd.weapon_idx = wpn_idx; return cmd;
 }
 
@@ -610,6 +636,7 @@ void net_process_snapshot(char *buffer, int len) {
             p->current_weapon = np->current_weapon;
             p->is_shooting = np->is_shooting;
             p->in_vehicle = np->in_vehicle;
+            p->storm_charges = np->storm_charges;
             
             // --- SYNC HIT MARKER ---
             if (id == my_client_id) {
@@ -622,6 +649,7 @@ void net_process_snapshot(char *buffer, int len) {
         } else if (id == 0) {
             local_state.players[0].ammo[local_state.players[0].current_weapon] = np->ammo;
             local_state.players[0].in_vehicle = np->in_vehicle; 
+            local_state.players[0].storm_charges = np->storm_charges;
         }
     }
 }
@@ -740,7 +768,8 @@ int main(int argc, char* argv[]) {
             int jump = k[SDL_SCANCODE_SPACE]; int crouch = k[SDL_SCANCODE_LCTRL];
             int shoot = (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT));
             int reload = k[SDL_SCANCODE_R];
-            int use = k[SDL_SCANCODE_E];
+            int use = k[SDL_SCANCODE_F];
+            int ability = k[SDL_SCANCODE_E];
             if(k[SDL_SCANCODE_1]) wpn_req=0; if(k[SDL_SCANCODE_2]) wpn_req=1;
             if(k[SDL_SCANCODE_3]) wpn_req=2; if(k[SDL_SCANCODE_4]) wpn_req=3; if(k[SDL_SCANCODE_5]) wpn_req=4;
 
@@ -749,8 +778,8 @@ int main(int argc, char* argv[]) {
             glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(current_fov, 1280.0/720.0, 0.1, Z_FAR); 
             glMatrixMode(GL_MODELVIEW);
             if (app_state == STATE_GAME_NET) {
-                local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn_req, jump, crouch, reload, NULL, 0);
-                UserCmd cmd = client_create_cmd(fwd, str, cam_yaw, cam_pitch, shoot, jump, crouch, reload, use, wpn_req);
+                local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn_req, jump, crouch, reload, ability, NULL, 0);
+                UserCmd cmd = client_create_cmd(fwd, str, cam_yaw, cam_pitch, shoot, jump, crouch, reload, use, ability, wpn_req);
                 net_send_cmd(cmd);
                 net_tick();
             } else {
@@ -760,7 +789,7 @@ int main(int argc, char* argv[]) {
                      local_state.players[0].vehicle_cooldown = 30;
                 }
                 if(local_state.players[0].vehicle_cooldown > 0) local_state.players[0].vehicle_cooldown--;
-                local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn_req, jump, crouch, reload, NULL, 0);
+                local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn_req, jump, crouch, reload, ability, NULL, 0);
             }
             draw_scene(&local_state.players[0]);
             SDL_GL_SwapWindow(win);
