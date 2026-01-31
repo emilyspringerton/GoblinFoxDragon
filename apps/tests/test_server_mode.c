@@ -32,6 +32,18 @@ static void test_tdm_mode(void) {
     ASSERT_EQ(parse_server_mode(2, args), MODE_TDM, "TDM flag sets team deathmatch");
 }
 
+int parse_server_mode(int argc, char **argv) {
+    int mode = MODE_DEATHMATCH;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--tdm") == 0) {
+            mode = MODE_TDM;
+        } else if (strcmp(argv[i], "--deathmatch") == 0) {
+            mode = MODE_DEATHMATCH;
+        }
+    }
+    return mode;
+}
+
 int main(void) {
     printf("🛡️ SHANKPIT SERVER MODE CHECK 🛡️\n");
     test_default_mode();

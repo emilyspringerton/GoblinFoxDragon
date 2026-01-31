@@ -31,6 +31,18 @@ unsigned int get_server_time() {
     return (unsigned int)(ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
 }
 
+int parse_server_mode(int argc, char **argv) {
+    int mode = MODE_DEATHMATCH;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--tdm") == 0) {
+            mode = MODE_TDM;
+        } else if (strcmp(argv[i], "--deathmatch") == 0) {
+            mode = MODE_DEATHMATCH;
+        }
+    }
+    return mode;
+}
+
 void server_net_init() {
     setbuf(stdout, NULL);
     #ifdef _WIN32
