@@ -21,6 +21,8 @@
 #include <SDL2/SDL_opengl.h>
 #include <GL/glu.h>
 
+#include "player_model.h"
+
 #include "../../../packages/common/protocol.h"
 #include "../../../packages/common/physics.h"
 #include "../../../packages/simulation/local_game.h"
@@ -293,41 +295,43 @@ static void draw_ronin_shell(void) {
     glColor3f(0.1f, 0.1f, 0.1f); // Matte black
     glPushMatrix();
     glTranslatef(0.0f, 0.9f, 0.0f);
-    draw_box(1.35f, 1.15f, 0.75f);
+    draw_box(RONIN_TORSO_W, RONIN_TORSO_H, RONIN_TORSO_D);
     // Shoulder pads
-    glPushMatrix(); glTranslatef(-0.95f, 0.35f, 0.0f); draw_box(0.45f, 0.45f, 0.7f); glPopMatrix();
-    glPushMatrix(); glTranslatef(0.95f, 0.35f, 0.0f); draw_box(0.45f, 0.45f, 0.7f); glPopMatrix();
+    glPushMatrix(); glTranslatef(-RONIN_SHOULDER_PAD_OFFSET, 0.35f, 0.0f); draw_box(RONIN_SHOULDER_PAD_W, RONIN_SHOULDER_PAD_H, RONIN_SHOULDER_PAD_D); glPopMatrix();
+    glPushMatrix(); glTranslatef(RONIN_SHOULDER_PAD_OFFSET, 0.35f, 0.0f); draw_box(RONIN_SHOULDER_PAD_W, RONIN_SHOULDER_PAD_H, RONIN_SHOULDER_PAD_D); glPopMatrix();
     // Sleeves
-    glPushMatrix(); glTranslatef(-0.85f, -0.25f, 0.0f); draw_box(0.35f, 1.1f, 0.45f); glPopMatrix();
-    glPushMatrix(); glTranslatef(0.85f, -0.25f, 0.0f); draw_box(0.35f, 1.1f, 0.45f); glPopMatrix();
+    glPushMatrix(); glTranslatef(-RONIN_SLEEVE_OFFSET, -0.25f, 0.0f); draw_box(RONIN_SLEEVE_W, RONIN_SLEEVE_H, RONIN_SLEEVE_D); glPopMatrix();
+    glPushMatrix(); glTranslatef(RONIN_SLEEVE_OFFSET, -0.25f, 0.0f); draw_box(RONIN_SLEEVE_W, RONIN_SLEEVE_H, RONIN_SLEEVE_D); glPopMatrix();
     // Red satin lining at hem
     glColor3f(0.6f, 0.0f, 0.0f);
     glBegin(GL_QUADS);
-    glVertex3f(-0.68f, -0.6f, 0.39f); glVertex3f(0.68f, -0.6f, 0.39f);
-    glVertex3f(0.68f, -0.52f, 0.39f); glVertex3f(-0.68f, -0.52f, 0.39f);
+    glVertex3f(-0.68f, RONIN_LINING_Y_BOTTOM, 0.39f); glVertex3f(0.68f, RONIN_LINING_Y_BOTTOM, 0.39f);
+    glVertex3f(0.68f, RONIN_LINING_Y_TOP, 0.39f); glVertex3f(-0.68f, RONIN_LINING_Y_TOP, 0.39f);
+
     glEnd();
     glPopMatrix();
 
     // Tech cargo pants (baggy)
     glColor3f(0.18f, 0.18f, 0.2f); // Charcoal
-    glPushMatrix(); glTranslatef(-0.32f, 0.0f, 0.0f); draw_box(0.55f, 1.55f, 0.7f); glPopMatrix();
-    glPushMatrix(); glTranslatef(0.32f, 0.0f, 0.0f); draw_box(0.55f, 1.55f, 0.7f); glPopMatrix();
+    glPushMatrix(); glTranslatef(-RONIN_PANTS_OFFSET, 0.0f, 0.0f); draw_box(RONIN_PANTS_W, RONIN_PANTS_H, RONIN_PANTS_D); glPopMatrix();
+    glPushMatrix(); glTranslatef(RONIN_PANTS_OFFSET, 0.0f, 0.0f); draw_box(RONIN_PANTS_W, RONIN_PANTS_H, RONIN_PANTS_D); glPopMatrix();
+
 }
 
 static void draw_storm_mask(void) {
     // Head base
     glColor3f(0.06f, 0.06f, 0.06f);
-    draw_box(0.65f, 0.75f, 0.65f);
+    draw_box(RONIN_HEAD_W, RONIN_HEAD_H, RONIN_HEAD_D);
     // Faceplate
     glColor3f(0.2f, 0.2f, 0.22f);
-    glPushMatrix(); glTranslatef(0.0f, -0.05f, 0.37f); draw_box(0.55f, 0.45f, 0.08f); glPopMatrix();
+    glPushMatrix(); glTranslatef(0.0f, -0.05f, 0.37f); draw_box(RONIN_FACEPLATE_W, RONIN_FACEPLATE_H, RONIN_FACEPLATE_D); glPopMatrix();
     // Cyan vents
     glColor3f(0.0f, 1.0f, 1.0f);
-    glPushMatrix(); glTranslatef(0.22f, -0.08f, 0.42f); draw_box(0.12f, 0.22f, 0.03f); glPopMatrix();
-    glPushMatrix(); glTranslatef(-0.22f, -0.08f, 0.42f); draw_box(0.12f, 0.22f, 0.03f); glPopMatrix();
+    glPushMatrix(); glTranslatef(RONIN_VENT_OFFSET_X, -0.08f, 0.42f); draw_box(RONIN_VENT_W, RONIN_VENT_H, RONIN_VENT_D); glPopMatrix();
+    glPushMatrix(); glTranslatef(-RONIN_VENT_OFFSET_X, -0.08f, 0.42f); draw_box(RONIN_VENT_W, RONIN_VENT_H, RONIN_VENT_D); glPopMatrix();
     // Broken horn silhouette (single jagged horn)
     glColor3f(0.08f, 0.08f, 0.08f);
-    glPushMatrix(); glTranslatef(0.28f, 0.52f, 0.05f); draw_box(0.12f, 0.28f, 0.12f); glPopMatrix();
+    glPushMatrix(); glTranslatef(RONIN_HORN_OFFSET_X, 0.52f, 0.05f); draw_box(RONIN_HORN_W, RONIN_HORN_H, RONIN_HORN_D); glPopMatrix();
 }
 
 void draw_weapon_p(PlayerState *p) {

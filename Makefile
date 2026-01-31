@@ -31,4 +31,9 @@ server:
 	$(CC) $(CFLAGS) services/game-server/src/server.c -o bin/shank_server -lm
 
 clean:
-	rm -rf bin/shank_client bin/shank_server
+	rm -rf bin/shank_client bin/shank_server bin/test_netcode bin/test_player_model
+
+tests: setup
+	@echo "🧪 Building Tests..."
+	$(CC) $(CFLAGS) apps/tests/test_netcode.c -o bin/test_netcode
+	$(CC) $(CFLAGS) apps/tests/test_player_model.c -o bin/test_player_model -lm
