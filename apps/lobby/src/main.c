@@ -22,6 +22,7 @@
 #include <GL/glu.h>
 
 #include "player_model.h"
+#include "../../../packages/ui/turtle_text.h"
 
 #include "../../../packages/common/protocol.h"
 #include "../../../packages/common/physics.h"
@@ -38,6 +39,7 @@ int SERVER_PORT = 6969;
 int app_state = STATE_LOBBY;
 int wpn_req = 1; 
 int my_client_id = -1;
+int lobby_selection = 0;
 
 float cam_yaw = 0.0f;
 float cam_pitch = 0.0f;
@@ -48,26 +50,75 @@ float current_fov = 75.0f;
 int sock = -1;
 struct sockaddr_in server_addr;
 
-void draw_char(char c, float x, float y, float s) {
-    glLineWidth(2.0f); glBegin(GL_LINES); // Thicker text for Cyberpunk feel
-    if(c>='0'&&c<='9'){ glVertex2f(x,y+s);glVertex2f(x+s,y+s);glVertex2f(x+s,y);glVertex2f(x,y);glVertex2f(x,y+s); }
-    else if(c=='A'){glVertex2f(x,y);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y);glVertex2f(x,y+s/2);glVertex2f(x+s/2,y+s);glVertex2f(x+s/2,y+s);glVertex2f(x+s,y+s/2);}
-    else if(c=='B'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s,y+s*0.75);glVertex2f(x+s,y+s*0.75);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x+s*0.8,y+s/2);glVertex2f(x+s,y+s/4);glVertex2f(x+s,y+s/4);glVertex2f(x+s*0.8,y);glVertex2f(x+s*0.8,y);glVertex2f(x,y);}
-    else if(c=='C'){glVertex2f(x+s,y);glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x+s,y+s);} // Added C for CTF
-    else if(c=='D'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s*0.8,y+s);glVertex2f(x+s*0.8,y+s);glVertex2f(x,y);}
-    else if(c=='J'){glVertex2f(x+s,y+s);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x,y+s/2);}
-    else if(c=='O'){glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x,y);}
-    else if(c=='I'){glVertex2f(x+s/2,y);glVertex2f(x+s/2,y+s);glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x,y+s);glVertex2f(x+s,y+s);}
-    else if(c=='N'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);}
-    else if(c=='S'){glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x,y);}
-    else if(c=='E'){glVertex2f(x+s,y);glVertex2f(x,y);glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s,y+s);glVertex2f(x,y+s/2);glVertex2f(x+s*0.8,y+s/2);}
-    else if(c=='R'){glVertex2f(x,y);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s/2);glVertex2f(x+s,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x,y+s/2);glVertex2f(x+s,y);}
-    else if(c=='V'){glVertex2f(x,y+s);glVertex2f(x+s/2,y);glVertex2f(x+s/2,y);glVertex2f(x+s,y+s);}
-    else if(c==' '){} 
-    else { glVertex2f(x,y);glVertex2f(x+s,y);glVertex2f(x+s,y);glVertex2f(x+s,y+s);glVertex2f(x+s,y+s);glVertex2f(x,y+s);glVertex2f(x,y+s);glVertex2f(x,y); }
-    glEnd();
+void draw_string(const char* str, float x, float y, float size) {
+    TurtlePen pen = turtle_pen_create(x, y, size);
+    turtle_draw_text(&pen, str);
 }
-void draw_string(const char* str, float x, float y, float size) { while(*str) { draw_char(*str, x, y, size); x += size * 1.5f; str++; } }
+
+typedef enum {
+    LOBBY_DEMO = 0,
+    LOBBY_BATTLE,
+    LOBBY_TDM,
+    LOBBY_CTF,
+    LOBBY_EVOLUTION,
+    LOBBY_JOIN,
+    LOBBY_COUNT
+} LobbyAction;
+
+static const char *LOBBY_LABELS[LOBBY_COUNT] = {
+    "DEMO (SOLO)",
+    "BATTLE (BOTS)",
+    "TEAM DM (BOTS)",
+    "LAN CTF",
+    "EVOLUTION",
+    "JOIN S.FARTHQ.COM"
+};
+
+static void setup_lobby_2d() {
+    glDisable(GL_DEPTH_TEST);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluOrtho2D(0, 1280, 0, 720);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+}
+
+static void lobby_start_action(int action) {
+    if (action == LOBBY_JOIN) {
+        app_state = STATE_GAME_NET;
+        net_connect();
+    } else {
+        app_state = STATE_GAME_LOCAL;
+        switch (action) {
+            case LOBBY_DEMO:
+                local_init_match(1, MODE_DEATHMATCH);
+                break;
+            case LOBBY_BATTLE:
+                local_init_match(12, MODE_DEATHMATCH);
+                break;
+            case LOBBY_TDM:
+                local_init_match(12, MODE_TDM);
+                break;
+            case LOBBY_CTF:
+                local_init_match(8, MODE_CTF);
+                break;
+            case LOBBY_EVOLUTION:
+                local_init_match(8, MODE_EVOLUTION);
+                break;
+            default:
+                break;
+        }
+    }
+
+    if (app_state != STATE_LOBBY) {
+        SDL_SetRelativeMouseMode(SDL_TRUE);
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        gluPerspective(75.0, 1280.0/720.0, 0.1, Z_FAR);
+        glMatrixMode(GL_MODELVIEW);
+        glEnable(GL_DEPTH_TEST);
+    }
+}
 
 #define MAX_TRAILS 4096 
 #define GRID_SIZE 50.0f
@@ -617,31 +668,31 @@ int main(int argc, char* argv[]) {
             
             if (app_state == STATE_LOBBY) {
                 if(e.type == SDL_KEYDOWN) {
-                    if (e.key.keysym.sym == SDLK_d) { app_state = STATE_GAME_LOCAL; local_init_match(1, MODE_DEATHMATCH); }
-                    if (e.key.keysym.sym == SDLK_b) { app_state = STATE_GAME_LOCAL; local_init_match(12, MODE_DEATHMATCH); }
-                    if (e.key.keysym.sym == SDLK_t) { app_state = STATE_GAME_LOCAL; local_init_match(12, MODE_TDM); }
-                    if (e.key.keysym.sym == SDLK_c) { app_state = STATE_GAME_LOCAL; local_init_match(8, MODE_CTF); } // Added CTF Bind
-                    if (e.key.keysym.sym == SDLK_k) { app_state = STATE_GAME_LOCAL; local_init_match(8, MODE_EVOLUTION); }
+                    if (e.key.keysym.sym == SDLK_UP) {
+                        lobby_selection = (lobby_selection + LOBBY_COUNT - 1) % LOBBY_COUNT;
+                    }
+                    if (e.key.keysym.sym == SDLK_DOWN) {
+                        lobby_selection = (lobby_selection + 1) % LOBBY_COUNT;
+                    }
+                    if (e.key.keysym.sym == SDLK_RETURN || e.key.keysym.sym == SDLK_KP_ENTER) {
+                        lobby_start_action(lobby_selection);
+                    }
+                    if (e.key.keysym.sym == SDLK_d) { lobby_selection = LOBBY_DEMO; lobby_start_action(LOBBY_DEMO); }
+                    if (e.key.keysym.sym == SDLK_b) { lobby_selection = LOBBY_BATTLE; lobby_start_action(LOBBY_BATTLE); }
+                    if (e.key.keysym.sym == SDLK_t) { lobby_selection = LOBBY_TDM; lobby_start_action(LOBBY_TDM); }
+                    if (e.key.keysym.sym == SDLK_c) { lobby_selection = LOBBY_CTF; lobby_start_action(LOBBY_CTF); }
+                    if (e.key.keysym.sym == SDLK_k) { lobby_selection = LOBBY_EVOLUTION; lobby_start_action(LOBBY_EVOLUTION); }
                     
                     if (e.key.keysym.sym == SDLK_j) { 
-                        app_state = STATE_GAME_NET;
-                        net_connect(); 
-                        SDL_SetRelativeMouseMode(SDL_TRUE);
-                        glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, Z_FAR); 
-                        glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
-                    }
-                    
-                    if (app_state == STATE_GAME_LOCAL) {
-                        SDL_SetRelativeMouseMode(SDL_TRUE);
-                        glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(75.0, 1280.0/720.0, 0.1, Z_FAR); 
-                        glMatrixMode(GL_MODELVIEW); glEnable(GL_DEPTH_TEST);
+                        lobby_selection = LOBBY_JOIN;
+                        lobby_start_action(LOBBY_JOIN);
                     }
                 }
             } else {
                 if(e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) {
                     app_state = STATE_LOBBY;
                     SDL_SetRelativeMouseMode(SDL_FALSE);
-                    glDisable(GL_DEPTH_TEST); glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720); glMatrixMode(GL_MODELVIEW);
+                    setup_lobby_2d();
                 }
                 if(e.type == SDL_MOUSEMOTION) {
                     float sens = (current_fov < 50.0f) ? 0.05f : 0.15f; 
@@ -656,15 +707,29 @@ int main(int argc, char* argv[]) {
         if (app_state == STATE_LOBBY) {
              glClearColor(0.02f, 0.02f, 0.05f, 1.0f); // Dark Lobby
              glClear(GL_COLOR_BUFFER_BIT);
-             glLoadIdentity(); glColor3f(0, 1, 1); // CYAN TEXT
-             draw_string("SHANKPIT", 480, 520, 24);
-             draw_string("SELECT MODE", 470, 470, 10);
-             draw_string("D: DEMO (SOLO)", 400, 420, 10);
-             draw_string("B: BATTLE (BOTS)", 400, 370, 10);
-             draw_string("T: TEAM DM (BOTS)", 400, 320, 10);
-             draw_string("C: LAN CTF", 400, 270, 10);
-             draw_string("K: EVOLUTION", 400, 220, 10);
-             draw_string("J: JOIN S.FARTHQ.COM", 400, 170, 10);
+             setup_lobby_2d();
+             glColor3f(0, 1, 1); // CYAN TEXT
+             draw_string("SHANKPIT", 430, 560, 12);
+             glColor3f(0.5f, 0.8f, 0.9f);
+             draw_string("SELECT MODE", 500, 520, 6);
+
+             float base_x = 420.0f;
+             float base_y = 450.0f;
+             float row_gap = 40.0f;
+             for (int i = 0; i < LOBBY_COUNT; i++) {
+                 float y = base_y - (row_gap * i);
+                 if (i == lobby_selection) {
+                     glColor3f(1.0f, 1.0f, 0.0f);
+                     draw_string(">", base_x - 30.0f, y, 6);
+                     glColor3f(0.0f, 1.0f, 1.0f);
+                 } else {
+                     glColor3f(0.0f, 0.7f, 0.8f);
+                 }
+                 draw_string(LOBBY_LABELS[i], base_x, y, 6);
+             }
+
+             glColor3f(0.4f, 0.6f, 0.7f);
+             draw_string("ARROWS + ENTER TO SELECT", 410, 140, 5);
              SDL_GL_SwapWindow(win);
         } 
         else {
