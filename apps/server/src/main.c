@@ -19,6 +19,7 @@
 #include "../../../packages/common/protocol.h"
 #include "../../../packages/common/physics.h"
 #include "../../../packages/simulation/local_game.h"
+#include "server_mode.h"
 
 int sock = -1;
 struct sockaddr_in bind_addr;
@@ -158,9 +159,11 @@ void server_broadcast() {
     }
 }
 
-int main() {
+int main(int argc, char *argv[]) {
     server_net_init();
-    local_init_match(1, 0); 
+    int mode = parse_server_mode(argc, argv);
+    local_init_match(1, mode);
+    printf("SERVER MODE: %s\n", mode == MODE_TDM ? "TEAM DEATHMATCH" : "DEATHMATCH");
     int running = 1;
     unsigned int tick = 0;
     
