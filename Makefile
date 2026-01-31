@@ -42,3 +42,4 @@ tests: setup
 	$(CC) $(CFLAGS) apps/tests/test_netcode.c -o bin/test_netcode
 	$(CC) $(CFLAGS) apps/tests/test_player_model.c -o bin/test_player_model -lm
 	$(CC) $(CFLAGS) apps/tests/test_server_mode.c apps/server/src/server_mode.c -o bin/test_server_mode
+
