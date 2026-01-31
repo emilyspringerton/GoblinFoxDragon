@@ -329,13 +329,11 @@ static void draw_ronin_shell(void) {
     // Sleeves
     glPushMatrix(); glTranslatef(-RONIN_SLEEVE_OFFSET, -0.25f, 0.0f); draw_box(RONIN_SLEEVE_W, RONIN_SLEEVE_H, RONIN_SLEEVE_D); draw_box_outline(RONIN_SLEEVE_W, RONIN_SLEEVE_H, RONIN_SLEEVE_D); glPopMatrix();
     glPushMatrix(); glTranslatef(RONIN_SLEEVE_OFFSET, -0.25f, 0.0f); draw_box(RONIN_SLEEVE_W, RONIN_SLEEVE_H, RONIN_SLEEVE_D); draw_box_outline(RONIN_SLEEVE_W, RONIN_SLEEVE_H, RONIN_SLEEVE_D); glPopMatrix();
-
     // Red satin lining at hem
     glColor3f(0.6f, 0.0f, 0.0f);
     glBegin(GL_QUADS);
     glVertex3f(-0.68f, RONIN_LINING_Y_BOTTOM, 0.39f); glVertex3f(0.68f, RONIN_LINING_Y_BOTTOM, 0.39f);
     glVertex3f(0.68f, RONIN_LINING_Y_TOP, 0.39f); glVertex3f(-0.68f, RONIN_LINING_Y_TOP, 0.39f);
-
     glEnd();
     glPopMatrix();
 
@@ -621,6 +619,7 @@ int main(int argc, char* argv[]) {
                 if(e.type == SDL_KEYDOWN) {
                     if (e.key.keysym.sym == SDLK_d) { app_state = STATE_GAME_LOCAL; local_init_match(1, MODE_DEATHMATCH); }
                     if (e.key.keysym.sym == SDLK_b) { app_state = STATE_GAME_LOCAL; local_init_match(12, MODE_DEATHMATCH); }
+                    if (e.key.keysym.sym == SDLK_t) { app_state = STATE_GAME_LOCAL; local_init_match(12, MODE_TDM); }
                     if (e.key.keysym.sym == SDLK_c) { app_state = STATE_GAME_LOCAL; local_init_match(8, MODE_CTF); } // Added CTF Bind
                     if (e.key.keysym.sym == SDLK_k) { app_state = STATE_GAME_LOCAL; local_init_match(8, MODE_EVOLUTION); }
                     
@@ -661,8 +660,9 @@ int main(int argc, char* argv[]) {
              draw_string("SHANKPIT [181]", 400, 500, 20);
              draw_string("D: DEMO", 400, 400, 10);
              draw_string("B: BATTLE", 400, 350, 10);
-             draw_string("C: LAN CTF", 400, 300, 10); // Added Visual
-             draw_string("J: JOIN S.FARTHQ.COM", 400, 250, 10);
+             draw_string("T: TEAM DM (BOTS)", 400, 300, 10);
+             draw_string("C: LAN CTF", 400, 250, 10); // Added Visual
+             draw_string("J: JOIN S.FARTHQ.COM", 400, 200, 10);
              SDL_GL_SwapWindow(win);
         } 
         else {
