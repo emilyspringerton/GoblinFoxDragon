@@ -19,6 +19,7 @@
 #include "../../../packages/common/protocol.h"
 #include "../../../packages/common/physics.h"
 #include "../../../packages/simulation/local_game.h"
+#include "server_mode.h"
 
 int sock = -1;
 struct sockaddr_in bind_addr;
@@ -28,6 +29,18 @@ unsigned int get_server_time() {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (unsigned int)(ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
+}
+
+int parse_server_mode(int argc, char **argv) {
+    int mode = MODE_DEATHMATCH;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--tdm") == 0) {
+            mode = MODE_TDM;
+        } else if (strcmp(argv[i], "--deathmatch") == 0) {
+            mode = MODE_DEATHMATCH;
+        }
+    }
+    return mode;
 }
 
 void server_net_init() {
@@ -158,9 +171,11 @@ void server_broadcast() {
     }
 }
 
-int main() {
+int main(int argc, char *argv[]) {
     server_net_init();
-    local_init_match(1, 0); 
+    int mode = parse_server_mode(argc, argv);
+    local_init_match(1, mode);
+    printf("SERVER MODE: %s\n", mode == MODE_TDM ? "TEAM DEATHMATCH" : "DEATHMATCH");
     int running = 1;
     unsigned int tick = 0;
     
