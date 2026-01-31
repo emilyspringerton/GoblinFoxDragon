@@ -657,12 +657,14 @@ int main(int argc, char* argv[]) {
              glClearColor(0.02f, 0.02f, 0.05f, 1.0f); // Dark Lobby
              glClear(GL_COLOR_BUFFER_BIT);
              glLoadIdentity(); glColor3f(0, 1, 1); // CYAN TEXT
-             draw_string("SHANKPIT [181]", 400, 500, 20);
-             draw_string("D: DEMO", 400, 400, 10);
-             draw_string("B: BATTLE", 400, 350, 10);
-             draw_string("T: TEAM DM (BOTS)", 400, 300, 10);
-             draw_string("C: LAN CTF", 400, 250, 10); // Added Visual
-             draw_string("J: JOIN S.FARTHQ.COM", 400, 200, 10);
+             draw_string("SHANKPIT", 480, 520, 24);
+             draw_string("SELECT MODE", 470, 470, 10);
+             draw_string("D: DEMO (SOLO)", 400, 420, 10);
+             draw_string("B: BATTLE (BOTS)", 400, 370, 10);
+             draw_string("T: TEAM DM (BOTS)", 400, 320, 10);
+             draw_string("C: LAN CTF", 400, 270, 10);
+             draw_string("K: EVOLUTION", 400, 220, 10);
+             draw_string("J: JOIN S.FARTHQ.COM", 400, 170, 10);
              SDL_GL_SwapWindow(win);
         } 
         else {
