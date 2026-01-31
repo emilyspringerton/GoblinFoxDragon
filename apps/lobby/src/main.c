@@ -21,6 +21,8 @@
 #include <SDL2/SDL_opengl.h>
 #include <GL/glu.h>
 
+#include "player_model.h"
+
 #include "../../../packages/common/protocol.h"
 #include "../../../packages/common/physics.h"
 #include "../../../packages/simulation/local_game.h"
@@ -268,6 +270,68 @@ void draw_gun_model(int weapon_id) {
     glEnd();
 }
 
+static void draw_box(float w, float h, float d) {
+    glPushMatrix();
+    glScalef(w, h, d);
+    glBegin(GL_QUADS);
+    // Front
+    glVertex3f(-0.5f,-0.5f,0.5f); glVertex3f(0.5f,-0.5f,0.5f); glVertex3f(0.5f,0.5f,0.5f); glVertex3f(-0.5f,0.5f,0.5f);
+    // Back
+    glVertex3f(-0.5f,-0.5f,-0.5f); glVertex3f(-0.5f,0.5f,-0.5f); glVertex3f(0.5f,0.5f,-0.5f); glVertex3f(0.5f,-0.5f,-0.5f);
+    // Left
+    glVertex3f(-0.5f,-0.5f,-0.5f); glVertex3f(-0.5f,-0.5f,0.5f); glVertex3f(-0.5f,0.5f,0.5f); glVertex3f(-0.5f,0.5f,-0.5f);
+    // Right
+    glVertex3f(0.5f,-0.5f,-0.5f); glVertex3f(0.5f,0.5f,-0.5f); glVertex3f(0.5f,0.5f,0.5f); glVertex3f(0.5f,-0.5f,0.5f);
+    // Top
+    glVertex3f(-0.5f,0.5f,0.5f); glVertex3f(0.5f,0.5f,0.5f); glVertex3f(0.5f,0.5f,-0.5f); glVertex3f(-0.5f,0.5f,-0.5f);
+    // Bottom
+    glVertex3f(-0.5f,-0.5f,0.5f); glVertex3f(-0.5f,-0.5f,-0.5f); glVertex3f(0.5f,-0.5f,-0.5f); glVertex3f(0.5f,-0.5f,0.5f);
+    glEnd();
+    glPopMatrix();
+}
+
+static void draw_ronin_shell(void) {
+    // Jacket core (cropped waist, broad shoulders)
+    glColor3f(0.1f, 0.1f, 0.1f); // Matte black
+    glPushMatrix();
+    glTranslatef(0.0f, 0.9f, 0.0f);
+    draw_box(RONIN_TORSO_W, RONIN_TORSO_H, RONIN_TORSO_D);
+    // Shoulder pads
+    glPushMatrix(); glTranslatef(-RONIN_SHOULDER_PAD_OFFSET, 0.35f, 0.0f); draw_box(RONIN_SHOULDER_PAD_W, RONIN_SHOULDER_PAD_H, RONIN_SHOULDER_PAD_D); glPopMatrix();
+    glPushMatrix(); glTranslatef(RONIN_SHOULDER_PAD_OFFSET, 0.35f, 0.0f); draw_box(RONIN_SHOULDER_PAD_W, RONIN_SHOULDER_PAD_H, RONIN_SHOULDER_PAD_D); glPopMatrix();
+    // Sleeves
+    glPushMatrix(); glTranslatef(-RONIN_SLEEVE_OFFSET, -0.25f, 0.0f); draw_box(RONIN_SLEEVE_W, RONIN_SLEEVE_H, RONIN_SLEEVE_D); glPopMatrix();
+    glPushMatrix(); glTranslatef(RONIN_SLEEVE_OFFSET, -0.25f, 0.0f); draw_box(RONIN_SLEEVE_W, RONIN_SLEEVE_H, RONIN_SLEEVE_D); glPopMatrix();
+    // Red satin lining at hem
+    glColor3f(0.6f, 0.0f, 0.0f);
+    glBegin(GL_QUADS);
+    glVertex3f(-0.68f, RONIN_LINING_Y_BOTTOM, 0.39f); glVertex3f(0.68f, RONIN_LINING_Y_BOTTOM, 0.39f);
+    glVertex3f(0.68f, RONIN_LINING_Y_TOP, 0.39f); glVertex3f(-0.68f, RONIN_LINING_Y_TOP, 0.39f);
+    glEnd();
+    glPopMatrix();
+
+    // Tech cargo pants (baggy)
+    glColor3f(0.18f, 0.18f, 0.2f); // Charcoal
+    glPushMatrix(); glTranslatef(-RONIN_PANTS_OFFSET, 0.0f, 0.0f); draw_box(RONIN_PANTS_W, RONIN_PANTS_H, RONIN_PANTS_D); glPopMatrix();
+    glPushMatrix(); glTranslatef(RONIN_PANTS_OFFSET, 0.0f, 0.0f); draw_box(RONIN_PANTS_W, RONIN_PANTS_H, RONIN_PANTS_D); glPopMatrix();
+}
+
+static void draw_storm_mask(void) {
+    // Head base
+    glColor3f(0.06f, 0.06f, 0.06f);
+    draw_box(RONIN_HEAD_W, RONIN_HEAD_H, RONIN_HEAD_D);
+    // Faceplate
+    glColor3f(0.2f, 0.2f, 0.22f);
+    glPushMatrix(); glTranslatef(0.0f, -0.05f, 0.37f); draw_box(RONIN_FACEPLATE_W, RONIN_FACEPLATE_H, RONIN_FACEPLATE_D); glPopMatrix();
+    // Cyan vents
+    glColor3f(0.0f, 1.0f, 1.0f);
+    glPushMatrix(); glTranslatef(RONIN_VENT_OFFSET_X, -0.08f, 0.42f); draw_box(RONIN_VENT_W, RONIN_VENT_H, RONIN_VENT_D); glPopMatrix();
+    glPushMatrix(); glTranslatef(-RONIN_VENT_OFFSET_X, -0.08f, 0.42f); draw_box(RONIN_VENT_W, RONIN_VENT_H, RONIN_VENT_D); glPopMatrix();
+    // Broken horn silhouette (single jagged horn)
+    glColor3f(0.08f, 0.08f, 0.08f);
+    glPushMatrix(); glTranslatef(RONIN_HORN_OFFSET_X, 0.52f, 0.05f); draw_box(RONIN_HORN_W, RONIN_HORN_H, RONIN_HORN_D); glPopMatrix();
+}
+
 void draw_weapon_p(PlayerState *p) {
     if (p->in_vehicle) return; 
     glPushMatrix();
@@ -305,24 +369,19 @@ void draw_head(int weapon_id) {
 
 void draw_player_3rd(PlayerState *p) {
     glPushMatrix();
-    glTranslatef(p->x, p->y + 2.0f, p->z);
+    glTranslatef(p->x, p->y + 0.2f, p->z);
     glRotatef(-p->yaw, 0, 1, 0);
     if (p->in_vehicle) {
         draw_buggy_model();
     } else {
-        if(p->health <= 0) glColor3f(0.2, 0, 0); else glColor3f(1, 0, 0);
-        glPushMatrix(); glScalef(0.97f, 2.91f, 0.97f); 
-        glBegin(GL_QUADS);
-        glVertex3f(-0.5,-0.5,0.5); glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(-0.5,0.5,0.5);
-        glVertex3f(-0.5,0.5,0.5); glVertex3f(0.5,0.5,0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
-        glVertex3f(-0.5,-0.5,-0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(-0.5,0.5,-0.5);
-        glVertex3f(-0.5,-0.5,-0.5); glVertex3f(-0.5,-0.5,0.5); glVertex3f(-0.5,0.5,0.5);
-        glVertex3f(-0.5,0.5,-0.5);
-        glVertex3f(0.5,-0.5,0.5); glVertex3f(0.5,-0.5,-0.5); glVertex3f(0.5,0.5,-0.5); glVertex3f(0.5,0.5,0.5);
-        glEnd(); glPopMatrix();
-        glPushMatrix(); glTranslatef(0, 1.54f, 0); draw_head(p->current_weapon); glPopMatrix();
-        glPushMatrix(); glTranslatef(0.5f, 1.0f, 0.5f);
-        glRotatef(p->pitch, 1, 0, 0);   
+        draw_ronin_shell();
+        glPushMatrix();
+        glTranslatef(0.0f, 1.85f, 0.0f);
+        glRotatef(p->pitch, 1, 0, 0);
+        draw_storm_mask();
+        glPopMatrix();
+        glPushMatrix(); glTranslatef(0.6f, 1.1f, 0.55f);
+        glRotatef(p->pitch, 1, 0, 0);
         glScalef(0.8f, 0.8f, 0.8f); draw_gun_model(p->current_weapon); glPopMatrix(); 
     }
     glPopMatrix();
