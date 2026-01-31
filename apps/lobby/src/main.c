@@ -307,6 +307,7 @@ static void draw_ronin_shell(void) {
     glBegin(GL_QUADS);
     glVertex3f(-0.68f, RONIN_LINING_Y_BOTTOM, 0.39f); glVertex3f(0.68f, RONIN_LINING_Y_BOTTOM, 0.39f);
     glVertex3f(0.68f, RONIN_LINING_Y_TOP, 0.39f); glVertex3f(-0.68f, RONIN_LINING_Y_TOP, 0.39f);
+
     glEnd();
     glPopMatrix();
 
@@ -314,6 +315,7 @@ static void draw_ronin_shell(void) {
     glColor3f(0.18f, 0.18f, 0.2f); // Charcoal
     glPushMatrix(); glTranslatef(-RONIN_PANTS_OFFSET, 0.0f, 0.0f); draw_box(RONIN_PANTS_W, RONIN_PANTS_H, RONIN_PANTS_D); glPopMatrix();
     glPushMatrix(); glTranslatef(RONIN_PANTS_OFFSET, 0.0f, 0.0f); draw_box(RONIN_PANTS_W, RONIN_PANTS_H, RONIN_PANTS_D); glPopMatrix();
+
 }
 
 static void draw_storm_mask(void) {
