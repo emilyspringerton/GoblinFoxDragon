@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    
+
     steps:
       - uses: actions/checkout@v4
 
@@ -21,42 +21,61 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y mingw-w64 zip build-essential
+          sudo apt-get install -y \
+            mingw-w64 \
+            zip \
+            build-essential \
+            libncurses-dev
+
           wget https://www.libsdl.org/release/SDL2-devel-2.28.5-mingw.tar.gz
           tar xzf SDL2-devel-2.28.5-mingw.tar.gz
           mv SDL2-2.28.5/x86_64-w64-mingw32 ./sdl2_mingw
 
-      # --- 2. BUILD ARTIFACTS ---
+      # --- 2. BUILD CLIENT ---
       - name: Build Windows Client
         run: |
-          echo "🔨 Building ShankPit.exe..."
-          x86_64-w64-mingw32-gcc apps/lobby/src/main.c -o ShankPit.exe \
+          x86_64-w64-mingw32-gcc apps/lobby/src/main.c \
+            -o ShankPit.exe \
             -O2 -static-libgcc \
-            -I./sdl2_mingw/include -Ipackages/common -Ipackages/simulation \
+            -I./sdl2_mingw/include \
+            -Ipackages/common \
+            -Ipackages/simulation \
             -L./sdl2_mingw/lib \
-            -lmingw32 -lSDL2main -lSDL2 -lopengl32 -lglu32 -lws2_32 -lwinmm -lgdi32 -lm
+            -lmingw32 -lSDL2main -lSDL2 \
+            -lopengl32 -lglu32 -lws2_32 -lwinmm -lgdi32 -lm
 
+      # --- 3. BUILD SERVER ---
       - name: Build Linux Server
         run: |
-          if [ -f apps/server/src/main.c ]; then
-            echo "🔨 Building ShankServer_Linux..."
-            gcc apps/server/src/main.c -o ShankServer_Linux -O2 -static -Ipackages/common -Ipackages/simulation -lm
-          else
-            echo "⚠️ Server source not found."
-            touch ShankServer_Linux 
-          fi
+          gcc apps/server/src/main.c \
+            -o ShankServer_Linux \
+            -O2 -static \
+            -Ipackages/common \
+            -Ipackages/simulation \
+            -lm
 
-      - name: Build Bots
+      # --- 4. BUILD WORLD CONTROLLER ---
+      - name: Build Server Control (ncurses)
         run: |
-          echo "🔨 Building Bots..."
-          x86_64-w64-mingw32-gcc apps/client/bot_main.c -o ShankBot.exe -O2 -static-libgcc -Ipackages/common -Ipackages/simulation -lws2_32 -lwinmm || echo "⚠️ Win Bot Failed"
-          gcc apps/client/bot_main.c -o ShankBot_Linux -O2 -static -Ipackages/common -Ipackages/simulation -lm || echo "⚠️ Lin Bot Failed"
+          gcc apps/server/serverctl.c \
+            -o shankpit_worldctl \
+            -std=c99 \
+            -O2 \
+            -lncurses
 
-      # --- 3. GENERATE CONSTRUCT ---
+      # --- 5. GENERATE CONSTRUCT ---
       - name: Generate Source Construct
         run: |
           echo "SHANKPIT BUILD ${{ github.run_number }} CONSTRUCT" > SHANKPIT_CONSTRUCT.txt
-          FILES="packages/common/protocol.h packages/common/physics.h packages/simulation/local_game.h apps/lobby/src/main.c apps/server/src/main.c apps/client/bot_main.c"
+          FILES="
+            packages/common/protocol.h
+            packages/common/physics.h
+            packages/simulation/local_game.h
+            apps/lobby/src/main.c
+            apps/server/src/main.c
+            apps/server/serverctl.c
+            apps/client/bot_main.c
+          "
           for file in $FILES; do
             if [ -f "$file" ]; then
               echo "--- FILE START: $file ---" >> SHANKPIT_CONSTRUCT.txt
@@ -65,30 +84,38 @@ jobs:
             fi
           done
 
-      # --- 4. PACKAGE ---
+      # --- 6. PACKAGE ---
       - name: Bundle Artifacts
         run: |
+          mkdir ShankPit_World
+          cp ShankServer_Linux ShankPit_World/
+          cp shankpit_worldctl ShankPit_World/
+          cp SHANKPIT_CONSTRUCT.txt ShankPit_World/
+          echo "./shankpit_worldctl" > ShankPit_World/START_WORLD.sh
+          chmod +x ShankPit_World/START_WORLD.sh
+          zip -r ShankPit_World.zip ShankPit_World
+
           mkdir ShankPit_Client
           cp ShankPit.exe ShankPit_Client/
           cp sdl2_mingw/bin/SDL2.dll ShankPit_Client/
           cp SHANKPIT_CONSTRUCT.txt ShankPit_Client/
           echo "start ShankPit.exe" > ShankPit_Client/PLAY.bat
-          zip -r ShankPit_Windows.zip ShankPit_Client
-          
-          mv ShankServer_Linux ShankPit_Server_Linux
-          
+          zip -r ShankPit_Client.zip ShankPit_Client
+
           mkdir ShankPit_Bots
-          [ -f ShankBot.exe ] && cp ShankBot.exe ShankPit_Bots/
+          gcc apps/client/bot_main.c -o ShankBot_Linux -O2 -static -Ipackages/common -Ipackages/simulation -lm || true
           [ -f ShankBot_Linux ] && cp ShankBot_Linux ShankPit_Bots/
           cp SHANKPIT_CONSTRUCT.txt ShankPit_Bots/
           zip -r ShankPit_Bots.zip ShankPit_Bots
 
+      # --- 7. UPLOAD ---
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ShankPit_Builds
           path: |
-            ShankPit_Windows.zip
-            ShankPit_Server_Linux
+            ShankPit_World.zip
+            ShankPit_Client.zip
             ShankPit_Bots.zip
             SHANKPIT_CONSTRUCT.txt
+
