@@ -25,15 +25,6 @@ int sock = -1;
 struct sockaddr_in bind_addr;
 unsigned int client_last_seq[MAX_CLIENTS]; 
 
-void server_disconnect(int i) {
-    printf("[SERVER] DISCONNECT slot=%d\n", i);
-    memset(&local_state.players[i], 0, sizeof(PlayerState));
-    memset(&local_state.clients[i], 0, sizeof(struct sockaddr_in));
-    local_state.client_meta[i].active = 0;
-    local_state.client_meta[i].last_heard_ms = 0;
-    client_last_seq[i] = 0;
-}
-
 unsigned int get_server_time() {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -97,15 +88,10 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
     int client_id = -1;
     
     for(int i=1; i<MAX_CLIENTS; i++) {
-        if (local_state.client_meta[i].active && 
+        if (local_state.client_active[i] && 
             memcmp(&local_state.clients[i].sin_addr, &sender->sin_addr, sizeof(struct in_addr)) == 0 &&
             local_state.clients[i].sin_port == sender->sin_port) {
             client_id = i;
-                    memset(&local_state.players[i], 0, sizeof(PlayerState));
-                    local_state.players[i].id = i;
-                    local_state.client_meta[i].active = 1;
-                    local_state.client_meta[i].last_heard_ms = get_server_time();
-
             break;
         }
     }
@@ -114,14 +100,9 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
         if (head->type == PACKET_CONNECT) {
             char *ip_str = inet_ntoa(sender->sin_addr);
             for(int i=1; i<MAX_CLIENTS; i++) {
-                if (!local_state.client_meta[i].active) {
+                if (!local_state.client_active[i]) {
                     client_id = i;
-                    memset(&local_state.players[i], 0, sizeof(PlayerState));
-                    local_state.players[i].id = i;
-                    local_state.client_meta[i].active = 1;
-                    local_state.client_meta[i].last_heard_ms = get_server_time();
-
-                    local_state.client_meta[i].active = 1;
+                    local_state.client_active[i] = 1;
                     local_state.clients[i] = *sender;
                     local_state.players[i].active = 1;
                     phys_respawn(&local_state.players[i], get_server_time());
@@ -142,8 +123,6 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
         if (size >= cursor + (count * sizeof(UserCmd))) {
             UserCmd *cmds = (UserCmd*)(buffer + cursor);
             for (int i = count - 1; i >= 0; i--) process_user_cmd(client_id, &cmds[i]);
-            local_state.client_meta[client_id].last_heard_ms = get_server_time();
-
             local_state.players[client_id].active = 1;
         }
     }
@@ -188,7 +167,7 @@ void server_broadcast() {
     }
     
     for(int i=1; i<MAX_CLIENTS; i++) {
-        if (local_state.client_meta[i].active) {
+        if (local_state.client_active[i]) {
             sendto(sock, buffer, cursor, 0, (struct sockaddr*)&local_state.clients[i], sizeof(struct sockaddr_in));
         }
     }
@@ -213,14 +192,6 @@ int main(int argc, char *argv[]) {
         }
         
         unsigned int now = get_server_time();
-        // TIMEOUT_SWEEP
-        for (int i = 1; i < MAX_CLIENTS; i++) {
-            if (local_state.client_meta[i].active &&
-                now - local_state.client_meta[i].last_heard_ms > 5000) {
-                server_disconnect(i);
-            }
-        }
-
         int active_count = 0;
         
         for(int i=0; i<MAX_CLIENTS; i++) {

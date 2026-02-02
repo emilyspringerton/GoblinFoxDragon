@@ -309,7 +309,7 @@ void update_weapons(PlayerState *p, PlayerState *targets, Projectile *projectile
 
             for(int i=0; i<MAX_CLIENTS; i++) {
                 if (p == &targets[i]) continue;
-                if (!targets[i].active) continue;
+                if (!targets[i].active || targets[i].state == STATE_DEAD) continue;
                 if (w == WPN_KNIFE) {
                     float kx = p->x - targets[i].x;
                     float ky = p->y - targets[i].y; float kz = p->z - targets[i].z;
