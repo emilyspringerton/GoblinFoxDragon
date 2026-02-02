@@ -39,11 +39,6 @@ typedef struct {
 } NetHeader;
 
 typedef struct {
-    int active;
-    unsigned int last_heard_ms;
-} ClientMeta;
-
-typedef struct {
     unsigned int sequence;
     unsigned int timestamp;
     unsigned short msec;
@@ -61,11 +56,6 @@ typedef struct {
 #define BTN_ABILITY_1 32
 
 typedef struct {
-    int active;
-    unsigned int last_heard_ms;
-} ClientMeta;
-
-typedef struct {
     int id;
     int dmg; int rof; int cnt; float spr; int ammo_max;
 } WeaponStats;
@@ -79,20 +69,10 @@ static const WeaponStats WPN_STATS[MAX_WEAPONS] = {
 };
 
 typedef struct {
-    int active;
-    unsigned int last_heard_ms;
-} ClientMeta;
-
-typedef struct {
     int active; float x, y, z; float vx, vy, vz; int owner_id;
     int bounces_left;
     int damage;
 } Projectile;
-
-typedef struct {
-    int active;
-    unsigned int last_heard_ms;
-} ClientMeta;
 
 typedef struct {
     unsigned char id; 
@@ -111,20 +91,10 @@ typedef struct {
 } NetPlayer;
 
 typedef struct {
-    int active;
-    unsigned int last_heard_ms;
-} ClientMeta;
-
-typedef struct {
     int version;
     float w_aggro;
     float w_strafe; float w_jump; float w_slide; float w_turret; float w_repel;      
 } BotGenome;
-
-typedef struct {
-    int active;
-    unsigned int last_heard_ms;
-} ClientMeta;
 
 typedef struct {
     int id;
@@ -150,22 +120,12 @@ typedef struct {
 } PlayerState;
 
 typedef struct {
-    int active;
-    unsigned int last_heard_ms;
-} ClientMeta;
-
-typedef struct {
     int active; unsigned int timestamp;
     float x, y, z;
     float vx, vy, vz;
 } LagRecord;
 
 typedef enum { MODE_DEATHMATCH=0, MODE_TDM=1, MODE_SURVIVAL=2, MODE_CTF=3, MODE_ODDBALL=4, MODE_LOCAL=98, MODE_NET=99, MODE_EVOLUTION=100 } GameMode;
-
-typedef struct {
-    int active;
-    unsigned int last_heard_ms;
-} ClientMeta;
 
 typedef struct {
     PlayerState players[MAX_CLIENTS];
