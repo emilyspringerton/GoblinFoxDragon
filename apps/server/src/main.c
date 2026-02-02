@@ -20,19 +20,11 @@
 #include "../../../packages/common/physics.h"
 #include "../../../packages/simulation/local_game.h"
 #include "server_mode.h"
+#include "server_state.h"
 
 int sock = -1;
 struct sockaddr_in bind_addr;
 unsigned int client_last_seq[MAX_CLIENTS]; 
-
-void server_disconnect(int i) {
-    printf("[SERVER] DISCONNECT slot=%d\n", i);
-    memset(&local_state.players[i], 0, sizeof(PlayerState));
-    memset(&local_state.clients[i], 0, sizeof(struct sockaddr_in));
-    local_state.client_meta[i].active = 0;
-    local_state.client_meta[i].last_heard_ms = 0;
-    client_last_seq[i] = 0;
-}
 
 unsigned int get_server_time() {
     struct timespec ts;
@@ -217,7 +209,7 @@ int main(int argc, char *argv[]) {
         for (int i = 1; i < MAX_CLIENTS; i++) {
             if (local_state.client_meta[i].active &&
                 now - local_state.client_meta[i].last_heard_ms > 5000) {
-                server_disconnect(i);
+                server_disconnect(i, client_last_seq);
             }
         }
 
