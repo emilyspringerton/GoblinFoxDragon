@@ -1,3 +1,4 @@
+// apps/server/src/main.c
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,7 +25,7 @@
 
 int sock = -1;
 struct sockaddr_in bind_addr;
-unsigned int client_last_seq[MAX_CLIENTS]; 
+unsigned int client_last_seq[MAX_CLIENTS];
 
 unsigned int get_server_time() {
     struct timespec ts;
@@ -56,7 +57,7 @@ void server_net_init() {
     int flags = fcntl(sock, F_GETFL, 0); fcntl(sock, F_SETFL, flags | O_NONBLOCK);
     #endif
     bind_addr.sin_family = AF_INET;
-    bind_addr.sin_port = htons(6969); 
+    bind_addr.sin_port = htons(6969);
     bind_addr.sin_addr.s_addr = INADDR_ANY;
     if (bind(sock, (struct sockaddr*)&bind_addr, sizeof(bind_addr)) < 0) {
         printf("FAILED TO BIND PORT 6969\n");
@@ -67,7 +68,7 @@ void server_net_init() {
 }
 
 void process_user_cmd(int client_id, UserCmd *cmd) {
-    if (cmd->sequence <= client_last_seq[client_id]) return; 
+    if (cmd->sequence <= client_last_seq[client_id]) return;
     PlayerState *p = &local_state.players[client_id];
     p->yaw = cmd->yaw;
     p->pitch = cmd->pitch;
@@ -84,58 +85,75 @@ void process_user_cmd(int client_id, UserCmd *cmd) {
 }
 
 void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
-    if (size < sizeof(NetHeader)) return;
+    if (size < (int)sizeof(NetHeader)) return;
     NetHeader *head = (NetHeader*)buffer;
     int client_id = -1;
-    
+
+    // --- FIND EXISTING CLIENT BY SENDER (DO NOT RESET PLAYER STATE) ---
     for(int i=1; i<MAX_CLIENTS; i++) {
-        if (local_state.client_meta[i].active && 
+        if (local_state.client_meta[i].active &&
             memcmp(&local_state.clients[i].sin_addr, &sender->sin_addr, sizeof(struct in_addr)) == 0 &&
             local_state.clients[i].sin_port == sender->sin_port) {
-            client_id = i;
-                    memset(&local_state.players[i], 0, sizeof(PlayerState));
-                    local_state.players[i].id = i;
-                    local_state.client_meta[i].active = 1;
-                    local_state.client_meta[i].last_heard_ms = get_server_time();
 
+            client_id = i;
+            // Touch only liveness; never memset player here.
+            local_state.client_meta[i].last_heard_ms = get_server_time();
             break;
         }
     }
-    
+
+    // --- NEW CONNECTION PATH ---
     if (client_id == -1) {
         if (head->type == PACKET_CONNECT) {
             char *ip_str = inet_ntoa(sender->sin_addr);
             for(int i=1; i<MAX_CLIENTS; i++) {
                 if (!local_state.client_meta[i].active) {
                     client_id = i;
+
+                    // Allocate + initialize player ONCE here.
                     memset(&local_state.players[i], 0, sizeof(PlayerState));
                     local_state.players[i].id = i;
-                    local_state.client_meta[i].active = 1;
-                    local_state.client_meta[i].last_heard_ms = get_server_time();
+                    local_state.players[i].active = 1;
 
                     local_state.client_meta[i].active = 1;
+                    local_state.client_meta[i].last_heard_ms = get_server_time();
                     local_state.clients[i] = *sender;
-                    local_state.players[i].active = 1;
+
                     phys_respawn(&local_state.players[i], get_server_time());
+
                     printf("CLIENT %d CONNECTED (%s)\n", client_id, ip_str);
+
                     NetHeader h;
-                    h.type = PACKET_WELCOME; h.client_id = client_id; 
-                    h.sequence = 0; h.timestamp = get_server_time(); h.entity_count = 0;
-                    sendto(sock, (char*)&h, sizeof(NetHeader), 0, (struct sockaddr*)sender, sizeof(struct sockaddr_in));
+                    h.type = PACKET_WELCOME;
+                    h.client_id = (unsigned char)client_id;
+                    h.sequence = 0;
+                    h.timestamp = get_server_time();
+                    h.entity_count = 0;
+
+                    sendto(sock, (char*)&h, sizeof(NetHeader), 0,
+                           (struct sockaddr*)sender, sizeof(struct sockaddr_in));
                     break;
                 }
             }
         }
     }
-    
-    if (client_id != -1 && head->type == PACKET_USERCMD) {
-        int cursor = sizeof(NetHeader);
-        unsigned char count = *(unsigned char*)(buffer + cursor); cursor += 1;
-        if (size >= cursor + (count * sizeof(UserCmd))) {
-            UserCmd *cmds = (UserCmd*)(buffer + cursor);
-            for (int i = count - 1; i >= 0; i--) process_user_cmd(client_id, &cmds[i]);
-            local_state.client_meta[client_id].last_heard_ms = get_server_time();
 
+    // --- USER COMMANDS ---
+    if (client_id != -1 && head->type == PACKET_USERCMD) {
+        int cursor = (int)sizeof(NetHeader);
+        if (size < cursor + 1) return;
+
+        unsigned char count = *(unsigned char*)(buffer + cursor); cursor += 1;
+
+        if (size >= cursor + (int)(count * sizeof(UserCmd))) {
+            UserCmd *cmds = (UserCmd*)(buffer + cursor);
+
+            // process newest->oldest so last write wins
+            for (int i = (int)count - 1; i >= 0; i--) {
+                process_user_cmd(client_id, &cmds[i]);
+            }
+
+            local_state.client_meta[client_id].last_heard_ms = get_server_time();
             local_state.players[client_id].active = 1;
         }
     }
@@ -145,16 +163,18 @@ void server_broadcast() {
     char buffer[4096];
     int cursor = 0;
     NetHeader head;
-    head.type = PACKET_SNAPSHOT; head.client_id = 0; 
-    head.sequence = local_state.server_tick; head.timestamp = get_server_time();
-    
+    head.type = PACKET_SNAPSHOT;
+    head.client_id = 0;
+    head.sequence = local_state.server_tick;
+    head.timestamp = get_server_time();
+
     unsigned char count = 0;
     for(int i=0; i<MAX_CLIENTS; i++) if (local_state.players[i].active) count++;
     head.entity_count = count;
-    
-    memcpy(buffer + cursor, &head, sizeof(NetHeader)); cursor += sizeof(NetHeader);
+
+    memcpy(buffer + cursor, &head, sizeof(NetHeader)); cursor += (int)sizeof(NetHeader);
     memcpy(buffer + cursor, &count, 1); cursor += 1;
-    
+
     for(int i=0; i<MAX_CLIENTS; i++) {
         PlayerState *p = &local_state.players[i];
         if (p->active) {
@@ -173,15 +193,17 @@ void server_broadcast() {
             np.in_vehicle = (unsigned char)p->in_vehicle;
             np.hit_feedback = (unsigned char)p->hit_feedback;
             np.storm_charges = (unsigned char)p->storm_charges;
-            
+
             p->accumulated_reward = 0;
-            memcpy(buffer + cursor, &np, sizeof(NetPlayer)); cursor += sizeof(NetPlayer);
+            memcpy(buffer + cursor, &np, sizeof(NetPlayer)); cursor += (int)sizeof(NetPlayer);
         }
     }
-    
+
     for(int i=1; i<MAX_CLIENTS; i++) {
         if (local_state.client_meta[i].active) {
-            sendto(sock, buffer, cursor, 0, (struct sockaddr*)&local_state.clients[i], sizeof(struct sockaddr_in));
+            sendto(sock, buffer, cursor, 0,
+                   (struct sockaddr*)&local_state.clients[i],
+                   sizeof(struct sockaddr_in));
         }
     }
 }
@@ -191,20 +213,23 @@ int main(int argc, char *argv[]) {
     int mode = parse_server_mode(argc, argv);
     local_init_match(1, mode);
     printf("SERVER MODE: %s\n", mode == MODE_TDM ? "TEAM DEATHMATCH" : "DEATHMATCH");
+
     int running = 1;
     unsigned int tick = 0;
-    
+
     while(running) {
         char buffer[1024];
         struct sockaddr_in sender;
         socklen_t slen = sizeof(sender);
+
         int len = recvfrom(sock, buffer, 1024, 0, (struct sockaddr*)&sender, &slen);
         while (len > 0) {
             server_handle_packet(&sender, buffer, len);
             len = recvfrom(sock, buffer, 1024, 0, (struct sockaddr*)&sender, &slen);
         }
-        
+
         unsigned int now = get_server_time();
+
         // TIMEOUT_SWEEP
         for (int i = 1; i < MAX_CLIENTS; i++) {
             if (local_state.client_meta[i].active &&
@@ -214,24 +239,25 @@ int main(int argc, char *argv[]) {
         }
 
         int active_count = 0;
-        
+
         for(int i=0; i<MAX_CLIENTS; i++) {
             PlayerState *p = &local_state.players[i];
             if (p->active) active_count++;
-            
+
             if (p->state == STATE_DEAD) {
-               if (local_state.game_mode != MODE_SURVIVAL && now > p->respawn_time) {
-                   phys_respawn(p, now);
-               }
+                if (local_state.game_mode != MODE_SURVIVAL && now > p->respawn_time) {
+                    phys_respawn(p, now);
+                }
             }
-            
+
             if (p->active && p->state != STATE_DEAD) {
                 if (p->in_use && p->vehicle_cooldown == 0) {
                     p->in_vehicle = !p->in_vehicle;
-                    p->vehicle_cooldown = 30; 
+                    p->vehicle_cooldown = 30;
                     printf("Client %d Toggle Vehicle: %d\n", i, p->in_vehicle);
                 }
                 if (p->vehicle_cooldown > 0) p->vehicle_cooldown--;
+
                 float rad = p->yaw * 3.14159f / 180.0f;
                 float wish_x = 0, wish_z = 0;
                 float max_spd = MAX_SPEED;
@@ -246,31 +272,41 @@ int main(int argc, char *argv[]) {
                     wish_x = sinf(rad) * p->in_fwd + cosf(rad) * p->in_strafe;
                     wish_z = cosf(rad) * p->in_fwd - sinf(rad) * p->in_strafe;
                 }
-                
+
                 float wish_speed = sqrtf(wish_x*wish_x + wish_z*wish_z);
-                if (wish_speed > 1.0f) { wish_speed = 1.0f; wish_x/=wish_speed; wish_z/=wish_speed;
+                if (wish_speed > 1.0f) {
+                    wish_speed = 1.0f;
+                    wish_x/=wish_speed; wish_z/=wish_speed;
                 }
                 wish_speed *= max_spd;
+
                 accelerate(p, wish_x, wish_z, wish_speed, acc);
-                
+
                 float g = p->in_vehicle ? BUGGY_GRAVITY : (p->in_jump ? GRAVITY_FLOAT : GRAVITY_DROP);
                 p->vy -= g;
-                if (p->in_jump && p->on_ground) { 
-                     p->y += 0.1f;
-                     p->vy += JUMP_FORCE; 
+                if (p->in_jump && p->on_ground) {
+                    p->y += 0.1f;
+                    p->vy += JUMP_FORCE;
                 }
             }
+
             update_entity(p, 0.016f, NULL, now);
         }
+
         server_broadcast();
-        if (tick % 300 == 0) printf("[STATUS] Tick: %d | Clients: %d\n", tick, active_count);
+
+        if (tick % 300 == 0) printf("[STATUS] Tick: %u | Clients: %d\n", tick, active_count);
+
         local_state.server_tick++;
+
         #ifdef _WIN32
         Sleep(16);
         #else
         usleep(16000);
         #endif
+
         tick++;
     }
+
     return 0;
 }
