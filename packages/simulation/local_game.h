@@ -46,6 +46,30 @@ PlayerState* get_best_bot() {
     return best;
 }
 
+static inline void scene_load(int scene_id) {
+    local_state.scene_id = scene_id;
+    phys_set_scene(scene_id);
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (!local_state.players[i].active) continue;
+        scene_force_spawn(&local_state.players[i]);
+    }
+}
+
+static inline void scene_request_transition(int scene_id) {
+    if (local_state.transition_timer > 0) return;
+    local_state.pending_scene = scene_id;
+    local_state.transition_timer = 12;
+}
+
+static inline void scene_tick_transition() {
+    if (local_state.transition_timer <= 0) return;
+    local_state.transition_timer--;
+    if (local_state.transition_timer == 0 && local_state.pending_scene >= 0) {
+        scene_load(local_state.pending_scene);
+        local_state.pending_scene = -1;
+    }
+}
+
 // --- BOT AI ---
 void bot_think(int bot_idx, PlayerState *players, float *out_fwd, float *out_yaw, int *out_buttons) {
     PlayerState *me = &players[bot_idx];
@@ -116,6 +140,7 @@ void update_entity(PlayerState *p, float dt, void *server_context, unsigned int 
     if (p->hit_feedback > 0) p->hit_feedback--;
 
     update_weapons(p, local_state.players, local_state.projectiles, p->in_shoot > 0, p->in_reload > 0, p->in_ability > 0);
+    scene_safety_check(p);
 }
 
 static void update_projectiles() {
@@ -146,6 +171,16 @@ static void update_projectiles() {
 
 void local_update(float fwd, float str, float yaw, float pitch, int shoot, int weapon_req, int jump, int crouch, int reload, int ability, void *server_context, unsigned int cmd_time) {
     PlayerState *p0 = &local_state.players[0];
+    scene_tick_transition();
+    if (local_state.transition_timer > 0) {
+        fwd = 0.0f;
+        str = 0.0f;
+        shoot = 0;
+        jump = 0;
+        crouch = 0;
+        reload = 0;
+        ability = 0;
+    }
     p0->yaw = yaw; p0->pitch = pitch;
     if (weapon_req >= 0 && weapon_req < MAX_WEAPONS) p0->current_weapon = weapon_req;
     float rad = yaw * 3.14159f / 180.0f;
@@ -203,6 +238,10 @@ void local_update(float fwd, float str, float yaw, float pitch, int shoot, int w
 void local_init_match(int num_players, int mode) {
     memset(&local_state, 0, sizeof(ServerState));
     local_state.game_mode = mode;
+    local_state.scene_id = SCENE_GARAGE_OSAKA;
+    local_state.pending_scene = -1;
+    local_state.transition_timer = 0;
+    phys_set_scene(local_state.scene_id);
     local_state.players[0].active = 1;
     phys_respawn(&local_state.players[0], 0);
     for(int i=1; i<num_players; i++) {
