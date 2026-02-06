@@ -90,6 +90,7 @@ void net_init(const char* host, int port) {
     
     // Connect Handshake
     char buf[32]; NetHeader *h = (NetHeader*)buf; h->type = PACKET_CONNECT;
+    h->scene_id = 0;
     sendto(sock, buf, sizeof(NetHeader), 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
 }
 
@@ -219,7 +220,7 @@ int main(int argc, char* argv[]) {
         
         // Pack & Send
         char pbuf[256];
-        NetHeader h; h.type = PACKET_USERCMD; h.entity_count=1;
+        NetHeader h; h.type = PACKET_USERCMD; h.entity_count=1; h.scene_id = 0;
         memcpy(pbuf, &h, sizeof(NetHeader));
         unsigned char c=1; memcpy(pbuf+sizeof(NetHeader), &c, 1);
         memcpy(pbuf+sizeof(NetHeader)+1, &cmd, sizeof(UserCmd));

@@ -255,6 +255,7 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
                     h.sequence = 0;
                     h.timestamp = get_server_time();
                     h.entity_count = 0;
+                    h.scene_id = (unsigned char)local_state.scene_id;
 
                     sendto(sock, (char*)&h, sizeof(NetHeader), 0,
                            (struct sockaddr*)sender, sizeof(struct sockaddr_in));
@@ -293,6 +294,7 @@ void server_broadcast() {
     head.client_id = 0;
     head.sequence = local_state.server_tick;
     head.timestamp = get_server_time();
+    head.scene_id = (unsigned char)local_state.scene_id;
 
     unsigned char count = 0;
     for(int i=0; i<MAX_CLIENTS; i++) if (local_state.players[i].active) count++;
@@ -372,6 +374,8 @@ int main(int argc, char *argv[]) {
         }
 
         unsigned int now = get_server_time();
+        scene_tick_transition();
+        int transition_active = local_state.transition_timer > 0;
 
         // TIMEOUT_SWEEP
         for (int i = 1; i < MAX_CLIENTS; i++) {
@@ -394,10 +398,29 @@ int main(int argc, char *argv[]) {
             }
 
             if (p->active && p->state != STATE_DEAD) {
+                if (transition_active) {
+                    p->in_fwd = 0.0f;
+                    p->in_strafe = 0.0f;
+                    p->in_jump = 0;
+                    p->in_shoot = 0;
+                    p->in_reload = 0;
+                    p->in_use = 0;
+                    p->in_ability = 0;
+                }
                 if (p->in_use && p->vehicle_cooldown == 0) {
-                    p->in_vehicle = !p->in_vehicle;
-                    p->vehicle_cooldown = 30;
-                    printf("Client %d Toggle Vehicle: %d\n", i, p->in_vehicle);
+                    int in_garage = local_state.scene_id == SCENE_GARAGE_OSAKA;
+                    if (in_garage && scene_portal_triggered(p)) {
+                        scene_request_transition(SCENE_STADIUM);
+                        p->in_use = 0;
+                    } else if (in_garage && scene_near_vehicle_pad(local_state.scene_id, p->x, p->z, 6.0f, NULL)) {
+                        p->in_vehicle = !p->in_vehicle;
+                        p->vehicle_cooldown = 30;
+                        printf("Client %d Toggle Vehicle: %d\n", i, p->in_vehicle);
+                    } else if (!in_garage) {
+                        p->in_vehicle = !p->in_vehicle;
+                        p->vehicle_cooldown = 30;
+                        printf("Client %d Toggle Vehicle: %d\n", i, p->in_vehicle);
+                    }
                 }
                 if (p->vehicle_cooldown > 0) p->vehicle_cooldown--;
 
