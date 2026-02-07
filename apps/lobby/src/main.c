@@ -24,6 +24,8 @@
 #include "player_model.h"
 #include "../../../packages/ui/turtle_text.h"
 #include "../../../packages/ui/ui_bridge.h"
+#define UI_BRIDGE_DECL static
+#include "../../../packages/ui/ui_bridge.c"
 
 #include "../../../packages/common/protocol.h"
 #include "../../../packages/common/physics.h"
@@ -54,6 +56,8 @@ float current_fov = 75.0f;
 
 int sock = -1;
 struct sockaddr_in server_addr;
+
+void net_connect();
 
 void draw_string(const char* str, float x, float y, float size) {
     TurtlePen pen = turtle_pen_create(x, y, size);

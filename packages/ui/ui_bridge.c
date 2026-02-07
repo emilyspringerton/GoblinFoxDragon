@@ -1,5 +1,9 @@
 #include "ui_bridge.h"
 
+#ifndef UI_BRIDGE_DECL
+#define UI_BRIDGE_DECL
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,7 +36,7 @@ static void ui_bridge_net_init() {
     ui_bridge_socket_init = 1;
 }
 
-int ui_bridge_init(const char *host, int port) {
+UI_BRIDGE_DECL int ui_bridge_init(const char *host, int port) {
     ui_bridge_net_init();
     if (host && host[0]) {
         strncpy(ui_bridge_host, host, sizeof(ui_bridge_host) - 1);
@@ -184,7 +188,7 @@ static void ui_bridge_state_reset(UiState *state) {
     strncpy(state->protocol_version, "v0", sizeof(state->protocol_version) - 1);
 }
 
-int ui_bridge_fetch_state(UiState *out_state) {
+UI_BRIDGE_DECL int ui_bridge_fetch_state(UiState *out_state) {
     if (!out_state) return 0;
     ui_bridge_state_reset(out_state);
 
@@ -207,7 +211,7 @@ int ui_bridge_fetch_state(UiState *out_state) {
     return ui_bridge_parse_menu(body, out_state);
 }
 
-int ui_bridge_send_intent_activate(const char *entry_id, UiState *out_state) {
+UI_BRIDGE_DECL int ui_bridge_send_intent_activate(const char *entry_id, UiState *out_state) {
     if (!entry_id || !entry_id[0]) return 0;
     long long ts = (long long)time(NULL) * 1000;
     char body[512];
