@@ -23,8 +23,8 @@
 
 #include "player_model.h"
 #include "../../../packages/ui/turtle_text.h"
-#include "../../../packages/ui/ui_bridge.h"
 #define UI_BRIDGE_DECL static
+#include "../../../packages/ui/ui_bridge.h"
 #include "../../../packages/ui/ui_bridge.c"
 
 #include "../../../packages/common/protocol.h"
