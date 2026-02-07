@@ -58,7 +58,7 @@ int test_gap_fill() {
     char buffer[1024];
     int cursor = 0;
     
-    NetHeader head; head.type = PACKET_USERCMD;
+    NetHeader head; head.type = PACKET_USERCMD; head.scene_id = 0;
     memcpy(buffer + cursor, &head, sizeof(NetHeader)); cursor += sizeof(NetHeader);
     
     unsigned char count = 3;
