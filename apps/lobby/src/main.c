@@ -52,7 +52,6 @@ int ui_edit_len = 0;
 unsigned int ui_last_click_ms = 0;
 int ui_last_click_index = -1;
 char ui_edit_buffer[64];
-char lobby_labels_mutable[LOBBY_COUNT][64];
 
 float cam_yaw = 0.0f;
 float cam_pitch = 0.0f;
@@ -79,6 +78,8 @@ typedef enum {
     LOBBY_JOIN,
     LOBBY_COUNT
 } LobbyAction;
+
+char lobby_labels_mutable[LOBBY_COUNT][64];
 
 static const char *LOBBY_LABELS[LOBBY_COUNT] = {
     "DEMO (SOLO)",
