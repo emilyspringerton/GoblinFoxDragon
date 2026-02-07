@@ -90,6 +90,7 @@ void bot_send(UserCmd cmd) {
     NetHeader head;
     head.type = PACKET_USERCMD;
     head.client_id = 999; // ID for "Bot"
+    head.scene_id = 0;
     memcpy(buffer + cursor, &head, sizeof(NetHeader)); cursor += sizeof(NetHeader);
     
     // Redundancy

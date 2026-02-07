@@ -48,6 +48,7 @@ int test_packet_stuffing() {
     NetHeader head;
     head.type = PACKET_USERCMD;
     head.client_id = 99;
+    head.scene_id = 0;
     
     char buffer[1400];
     int size = serialize_packet(buffer, &head, history, 3);
