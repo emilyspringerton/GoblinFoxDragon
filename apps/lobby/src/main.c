@@ -23,6 +23,9 @@
 
 #include "player_model.h"
 #include "../../../packages/ui/turtle_text.h"
+#include "../../../packages/ui/ui_bridge.h"
+#define UI_BRIDGE_DECL static
+#include "../../../packages/ui/ui_bridge.c"
 
 #include "../../../packages/common/protocol.h"
 #include "../../../packages/common/physics.h"
@@ -41,6 +44,10 @@ int wpn_req = 1;
 int my_client_id = -1;
 int lobby_selection = 0;
 
+UiState ui_state;
+int ui_use_server = 0;
+unsigned int ui_last_poll = 0;
+
 float cam_yaw = 0.0f;
 float cam_pitch = 0.0f;
 float current_fov = 75.0f;
@@ -49,6 +56,8 @@ float current_fov = 75.0f;
 
 int sock = -1;
 struct sockaddr_in server_addr;
+
+void net_connect();
 
 void draw_string(const char* str, float x, float y, float size) {
     TurtlePen pen = turtle_pen_create(x, y, size);
@@ -74,6 +83,75 @@ static const char *LOBBY_LABELS[LOBBY_COUNT] = {
     "JOIN S.FARTHQ.COM"
 };
 
+static int lobby_menu_count() {
+    if (ui_use_server && ui_state.entry_count > 0) {
+        return ui_state.entry_count;
+    }
+    return LOBBY_COUNT;
+}
+
+static const char *lobby_menu_label(int idx) {
+    if (ui_use_server && idx >= 0 && idx < ui_state.entry_count) {
+        return ui_state.entries[idx].label;
+    }
+    return LOBBY_LABELS[idx];
+}
+
+static const char *lobby_menu_entry_id(int idx) {
+    if (ui_use_server && idx >= 0 && idx < ui_state.entry_count) {
+        return ui_state.entries[idx].id;
+    }
+    return NULL;
+}
+
+static void lobby_apply_scene_id(const char *scene_id) {
+    if (!scene_id || !scene_id[0]) return;
+    if (strcmp(scene_id, "GARAGE_OSAKA") == 0) {
+        scene_load(SCENE_GARAGE_OSAKA);
+    } else if (strcmp(scene_id, "STADIUM") == 0) {
+        scene_load(SCENE_STADIUM);
+    }
+}
+
+static void lobby_apply_ui_state() {
+    if (!ui_use_server) return;
+    if (strcmp(ui_state.active_mode_id, "mode.join") == 0) {
+        app_state = STATE_GAME_NET;
+        net_connect();
+        return;
+    }
+
+    if (strcmp(ui_state.active_mode_id, "mode.demo") == 0) {
+        app_state = STATE_GAME_LOCAL;
+        local_init_match(1, MODE_DEATHMATCH);
+    } else if (strcmp(ui_state.active_mode_id, "mode.battle") == 0) {
+        app_state = STATE_GAME_LOCAL;
+        local_init_match(12, MODE_DEATHMATCH);
+    } else if (strcmp(ui_state.active_mode_id, "mode.tdm") == 0) {
+        app_state = STATE_GAME_LOCAL;
+        local_init_match(12, MODE_TDM);
+    } else if (strcmp(ui_state.active_mode_id, "mode.ctf") == 0) {
+        app_state = STATE_GAME_LOCAL;
+        local_init_match(8, MODE_CTF);
+    } else if (strcmp(ui_state.active_mode_id, "mode.evolution") == 0) {
+        app_state = STATE_GAME_LOCAL;
+        local_init_match(8, MODE_EVOLUTION);
+    } else if (strcmp(ui_state.active_mode_id, "mode.training") == 0) {
+        app_state = STATE_GAME_LOCAL;
+        local_init_match(1, MODE_DEATHMATCH);
+    } else if (strcmp(ui_state.active_mode_id, "mode.recorder") == 0) {
+        app_state = STATE_GAME_LOCAL;
+        local_init_match(1, MODE_DEATHMATCH);
+    } else if (strcmp(ui_state.active_mode_id, "mode.garage") == 0) {
+        app_state = STATE_GAME_LOCAL;
+        local_init_match(1, MODE_DEATHMATCH);
+    } else {
+        return;
+    }
+
+    lobby_apply_scene_id(ui_state.active_scene_id);
+}
+
 static void setup_lobby_2d() {
     glDisable(GL_DEPTH_TEST);
     glMatrixMode(GL_PROJECTION);
@@ -84,6 +162,15 @@ static void setup_lobby_2d() {
 }
 
 static void lobby_start_action(int action) {
+    if (ui_use_server) {
+        const char *entry_id = lobby_menu_entry_id(action);
+        if (entry_id) {
+            if (ui_bridge_send_intent_activate(entry_id, &ui_state)) {
+                lobby_apply_ui_state();
+                return;
+            }
+        }
+    }
     if (action == LOBBY_JOIN) {
         app_state = STATE_GAME_NET;
         net_connect();
@@ -811,6 +898,11 @@ int main(int argc, char* argv[]) {
     net_init();
     
     local_init_match(1, 0);
+    ui_bridge_init("127.0.0.1", 17777);
+    if (ui_bridge_fetch_state(&ui_state)) {
+        ui_use_server = 1;
+        ui_last_poll = SDL_GetTicks();
+    }
     
     int running = 1;
     while(running) {
@@ -823,21 +915,25 @@ int main(int argc, char* argv[]) {
             if (app_state == STATE_LOBBY) {
                 if(e.type == SDL_KEYDOWN) {
                     if (e.key.keysym.sym == SDLK_UP) {
-                        lobby_selection = (lobby_selection + LOBBY_COUNT - 1) % LOBBY_COUNT;
+                        int count = lobby_menu_count();
+                        lobby_selection = (lobby_selection + count - 1) % count;
                     }
                     if (e.key.keysym.sym == SDLK_DOWN) {
-                        lobby_selection = (lobby_selection + 1) % LOBBY_COUNT;
+                        int count = lobby_menu_count();
+                        lobby_selection = (lobby_selection + 1) % count;
                     }
                     if (e.key.keysym.sym == SDLK_RETURN || e.key.keysym.sym == SDLK_KP_ENTER) {
                         lobby_start_action(lobby_selection);
                     }
-                    if (e.key.keysym.sym == SDLK_d) { lobby_selection = LOBBY_DEMO; lobby_start_action(LOBBY_DEMO); }
-                    if (e.key.keysym.sym == SDLK_b) { lobby_selection = LOBBY_BATTLE; lobby_start_action(LOBBY_BATTLE); }
-                    if (e.key.keysym.sym == SDLK_t) { lobby_selection = LOBBY_TDM; lobby_start_action(LOBBY_TDM); }
-                    if (e.key.keysym.sym == SDLK_c) { lobby_selection = LOBBY_CTF; lobby_start_action(LOBBY_CTF); }
-                    if (e.key.keysym.sym == SDLK_k) { lobby_selection = LOBBY_EVOLUTION; lobby_start_action(LOBBY_EVOLUTION); }
+                    if (!ui_use_server) {
+                        if (e.key.keysym.sym == SDLK_d) { lobby_selection = LOBBY_DEMO; lobby_start_action(LOBBY_DEMO); }
+                        if (e.key.keysym.sym == SDLK_b) { lobby_selection = LOBBY_BATTLE; lobby_start_action(LOBBY_BATTLE); }
+                        if (e.key.keysym.sym == SDLK_t) { lobby_selection = LOBBY_TDM; lobby_start_action(LOBBY_TDM); }
+                        if (e.key.keysym.sym == SDLK_c) { lobby_selection = LOBBY_CTF; lobby_start_action(LOBBY_CTF); }
+                        if (e.key.keysym.sym == SDLK_k) { lobby_selection = LOBBY_EVOLUTION; lobby_start_action(LOBBY_EVOLUTION); }
+                    }
                     
-                    if (e.key.keysym.sym == SDLK_j) { 
+                    if (!ui_use_server && e.key.keysym.sym == SDLK_j) { 
                         lobby_selection = LOBBY_JOIN;
                         lobby_start_action(LOBBY_JOIN);
                     }
@@ -859,6 +955,14 @@ int main(int argc, char* argv[]) {
         }
         if (app_state != STATE_LOBBY) SDL_SetRelativeMouseMode(SDL_TRUE);
         if (app_state == STATE_LOBBY) {
+             unsigned int now = SDL_GetTicks();
+             if (ui_use_server && (now - ui_last_poll) > 1000) {
+                 if (ui_bridge_fetch_state(&ui_state)) {
+                     ui_last_poll = now;
+                     int count = lobby_menu_count();
+                     if (lobby_selection >= count) lobby_selection = 0;
+                 }
+             }
              glClearColor(0.02f, 0.02f, 0.05f, 1.0f); // Dark Lobby
              glClear(GL_COLOR_BUFFER_BIT);
              setup_lobby_2d();
@@ -870,7 +974,8 @@ int main(int argc, char* argv[]) {
              float base_x = 420.0f;
              float base_y = 450.0f;
              float row_gap = 40.0f;
-             for (int i = 0; i < LOBBY_COUNT; i++) {
+             int menu_count = lobby_menu_count();
+             for (int i = 0; i < menu_count; i++) {
                  float y = base_y - (row_gap * i);
                  if (i == lobby_selection) {
                      glColor3f(1.0f, 1.0f, 0.0f);
@@ -879,7 +984,7 @@ int main(int argc, char* argv[]) {
                  } else {
                      glColor3f(0.0f, 0.7f, 0.8f);
                  }
-                 draw_string(LOBBY_LABELS[i], base_x, y, 6);
+                 draw_string(lobby_menu_label(i), base_x, y, 6);
              }
 
              glColor3f(0.4f, 0.6f, 0.7f);
