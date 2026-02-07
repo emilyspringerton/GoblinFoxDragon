@@ -1,0 +1,227 @@
+openapi: 3.0.3
+info:
+  title: Shankpit UI Server
+  version: "0.1.0"
+servers:
+  - url: http://localhost:17777
+paths:
+  /api/v0/health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+
+  /api/v0/capabilities:
+    get:
+      summary: Server capabilities
+      responses:
+        "200":
+          description: capabilities
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Capabilities"
+
+  /api/v0/ui/state:
+    get:
+      summary: Current UI state snapshot
+      responses:
+        "200":
+          description: UI state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UiState"
+
+  /api/v0/ui/intent:
+    post:
+      summary: Send a UI intent (HTTP fallback; WS preferred)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntentEnvelope"
+      responses:
+        "200":
+          description: Intent accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntentResult"
+
+  /api/v0/world/scenes:
+    get:
+      summary: List scenes
+      responses:
+        "200":
+          description: scenes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SceneList"
+
+  /api/v0/world/travel:
+    post:
+      summary: Request travel to a scene
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TravelRequest"
+      responses:
+        "200":
+          description: travel result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntentResult"
+
+  /api/v0/ws:
+    get:
+      summary: WebSocket for events + intents
+      responses:
+        "101":
+          description: Switching Protocols
+
+components:
+  schemas:
+    Health:
+      type: object
+      required: [ok, version, protocolVersion]
+      properties:
+        ok: { type: boolean }
+        version: { type: string }
+        protocolVersion: { type: string, example: "v0" }
+
+    Capabilities:
+      type: object
+      properties:
+        protocolVersion: { type: string, example: "v0" }
+        features:
+          type: object
+          additionalProperties: { type: boolean }
+          example:
+            menus: true
+            overlays: true
+            scenes: true
+            recorder: false
+
+    UiState:
+      type: object
+      required: [protocolVersion, session, menu, overlay]
+      properties:
+        protocolVersion: { type: string, example: "v0" }
+        session:
+          type: object
+          properties:
+            sessionId: { type: string }
+            activeSceneId: { type: string }
+            activeModeId: { type: string }
+        menu:
+          $ref: "#/components/schemas/MenuState"
+        overlay:
+          $ref: "#/components/schemas/OverlayState"
+
+    MenuState:
+      type: object
+      properties:
+        isOpen: { type: boolean }
+        path:
+          type: array
+          items: { type: string }
+          example: ["PLAY"]
+        entries:
+          type: array
+          items: { $ref: "#/components/schemas/MenuEntry" }
+
+    MenuEntry:
+      type: object
+      required: [id, label, kind]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        kind: { type: string, enum: ["action", "submenu", "toggle", "slider", "text"] }
+        value: { nullable: true }
+        enabled: { type: boolean, default: true }
+
+    OverlayState:
+      type: object
+      properties:
+        environment:
+          type: string
+          example: "GARAGE_OSAKA"
+        prompts:
+          type: array
+          items: { $ref: "#/components/schemas/Prompt" }
+        hud:
+          type: object
+          additionalProperties: true
+
+    Prompt:
+      type: object
+      required: [id, text, priority]
+      properties:
+        id: { type: string }
+        text: { type: string }
+        priority: { type: integer }
+        targetId: { type: string, nullable: true }
+
+    IntentEnvelope:
+      type: object
+      required: [protocolVersion, intentId, type, ts]
+      properties:
+        protocolVersion: { type: string, example: "v0" }
+        intentId: { type: string }
+        type:
+          type: string
+          enum:
+            - intent.activate
+            - intent.open
+            - intent.back
+            - intent.editLabel
+            - intent.select
+            - intent.portalTravel
+            - intent.enterVehicle
+        ts: { type: integer, description: "ms since epoch or monotonic" }
+        payload:
+          type: object
+          additionalProperties: true
+
+    IntentResult:
+      type: object
+      required: [intentId, ok]
+      properties:
+        intentId: { type: string }
+        ok: { type: boolean }
+        message: { type: string }
+        patch:
+          type: array
+          description: "Optional JSON Patch to apply to UiState"
+          items: { type: object }
+
+    SceneList:
+      type: object
+      properties:
+        scenes:
+          type: array
+          items: { $ref: "#/components/schemas/Scene" }
+
+    Scene:
+      type: object
+      required: [sceneId, label]
+      properties:
+        sceneId: { type: string }
+        label: { type: string }
+
+    TravelRequest:
+      type: object
+      required: [sceneId]
+      properties:
+        sceneId: { type: string }
