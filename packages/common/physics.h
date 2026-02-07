@@ -35,8 +35,8 @@ PlayerState* get_best_bot();
 typedef struct { float x, y, z, w, h, d; } Box;
 typedef struct { float x, y; } Vec2;
 
-// --- THE BONEYARD (Phase 489: Compressed & Dense) ---
-static Box map_geo[] = {
+// --- SCENES ---
+static const Box map_geo_stadium[] = {
     {0.00, -2.00, 0.00, 800.00, 4.00, 800.00},
     {400.00, 100.00, 0.00, 10.00, 200.00, 800.00},
     {-400.00, 100.00, 0.00, 10.00, 200.00, 800.00},
@@ -71,9 +71,161 @@ static Box map_geo[] = {
     {337.22, 4.43, -14.90, 15.00, 10.00, 15.00},
     {-321.12, 8.33, 22.02, 15.00, 10.00, 15.00}
 };
-static int map_count = sizeof(map_geo) / sizeof(Box);
+
+static const Box map_geo_garage[] = {
+    {0.00, -2.00, 0.00, 160.00, 4.00, 160.00},
+    {0.00, -8.00, 0.00, 170.00, 2.00, 170.00},
+    {0.00, 18.00, 0.00, 160.00, 4.00, 160.00},
+    {60.00, 9.00, 0.00, 4.00, 18.00, 160.00},
+    {-60.00, 9.00, 0.00, 4.00, 18.00, 160.00},
+    {0.00, 9.00, 60.00, 160.00, 18.00, 4.00},
+    {0.00, 9.00, -60.00, 160.00, 18.00, 4.00},
+    {64.00, 9.00, 0.00, 4.00, 22.00, 170.00},
+    {-64.00, 9.00, 0.00, 4.00, 22.00, 170.00},
+    {0.00, 9.00, 64.00, 170.00, 22.00, 4.00},
+    {0.00, 9.00, -64.00, 170.00, 22.00, 4.00},
+    {0.00, 21.00, 64.50, 174.00, 2.00, 6.00},
+    {0.00, 21.00, -64.50, 174.00, 2.00, 6.00},
+    {64.50, 21.00, 0.00, 6.00, 2.00, 174.00},
+    {-64.50, 21.00, 0.00, 6.00, 2.00, 174.00},
+    {0.00, 9.00, 52.00, 14.00, 12.00, 2.00},
+    {-10.00, 5.00, -20.00, 12.00, 4.00, 12.00},
+    {10.00, 5.00, -20.00, 12.00, 4.00, 12.00}
+};
+
+static const Box *map_geo = map_geo_stadium;
+static int map_count = 0;
+
+#define GARAGE_KILL_Y -30.0f
+#define GARAGE_BOUNDS_X 70.0f
+#define GARAGE_BOUNDS_Z 70.0f
+
+#define GARAGE_PORTAL_X 0.0f
+#define GARAGE_PORTAL_Y 6.0f
+#define GARAGE_PORTAL_Z 56.0f
+#define GARAGE_PORTAL_RADIUS 6.0f
+
+typedef struct {
+    float x;
+    float y;
+    float z;
+    const char *label;
+} VehiclePad;
+
+static const VehiclePad garage_vehicle_pads[] = {
+    {-30.0f, 0.0f, -30.0f, "FOXBODY '93"},
+    {0.0f, 0.0f, -30.0f, "LANDSHIP"},
+    {30.0f, 0.0f, -30.0f, "RESERVED"}
+};
 
 float phys_rand_f() { return ((float)(rand()%1000)/500.0f) - 1.0f; }
+
+static int phys_scene_id = SCENE_STADIUM;
+
+static inline void phys_set_scene(int scene_id) {
+    phys_scene_id = scene_id;
+    if (scene_id == SCENE_GARAGE_OSAKA) {
+        map_geo = map_geo_garage;
+        map_count = (int)(sizeof(map_geo_garage) / sizeof(Box));
+    } else {
+        map_geo = map_geo_stadium;
+        map_count = (int)(sizeof(map_geo_stadium) / sizeof(Box));
+    }
+}
+
+static inline void scene_spawn_point(int scene_id, int slot, float *out_x, float *out_y, float *out_z) {
+    if (scene_id == SCENE_GARAGE_OSAKA) {
+        float offsets[] = {-20.0f, 0.0f, 20.0f, -10.0f, 10.0f};
+        int idx = slot % 5;
+        *out_x = offsets[idx];
+        *out_y = 2.0f;
+        *out_z = 20.0f;
+        return;
+    }
+    if (slot % 2 == 0) {
+        *out_x = 0.0f; *out_z = 0.0f; *out_y = 80.0f;
+    } else {
+        float ang = phys_rand_f() * 6.28f;
+        *out_x = sinf(ang) * 500.0f;
+        *out_z = cosf(ang) * 500.0f;
+        *out_y = 20.0f;
+    }
+}
+
+static inline void scene_force_spawn(PlayerState *p) {
+    float sx = 0.0f, sy = 0.0f, sz = 0.0f;
+    scene_spawn_point(phys_scene_id, p->id, &sx, &sy, &sz);
+    p->x = sx; p->y = sy; p->z = sz;
+    p->vx = 0.0f; p->vy = 0.0f; p->vz = 0.0f;
+}
+
+static inline void scene_safety_check(PlayerState *p) {
+    if (!isfinite(p->x) || !isfinite(p->y) || !isfinite(p->z)) {
+        scene_force_spawn(p);
+        return;
+    }
+    if (phys_scene_id == SCENE_GARAGE_OSAKA) {
+        if (p->y < GARAGE_KILL_Y ||
+            p->x < -GARAGE_BOUNDS_X || p->x > GARAGE_BOUNDS_X ||
+            p->z < -GARAGE_BOUNDS_Z || p->z > GARAGE_BOUNDS_Z) {
+            scene_force_spawn(p);
+        }
+    }
+}
+
+static inline int scene_portal_active(int scene_id) {
+    return scene_id == SCENE_GARAGE_OSAKA;
+}
+
+static inline void scene_portal_info(int scene_id, float *out_x, float *out_y, float *out_z, float *out_radius) {
+    if (scene_id == SCENE_GARAGE_OSAKA) {
+        *out_x = GARAGE_PORTAL_X;
+        *out_y = GARAGE_PORTAL_Y;
+        *out_z = GARAGE_PORTAL_Z;
+        *out_radius = GARAGE_PORTAL_RADIUS;
+    } else {
+        *out_x = 0.0f; *out_y = 0.0f; *out_z = 0.0f; *out_radius = 0.0f;
+    }
+}
+
+static inline const VehiclePad *scene_vehicle_pads(int scene_id, int *out_count) {
+    if (scene_id == SCENE_GARAGE_OSAKA) {
+        if (out_count) *out_count = (int)(sizeof(garage_vehicle_pads) / sizeof(VehiclePad));
+        return garage_vehicle_pads;
+    }
+    if (out_count) *out_count = 0;
+    return NULL;
+}
+
+static inline int scene_portal_triggered(PlayerState *p) {
+    if (phys_scene_id != SCENE_GARAGE_OSAKA) return 0;
+    float dx = p->x - GARAGE_PORTAL_X;
+    float dz = p->z - GARAGE_PORTAL_Z;
+    float dist_sq = dx * dx + dz * dz;
+    return dist_sq <= (GARAGE_PORTAL_RADIUS * GARAGE_PORTAL_RADIUS);
+}
+
+static inline int scene_near_vehicle_pad(int scene_id, float x, float z, float max_dist, int *out_idx) {
+    int count = 0;
+    const VehiclePad *pads = scene_vehicle_pads(scene_id, &count);
+    if (!pads || count == 0) return 0;
+    float best_dist_sq = max_dist * max_dist;
+    int best_idx = -1;
+    for (int i = 0; i < count; i++) {
+        float dx = x - pads[i].x;
+        float dz = z - pads[i].z;
+        float dist_sq = dx * dx + dz * dz;
+        if (dist_sq <= best_dist_sq) {
+            best_dist_sq = dist_sq;
+            best_idx = i;
+        }
+    }
+    if (best_idx >= 0) {
+        if (out_idx) *out_idx = best_idx;
+        return 1;
+    }
+    return 0;
+}
 
 static inline void apply_friction_2d(Vec2 *vel, float friction, float dt) {
     float speed = sqrtf(vel->x * vel->x + vel->y * vel->y);
@@ -228,14 +380,13 @@ void resolve_collision(PlayerState *p) {
 void phys_respawn(PlayerState *p, unsigned int now) {
     p->active = 1; p->state = STATE_ALIVE;
     p->health = 100; p->shield = 100; p->respawn_time = 0; p->in_vehicle = 0;
-    if (rand()%2 == 0) { p->x = 0; p->z = 0; p->y = 80; } 
-    else { float ang = phys_rand_f() * 6.28f;
-        p->x = sinf(ang) * 500; p->z = cosf(ang) * 500; p->y = 20;
-    }
+    scene_spawn_point(phys_scene_id, p->id, &p->x, &p->y, &p->z);
     p->current_weapon = WPN_MAGNUM;
     for(int i=0; i<MAX_WEAPONS; i++) p->ammo[i] = WPN_STATS[i].ammo_max;
     p->storm_charges = 0;
     p->ability_cooldown = 0;
+    p->stunned_until_ms = 0;
+    p->stun_immune_until_ms = 0;
     if (p->is_bot) {
         PlayerState *winner = get_best_bot();
         if (winner && winner != p) evolve_bot(p, winner);

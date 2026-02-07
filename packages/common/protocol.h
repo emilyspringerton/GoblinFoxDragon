@@ -6,6 +6,9 @@
 #define MAX_PROJECTILES 1024
 #define LAG_HISTORY 64
 
+#define SCENE_GARAGE_OSAKA 0
+#define SCENE_STADIUM 1
+
 #define PACKET_CONNECT 0
 #define PACKET_USERCMD 1
 #define PACKET_SNAPSHOT 2
@@ -36,6 +39,7 @@ typedef struct {
     unsigned short sequence;
     unsigned int timestamp;
     unsigned char entity_count; 
+    unsigned char scene_id;
 } NetHeader;
 
 typedef struct {
@@ -117,6 +121,8 @@ typedef struct {
     unsigned int respawn_time;
     int storm_charges;
     int ability_cooldown;
+    unsigned int stunned_until_ms;
+    unsigned int stun_immune_until_ms;
 } PlayerState;
 
 typedef struct {
@@ -133,6 +139,9 @@ typedef struct {
     LagRecord history[MAX_CLIENTS][LAG_HISTORY];
     int server_tick;
     int game_mode;
+    int scene_id;
+    int pending_scene;
+    int transition_timer;
     struct sockaddr_in clients[MAX_CLIENTS];
     ClientMeta client_meta[MAX_CLIENTS];
 } ServerState;
