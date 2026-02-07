@@ -23,6 +23,9 @@
 
 #include "player_model.h"
 #include "../../../packages/ui/turtle_text.h"
+#define UI_BRIDGE_DECL static
+#include "../../../packages/ui/ui_bridge.h"
+#include "../../../packages/ui/ui_bridge.c"
 
 #include "../../../packages/common/protocol.h"
 #include "../../../packages/common/physics.h"
@@ -41,6 +44,10 @@ int wpn_req = 1;
 int my_client_id = -1;
 int lobby_selection = 0;
 
+UiState ui_state;
+int ui_use_server = 0;
+unsigned int ui_last_poll = 0;
+
 float cam_yaw = 0.0f;
 float cam_pitch = 0.0f;
 float current_fov = 75.0f;
@@ -49,6 +56,8 @@ float current_fov = 75.0f;
 
 int sock = -1;
 struct sockaddr_in server_addr;
+
+void net_connect();
 
 void draw_string(const char* str, float x, float y, float size) {
     TurtlePen pen = turtle_pen_create(x, y, size);
@@ -74,6 +83,75 @@ static const char *LOBBY_LABELS[LOBBY_COUNT] = {
     "JOIN S.FARTHQ.COM"
 };
 
+static int lobby_menu_count() {
+    if (ui_use_server && ui_state.entry_count > 0) {
+        return ui_state.entry_count;
+    }
+    return LOBBY_COUNT;
+}
+
+static const char *lobby_menu_label(int idx) {
+    if (ui_use_server && idx >= 0 && idx < ui_state.entry_count) {
+        return ui_state.entries[idx].label;
+    }
+    return LOBBY_LABELS[idx];
+}
+
+static const char *lobby_menu_entry_id(int idx) {
+    if (ui_use_server && idx >= 0 && idx < ui_state.entry_count) {
+        return ui_state.entries[idx].id;
+    }
+    return NULL;
+}
+
+static void lobby_apply_scene_id(const char *scene_id) {
+    if (!scene_id || !scene_id[0]) return;
+    if (strcmp(scene_id, "GARAGE_OSAKA") == 0) {
+        scene_load(SCENE_GARAGE_OSAKA);
+    } else if (strcmp(scene_id, "STADIUM") == 0) {
+        scene_load(SCENE_STADIUM);
+    }
+}
+
+static void lobby_apply_ui_state() {
+    if (!ui_use_server) return;
+    if (strcmp(ui_state.active_mode_id, "mode.join") == 0) {
+        app_state = STATE_GAME_NET;
+        net_connect();
+        return;
+    }
+
+    if (strcmp(ui_state.active_mode_id, "mode.demo") == 0) {
+        app_state = STATE_GAME_LOCAL;
+        local_init_match(1, MODE_DEATHMATCH);
+    } else if (strcmp(ui_state.active_mode_id, "mode.battle") == 0) {
+        app_state = STATE_GAME_LOCAL;
+        local_init_match(12, MODE_DEATHMATCH);
+    } else if (strcmp(ui_state.active_mode_id, "mode.tdm") == 0) {
+        app_state = STATE_GAME_LOCAL;
+        local_init_match(12, MODE_TDM);
+    } else if (strcmp(ui_state.active_mode_id, "mode.ctf") == 0) {
+        app_state = STATE_GAME_LOCAL;
+        local_init_match(8, MODE_CTF);
+    } else if (strcmp(ui_state.active_mode_id, "mode.evolution") == 0) {
+        app_state = STATE_GAME_LOCAL;
+        local_init_match(8, MODE_EVOLUTION);
+    } else if (strcmp(ui_state.active_mode_id, "mode.training") == 0) {
+        app_state = STATE_GAME_LOCAL;
+        local_init_match(1, MODE_DEATHMATCH);
+    } else if (strcmp(ui_state.active_mode_id, "mode.recorder") == 0) {
+        app_state = STATE_GAME_LOCAL;
+        local_init_match(1, MODE_DEATHMATCH);
+    } else if (strcmp(ui_state.active_mode_id, "mode.garage") == 0) {
+        app_state = STATE_GAME_LOCAL;
+        local_init_match(1, MODE_DEATHMATCH);
+    } else {
+        return;
+    }
+
+    lobby_apply_scene_id(ui_state.active_scene_id);
+}
+
 static void setup_lobby_2d() {
     glDisable(GL_DEPTH_TEST);
     glMatrixMode(GL_PROJECTION);
@@ -84,6 +162,15 @@ static void setup_lobby_2d() {
 }
 
 static void lobby_start_action(int action) {
+    if (ui_use_server) {
+        const char *entry_id = lobby_menu_entry_id(action);
+        if (entry_id) {
+            if (ui_bridge_send_intent_activate(entry_id, &ui_state)) {
+                lobby_apply_ui_state();
+                return;
+            }
+        }
+    }
     if (action == LOBBY_JOIN) {
         app_state = STATE_GAME_NET;
         net_connect();
@@ -527,6 +614,121 @@ void draw_hud(PlayerState *p) {
     glEnable(GL_DEPTH_TEST); glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW); glPopMatrix();
 }
 
+static int target_in_view(PlayerState *p, float tx, float ty, float tz, float max_dist, float min_dot) {
+    float rad_yaw = cam_yaw * 0.0174533f;
+    float rad_pitch = cam_pitch * 0.0174533f;
+    float fx = sinf(rad_yaw) * cosf(rad_pitch);
+    float fy = sinf(rad_pitch);
+    float fz = -cosf(rad_yaw) * cosf(rad_pitch);
+
+    float ox = p->x;
+    float oy = p->y + EYE_HEIGHT;
+    float oz = p->z;
+
+    float dx = tx - ox;
+    float dy = ty - oy;
+    float dz = tz - oz;
+    float dist = sqrtf(dx * dx + dy * dy + dz * dz);
+    if (dist > max_dist || dist <= 0.001f) return 0;
+    dx /= dist; dy /= dist; dz /= dist;
+    float dot = fx * dx + fy * dy + fz * dz;
+    return dot >= min_dot;
+}
+
+static void draw_garage_portal_frame() {
+    if (!scene_portal_active(local_state.scene_id)) return;
+    float px = 0.0f, py = 0.0f, pz = 0.0f, pr = 0.0f;
+    scene_portal_info(local_state.scene_id, &px, &py, &pz, &pr);
+
+    glPushMatrix();
+    glTranslatef(px, py, pz);
+    glColor3f(0.2f, 0.9f, 1.0f);
+    glLineWidth(3.0f);
+    glBegin(GL_LINE_LOOP);
+    glVertex3f(-pr, -2.0f, 0.0f);
+    glVertex3f(pr, -2.0f, 0.0f);
+    glVertex3f(pr, 6.0f, 0.0f);
+    glVertex3f(-pr, 6.0f, 0.0f);
+    glEnd();
+    glPopMatrix();
+}
+
+static void draw_garage_vehicle_pads() {
+    int pad_count = 0;
+    const VehiclePad *pads = scene_vehicle_pads(local_state.scene_id, &pad_count);
+    if (!pads || pad_count == 0) return;
+    for (int i = 0; i < pad_count; i++) {
+        glPushMatrix();
+        glTranslatef(pads[i].x, pads[i].y + 0.1f, pads[i].z);
+        glColor3f(0.4f, 0.8f, 0.4f);
+        glBegin(GL_LINE_LOOP);
+        glVertex3f(-3.0f, 0.0f, -3.0f);
+        glVertex3f(3.0f, 0.0f, -3.0f);
+        glVertex3f(3.0f, 0.0f, 3.0f);
+        glVertex3f(-3.0f, 0.0f, 3.0f);
+        glEnd();
+        glPopMatrix();
+    }
+}
+
+static void draw_garage_overlay(PlayerState *p) {
+    if (local_state.scene_id != SCENE_GARAGE_OSAKA) return;
+
+    glDisable(GL_DEPTH_TEST);
+    glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity();
+    glOrtho(0, 1280, 0, 720, -1, 1);
+    glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
+
+    glColor3f(0.2f, 1.0f, 1.0f);
+    draw_string("OSAKA GARAGE", 40, 670, 10);
+    glColor3f(0.9f, 0.9f, 0.9f);
+    draw_string("PORTAL -> STADIUM", 40, 640, 6);
+
+    int pad_count = 0;
+    const VehiclePad *pads = scene_vehicle_pads(local_state.scene_id, &pad_count);
+    float list_y = 600.0f;
+    for (int i = 0; i < pad_count; i++) {
+        int occupied = 0;
+        for (int j = 0; j < MAX_CLIENTS; j++) {
+            PlayerState *other = &local_state.players[j];
+            if (!other->active) continue;
+            float dx = other->x - pads[i].x;
+            float dz = other->z - pads[i].z;
+            if (other->in_vehicle && (dx * dx + dz * dz) < 16.0f) {
+                occupied = 1;
+                break;
+            }
+        }
+        char line[128];
+        snprintf(line, sizeof(line), "%s [%s]", pads[i].label, occupied ? "OCCUPIED" : "IDLE");
+        glColor3f(occupied ? 1.0f : 0.5f, occupied ? 0.6f : 0.9f, 0.6f);
+        draw_string(line, 40, list_y, 6);
+        list_y -= 20.0f;
+    }
+
+    float portal_x = 0.0f, portal_y = 0.0f, portal_z = 0.0f, portal_r = 0.0f;
+    scene_portal_info(local_state.scene_id, &portal_x, &portal_y, &portal_z, &portal_r);
+    int portal_target = target_in_view(p, portal_x, portal_y, portal_z, 30.0f, 0.75f);
+    int pad_target = 0;
+    if (scene_near_vehicle_pad(local_state.scene_id, p->x, p->z, 12.0f, NULL)) {
+        int pad_idx = -1;
+        if (scene_near_vehicle_pad(local_state.scene_id, p->x, p->z, 12.0f, &pad_idx)) {
+            pad_target = target_in_view(p, pads[pad_idx].x, pads[pad_idx].y + 1.0f, pads[pad_idx].z, 20.0f, 0.7f);
+        }
+    }
+
+    glColor3f(1.0f, 1.0f, 0.0f);
+    if (portal_target) {
+        draw_string("TRAVEL", 600, 350, 8);
+    } else if (pad_target) {
+        draw_string(p->in_vehicle ? "EXIT VEHICLE" : "ENTER VEHICLE", 560, 350, 8);
+    }
+
+    glEnable(GL_DEPTH_TEST);
+    glMatrixMode(GL_PROJECTION); glPopMatrix();
+    glMatrixMode(GL_MODELVIEW); glPopMatrix();
+}
+
 void draw_projectiles() {
     glDisable(GL_TEXTURE_2D);
     glPointSize(6.0f);
@@ -557,10 +759,12 @@ void draw_scene(PlayerState *render_p) {
     draw_grid(); 
     update_and_draw_trails();
     draw_map();
+    draw_garage_vehicle_pads();
+    draw_garage_portal_frame();
     draw_projectiles();
     if (render_p->in_vehicle) draw_player_3rd(render_p);
     for(int i=1; i<MAX_CLIENTS; i++) if(local_state.players[i].active && i != my_client_id) draw_player_3rd(&local_state.players[i]);
-    draw_weapon_p(render_p); draw_hud(render_p);
+    draw_weapon_p(render_p); draw_hud(render_p); draw_garage_overlay(render_p);
 }
 
 void net_init() {
@@ -585,6 +789,7 @@ void net_connect() {
         char buffer[128];
         NetHeader *h = (NetHeader*)buffer;
         h->type = PACKET_CONNECT;
+        h->scene_id = (unsigned char)local_state.scene_id;
         sendto(sock, buffer, sizeof(NetHeader), 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
         printf("Connected to %s...\n", SERVER_HOST);
     } else {
@@ -611,6 +816,7 @@ void net_send_cmd(UserCmd cmd) {
     int cursor = 0;
     NetHeader head; head.type = PACKET_USERCMD;
     head.client_id = 0; 
+    head.scene_id = (unsigned char)local_state.scene_id;
     memcpy(packet_data + cursor, &head, sizeof(NetHeader)); cursor += sizeof(NetHeader);
     unsigned char count = 1;
     memcpy(packet_data + cursor, &count, 1); cursor += 1;
@@ -618,9 +824,14 @@ void net_send_cmd(UserCmd cmd) {
     sendto(sock, packet_data, cursor, 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
 }
 
-void net_process_snapshot(char *buffer, int len) {
+void net_process_snapshot(char *buffer, int len, unsigned char scene_id) {
     int cursor = sizeof(NetHeader);
     unsigned char count = *(unsigned char*)(buffer + cursor); cursor++;
+
+    if (local_state.scene_id != scene_id) {
+        local_state.scene_id = scene_id;
+        phys_set_scene(scene_id);
+    }
     
     for(int i=0; i<count; i++) {
         NetPlayer *np = (NetPlayer*)(buffer + cursor);
@@ -662,10 +873,12 @@ void net_tick() {
     while (len > 0) {
         NetHeader *head = (NetHeader*)buffer;
         if (head->type == PACKET_SNAPSHOT) {
-            net_process_snapshot(buffer, len);
+            net_process_snapshot(buffer, len, head->scene_id);
         }
         if (head->type == PACKET_WELCOME) {
             my_client_id = head->client_id;
+            local_state.scene_id = head->scene_id;
+            phys_set_scene(head->scene_id);
             printf("✅ JOINED SERVER AS CLIENT ID: %d\n", my_client_id);
         }
         len = recvfrom(sock, buffer, 4096, 0, (struct sockaddr*)&sender, &slen);
@@ -685,6 +898,11 @@ int main(int argc, char* argv[]) {
     net_init();
     
     local_init_match(1, 0);
+    ui_bridge_init("127.0.0.1", 17777);
+    if (ui_bridge_fetch_state(&ui_state)) {
+        ui_use_server = 1;
+        ui_last_poll = SDL_GetTicks();
+    }
     
     int running = 1;
     while(running) {
@@ -697,21 +915,25 @@ int main(int argc, char* argv[]) {
             if (app_state == STATE_LOBBY) {
                 if(e.type == SDL_KEYDOWN) {
                     if (e.key.keysym.sym == SDLK_UP) {
-                        lobby_selection = (lobby_selection + LOBBY_COUNT - 1) % LOBBY_COUNT;
+                        int count = lobby_menu_count();
+                        lobby_selection = (lobby_selection + count - 1) % count;
                     }
                     if (e.key.keysym.sym == SDLK_DOWN) {
-                        lobby_selection = (lobby_selection + 1) % LOBBY_COUNT;
+                        int count = lobby_menu_count();
+                        lobby_selection = (lobby_selection + 1) % count;
                     }
                     if (e.key.keysym.sym == SDLK_RETURN || e.key.keysym.sym == SDLK_KP_ENTER) {
                         lobby_start_action(lobby_selection);
                     }
-                    if (e.key.keysym.sym == SDLK_d) { lobby_selection = LOBBY_DEMO; lobby_start_action(LOBBY_DEMO); }
-                    if (e.key.keysym.sym == SDLK_b) { lobby_selection = LOBBY_BATTLE; lobby_start_action(LOBBY_BATTLE); }
-                    if (e.key.keysym.sym == SDLK_t) { lobby_selection = LOBBY_TDM; lobby_start_action(LOBBY_TDM); }
-                    if (e.key.keysym.sym == SDLK_c) { lobby_selection = LOBBY_CTF; lobby_start_action(LOBBY_CTF); }
-                    if (e.key.keysym.sym == SDLK_k) { lobby_selection = LOBBY_EVOLUTION; lobby_start_action(LOBBY_EVOLUTION); }
+                    if (!ui_use_server) {
+                        if (e.key.keysym.sym == SDLK_d) { lobby_selection = LOBBY_DEMO; lobby_start_action(LOBBY_DEMO); }
+                        if (e.key.keysym.sym == SDLK_b) { lobby_selection = LOBBY_BATTLE; lobby_start_action(LOBBY_BATTLE); }
+                        if (e.key.keysym.sym == SDLK_t) { lobby_selection = LOBBY_TDM; lobby_start_action(LOBBY_TDM); }
+                        if (e.key.keysym.sym == SDLK_c) { lobby_selection = LOBBY_CTF; lobby_start_action(LOBBY_CTF); }
+                        if (e.key.keysym.sym == SDLK_k) { lobby_selection = LOBBY_EVOLUTION; lobby_start_action(LOBBY_EVOLUTION); }
+                    }
                     
-                    if (e.key.keysym.sym == SDLK_j) { 
+                    if (!ui_use_server && e.key.keysym.sym == SDLK_j) { 
                         lobby_selection = LOBBY_JOIN;
                         lobby_start_action(LOBBY_JOIN);
                     }
@@ -733,6 +955,14 @@ int main(int argc, char* argv[]) {
         }
         if (app_state != STATE_LOBBY) SDL_SetRelativeMouseMode(SDL_TRUE);
         if (app_state == STATE_LOBBY) {
+             unsigned int now = SDL_GetTicks();
+             if (ui_use_server && (now - ui_last_poll) > 1000) {
+                 if (ui_bridge_fetch_state(&ui_state)) {
+                     ui_last_poll = now;
+                     int count = lobby_menu_count();
+                     if (lobby_selection >= count) lobby_selection = 0;
+                 }
+             }
              glClearColor(0.02f, 0.02f, 0.05f, 1.0f); // Dark Lobby
              glClear(GL_COLOR_BUFFER_BIT);
              setup_lobby_2d();
@@ -744,7 +974,8 @@ int main(int argc, char* argv[]) {
              float base_x = 420.0f;
              float base_y = 450.0f;
              float row_gap = 40.0f;
-             for (int i = 0; i < LOBBY_COUNT; i++) {
+             int menu_count = lobby_menu_count();
+             for (int i = 0; i < menu_count; i++) {
                  float y = base_y - (row_gap * i);
                  if (i == lobby_selection) {
                      glColor3f(1.0f, 1.0f, 0.0f);
@@ -753,7 +984,7 @@ int main(int argc, char* argv[]) {
                  } else {
                      glColor3f(0.0f, 0.7f, 0.8f);
                  }
-                 draw_string(LOBBY_LABELS[i], base_x, y, 6);
+                 draw_string(lobby_menu_label(i), base_x, y, 6);
              }
 
              glColor3f(0.4f, 0.6f, 0.7f);
@@ -784,9 +1015,18 @@ int main(int argc, char* argv[]) {
                 net_tick();
             } else {
                 local_state.players[0].in_use = use;
-                if (use && local_state.players[0].vehicle_cooldown == 0) {
-                     local_state.players[0].in_vehicle = !local_state.players[0].in_vehicle;
-                     local_state.players[0].vehicle_cooldown = 30;
+                if (use && local_state.players[0].vehicle_cooldown == 0 && local_state.transition_timer == 0) {
+                    PlayerState *p0 = &local_state.players[0];
+                    int in_garage = local_state.scene_id == SCENE_GARAGE_OSAKA;
+                    if (in_garage && scene_portal_triggered(p0)) {
+                        scene_request_transition(SCENE_STADIUM);
+                    } else if (in_garage && scene_near_vehicle_pad(local_state.scene_id, p0->x, p0->z, 6.0f, NULL)) {
+                        p0->in_vehicle = !p0->in_vehicle;
+                        p0->vehicle_cooldown = 30;
+                    } else if (!in_garage) {
+                        p0->in_vehicle = !p0->in_vehicle;
+                        p0->vehicle_cooldown = 30;
+                    }
                 }
                 if(local_state.players[0].vehicle_cooldown > 0) local_state.players[0].vehicle_cooldown--;
                 local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn_req, jump, crouch, reload, ability, NULL, 0);

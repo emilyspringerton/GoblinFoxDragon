@@ -27,10 +27,136 @@ int sock = -1;
 struct sockaddr_in bind_addr;
 unsigned int client_last_seq[MAX_CLIENTS];
 
+typedef struct {
+    int enabled;
+    FILE *file;
+    int target_id;
+    float cam_x;
+    float cam_y;
+    float cam_z;
+    float cam_yaw;
+    float cam_pitch;
+    float cam_zoom;
+} RecorderState;
+
+static RecorderState recorder = {0};
+
+#define RECORDER_SHAKE_POS 0.08f
+#define RECORDER_SHAKE_ANGLE 0.35f
+#define RECORDER_SMOOTH_POS 0.08f
+#define RECORDER_SMOOTH_ANGLE 0.18f
+#define RECORDER_NORTH_X 0.0f
+#define RECORDER_NORTH_Y 6.5f
+#define RECORDER_NORTH_Z -32.0f
+
 unsigned int get_server_time() {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (unsigned int)(ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
+}
+
+static int recorder_pick_target() {
+    if (recorder.target_id >= 0 && recorder.target_id < MAX_CLIENTS) {
+        if (local_state.players[recorder.target_id].active) {
+            return recorder.target_id;
+        }
+    }
+    int best_id = -1;
+    int best_kills = -1;
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (!local_state.players[i].active) continue;
+        if (local_state.players[i].kills > best_kills) {
+            best_kills = local_state.players[i].kills;
+            best_id = i;
+        }
+    }
+    return best_id;
+}
+
+static float recorder_compute_zoom(float dist) {
+    if (dist > 120.0f) return 3.0f;
+    if (dist > 70.0f) return 2.4f;
+    if (dist > 35.0f) return 1.8f;
+    return 1.2f;
+}
+
+static void recorder_init_file(const char *path) {
+    if (!recorder.enabled) return;
+    recorder.file = fopen(path, "w");
+    if (!recorder.file) {
+        printf("[REC] Failed to open recording file: %s\n", path);
+        recorder.enabled = 0;
+        return;
+    }
+    recorder.cam_x = RECORDER_NORTH_X;
+    recorder.cam_y = RECORDER_NORTH_Y;
+    recorder.cam_z = RECORDER_NORTH_Z;
+    recorder.cam_yaw = 0.0f;
+    recorder.cam_pitch = 0.0f;
+    recorder.cam_zoom = 1.2f;
+    fprintf(recorder.file, "; SHANKPIT Recorder v1 (Lisp-ASM)\n");
+    fprintf(recorder.file, "(begin-recording :dt-ms 16 :north-start '(%.2f %.2f %.2f))\n",
+            RECORDER_NORTH_X, RECORDER_NORTH_Y, RECORDER_NORTH_Z);
+}
+
+static void recorder_update_camera() {
+    int target_id = recorder_pick_target();
+    if (target_id < 0) return;
+    PlayerState *target = &local_state.players[target_id];
+
+    float desired_x = RECORDER_NORTH_X + target->x * 0.15f;
+    float desired_y = RECORDER_NORTH_Y + target->y * 0.1f;
+    float desired_z = RECORDER_NORTH_Z + target->z * 0.15f;
+
+    recorder.cam_x += (desired_x - recorder.cam_x) * RECORDER_SMOOTH_POS;
+    recorder.cam_y += (desired_y - recorder.cam_y) * RECORDER_SMOOTH_POS;
+    recorder.cam_z += (desired_z - recorder.cam_z) * RECORDER_SMOOTH_POS;
+
+    float dx = target->x - recorder.cam_x;
+    float dy = (target->y + 2.0f) - recorder.cam_y;
+    float dz = target->z - recorder.cam_z;
+    float dist = sqrtf(dx * dx + dz * dz);
+    float target_yaw = atan2f(dx, dz) * (180.0f / 3.14159f);
+    float target_pitch = atan2f(dy, dist) * (180.0f / 3.14159f);
+
+    recorder.cam_yaw += (target_yaw - recorder.cam_yaw) * RECORDER_SMOOTH_ANGLE;
+    recorder.cam_pitch += (target_pitch - recorder.cam_pitch) * RECORDER_SMOOTH_ANGLE;
+
+    float zoom = recorder_compute_zoom(dist);
+    if (target->current_weapon == WPN_SNIPER) {
+        zoom += 0.4f;
+    }
+    float shake_pos = RECORDER_SHAKE_POS / zoom;
+    float shake_ang = RECORDER_SHAKE_ANGLE / zoom;
+
+    recorder.cam_x += phys_rand_f() * shake_pos;
+    recorder.cam_y += phys_rand_f() * shake_pos;
+    recorder.cam_z += phys_rand_f() * shake_pos;
+    recorder.cam_yaw += phys_rand_f() * shake_ang;
+    recorder.cam_pitch += phys_rand_f() * shake_ang;
+    recorder.cam_zoom = zoom;
+}
+
+static void recorder_write_frame(unsigned int tick, unsigned int now_ms) {
+    if (!recorder.enabled || !recorder.file) return;
+    recorder_update_camera();
+
+    fprintf(recorder.file, "(frame :tick %u :time-ms %u\n", tick, now_ms);
+    fprintf(recorder.file, "  (camera :x %.3f :y %.3f :z %.3f :yaw %.2f :pitch %.2f :zoom %.2f :mode \"handicam\")\n",
+            recorder.cam_x, recorder.cam_y, recorder.cam_z,
+            recorder.cam_yaw, recorder.cam_pitch, recorder.cam_zoom);
+
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        PlayerState *p = &local_state.players[i];
+        if (!p->active) continue;
+        fprintf(recorder.file,
+                "  (actor :id %d :x %.3f :y %.3f :z %.3f :vx %.3f :vy %.3f :vz %.3f :yaw %.2f :pitch %.2f :weapon %d :state %d)\n",
+                i, p->x, p->y, p->z, p->vx, p->vy, p->vz, p->yaw, p->pitch, p->current_weapon, p->state);
+    }
+    fprintf(recorder.file, ")\n");
+    if (tick % 60 == 0) {
+        fflush(recorder.file);
+    }
 }
 
 int parse_server_mode(int argc, char **argv) {
@@ -129,6 +255,7 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
                     h.sequence = 0;
                     h.timestamp = get_server_time();
                     h.entity_count = 0;
+                    h.scene_id = (unsigned char)local_state.scene_id;
 
                     sendto(sock, (char*)&h, sizeof(NetHeader), 0,
                            (struct sockaddr*)sender, sizeof(struct sockaddr_in));
@@ -167,6 +294,7 @@ void server_broadcast() {
     head.client_id = 0;
     head.sequence = local_state.server_tick;
     head.timestamp = get_server_time();
+    head.scene_id = (unsigned char)local_state.scene_id;
 
     unsigned char count = 0;
     for(int i=0; i<MAX_CLIENTS; i++) if (local_state.players[i].active) count++;
@@ -209,6 +337,23 @@ void server_broadcast() {
 }
 
 int main(int argc, char *argv[]) {
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--record") == 0) {
+            recorder.enabled = 1;
+        } else if (strcmp(argv[i], "--record-target") == 0 && i + 1 < argc) {
+            recorder.target_id = atoi(argv[i + 1]);
+            i++;
+        } else if (strcmp(argv[i], "--record-file") == 0 && i + 1 < argc) {
+            recorder.enabled = 1;
+            recorder_init_file(argv[i + 1]);
+            i++;
+        }
+    }
+
+    if (recorder.enabled && !recorder.file) {
+        recorder_init_file("shankpit_recording.lispasm");
+    }
+
     server_net_init();
     int mode = parse_server_mode(argc, argv);
     local_init_match(1, mode);
@@ -229,6 +374,8 @@ int main(int argc, char *argv[]) {
         }
 
         unsigned int now = get_server_time();
+        scene_tick_transition();
+        int transition_active = local_state.transition_timer > 0;
 
         // TIMEOUT_SWEEP
         for (int i = 1; i < MAX_CLIENTS; i++) {
@@ -251,10 +398,29 @@ int main(int argc, char *argv[]) {
             }
 
             if (p->active && p->state != STATE_DEAD) {
+                if (transition_active) {
+                    p->in_fwd = 0.0f;
+                    p->in_strafe = 0.0f;
+                    p->in_jump = 0;
+                    p->in_shoot = 0;
+                    p->in_reload = 0;
+                    p->in_use = 0;
+                    p->in_ability = 0;
+                }
                 if (p->in_use && p->vehicle_cooldown == 0) {
-                    p->in_vehicle = !p->in_vehicle;
-                    p->vehicle_cooldown = 30;
-                    printf("Client %d Toggle Vehicle: %d\n", i, p->in_vehicle);
+                    int in_garage = local_state.scene_id == SCENE_GARAGE_OSAKA;
+                    if (in_garage && scene_portal_triggered(p)) {
+                        scene_request_transition(SCENE_STADIUM);
+                        p->in_use = 0;
+                    } else if (in_garage && scene_near_vehicle_pad(local_state.scene_id, p->x, p->z, 6.0f, NULL)) {
+                        p->in_vehicle = !p->in_vehicle;
+                        p->vehicle_cooldown = 30;
+                        printf("Client %d Toggle Vehicle: %d\n", i, p->in_vehicle);
+                    } else if (!in_garage) {
+                        p->in_vehicle = !p->in_vehicle;
+                        p->vehicle_cooldown = 30;
+                        printf("Client %d Toggle Vehicle: %d\n", i, p->in_vehicle);
+                    }
                 }
                 if (p->vehicle_cooldown > 0) p->vehicle_cooldown--;
 
@@ -293,6 +459,7 @@ int main(int argc, char *argv[]) {
             update_entity(p, 0.016f, NULL, now);
         }
 
+        recorder_write_frame(tick, now);
         server_broadcast();
 
         if (tick % 300 == 0) printf("[STATUS] Tick: %u | Clients: %d\n", tick, active_count);
