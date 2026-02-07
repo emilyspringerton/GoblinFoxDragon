@@ -47,6 +47,12 @@ int lobby_selection = 0;
 UiState ui_state;
 int ui_use_server = 0;
 unsigned int ui_last_poll = 0;
+int ui_edit_index = -1;
+int ui_edit_len = 0;
+unsigned int ui_last_click_ms = 0;
+int ui_last_click_index = -1;
+char ui_edit_buffer[64];
+char lobby_labels_mutable[LOBBY_COUNT][64];
 
 float cam_yaw = 0.0f;
 float cam_pitch = 0.0f;
@@ -83,6 +89,12 @@ static const char *LOBBY_LABELS[LOBBY_COUNT] = {
     "JOIN S.FARTHQ.COM"
 };
 
+static void lobby_init_labels() {
+    for (int i = 0; i < LOBBY_COUNT; i++) {
+        snprintf(lobby_labels_mutable[i], sizeof(lobby_labels_mutable[i]), "%s", LOBBY_LABELS[i]);
+    }
+}
+
 static int lobby_menu_count() {
     if (ui_use_server && ui_state.entry_count > 0) {
         return ui_state.entry_count;
@@ -94,7 +106,7 @@ static const char *lobby_menu_label(int idx) {
     if (ui_use_server && idx >= 0 && idx < ui_state.entry_count) {
         return ui_state.entries[idx].label;
     }
-    return LOBBY_LABELS[idx];
+    return lobby_labels_mutable[idx];
 }
 
 static const char *lobby_menu_entry_id(int idx) {
@@ -102,6 +114,35 @@ static const char *lobby_menu_entry_id(int idx) {
         return ui_state.entries[idx].id;
     }
     return NULL;
+}
+
+static void lobby_commit_edit(int index) {
+    if (index < 0) return;
+    if (ui_edit_len <= 0) return;
+    ui_edit_buffer[ui_edit_len] = '\0';
+    if (ui_use_server && index < ui_state.entry_count) {
+        snprintf(ui_state.entries[index].label, UI_BRIDGE_LABEL_LEN, "%s", ui_edit_buffer);
+    } else if (!ui_use_server && index < LOBBY_COUNT) {
+        snprintf(lobby_labels_mutable[index], sizeof(lobby_labels_mutable[index]), "%s", ui_edit_buffer);
+    }
+}
+
+static void lobby_start_edit(int index) {
+    if (index < 0) return;
+    ui_edit_index = index;
+    ui_edit_len = 0;
+    ui_edit_buffer[0] = '\0';
+    SDL_StartTextInput();
+}
+
+static void lobby_end_edit(int commit) {
+    if (commit) {
+        lobby_commit_edit(ui_edit_index);
+    }
+    ui_edit_index = -1;
+    ui_edit_len = 0;
+    ui_edit_buffer[0] = '\0';
+    SDL_StopTextInput();
 }
 
 static void lobby_apply_scene_id(const char *scene_id) {
@@ -767,6 +808,56 @@ void draw_scene(PlayerState *render_p) {
     draw_weapon_p(render_p); draw_hud(render_p); draw_garage_overlay(render_p);
 }
 
+static void draw_lobby_buttons(int menu_count, float base_x, float base_y, float gap, float size) {
+    const float colors[][3] = {
+        {0.1f, 0.45f, 0.95f}, // blue
+        {0.75f, 0.2f, 0.75f}, // magenta
+        {0.0f, 0.75f, 0.75f}, // teal
+        {0.2f, 0.6f, 0.6f},   // light teal
+        {0.0f, 0.4f, 0.45f},  // dark teal
+        {0.4f, 0.5f, 0.1f},   // olive
+        {0.85f, 0.2f, 0.2f},  // red
+        {0.9f, 0.75f, 0.1f},  // yellow
+        {0.2f, 0.8f, 0.2f}    // green
+    };
+    int color_count = (int)(sizeof(colors) / sizeof(colors[0]));
+
+    for (int i = 0; i < menu_count; i++) {
+        float y = base_y - (gap * i);
+        const float *c = colors[i % color_count];
+        glColor3f(c[0], c[1], c[2]);
+        glRectf(base_x, y, base_x + size, y + size);
+
+        if (i == lobby_selection) {
+            glColor3f(0.05f, 0.05f, 0.05f);
+            glLineWidth(2.0f);
+            glBegin(GL_LINE_LOOP);
+            glVertex2f(base_x, y);
+            glVertex2f(base_x + size, y);
+            glVertex2f(base_x + size, y + size);
+            glVertex2f(base_x, y + size);
+            glEnd();
+        }
+
+        glColor3f(0.05f, 0.05f, 0.05f);
+        draw_string(lobby_menu_label(i), base_x + 12.0f, y + size * 0.55f, 5);
+        if (ui_edit_index == i) {
+            glColor3f(0.95f, 0.9f, 0.2f);
+            draw_string(ui_edit_buffer, base_x + 12.0f, y + size * 0.25f, 5);
+        }
+    }
+}
+
+static int lobby_hit_test(float mx, float my, int menu_count, float base_x, float base_y, float gap, float size) {
+    for (int i = 0; i < menu_count; i++) {
+        float y = base_y - (gap * i);
+        if (mx >= base_x && mx <= base_x + size && my >= y && my <= y + size) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 void net_init() {
     #ifdef _WIN32
     WSADATA wsa; WSAStartup(MAKEWORD(2,2), &wsa);
@@ -898,6 +989,7 @@ int main(int argc, char* argv[]) {
     net_init();
     
     local_init_match(1, 0);
+    lobby_init_labels();
     ui_bridge_init("127.0.0.1", 17777);
     if (ui_bridge_fetch_state(&ui_state)) {
         ui_use_server = 1;
@@ -913,7 +1005,32 @@ int main(int argc, char* argv[]) {
             if (e.type == SDL_MOUSEBUTTONDOWN && app_state != STATE_LOBBY) SDL_SetRelativeMouseMode(SDL_TRUE);
             
             if (app_state == STATE_LOBBY) {
-                if(e.type == SDL_KEYDOWN) {
+                if (e.type == SDL_TEXTINPUT && ui_edit_index >= 0) {
+                    size_t len = strlen(e.text.text);
+                    if (len > 0 && ui_edit_len < (int)sizeof(ui_edit_buffer) - 1) {
+                        int copy = (int)len;
+                        if (ui_edit_len + copy >= (int)sizeof(ui_edit_buffer) - 1) {
+                            copy = (int)sizeof(ui_edit_buffer) - 1 - ui_edit_len;
+                        }
+                        memcpy(ui_edit_buffer + ui_edit_len, e.text.text, (size_t)copy);
+                        ui_edit_len += copy;
+                        ui_edit_buffer[ui_edit_len] = '\0';
+                    }
+                }
+                if (e.type == SDL_KEYDOWN) {
+                    if (ui_edit_index >= 0) {
+                        if (e.key.keysym.sym == SDLK_BACKSPACE && ui_edit_len > 0) {
+                            ui_edit_len--;
+                            ui_edit_buffer[ui_edit_len] = '\0';
+                        }
+                        if (e.key.keysym.sym == SDLK_RETURN || e.key.keysym.sym == SDLK_KP_ENTER) {
+                            lobby_end_edit(1);
+                        }
+                        if (e.key.keysym.sym == SDLK_ESCAPE) {
+                            lobby_end_edit(0);
+                        }
+                        continue;
+                    }
                     if (e.key.keysym.sym == SDLK_UP) {
                         int count = lobby_menu_count();
                         lobby_selection = (lobby_selection + count - 1) % count;
@@ -936,6 +1053,39 @@ int main(int argc, char* argv[]) {
                     if (!ui_use_server && e.key.keysym.sym == SDLK_j) { 
                         lobby_selection = LOBBY_JOIN;
                         lobby_start_action(LOBBY_JOIN);
+                    }
+                }
+                if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
+                    int menu_count = lobby_menu_count();
+                    float base_x = 360.0f;
+                    float base_y = 520.0f;
+                    float size = 70.0f;
+                    float gap = 85.0f;
+                    float mx = (float)e.button.x;
+                    float my = 720.0f - (float)e.button.y;
+                    int hit = lobby_hit_test(mx, my, menu_count, base_x, base_y, gap, size);
+                    if (hit >= 0) {
+                        unsigned int now = SDL_GetTicks();
+                        if (ui_last_click_index == hit && ui_last_click_ms > 0) {
+                            unsigned int delta = now - ui_last_click_ms;
+                            if (delta <= 250) {
+                                lobby_selection = hit;
+                                lobby_start_action(hit);
+                                ui_last_click_ms = 0;
+                                ui_last_click_index = -1;
+                            } else if (delta <= 700) {
+                                lobby_selection = hit;
+                                lobby_start_edit(hit);
+                                ui_last_click_ms = 0;
+                                ui_last_click_index = -1;
+                            } else {
+                                ui_last_click_ms = now;
+                                ui_last_click_index = hit;
+                            }
+                        } else {
+                            ui_last_click_ms = now;
+                            ui_last_click_index = hit;
+                        }
                     }
                 }
             } else {
@@ -971,24 +1121,15 @@ int main(int argc, char* argv[]) {
              glColor3f(0.5f, 0.8f, 0.9f);
              draw_string("SELECT MODE", 500, 520, 6);
 
-             float base_x = 420.0f;
-             float base_y = 450.0f;
-             float row_gap = 40.0f;
+             float base_x = 360.0f;
+             float base_y = 520.0f;
+             float size = 70.0f;
+             float gap = 85.0f;
              int menu_count = lobby_menu_count();
-             for (int i = 0; i < menu_count; i++) {
-                 float y = base_y - (row_gap * i);
-                 if (i == lobby_selection) {
-                     glColor3f(1.0f, 1.0f, 0.0f);
-                     draw_string(">", base_x - 30.0f, y, 6);
-                     glColor3f(0.0f, 1.0f, 1.0f);
-                 } else {
-                     glColor3f(0.0f, 0.7f, 0.8f);
-                 }
-                 draw_string(lobby_menu_label(i), base_x, y, 6);
-             }
+             draw_lobby_buttons(menu_count, base_x, base_y, gap, size);
 
              glColor3f(0.4f, 0.6f, 0.7f);
-             draw_string("ARROWS + ENTER TO SELECT", 410, 140, 5);
+             draw_string("DOUBLE-CLICK: FAST=OPEN / SLOW=RENAME", 320, 140, 5);
              SDL_GL_SwapWindow(win);
         } 
         else {
