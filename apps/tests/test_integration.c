@@ -76,6 +76,7 @@ int test_full_loop() {
     NetHeader head;
     head.type = PACKET_USERCMD;
     head.client_id = 1;
+    head.scene_id = 0;
     
     VirtualPacket wire;
     net_transmit(&wire, &head, &client_cmd);
