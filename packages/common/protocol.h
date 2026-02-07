@@ -121,6 +121,8 @@ typedef struct {
     unsigned int respawn_time;
     int storm_charges;
     int ability_cooldown;
+    unsigned int stunned_until_ms;
+    unsigned int stun_immune_until_ms;
 } PlayerState;
 
 typedef struct {

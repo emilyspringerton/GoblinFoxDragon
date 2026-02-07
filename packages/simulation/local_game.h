@@ -126,6 +126,18 @@ void update_entity(PlayerState *p, float dt, void *server_context, unsigned int 
     if (!p->active) return;
     if (p->state == STATE_DEAD) return;
 
+    if (cmd_time < p->stunned_until_ms) {
+        p->in_fwd = 0.0f;
+        p->in_strafe = 0.0f;
+        p->in_jump = 0;
+        p->in_shoot = 0;
+        p->in_reload = 0;
+        p->in_use = 0;
+        p->in_ability = 0;
+        p->vx = 0.0f;
+        p->vz = 0.0f;
+    }
+
     apply_friction(p);
     float g = (p->in_jump) ? GRAVITY_FLOAT : GRAVITY_DROP;
     p->vy -= g; 
@@ -143,7 +155,28 @@ void update_entity(PlayerState *p, float dt, void *server_context, unsigned int 
     scene_safety_check(p);
 }
 
-static void update_projectiles() {
+static void apply_projectile_damage(PlayerState *owner, PlayerState *target, int damage, unsigned int now_ms) {
+    if (!target->active || target->state == STATE_DEAD) return;
+    target->shield_regen_timer = SHIELD_REGEN_DELAY;
+    if (target->shield > 0) {
+        if (target->shield >= damage) { target->shield -= damage; damage = 0; }
+        else { damage -= target->shield; target->shield = 0; }
+    }
+    target->health -= damage;
+    if (target->health <= 0) {
+        if (owner) { owner->kills++; owner->accumulated_reward += 500.0f; }
+        target->deaths++;
+        phys_respawn(target, now_ms);
+    }
+
+    if (now_ms >= target->stun_immune_until_ms) {
+        unsigned int stun_end = now_ms + 100;
+        if (stun_end > target->stunned_until_ms) target->stunned_until_ms = stun_end;
+        target->stun_immune_until_ms = now_ms + 250;
+    }
+}
+
+static void update_projectiles(unsigned int now_ms) {
     for (int i=0; i<MAX_PROJECTILES; i++) {
         Projectile *p = &local_state.projectiles[i];
         if (!p->active) continue;
@@ -163,6 +196,27 @@ static void update_projectiles() {
             }
         } else {
             p->x = next_x; p->y = next_y; p->z = next_z;
+        }
+
+        if (p->active) {
+            for (int t = 0; t < MAX_CLIENTS; t++) {
+                PlayerState *target = &local_state.players[t];
+                if (!target->active || target->state == STATE_DEAD) continue;
+                if (t == p->owner_id) continue;
+                float dx = target->x - p->x;
+                float dy = (target->y + EYE_HEIGHT) - p->y;
+                float dz = target->z - p->z;
+                float dist_sq = dx * dx + dy * dy + dz * dz;
+                if (dist_sq < 4.0f) {
+                    PlayerState *owner = NULL;
+                    if (p->owner_id >= 0 && p->owner_id < MAX_CLIENTS) {
+                        owner = &local_state.players[p->owner_id];
+                    }
+                    apply_projectile_damage(owner, target, p->damage, now_ms);
+                    p->active = 0;
+                    break;
+                }
+            }
         }
 
         if (p->x > 4000 || p->x < -4000 || p->z > 4000 || p->z < -4000 || p->y > 2000) p->active = 0;
@@ -232,7 +286,7 @@ void local_update(float fwd, float str, float yaw, float pitch, int shoot, int w
         }
         update_entity(p, 0.016f, server_context, cmd_time);
     }
-    update_projectiles();
+    update_projectiles(cmd_time);
 }
 
 void local_init_match(int num_players, int mode) {

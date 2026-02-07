@@ -459,6 +459,7 @@ int main(int argc, char *argv[]) {
             update_entity(p, 0.016f, NULL, now);
         }
 
+        update_projectiles(now);
         recorder_write_frame(tick, now);
         server_broadcast();
 

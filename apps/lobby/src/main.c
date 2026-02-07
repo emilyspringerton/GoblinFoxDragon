@@ -1151,7 +1151,8 @@ int main(int argc, char* argv[]) {
             glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(current_fov, 1280.0/720.0, 0.1, Z_FAR); 
             glMatrixMode(GL_MODELVIEW);
             if (app_state == STATE_GAME_NET) {
-                local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn_req, jump, crouch, reload, ability, NULL, 0);
+                unsigned int now_ms = SDL_GetTicks();
+                local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn_req, jump, crouch, reload, ability, NULL, now_ms);
                 UserCmd cmd = client_create_cmd(fwd, str, cam_yaw, cam_pitch, shoot, jump, crouch, reload, use, ability, wpn_req);
                 net_send_cmd(cmd);
                 net_tick();
@@ -1171,7 +1172,8 @@ int main(int argc, char* argv[]) {
                     }
                 }
                 if(local_state.players[0].vehicle_cooldown > 0) local_state.players[0].vehicle_cooldown--;
-                local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn_req, jump, crouch, reload, ability, NULL, 0);
+                unsigned int now_ms = SDL_GetTicks();
+                local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn_req, jump, crouch, reload, ability, NULL, now_ms);
             }
             draw_scene(&local_state.players[0]);
             SDL_GL_SwapWindow(win);

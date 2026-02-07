@@ -385,6 +385,8 @@ void phys_respawn(PlayerState *p, unsigned int now) {
     for(int i=0; i<MAX_WEAPONS; i++) p->ammo[i] = WPN_STATS[i].ammo_max;
     p->storm_charges = 0;
     p->ability_cooldown = 0;
+    p->stunned_until_ms = 0;
+    p->stun_immune_until_ms = 0;
     if (p->is_bot) {
         PlayerState *winner = get_best_bot();
         if (winner && winner != p) evolve_bot(p, winner);
