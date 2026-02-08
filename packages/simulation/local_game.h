@@ -51,6 +51,7 @@ static inline void scene_load(int scene_id) {
     phys_set_scene(scene_id);
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (!local_state.players[i].active) continue;
+        local_state.players[i].scene_id = scene_id;
         scene_force_spawn(&local_state.players[i]);
     }
 }
@@ -181,6 +182,8 @@ static void update_projectiles(unsigned int now_ms) {
         Projectile *p = &local_state.projectiles[i];
         if (!p->active) continue;
 
+        phys_set_scene(p->scene_id);
+
         float next_x = p->x + p->vx;
         float next_y = p->y + p->vy;
         float next_z = p->z + p->vz;
@@ -203,6 +206,7 @@ static void update_projectiles(unsigned int now_ms) {
                 PlayerState *target = &local_state.players[t];
                 if (!target->active || target->state == STATE_DEAD) continue;
                 if (t == p->owner_id) continue;
+                if (target->scene_id != p->scene_id) continue;
                 float dx = target->x - p->x;
                 float dy = (target->y + EYE_HEIGHT) - p->y;
                 float dz = target->z - p->z;
@@ -284,6 +288,7 @@ void local_update(float fwd, float str, float yaw, float pitch, int shoot, int w
             p->in_ability = 0;
             if ((b_btns & BTN_JUMP) && p->on_ground) { p->y += 0.1f; p->vy += JUMP_FORCE; }
         }
+        phys_set_scene(p->scene_id);
         update_entity(p, 0.016f, server_context, cmd_time);
     }
     update_projectiles(cmd_time);
@@ -297,9 +302,11 @@ void local_init_match(int num_players, int mode) {
     local_state.transition_timer = 0;
     phys_set_scene(local_state.scene_id);
     local_state.players[0].active = 1;
+    local_state.players[0].scene_id = local_state.scene_id;
     phys_respawn(&local_state.players[0], 0);
     for(int i=1; i<num_players; i++) {
         local_state.players[i].active = 1;
+        local_state.players[i].scene_id = local_state.scene_id;
         phys_respawn(&local_state.players[i], i*100);
         init_genome(&local_state.players[i].brain);
     }

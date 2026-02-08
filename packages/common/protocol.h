@@ -76,10 +76,12 @@ typedef struct {
     int active; float x, y, z; float vx, vy, vz; int owner_id;
     int bounces_left;
     int damage;
+    unsigned char scene_id;
 } Projectile;
 
 typedef struct {
     unsigned char id; 
+    unsigned char scene_id;
     float x, y, z; float yaw, pitch;
     unsigned char current_weapon;
     unsigned char state;
@@ -102,6 +104,7 @@ typedef struct {
 
 typedef struct {
     int id;
+    int scene_id;
     int active; int is_bot;
     float x, y, z; float vx, vy, vz; float yaw, pitch; int on_ground;
     float in_fwd;

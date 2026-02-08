@@ -154,7 +154,8 @@ static inline void scene_spawn_point(int scene_id, int slot, float *out_x, float
 
 static inline void scene_force_spawn(PlayerState *p) {
     float sx = 0.0f, sy = 0.0f, sz = 0.0f;
-    scene_spawn_point(phys_scene_id, p->id, &sx, &sy, &sz);
+    phys_set_scene(p->scene_id);
+    scene_spawn_point(p->scene_id, p->id, &sx, &sy, &sz);
     p->x = sx; p->y = sy; p->z = sz;
     p->vx = 0.0f; p->vy = 0.0f; p->vz = 0.0f;
 }
@@ -164,7 +165,7 @@ static inline void scene_safety_check(PlayerState *p) {
         scene_force_spawn(p);
         return;
     }
-    if (phys_scene_id == SCENE_GARAGE_OSAKA) {
+    if (p->scene_id == SCENE_GARAGE_OSAKA) {
         if (p->y < GARAGE_KILL_Y ||
             p->x < -GARAGE_BOUNDS_X || p->x > GARAGE_BOUNDS_X ||
             p->z < -GARAGE_BOUNDS_Z || p->z > GARAGE_BOUNDS_Z) {
@@ -198,7 +199,7 @@ static inline const VehiclePad *scene_vehicle_pads(int scene_id, int *out_count)
 }
 
 static inline int scene_portal_triggered(PlayerState *p) {
-    if (phys_scene_id != SCENE_GARAGE_OSAKA) return 0;
+    if (p->scene_id != SCENE_GARAGE_OSAKA) return 0;
     float dx = p->x - GARAGE_PORTAL_X;
     float dz = p->z - GARAGE_PORTAL_Z;
     float dist_sq = dx * dx + dz * dz;
@@ -380,7 +381,7 @@ void resolve_collision(PlayerState *p) {
 void phys_respawn(PlayerState *p, unsigned int now) {
     p->active = 1; p->state = STATE_ALIVE;
     p->health = 100; p->shield = 100; p->respawn_time = 0; p->in_vehicle = 0;
-    scene_spawn_point(phys_scene_id, p->id, &p->x, &p->y, &p->z);
+    scene_spawn_point(p->scene_id, p->id, &p->x, &p->y, &p->z);
     p->current_weapon = WPN_MAGNUM;
     for(int i=0; i<MAX_WEAPONS; i++) p->ammo[i] = WPN_STATS[i].ammo_max;
     p->storm_charges = 0;
@@ -401,6 +402,7 @@ static inline void spawn_projectile(Projectile *projectiles, PlayerState *p, int
             proj->owner_id = p->id;
             proj->damage = damage;
             proj->bounces_left = bounces;
+            proj->scene_id = (unsigned char)p->scene_id;
 
             float r = -p->yaw * 0.0174533f; float rp = p->pitch * 0.0174533f;
             float speed = 4.0f * speed_mult;
@@ -461,6 +463,7 @@ void update_weapons(PlayerState *p, PlayerState *targets, Projectile *projectile
             for(int i=0; i<MAX_CLIENTS; i++) {
                 if (p == &targets[i]) continue;
                 if (!targets[i].active || targets[i].state == STATE_DEAD) continue;
+                if (targets[i].scene_id != p->scene_id) continue;
                 if (w == WPN_KNIFE) {
                     float kx = p->x - targets[i].x;
                     float ky = p->y - targets[i].y; float kz = p->z - targets[i].z;

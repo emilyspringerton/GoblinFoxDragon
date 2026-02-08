@@ -267,7 +267,7 @@ void update_and_draw_trails() {
     glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     for(int i=0; i<MAX_CLIENTS; i++) {
         PlayerState *p = &local_state.players[i];
-        if (p->active && p->on_ground) {
+        if (p->active && p->on_ground && p->scene_id == local_state.scene_id) {
             int gx = (int)floorf(p->x / GRID_SIZE) * (int)GRID_SIZE + (int)(GRID_SIZE/2);
             int gz = (int)floorf(p->z / GRID_SIZE) * (int)GRID_SIZE + (int)(GRID_SIZE/2);
             add_trail(gx, gz);
@@ -778,6 +778,7 @@ void draw_projectiles() {
     for (int i = 0; i < MAX_PROJECTILES; i++) {
         Projectile *p = &local_state.projectiles[i];
         if (!p->active) continue;
+        if (p->scene_id != local_state.scene_id) continue;
         if (p->bounces_left > 0) glColor3f(1.0f, 0.4f, 0.1f);
         else glColor3f(1.0f, 0.0f, 0.0f);
         glVertex3f(p->x, p->y, p->z);
@@ -788,6 +789,8 @@ void draw_projectiles() {
 void draw_scene(PlayerState *render_p) {
     glClearColor(0.02f, 0.02f, 0.05f, 1.0f); // DEEP SPACE BLUE BG
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); glLoadIdentity();
+    local_state.scene_id = render_p->scene_id;
+    phys_set_scene(render_p->scene_id);
     float cam_y = render_p->in_vehicle ? 8.0f : (render_p->crouching ? 2.5f : EYE_HEIGHT);
     float cam_z_off = render_p->in_vehicle ? 10.0f : 0.0f;
     
@@ -805,7 +808,12 @@ void draw_scene(PlayerState *render_p) {
     draw_garage_portal_frame();
     draw_projectiles();
     if (render_p->in_vehicle) draw_player_3rd(render_p);
-    for(int i=1; i<MAX_CLIENTS; i++) if(local_state.players[i].active && i != my_client_id) draw_player_3rd(&local_state.players[i]);
+    for(int i=0; i<MAX_CLIENTS; i++) {
+        PlayerState *p = &local_state.players[i];
+        if (!p->active || p->scene_id != render_p->scene_id) continue;
+        if (p == render_p) continue;
+        draw_player_3rd(p);
+    }
     draw_weapon_p(render_p); draw_hud(render_p); draw_garage_overlay(render_p);
 }
 
@@ -881,7 +889,7 @@ void net_connect() {
         char buffer[128];
         NetHeader *h = (NetHeader*)buffer;
         h->type = PACKET_CONNECT;
-        h->scene_id = (unsigned char)local_state.scene_id;
+        h->scene_id = 0;
         sendto(sock, buffer, sizeof(NetHeader), 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
         printf("Connected to %s...\n", SERVER_HOST);
     } else {
@@ -908,7 +916,7 @@ void net_send_cmd(UserCmd cmd) {
     int cursor = 0;
     NetHeader head; head.type = PACKET_USERCMD;
     head.client_id = 0; 
-    head.scene_id = (unsigned char)local_state.scene_id;
+    head.scene_id = 0;
     memcpy(packet_data + cursor, &head, sizeof(NetHeader)); cursor += sizeof(NetHeader);
     unsigned char count = 1;
     memcpy(packet_data + cursor, &count, 1); cursor += 1;
@@ -919,11 +927,7 @@ void net_send_cmd(UserCmd cmd) {
 void net_process_snapshot(char *buffer, int len, unsigned char scene_id) {
     int cursor = sizeof(NetHeader);
     unsigned char count = *(unsigned char*)(buffer + cursor); cursor++;
-
-    if (local_state.scene_id != scene_id) {
-        local_state.scene_id = scene_id;
-        phys_set_scene(scene_id);
-    }
+    (void)scene_id;
     
     for(int i=0; i<count; i++) {
         NetPlayer *np = (NetPlayer*)(buffer + cursor);
@@ -933,6 +937,7 @@ void net_process_snapshot(char *buffer, int len, unsigned char scene_id) {
         if (id > 0 && id < MAX_CLIENTS) {
             PlayerState *p = &local_state.players[id];
             p->active = 1;
+            p->scene_id = np->scene_id;
             p->x = np->x; p->y = np->y; p->z = np->z;
             p->yaw = np->yaw; p->pitch = np->pitch;
             p->health = np->health;
@@ -950,10 +955,19 @@ void net_process_snapshot(char *buffer, int len, unsigned char scene_id) {
 
             if (p->is_shooting) p->recoil_anim = 1.0f;
         } else if (id == 0) {
+            local_state.players[0].scene_id = np->scene_id;
             local_state.players[0].ammo[local_state.players[0].current_weapon] = np->ammo;
             local_state.players[0].in_vehicle = np->in_vehicle; 
             local_state.players[0].storm_charges = np->storm_charges;
         }
+    }
+
+    int render_id = (my_client_id > 0 && my_client_id < MAX_CLIENTS && local_state.players[my_client_id].active)
+        ? my_client_id
+        : 0;
+    if (local_state.scene_id != local_state.players[render_id].scene_id) {
+        local_state.scene_id = local_state.players[render_id].scene_id;
+        phys_set_scene(local_state.scene_id);
     }
 }
 
@@ -971,6 +985,10 @@ void net_tick() {
             my_client_id = head->client_id;
             local_state.scene_id = head->scene_id;
             phys_set_scene(head->scene_id);
+            if (my_client_id > 0 && my_client_id < MAX_CLIENTS) {
+                local_state.players[my_client_id].active = 1;
+                local_state.players[my_client_id].scene_id = head->scene_id;
+            }
             printf("✅ JOINED SERVER AS CLIENT ID: %d\n", my_client_id);
         }
         len = recvfrom(sock, buffer, 4096, 0, (struct sockaddr*)&sender, &slen);
@@ -1170,8 +1188,6 @@ int main(int argc, char* argv[]) {
             glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(current_fov, 1280.0/720.0, 0.1, Z_FAR); 
             glMatrixMode(GL_MODELVIEW);
             if (app_state == STATE_GAME_NET) {
-                unsigned int now_ms = SDL_GetTicks();
-                local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn_req, jump, crouch, reload, ability, NULL, now_ms);
                 UserCmd cmd = client_create_cmd(fwd, str, cam_yaw, cam_pitch, shoot, jump, crouch, reload, use, ability, wpn_req);
                 net_send_cmd(cmd);
                 net_tick();
@@ -1194,7 +1210,13 @@ int main(int argc, char* argv[]) {
                 unsigned int now_ms = SDL_GetTicks();
                 local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn_req, jump, crouch, reload, ability, NULL, now_ms);
             }
-            draw_scene(&local_state.players[0]);
+            PlayerState *render_p = &local_state.players[0];
+            if (app_state == STATE_GAME_NET &&
+                my_client_id > 0 && my_client_id < MAX_CLIENTS &&
+                local_state.players[my_client_id].active) {
+                render_p = &local_state.players[my_client_id];
+            }
+            draw_scene(render_p);
             SDL_GL_SwapWindow(win);
         }
         SDL_Delay(16);
