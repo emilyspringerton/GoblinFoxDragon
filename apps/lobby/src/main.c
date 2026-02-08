@@ -1075,6 +1075,39 @@ int main(int argc, char* argv[]) {
                         }
                     }
                 }
+                if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
+                    int menu_count = lobby_menu_count();
+                    float base_x = 360.0f;
+                    float base_y = 520.0f;
+                    float size = 70.0f;
+                    float gap = 85.0f;
+                    float mx = (float)e.button.x;
+                    float my = 720.0f - (float)e.button.y;
+                    int hit = lobby_hit_test(mx, my, menu_count, base_x, base_y, gap, size);
+                    if (hit >= 0) {
+                        unsigned int now = SDL_GetTicks();
+                        if (ui_last_click_index == hit && ui_last_click_ms > 0) {
+                            unsigned int delta = now - ui_last_click_ms;
+                            if (delta <= 250) {
+                                lobby_selection = hit;
+                                lobby_start_action(hit);
+                                ui_last_click_ms = 0;
+                                ui_last_click_index = -1;
+                            } else if (delta <= 700) {
+                                lobby_selection = hit;
+                                lobby_start_edit(hit);
+                                ui_last_click_ms = 0;
+                                ui_last_click_index = -1;
+                            } else {
+                                ui_last_click_ms = now;
+                                ui_last_click_index = hit;
+                            }
+                        } else {
+                            ui_last_click_ms = now;
+                            ui_last_click_index = hit;
+                        }
+                    }
+                }
             } else {
                 if(e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) {
                     app_state = STATE_LOBBY;
