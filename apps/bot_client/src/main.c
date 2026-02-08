@@ -108,6 +108,7 @@ UserCmd bot_think() {
     for(int i=0; i<MAX_CLIENTS; i++) {
         if (!world_state[i].active || world_state[i].state == STATE_DEAD) continue;
         if (i == my_state.id) continue; // Don't target self (Need ID from server)
+        if (world_state[i].scene_id != my_state.scene_id) continue;
         
         float dx = world_state[i].x - my_state.x;
         float dz = world_state[i].z - my_state.z;
@@ -154,6 +155,11 @@ UserCmd bot_think() {
 
 void process_packet(char *buf, int len) {
     NetHeader *h = (NetHeader*)buf;
+    if (h->type == PACKET_WELCOME) {
+        my_state.id = h->client_id;
+        my_state.scene_id = h->scene_id;
+        return;
+    }
     if (h->type == PACKET_SNAPSHOT) {
         int cursor = sizeof(NetHeader);
         unsigned char count = *(unsigned char*)(buf + cursor); cursor++;
@@ -165,6 +171,7 @@ void process_packet(char *buf, int len) {
             // Update World View
             if (np->id > 0 && np->id < MAX_CLIENTS) {
                 world_state[np->id].active = 1;
+                world_state[np->id].scene_id = np->scene_id;
                 world_state[np->id].x = np->x;
                 world_state[np->id].z = np->z;
                 world_state[np->id].state = np->state;

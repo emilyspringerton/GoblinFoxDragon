@@ -924,10 +924,9 @@ void net_send_cmd(UserCmd cmd) {
     sendto(sock, packet_data, cursor, 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
 }
 
-void net_process_snapshot(char *buffer, int len, unsigned char scene_id) {
+void net_process_snapshot(char *buffer, int len) {
     int cursor = sizeof(NetHeader);
     unsigned char count = *(unsigned char*)(buffer + cursor); cursor++;
-    (void)scene_id;
     
     for(int i=0; i<count; i++) {
         NetPlayer *np = (NetPlayer*)(buffer + cursor);
@@ -979,12 +978,10 @@ void net_tick() {
     while (len > 0) {
         NetHeader *head = (NetHeader*)buffer;
         if (head->type == PACKET_SNAPSHOT) {
-            net_process_snapshot(buffer, len, head->scene_id);
+            net_process_snapshot(buffer, len);
         }
         if (head->type == PACKET_WELCOME) {
             my_client_id = head->client_id;
-            local_state.scene_id = head->scene_id;
-            phys_set_scene(head->scene_id);
             if (my_client_id > 0 && my_client_id < MAX_CLIENTS) {
                 local_state.players[my_client_id].active = 1;
                 local_state.players[my_client_id].scene_id = head->scene_id;
