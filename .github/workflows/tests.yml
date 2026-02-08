@@ -2,10 +2,10 @@ name: ShankPit Factory
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "master" ]
     tags: [ "v*" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "master" ]
 
 jobs:
   build:
@@ -40,14 +40,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          x86_64-w64-mingw32-gcc apps/lobby/src/main.c \
+          x86_64-w64-mingw32-gcc apps/lobby/src/master.c \
             -o ShankPit.exe \
             -O2 -static-libgcc \
             -I./sdl2_mingw/include \
             -Ipackages/common \
             -Ipackages/simulation \
             -L./sdl2_mingw/lib \
-            -lmingw32 -lSDL2main -lSDL2 \
+            -lmingw32 -lSDL2master -lSDL2 \
             -lopengl32 -lglu32 -lws2_32 -lwinmm -lgdi32 -lm
 
       # --- 3. BUILD SERVER ---
@@ -55,7 +55,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gcc apps/server/src/main.c \
+          gcc apps/server/src/master.c \
             -o ShankServer_Linux \
             -O2 -static \
             -Ipackages/common \
@@ -125,7 +125,7 @@ jobs:
           zip -r "ShankPit_Client_${BUILD}.zip" ShankPit_Client
 
           mkdir -p ShankPit_Bots
-          gcc apps/client/bot_main.c -o ShankBot_Linux -O2 -static -Ipackages/common -Ipackages/simulation -lm || true
+          gcc apps/client/bot_master.c -o ShankBot_Linux -O2 -static -Ipackages/common -Ipackages/simulation -lm || true
           if [ -f ShankBot_Linux ]; then
             cp ShankBot_Linux ShankPit_Bots/
           fi
