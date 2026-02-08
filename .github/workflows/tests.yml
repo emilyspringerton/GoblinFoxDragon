@@ -17,6 +17,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Normalize merged layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -e apps ] && [ -d apps2 ]; then
+            ln -s apps2 apps
+          fi
+          if [ ! -e packages ] && [ -d packages2 ]; then
+            ln -s packages2 packages
+          fi
+          if [ ! -e docs ] && [ -d docs2 ]; then
+            ln -s docs2 docs
+          fi
+          echo "Normalized layout:"
+          ls -al
+          test -e apps && echo "apps OK"
+          test -e packages && echo "packages OK"
+          test -e docs && echo "docs OK"
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Go Tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test ./...
+
       # --- 1. SETUP ---
       - name: Install Dependencies
         shell: bash
@@ -44,6 +74,7 @@ jobs:
             -o ShankPit.exe \
             -O2 -static-libgcc \
             -I./sdl2_mingw/include \
+            -I. \
             -Ipackages/common \
             -Ipackages/simulation \
             -L./sdl2_mingw/lib \
@@ -58,6 +89,7 @@ jobs:
           gcc apps/server/src/master.c \
             -o ShankServer_Linux \
             -O2 -static \
+            -I. \
             -Ipackages/common \
             -Ipackages/simulation \
             -lm
@@ -125,7 +157,7 @@ jobs:
           zip -r "ShankPit_Client_${BUILD}.zip" ShankPit_Client
 
           mkdir -p ShankPit_Bots
-          gcc apps/client/bot_master.c -o ShankBot_Linux -O2 -static -Ipackages/common -Ipackages/simulation -lm || true
+          gcc apps/client/bot_master.c -o ShankBot_Linux -O2 -static -I. -Ipackages/common -Ipackages/simulation -lm || true
           if [ -f ShankBot_Linux ]; then
             cp ShankBot_Linux ShankPit_Bots/
           fi
