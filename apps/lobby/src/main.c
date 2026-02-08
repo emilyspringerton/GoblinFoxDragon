@@ -1040,20 +1040,39 @@ int main(int argc, char* argv[]) {
                         int count = lobby_menu_count();
                         lobby_selection = (lobby_selection + 1) % count;
                     }
-                    if (e.key.keysym.sym == SDLK_RETURN || e.key.keysym.sym == SDLK_KP_ENTER) {
-                        lobby_start_action(lobby_selection);
-                    }
-                    if (!ui_use_server) {
-                        if (e.key.keysym.sym == SDLK_d) { lobby_selection = LOBBY_DEMO; lobby_start_action(LOBBY_DEMO); }
-                        if (e.key.keysym.sym == SDLK_b) { lobby_selection = LOBBY_BATTLE; lobby_start_action(LOBBY_BATTLE); }
-                        if (e.key.keysym.sym == SDLK_t) { lobby_selection = LOBBY_TDM; lobby_start_action(LOBBY_TDM); }
-                        if (e.key.keysym.sym == SDLK_c) { lobby_selection = LOBBY_CTF; lobby_start_action(LOBBY_CTF); }
-                        if (e.key.keysym.sym == SDLK_k) { lobby_selection = LOBBY_EVOLUTION; lobby_start_action(LOBBY_EVOLUTION); }
-                    }
-                    
-                    if (!ui_use_server && e.key.keysym.sym == SDLK_j) { 
-                        lobby_selection = LOBBY_JOIN;
-                        lobby_start_action(LOBBY_JOIN);
+                    // P0: no single-click or single-key activation in Emily UI.
+                }
+                if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
+                    int menu_count = lobby_menu_count();
+                    float base_x = 360.0f;
+                    float base_y = 520.0f;
+                    float size = 70.0f;
+                    float gap = 85.0f;
+                    float mx = (float)e.button.x;
+                    float my = 720.0f - (float)e.button.y;
+                    int hit = lobby_hit_test(mx, my, menu_count, base_x, base_y, gap, size);
+                    if (hit >= 0) {
+                        unsigned int now = SDL_GetTicks();
+                        if (ui_last_click_index == hit && ui_last_click_ms > 0) {
+                            unsigned int delta = now - ui_last_click_ms;
+                            if (delta <= 250) {
+                                lobby_selection = hit;
+                                lobby_start_action(hit);
+                                ui_last_click_ms = 0;
+                                ui_last_click_index = -1;
+                            } else if (delta <= 700) {
+                                lobby_selection = hit;
+                                lobby_start_edit(hit);
+                                ui_last_click_ms = 0;
+                                ui_last_click_index = -1;
+                            } else {
+                                ui_last_click_ms = now;
+                                ui_last_click_index = hit;
+                            }
+                        } else {
+                            ui_last_click_ms = now;
+                            ui_last_click_index = hit;
+                        }
                     }
                 }
                 if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
