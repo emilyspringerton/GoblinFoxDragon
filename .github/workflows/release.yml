@@ -17,9 +17,41 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Normalize merged layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -e apps ] && [ -d apps2 ]; then
+            ln -s apps2 apps
+          fi
+          if [ ! -e packages ] && [ -d packages2 ]; then
+            ln -s packages2 packages
+          fi
+          if [ ! -e docs ] && [ -d docs2 ]; then
+            ln -s docs2 docs
+          fi
+          echo "Normalized layout:"
+          ls -al
+          test -e apps && echo "apps OK"
+          test -e packages && echo "packages OK"
+          test -e docs && echo "docs OK"
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Go Tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test ./...
+
       # --- 1. SETUP ---
       - name: Install Dependencies
+        shell: bash
         run: |
+          set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y \
             mingw-w64 \
@@ -33,11 +65,14 @@ jobs:
 
       # --- 2. BUILD CLIENT ---
       - name: Build Windows Client
+        shell: bash
         run: |
+          set -euo pipefail
           x86_64-w64-mingw32-gcc apps/lobby/src/main.c \
             -o ShankPit.exe \
             -O2 -static-libgcc \
             -I./sdl2_mingw/include \
+            -I. \
             -Ipackages/common \
             -Ipackages/simulation \
             -L./sdl2_mingw/lib \
@@ -46,17 +81,22 @@ jobs:
 
       # --- 3. BUILD SERVER ---
       - name: Build Linux Server
+        shell: bash
         run: |
+          set -euo pipefail
           gcc apps/server/src/main.c \
             -o ShankServer_Linux \
             -O2 -static \
+            -I. \
             -Ipackages/common \
             -Ipackages/simulation \
             -lm
 
       # --- 4. BUILD WORLD CONTROLLER ---
       - name: Build Server Control (ncurses)
+        shell: bash
         run: |
+          set -euo pipefail
           gcc apps/server/serverctl.c \
             -o shankpit_worldctl \
             -std=c99 \
@@ -65,7 +105,9 @@ jobs:
 
       # --- 5. GENERATE CONSTRUCT ---
       - name: Generate Source Construct
+        shell: bash
         run: |
+          set -euo pipefail
           echo "SHANKPIT BUILD ${{ github.run_number }} CONSTRUCT" > SHANKPIT_CONSTRUCT.txt
           FILES="
             packages/common/protocol.h
@@ -86,7 +128,9 @@ jobs:
 
       # --- 6. PACKAGE ---
       - name: Bundle Artifacts
+        shell: bash
         run: |
+          set -euo pipefail
           mkdir ShankPit_World
           cp ShankServer_Linux ShankPit_World/
           cp shankpit_worldctl ShankPit_World/
@@ -103,7 +147,7 @@ jobs:
           zip -r ShankPit_Client.zip ShankPit_Client
 
           mkdir ShankPit_Bots
-          gcc apps/client/bot_main.c -o ShankBot_Linux -O2 -static -Ipackages/common -Ipackages/simulation -lm || true
+          gcc apps/client/bot_main.c -o ShankBot_Linux -O2 -static -I. -Ipackages/common -Ipackages/simulation -lm || true
           [ -f ShankBot_Linux ] && cp ShankBot_Linux ShankPit_Bots/
           cp SHANKPIT_CONSTRUCT.txt ShankPit_Bots/
           zip -r ShankPit_Bots.zip ShankPit_Bots
