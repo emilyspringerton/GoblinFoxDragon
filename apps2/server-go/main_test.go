@@ -5,7 +5,7 @@ import (
 	"math"
 	"testing"
 
-	"dragonsnshit/packages/common"
+	"dragonsnshit/packages2/common"
 )
 
 func TestParseUserCmd(t *testing.T) {

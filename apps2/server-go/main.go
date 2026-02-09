@@ -7,7 +7,7 @@ import (
 	"net"
 	"time"
 
-	"dragonsnshit/packages/common"
+	"dragonsnshit/packages2/common"
 	"dragonsnshit/server/player"
 	"dragonsnshit/server/store"
 	"dragonsnshit/server/system"
