@@ -127,6 +127,8 @@ void update_entity(PlayerState *p, float dt, void *server_context, unsigned int 
     if (!p->active) return;
     if (p->state == STATE_DEAD) return;
 
+    phys_set_scene(p->scene_id);
+
     if (cmd_time < p->stunned_until_ms) {
         p->in_fwd = 0.0f;
         p->in_strafe = 0.0f;

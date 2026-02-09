@@ -110,6 +110,7 @@ typedef struct {
     float in_fwd;
     float in_strafe;
     int in_jump; int in_shoot; int in_reload; int crouching; int in_use;
+    int use_was_down;
     int in_ability;
     int current_weapon; int ammo[MAX_WEAPONS];
     int reload_timer; int attack_cooldown;
@@ -118,6 +119,7 @@ typedef struct {
     int kills; int deaths; int hit_feedback; float recoil_anim;
     int in_vehicle;      
     int vehicle_cooldown;
+    unsigned int portal_cooldown_until_ms;
     float accumulated_reward; 
     BotGenome brain;
     unsigned int last_hit_time;
