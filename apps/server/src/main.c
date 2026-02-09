@@ -398,7 +398,8 @@ int main(int argc, char *argv[]) {
 
             if (p->active && p->state != STATE_DEAD) {
                 phys_set_scene(p->scene_id);
-                if (p->in_use && now >= p->portal_cooldown_until_ms &&
+                int use_pressed = p->in_use && !p->use_was_down;
+                if (use_pressed && now >= p->portal_cooldown_until_ms &&
                     scene_portal_active(p->scene_id) && scene_portal_triggered(p)) {
                     int dest_scene = -1;
                     float sx = 0.0f, sy = 0.0f, sz = 0.0f;
@@ -414,7 +415,7 @@ int main(int argc, char *argv[]) {
                         p->in_use = 0;
                         printf("PORTAL_TRAVEL client=%d from=%d to=%d\n", i, from_scene, dest_scene);
                     }
-                } else if (p->in_use && p->vehicle_cooldown == 0) {
+                } else if (use_pressed && p->vehicle_cooldown == 0) {
                     int in_garage = p->scene_id == SCENE_GARAGE_OSAKA;
                     if (in_garage && scene_near_vehicle_pad(p->scene_id, p->x, p->z, 6.0f, NULL)) {
                         p->in_vehicle = !p->in_vehicle;
@@ -426,6 +427,7 @@ int main(int argc, char *argv[]) {
                         printf("Client %d Toggle Vehicle: %d\n", i, p->in_vehicle);
                     }
                 }
+                p->use_was_down = p->in_use;
                 if (p->vehicle_cooldown > 0) p->vehicle_cooldown--;
 
                 float rad = p->yaw * 3.14159f / 180.0f;
