@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"dragonsnshit/packages/common"
+	"dragonsnshit/packages2/common"
 )
 
 type ClientState struct {

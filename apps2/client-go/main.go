@@ -8,7 +8,7 @@ import (
 	"net"
 	"time"
 
-	"dragonsnshit/packages/common"
+	"dragonsnshit/packages2/common"
 )
 
 func main() {

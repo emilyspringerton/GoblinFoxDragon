@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"dragonsnshit/packages/common"
+	"dragonsnshit/packages2/common"
 )
 
 func TestMemoryClientStoreLifecycle(t *testing.T) {
