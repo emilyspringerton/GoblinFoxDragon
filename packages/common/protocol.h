@@ -118,6 +118,7 @@ typedef struct {
     int kills; int deaths; int hit_feedback; float recoil_anim;
     int in_vehicle;      
     int vehicle_cooldown;
+    unsigned int portal_cooldown_until_ms;
     float accumulated_reward; 
     BotGenome brain;
     unsigned int last_hit_time;

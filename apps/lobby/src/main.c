@@ -52,6 +52,7 @@ int ui_edit_len = 0;
 unsigned int ui_last_click_ms = 0;
 int ui_last_click_index = -1;
 char ui_edit_buffer[64];
+unsigned int travel_overlay_until_ms = 0;
 
 float cam_yaw = 0.0f;
 float cam_pitch = 0.0f;
@@ -786,6 +787,34 @@ void draw_projectiles() {
     glEnd();
 }
 
+static void client_apply_scene_id(int scene_id, unsigned int now_ms) {
+    if (scene_id < 0) return;
+    if (local_state.scene_id != scene_id) {
+        local_state.scene_id = scene_id;
+        phys_set_scene(scene_id);
+        travel_overlay_until_ms = now_ms + 500;
+        for (int i = 0; i < MAX_PROJECTILES; i++) {
+            local_state.projectiles[i].active = 0;
+        }
+    }
+}
+
+static void draw_travel_overlay() {
+    unsigned int now_ms = SDL_GetTicks();
+    if (travel_overlay_until_ms <= now_ms) return;
+    glDisable(GL_DEPTH_TEST);
+    glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity();
+    glOrtho(0, 1280, 0, 720, -1, 1);
+    glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
+
+    glColor3f(0.9f, 0.9f, 0.2f);
+    draw_string("TRAVELING...", 520, 360, 8);
+
+    glMatrixMode(GL_PROJECTION); glPopMatrix();
+    glMatrixMode(GL_MODELVIEW); glPopMatrix();
+    glEnable(GL_DEPTH_TEST);
+}
+
 void draw_scene(PlayerState *render_p) {
     glClearColor(0.02f, 0.02f, 0.05f, 1.0f); // DEEP SPACE BLUE BG
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); glLoadIdentity();
@@ -815,6 +844,7 @@ void draw_scene(PlayerState *render_p) {
         draw_player_3rd(p);
     }
     draw_weapon_p(render_p); draw_hud(render_p); draw_garage_overlay(render_p);
+    draw_travel_overlay();
 }
 
 static void draw_lobby_buttons(int menu_count, float base_x, float base_y, float gap, float size) {
@@ -964,10 +994,7 @@ void net_process_snapshot(char *buffer, int len) {
     int render_id = (my_client_id > 0 && my_client_id < MAX_CLIENTS && local_state.players[my_client_id].active)
         ? my_client_id
         : 0;
-    if (local_state.scene_id != local_state.players[render_id].scene_id) {
-        local_state.scene_id = local_state.players[render_id].scene_id;
-        phys_set_scene(local_state.scene_id);
-    }
+    client_apply_scene_id(local_state.players[render_id].scene_id, SDL_GetTicks());
 }
 
 void net_tick() {
@@ -985,6 +1012,7 @@ void net_tick() {
             if (my_client_id > 0 && my_client_id < MAX_CLIENTS) {
                 local_state.players[my_client_id].active = 1;
                 local_state.players[my_client_id].scene_id = head->scene_id;
+                client_apply_scene_id(head->scene_id, SDL_GetTicks());
             }
             printf("✅ JOINED SERVER AS CLIENT ID: %d\n", my_client_id);
         }

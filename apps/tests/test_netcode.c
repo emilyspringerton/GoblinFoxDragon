@@ -79,12 +79,22 @@ void test_button_bits() {
     ASSERT_EQ((btns & BTN_CROUCH), 0, "Crouch bit NOT set");
 }
 
+void test_scene_fields() {
+    printf("--- Testing Scene Fields ---\n");
+    ASSERT_EQ(sizeof(((NetHeader*)0)->scene_id), 1, "NetHeader scene_id is 1 byte");
+    ASSERT_EQ(sizeof(((NetPlayer*)0)->scene_id), 1, "NetPlayer scene_id is 1 byte");
+    NetPlayer np;
+    np.scene_id = SCENE_STADIUM;
+    ASSERT_EQ(np.scene_id, SCENE_STADIUM, "NetPlayer stores scene_id");
+}
+
 int main() {
     printf("🛡️ SHANKPIT PROTOCOL VERIFICATION 🛡️\n");
     test_packet_structure();
     test_handshake_enums();
     test_simulation_delta();
     test_button_bits();
+    test_scene_fields();
     
     printf("\n--------------------------------------\n");
     printf("SUMMARY: %d/%d Tests Passed.\n", tests_passed, tests_run);
