@@ -117,6 +117,13 @@ jobs:
             apps/server/src/main.c
             apps/server/serverctl.c
             apps/client/bot_main.c
+            apps/tests/test_netcode.c
+            services/game-server/src/server.c
+            services/game-server/src/heartbeat.h
+            services/master-server/main.go
+            services/skate-node/bridge/bridge.go
+            services/skate-node/chain/engine.go
+            services/skate-node/chain/types.go
           "
           for file in $FILES; do
             if [ -f "$file" ]; then

@@ -104,6 +104,7 @@ static int map_count = 0;
 #define GARAGE_PORTAL_Y 6.0f
 #define GARAGE_PORTAL_Z 56.0f
 #define GARAGE_PORTAL_RADIUS 6.0f
+#define PORTAL_ID_GARAGE_EXIT 0
 
 typedef struct {
     float x;
@@ -176,6 +177,22 @@ static inline void scene_safety_check(PlayerState *p) {
 
 static inline int scene_portal_active(int scene_id) {
     return scene_id == SCENE_GARAGE_OSAKA;
+}
+
+static inline int portal_resolve_destination(int current_scene, int portal_id, int slot,
+                                             int *out_scene, float *out_x, float *out_y, float *out_z) {
+    if (!out_scene || !out_x || !out_y || !out_z) return 0;
+    if (current_scene == SCENE_GARAGE_OSAKA && portal_id == PORTAL_ID_GARAGE_EXIT) {
+        *out_scene = SCENE_STADIUM;
+        scene_spawn_point(*out_scene, slot, out_x, out_y, out_z);
+        return 1;
+    }
+    if (current_scene == SCENE_STADIUM && portal_id == PORTAL_ID_GARAGE_EXIT) {
+        *out_scene = SCENE_GARAGE_OSAKA;
+        scene_spawn_point(*out_scene, slot, out_x, out_y, out_z);
+        return 1;
+    }
+    return 0;
 }
 
 static inline void scene_portal_info(int scene_id, float *out_x, float *out_y, float *out_z, float *out_radius) {
@@ -389,6 +406,7 @@ void phys_respawn(PlayerState *p, unsigned int now) {
     for(int i=0; i<MAX_WEAPONS; i++) p->ammo[i] = WPN_STATS[i].ammo_max;
     p->storm_charges = 0;
     p->ability_cooldown = 0;
+    p->portal_cooldown_until_ms = 0;
     p->stunned_until_ms = 0;
     p->stun_immune_until_ms = 0;
     if (p->is_bot) {
