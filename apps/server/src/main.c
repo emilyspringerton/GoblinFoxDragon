@@ -195,9 +195,10 @@ void server_net_init() {
 
 void process_user_cmd(int client_id, UserCmd *cmd) {
     if (cmd->sequence <= client_last_seq[client_id]) return;
+    printf("[CMD] client=%d seq=%u buttons=%u\n", client_id, cmd->sequence, cmd->buttons);
     PlayerState *p = &local_state.players[client_id];
-    p->yaw = cmd->yaw;
-    p->pitch = cmd->pitch;
+    if (isfinite(cmd->yaw)) p->yaw = norm_yaw_deg(cmd->yaw);
+    if (isfinite(cmd->pitch)) p->pitch = clamp_pitch_deg(cmd->pitch);
     p->in_fwd = cmd->fwd;
     p->in_strafe = cmd->str;
     p->in_jump = (cmd->buttons & BTN_JUMP);
@@ -205,6 +206,7 @@ void process_user_cmd(int client_id, UserCmd *cmd) {
     p->crouching = (cmd->buttons & BTN_CROUCH);
     p->in_reload = (cmd->buttons & BTN_RELOAD);
     p->in_use = (cmd->buttons & BTN_USE);
+    p->in_bike = (cmd->buttons & BTN_VEHICLE_2);
     p->in_ability = (cmd->buttons & BTN_ABILITY_1);
     if (cmd->weapon_idx >= 0 && cmd->weapon_idx < MAX_WEAPONS) p->current_weapon = cmd->weapon_idx;
     client_last_seq[client_id] = cmd->sequence;
@@ -222,8 +224,37 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
             local_state.clients[i].sin_port == sender->sin_port) {
 
             client_id = i;
-            // Touch only liveness; never memset player here.
             local_state.client_meta[i].last_heard_ms = get_server_time();
+            if (head->type == PACKET_CONNECT) {
+                unsigned int now = get_server_time();
+                PlayerState *p = &local_state.players[i];
+                client_last_seq[i] = 0;
+                p->in_fwd = 0.0f;
+                p->in_strafe = 0.0f;
+                p->in_jump = 0;
+                p->in_shoot = 0;
+                p->in_reload = 0;
+                p->in_use = 0;
+                p->in_bike = 0;
+                p->in_ability = 0;
+                p->use_was_down = 0;
+                p->bike_was_down = 0;
+                p->portal_cooldown_until_ms = 0;
+                p->vehicle_type = VEH_NONE;
+                p->bike_gear = 0;
+                p->vehicle_cooldown = 0;
+
+                NetHeader h;
+                h.type = PACKET_WELCOME;
+                h.client_id = (unsigned char)i;
+                h.sequence = 0;
+                h.timestamp = now;
+                h.entity_count = 0;
+                h.scene_id = (unsigned char)p->scene_id;
+                sendto(sock, (char*)&h, sizeof(NetHeader), 0,
+                       (struct sockaddr*)sender, sizeof(struct sockaddr_in));
+                printf("CLIENT %d RECONNECTED (seq reset)\n", i);
+            }
             break;
         }
     }
@@ -266,6 +297,11 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
         }
     }
 
+    if (client_id != -1 && head->type == PACKET_DISCONNECT) {
+        server_disconnect(client_id, client_last_seq);
+        return;
+    }
+
     // --- USER COMMANDS ---
     if (client_id != -1 && head->type == PACKET_USERCMD) {
         int cursor = (int)sizeof(NetHeader);
@@ -276,7 +312,7 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
         if (size >= cursor + (int)(count * sizeof(UserCmd))) {
             UserCmd *cmds = (UserCmd*)(buffer + cursor);
 
-            // process newest->oldest so last write wins
+            // process oldest->newest to preserve chronological intent
             for (int i = (int)count - 1; i >= 0; i--) {
                 process_user_cmd(client_id, &cmds[i]);
             }
@@ -311,7 +347,7 @@ void server_broadcast() {
             np.id = (unsigned char)i;
             np.scene_id = (unsigned char)p->scene_id;
             np.x = p->x; np.y = p->y; np.z = p->z;
-            np.yaw = p->yaw; np.pitch = p->pitch;
+            np.yaw = norm_yaw_deg(p->yaw); np.pitch = clamp_pitch_deg(p->pitch);
             np.current_weapon = (unsigned char)p->current_weapon;
             np.state = (unsigned char)p->state;
             np.health = (unsigned char)p->health;
@@ -359,6 +395,9 @@ int main(int argc, char *argv[]) {
     server_net_init();
     int mode = parse_server_mode(argc, argv);
     local_init_match(1, mode);
+    local_state.players[0].active = 0;
+    local_state.players[0].health = 0;
+    local_state.players[0].state = STATE_DEAD;
     printf("SERVER MODE: %s\n", mode == MODE_TDM ? "TEAM DEATHMATCH" : "DEATHMATCH");
 
     int running = 1;
@@ -399,11 +438,12 @@ int main(int argc, char *argv[]) {
             if (p->active && p->state != STATE_DEAD) {
                 phys_set_scene(p->scene_id);
                 int use_pressed = p->in_use && !p->use_was_down;
+                int portal_id = -1;
                 if (use_pressed && now >= p->portal_cooldown_until_ms &&
-                    scene_portal_active(p->scene_id) && scene_portal_triggered(p)) {
+                    scene_portal_active(p->scene_id) && scene_portal_triggered(p, &portal_id)) {
                     int dest_scene = -1;
                     float sx = 0.0f, sy = 0.0f, sz = 0.0f;
-                    if (portal_resolve_destination(p->scene_id, PORTAL_ID_GARAGE_EXIT, p->id,
+                    if (portal_resolve_destination(p->scene_id, portal_id, p->id,
                                                    &dest_scene, &sx, &sy, &sz)) {
                         int from_scene = p->scene_id;
                         p->scene_id = dest_scene;
@@ -411,23 +451,50 @@ int main(int argc, char *argv[]) {
                         p->x = sx; p->y = sy; p->z = sz;
                         p->vx = 0.0f; p->vy = 0.0f; p->vz = 0.0f;
                         p->in_vehicle = 0;
+                        p->vehicle_type = VEH_NONE;
+                        p->bike_gear = 0;
                         p->portal_cooldown_until_ms = now + 1000;
                         p->in_use = 0;
+                        p->in_bike = 0;
                         printf("PORTAL_TRAVEL client=%d from=%d to=%d\n", i, from_scene, dest_scene);
                     }
-                } else if (use_pressed && p->vehicle_cooldown == 0) {
+                } else {
+                    int bike_pressed = p->in_bike && !p->bike_was_down;
+                    int can_toggle_vehicle = p->vehicle_cooldown == 0;
                     int in_garage = p->scene_id == SCENE_GARAGE_OSAKA;
-                    if (in_garage && scene_near_vehicle_pad(p->scene_id, p->x, p->z, 6.0f, NULL)) {
-                        p->in_vehicle = !p->in_vehicle;
+                    int near_pad = scene_near_vehicle_pad(p->scene_id, p->x, p->z, 6.0f, NULL);
+                    int vehicle_allowed = (!in_garage) || near_pad;
+
+                    if (can_toggle_vehicle && vehicle_allowed && use_pressed) {
+                        if (p->vehicle_type == VEH_BUGGY) {
+                            p->vehicle_type = VEH_NONE;
+                            p->in_vehicle = 0;
+                            p->bike_gear = 0;
+                            printf("Client %d Toggle Vehicle: NONE\n", i);
+                        } else {
+                            p->vehicle_type = VEH_BUGGY;
+                            p->in_vehicle = 1;
+                            p->bike_gear = 0;
+                            printf("Client %d Toggle Vehicle: BUGGY\n", i);
+                        }
                         p->vehicle_cooldown = 30;
-                        printf("Client %d Toggle Vehicle: %d\n", i, p->in_vehicle);
-                    } else if (!in_garage) {
-                        p->in_vehicle = !p->in_vehicle;
+                    } else if (can_toggle_vehicle && vehicle_allowed && bike_pressed) {
+                        if (p->vehicle_type == VEH_BIKE) {
+                            p->vehicle_type = VEH_NONE;
+                            p->in_vehicle = 0;
+                            p->bike_gear = 0;
+                            printf("Client %d Toggle Vehicle: NONE\n", i);
+                        } else {
+                            p->vehicle_type = VEH_BIKE;
+                            p->in_vehicle = 1;
+                            p->bike_gear = 1;
+                            printf("Client %d Toggle Vehicle: BIKE (gear %d)\n", i, p->bike_gear);
+                        }
                         p->vehicle_cooldown = 30;
-                        printf("Client %d Toggle Vehicle: %d\n", i, p->in_vehicle);
                     }
                 }
                 p->use_was_down = p->in_use;
+                p->bike_was_down = p->in_bike;
                 if (p->vehicle_cooldown > 0) p->vehicle_cooldown--;
 
                 float rad = p->yaw * 3.14159f / 180.0f;
@@ -435,7 +502,18 @@ int main(int argc, char *argv[]) {
                 float max_spd = MAX_SPEED;
                 float acc = ACCEL;
 
-                if (p->in_vehicle) {
+                if (p->in_vehicle && p->vehicle_type == VEH_BIKE) {
+                    wish_x = sinf(rad) * p->in_fwd;
+                    wish_z = cosf(rad) * p->in_fwd;
+
+                    float vmag = sqrtf(p->vx * p->vx + p->vz * p->vz);
+                    if (p->bike_gear < 1) p->bike_gear = 1;
+                    if (p->bike_gear < BIKE_GEARS && vmag > BIKE_GEAR_MAX[p->bike_gear] * 0.92f) p->bike_gear++;
+                    if (p->bike_gear > 1 && vmag < BIKE_GEAR_MAX[p->bike_gear - 1] * 0.55f) p->bike_gear--;
+
+                    max_spd = BIKE_GEAR_MAX[p->bike_gear];
+                    acc = BIKE_GEAR_ACCEL[p->bike_gear];
+                } else if (p->in_vehicle) {
                     wish_x = sinf(rad) * p->in_fwd;
                     wish_z = cosf(rad) * p->in_fwd;
                     max_spd = BUGGY_MAX_SPEED;
@@ -454,7 +532,7 @@ int main(int argc, char *argv[]) {
 
                 accelerate(p, wish_x, wish_z, wish_speed, acc);
 
-                float g = p->in_vehicle ? BUGGY_GRAVITY : (p->in_jump ? GRAVITY_FLOAT : GRAVITY_DROP);
+                float g = p->in_vehicle ? ((p->vehicle_type == VEH_BIKE) ? BIKE_GRAVITY : BUGGY_GRAVITY) : (p->in_jump ? GRAVITY_FLOAT : GRAVITY_DROP);
                 p->vy -= g;
                 if (p->in_jump && p->on_ground) {
                     p->y += 0.1f;
