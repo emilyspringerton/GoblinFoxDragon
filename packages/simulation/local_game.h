@@ -3,10 +3,247 @@
 
 #include "../common/protocol.h"
 #include "../common/physics.h"
+#include "../rts/entity_behaviors.h"
 #include <string.h>
 
 ServerState local_state;
 int was_holding_jump = 0;
+
+#define MAX_CITY_NPCS 96
+
+typedef enum { NPC_IDLE = 0, NPC_WANDER, NPC_FLEE, NPC_CHASE, NPC_PATROL, NPC_GUARD } CityNpcBrain;
+
+typedef struct {
+    int active;
+    int type;
+    int state;
+    float x, y, z;
+    float vx, vz;
+    float yaw;
+    float hp;
+    float leash_x, leash_z;
+    int home_district;
+    unsigned int think_tick;
+    unsigned int action_tick;
+} CityNpc;
+
+typedef struct {
+    CityNpc npcs[MAX_CITY_NPCS];
+    unsigned int seed;
+    unsigned int last_spawn_tick;
+} CityNpcManager;
+
+CityNpcManager city_npcs;
+
+static inline unsigned int city_hash2(int a, int b, unsigned int seed) {
+    unsigned int x = (unsigned int)(a * 73856093u) ^ (unsigned int)(b * 19349663u) ^ seed;
+    x ^= x >> 13;
+    x *= 1274126177u;
+    x ^= x >> 16;
+    return x;
+}
+
+static inline int city_district_at(float x, float z) {
+    float pitch = CITY_BLOCK_SIZE + CITY_ROAD_SIZE;
+    int gx = (int)floorf(x / pitch);
+    int gz = (int)floorf(z / pitch);
+    return (int)(city_hash2(gx, gz, 1337u) % CITY_DISTRICTS);
+}
+
+static inline int city_point_blocked(float x, float y, float z) {
+    for (int i = 1; i < map_count; i++) {
+        Box b = map_geo[i];
+        if (fabsf(x - b.x) < b.w * 0.5f + 2.0f && fabsf(z - b.z) < b.d * 0.5f + 2.0f && y < b.y + b.h * 0.5f) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static inline int city_is_hostile_type(int type) {
+    return type == ENT_CULTIST || type == ENT_GOBLIN || type == ENT_ORC || type == ENT_PILLAGER_MARAUDER || type == ENT_PILLAGER_DESTROYER || type == ENT_PILLAGER_CORRUPTOR;
+}
+
+static inline int city_pick_npc_type(int district, unsigned int roll) {
+    int bucket = (int)(roll % 100);
+    if (district == 0) {
+        if (bucket < 26) return ENT_PEASANT;
+        if (bucket < 46) return ENT_GUARD;
+        if (bucket < 56) return ENT_HUNTER;
+        if (bucket < 70) return ENT_GOBLIN;
+        if (bucket < 82) return ENT_CULTIST;
+        if (bucket < 90) return ENT_ORC;
+        if (bucket < 96) return ENT_PILLAGER_MARAUDER;
+        return ENT_PILLAGER_CORRUPTOR;
+    }
+    if (district == 3) {
+        if (bucket < 10) return ENT_PEASANT;
+        if (bucket < 18) return ENT_GUARD;
+        if (bucket < 28) return ENT_HUNTER;
+        if (bucket < 52) return ENT_GOBLIN;
+        if (bucket < 68) return ENT_CULTIST;
+        if (bucket < 82) return ENT_ORC;
+        if (bucket < 93) return ENT_PILLAGER_MARAUDER;
+        return ENT_PILLAGER_DESTROYER;
+    }
+    if (district == 4) {
+        if (bucket < 14) return ENT_PEASANT;
+        if (bucket < 26) return ENT_GUARD;
+        if (bucket < 34) return ENT_HUNTER;
+        if (bucket < 52) return ENT_CULTIST;
+        if (bucket < 68) return ENT_GOBLIN;
+        if (bucket < 80) return ENT_ORC;
+        if (bucket < 90) return ENT_PILLAGER_MARAUDER;
+        return ENT_PILLAGER_CORRUPTOR;
+    }
+    if (bucket < 22) return ENT_PEASANT;
+    if (bucket < 36) return ENT_GUARD;
+    if (bucket < 48) return ENT_HUNTER;
+    if (bucket < 64) return ENT_GOBLIN;
+    if (bucket < 76) return ENT_CULTIST;
+    if (bucket < 86) return ENT_ORC;
+    if (bucket < 94) return ENT_PILLAGER_MARAUDER;
+    if (bucket < 98) return ENT_PILLAGER_DESTROYER;
+    return ENT_PILLAGER_CORRUPTOR;
+}
+
+static inline void city_reset_npcs() {
+    memset(&city_npcs, 0, sizeof(city_npcs));
+    city_npcs.seed = 0xC17BEEFu;
+}
+
+static inline int city_target_population(int district) {
+    if (district == 0) return 44;
+    if (district == 3) return 38;
+    if (district == 4) return 34;
+    return 30;
+}
+
+static void city_npc_update(unsigned int now_tick) {
+    PlayerState *focus = &local_state.players[0];
+    if (!focus->active || focus->scene_id != SCENE_CITY) return;
+    phys_set_scene(SCENE_CITY);
+
+    int player_district = city_district_at(focus->x, focus->z);
+    int target_pop = city_target_population(player_district);
+    int alive = 0;
+    for (int i = 0; i < MAX_CITY_NPCS; i++) {
+        if (city_npcs.npcs[i].active) alive++;
+    }
+
+    if (alive < target_pop && now_tick - city_npcs.last_spawn_tick > 130) {
+        city_npcs.last_spawn_tick = now_tick;
+        for (int i = 0; i < MAX_CITY_NPCS; i++) {
+            CityNpc *n = &city_npcs.npcs[i];
+            if (n->active) continue;
+            unsigned int h = city_hash2((int)now_tick + i * 31, i * 17, city_npcs.seed);
+            float ang = (float)(h % 6283) * 0.001f;
+            float dist = 80.0f + (float)((h >> 8) % 120);
+            float sx = focus->x + sinf(ang) * dist;
+            float sz = focus->z + cosf(ang) * dist;
+            float sy = 2.0f;
+            int ok = 0;
+            for (int tries = 0; tries < 6; tries++) {
+                if (!city_point_blocked(sx, sy, sz)) { ok = 1; break; }
+                sx += sinf(ang + tries) * 10.0f;
+                sz += cosf(ang + tries) * 10.0f;
+            }
+            if (!ok) continue;
+
+            n->active = 1;
+            n->x = sx; n->y = sy; n->z = sz;
+            n->vx = 0.0f; n->vz = 0.0f;
+            n->yaw = ang * (180.0f / 3.14159f);
+            n->home_district = city_district_at(sx, sz);
+            n->type = city_pick_npc_type(n->home_district, h);
+            n->state = city_is_hostile_type(n->type) ? NPC_CHASE : NPC_WANDER;
+            if (n->type == ENT_GUARD) n->state = NPC_PATROL;
+            n->hp = (float)get_entity_stats((EntityType)n->type)->hp_max;
+            n->leash_x = sx; n->leash_z = sz;
+            n->think_tick = now_tick + (h % 20);
+            n->action_tick = now_tick;
+            break;
+        }
+    }
+
+    for (int i = 0; i < MAX_CITY_NPCS; i++) {
+        CityNpc *n = &city_npcs.npcs[i];
+        if (!n->active) continue;
+        float pdx = focus->x - n->x;
+        float pdz = focus->z - n->z;
+        float pd = sqrtf(pdx * pdx + pdz * pdz);
+        if (pd > 350.0f) { n->active = 0; continue; }
+
+        if (n->think_tick <= now_tick) {
+            n->think_tick = now_tick + 15 + (i % 11);
+            if (n->type == ENT_PEASANT) {
+                n->state = (focus->in_shoot && pd < 80.0f) ? NPC_FLEE : NPC_WANDER;
+            } else if (n->type == ENT_GUARD) {
+                n->state = (pd < 90.0f && city_is_hostile_type(ENT_GOBLIN)) ? NPC_GUARD : NPC_PATROL;
+            } else if (n->type == ENT_HUNTER) {
+                n->state = (pd < 120.0f) ? NPC_CHASE : NPC_WANDER;
+            } else if (n->type == ENT_CULTIST) {
+                n->state = (pd < 130.0f) ? NPC_CHASE : NPC_WANDER;
+                if (now_tick - n->action_tick > 600 && pd < 170.0f) {
+                    n->action_tick = now_tick;
+                    for (int j = 0; j < MAX_CITY_NPCS; j++) {
+                        if (!city_npcs.npcs[j].active) {
+                            city_npcs.npcs[j] = *n;
+                            city_npcs.npcs[j].type = ENT_GOBLIN;
+                            city_npcs.npcs[j].x += 4.0f;
+                            city_npcs.npcs[j].z -= 4.0f;
+                            city_npcs.npcs[j].hp = 40.0f;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        float tx = n->leash_x;
+        float tz = n->leash_z;
+        float speed = 0.35f;
+
+        if (n->state == NPC_FLEE) { tx = n->x - pdx; tz = n->z - pdz; speed = 0.55f; }
+        else if (n->state == NPC_CHASE || n->state == NPC_GUARD) { tx = focus->x; tz = focus->z; speed = (n->type == ENT_GOBLIN) ? 0.72f : 0.48f; }
+        else if (n->state == NPC_PATROL || n->state == NPC_WANDER) {
+            if ((now_tick + i) % 40 == 0) {
+                float wa = (float)((city_hash2(i, now_tick, city_npcs.seed) % 6283)) * 0.001f;
+                n->leash_x += sinf(wa) * 18.0f;
+                n->leash_z += cosf(wa) * 18.0f;
+            }
+            tx = n->leash_x; tz = n->leash_z;
+            speed = (n->type == ENT_PEASANT) ? 0.24f : 0.30f;
+        }
+
+        float dx = tx - n->x;
+        float dz = tz - n->z;
+        float dl = sqrtf(dx * dx + dz * dz);
+        if (dl > 0.01f) {
+            dx /= dl; dz /= dl;
+            n->vx = n->vx * 0.8f + dx * speed * 0.2f;
+            n->vz = n->vz * 0.8f + dz * speed * 0.2f;
+        }
+
+        float best_x = n->vx;
+        float best_z = n->vz;
+        float dirs[4][2] = {{n->vx,n->vz},{n->vz,-n->vx},{-n->vx,n->vz},{-n->vx,-n->vz}};
+        for (int d = 0; d < 4; d++) {
+            float sx = n->x + dirs[d][0] * 6.0f;
+            float sz = n->z + dirs[d][1] * 6.0f;
+            if (!city_point_blocked(sx, 2.0f, sz)) { best_x = dirs[d][0]; best_z = dirs[d][1]; break; }
+        }
+        n->vx = best_x;
+        n->vz = best_z;
+        n->x += n->vx;
+        n->z += n->vz;
+        n->yaw = atan2f(n->vx, n->vz) * (180.0f / 3.14159f);
+
+        if (n->type == ENT_PILLAGER_CORRUPTOR && pd < 22.0f && (now_tick % 18 == 0) && focus->health > 1) {
+            focus->health -= 1;
+        }
+    }
+}
 
 void local_update(float fwd, float str, float yaw, float pitch, int shoot, int weapon_req, int jump, int crouch, int reload, int use, int bike, int ability, void *server_context, unsigned int cmd_time);
 void update_entity(PlayerState *p, float dt, void *server_context, unsigned int cmd_time);
@@ -54,6 +291,7 @@ static inline void scene_load(int scene_id) {
         local_state.players[i].scene_id = scene_id;
         scene_force_spawn(&local_state.players[i]);
     }
+    if (scene_id == SCENE_CITY) city_reset_npcs();
 }
 
 static inline void scene_request_transition(int scene_id) {
@@ -316,6 +554,9 @@ void local_update(float fwd, float str, float yaw, float pitch, int shoot, int w
         update_entity(p, 0.016f, server_context, cmd_time);
     }
     update_projectiles(cmd_time);
+    if (local_state.scene_id == SCENE_CITY) {
+        city_npc_update(cmd_time);
+    }
 }
 
 void local_init_match(int num_players, int mode) {
@@ -325,6 +566,7 @@ void local_init_match(int num_players, int mode) {
     local_state.pending_scene = -1;
     local_state.transition_timer = 0;
     phys_set_scene(local_state.scene_id);
+    city_reset_npcs();
     local_state.players[0].active = 1;
     local_state.players[0].scene_id = local_state.scene_id;
     phys_respawn(&local_state.players[0], 0);
