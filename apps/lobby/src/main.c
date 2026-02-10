@@ -58,6 +58,12 @@ unsigned int travel_overlay_until_ms = 0;
 float cam_yaw = 0.0f;
 float cam_pitch = 0.0f;
 float current_fov = 75.0f;
+static float cam_follow_x = 0.0f;
+static float cam_follow_y = 0.0f;
+static float cam_follow_z = 0.0f;
+static float cam_dist = 6.0f;
+static float cam_height = 2.2f;
+static float cam_side = 0.6f;
 
 #define Z_FAR 8000.0f
 
@@ -183,6 +189,67 @@ static void reset_client_render_state_for_net() {
 void draw_string(const char* str, float x, float y, float size) {
     TurtlePen pen = turtle_pen_create(x, y, size);
     turtle_draw_text(&pen, str);
+}
+
+static const char* weapon_name(int weapon_id) {
+    switch (weapon_id) {
+        case WPN_KNIFE: return "KNIFE";
+        case WPN_MAGNUM: return "MAGNUM";
+        case WPN_AR: return "AR";
+        case WPN_SHOTGUN: return "SHOTGUN";
+        case WPN_SNIPER: return "SNIPER";
+        default: return "UNKNOWN";
+    }
+}
+
+static void player_update_run_cycle(PlayerState *p, float dt) {
+    if (!p || !p->active) return;
+    float spd = sqrtf(p->vx * p->vx + p->vz * p->vz);
+    float target = spd / (MAX_SPEED * 0.9f);
+    if (target < 0.0f) target = 0.0f;
+    if (target > 1.0f) target = 1.0f;
+    if (!p->on_ground) target = 0.0f;
+    p->run_weight += (target - p->run_weight) * 0.2f;
+    p->run_phase += dt * (6.0f + 6.0f * p->run_weight);
+}
+
+static void camera_update_third_person(const PlayerState *p, float dt) {
+    if (!p) return;
+    float pivot_x = p->x;
+    float pivot_y = p->y + cam_height;
+    float pivot_z = p->z;
+
+    if (cam_pitch > 70.0f) cam_pitch = 70.0f;
+    if (cam_pitch < -70.0f) cam_pitch = -70.0f;
+
+    float yaw_rad = cam_yaw * 0.0174532925f;
+    float pitch_rad = cam_pitch * 0.0174532925f;
+    float fx = sinf(yaw_rad) * cosf(pitch_rad);
+    float fy = sinf(pitch_rad);
+    float fz = -cosf(yaw_rad) * cosf(pitch_rad);
+    float rl = sqrtf(fx * fx + fz * fz);
+    float rx = (rl > 0.0001f) ? (fz / rl) : 1.0f;
+    float rz = (rl > 0.0001f) ? (-fx / rl) : 0.0f;
+
+    float desired_x = pivot_x - fx * cam_dist + rx * cam_side;
+    float desired_y = pivot_y - fy * cam_dist;
+    float desired_z = pivot_z - fz * cam_dist + rz * cam_side;
+
+    float dx = cam_follow_x - desired_x;
+    float dy = cam_follow_y - desired_y;
+    float dz = cam_follow_z - desired_z;
+    float dist_err = sqrtf(dx * dx + dy * dy + dz * dz);
+    if (dist_err > 30.0f || (cam_follow_x == 0.0f && cam_follow_y == 0.0f && cam_follow_z == 0.0f)) {
+        cam_follow_x = desired_x;
+        cam_follow_y = desired_y;
+        cam_follow_z = desired_z;
+        return;
+    }
+
+    float alpha = 1.0f - expf(-14.0f * dt);
+    cam_follow_x += (desired_x - cam_follow_x) * alpha;
+    cam_follow_y += (desired_y - cam_follow_y) * alpha;
+    cam_follow_z += (desired_z - cam_follow_z) * alpha;
 }
 
 typedef enum {
@@ -736,6 +803,11 @@ void draw_player_3rd(PlayerState *p) {
     if (p->in_vehicle) {
         draw_buggy_model();
     } else {
+        float s = fabsf(sinf(p->run_phase));
+        float amp = 0.10f * p->run_weight;
+        float scale_y = 1.0f - amp * s;
+        float scale_xz = 1.0f + amp * 0.6f * s;
+        glScalef(scale_xz, scale_y, scale_xz);
         draw_ronin_shell();
         glPushMatrix();
         glTranslatef(0.0f, 1.85f, 0.0f);
@@ -808,6 +880,14 @@ void draw_hud(PlayerState *p) {
     float raw_speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
     char vel_buf[32]; sprintf(vel_buf, "VEL: %.2f", raw_speed);
     glColor3f(1.0f, 1.0f, 0.0f); draw_string(vel_buf, 1100, 50, 8); 
+
+    int wpn = p->current_weapon;
+    if (wpn < 0 || wpn >= MAX_WEAPONS) wpn = WPN_KNIFE;
+    int ammo = p->ammo[wpn];
+    char ammo_buf[96];
+    snprintf(ammo_buf, sizeof(ammo_buf), "%s AMMO: %d", weapon_name(wpn), ammo);
+    glColor3f(0.95f, 0.95f, 0.95f);
+    draw_string(ammo_buf, 960, 100, 8);
 
     if (p->scene_id == SCENE_CITY && (fabsf(p->x) > CITY_SOFT_X || fabsf(p->z) > CITY_SOFT_Z)) {
         glColor3f(1.0f, 0.55f, 0.2f);
@@ -1086,21 +1166,31 @@ static void draw_travel_overlay() {
     glEnable(GL_DEPTH_TEST);
 }
 
-void draw_scene(PlayerState *render_p) {
+void draw_scene(PlayerState *render_p, float dt) {
     glClearColor(0.02f, 0.02f, 0.05f, 1.0f); // DEEP SPACE BLUE BG
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); glLoadIdentity();
     local_state.scene_id = render_p->scene_id;
     phys_set_scene(render_p->scene_id);
-    int third_person = (app_state == STATE_GAME_LOCAL && match_prog.camera_third_person && !render_p->in_vehicle);
-    float cam_y = render_p->in_vehicle ? 8.0f : (third_person ? 5.5f : (render_p->crouching ? 2.5f : EYE_HEIGHT));
-    float cam_z_off = render_p->in_vehicle ? 10.0f : (third_person ? 16.0f : 0.0f);
+    int third_person = (match_prog.camera_third_person && !render_p->in_vehicle);
+    float yaw_rad = cam_yaw * 0.0174532925f;
+    float pitch_rad = cam_pitch * 0.0174532925f;
+    float look_x = sinf(yaw_rad) * cosf(pitch_rad);
+    float look_y = sinf(pitch_rad);
+    float look_z = -cosf(yaw_rad) * cosf(pitch_rad);
 
-    float rad = -cam_yaw * 0.01745f;
-    float cx = sinf(rad) * cam_z_off;
-    float cz = cosf(rad) * cam_z_off;
-
-    glRotatef(-cam_pitch, 1, 0, 0); glRotatef(-cam_yaw, 0, 1, 0);
-    glTranslatef(-(render_p->x - cx), -(render_p->y + cam_y), -(render_p->z - cz));
+    if (third_person) {
+        camera_update_third_person(render_p, dt);
+        gluLookAt(cam_follow_x, cam_follow_y, cam_follow_z,
+                  render_p->x, render_p->y + cam_height, render_p->z,
+                  0.0f, 1.0f, 0.0f);
+    } else {
+        float eye_y = render_p->in_vehicle ? 8.0f : (render_p->crouching ? 2.5f : EYE_HEIGHT);
+        float eye_x = render_p->x;
+        float eye_z = render_p->z;
+        gluLookAt(eye_x, render_p->y + eye_y, eye_z,
+                  eye_x + look_x, render_p->y + eye_y + look_y, eye_z + look_z,
+                  0.0f, 1.0f, 0.0f);
+    }
     
     draw_grid(); 
     update_and_draw_trails();
@@ -1308,6 +1398,7 @@ void net_process_snapshot(char *buffer, int len) {
             p->yaw = norm_yaw_deg(np->yaw); p->pitch = clamp_pitch_deg(np->pitch);
             p->health = np->health;
             p->current_weapon = np->current_weapon;
+            p->ammo[p->current_weapon] = np->ammo;
             p->is_shooting = np->is_shooting;
             p->in_vehicle = np->in_vehicle;
             p->storm_charges = np->storm_charges;
@@ -1320,6 +1411,7 @@ void net_process_snapshot(char *buffer, int len) {
             local_state.players[0].scene_id = np->scene_id;
             local_state.players[0].yaw = norm_yaw_deg(np->yaw);
             local_state.players[0].pitch = clamp_pitch_deg(np->pitch);
+            local_state.players[0].current_weapon = np->current_weapon;
             local_state.players[0].ammo[local_state.players[0].current_weapon] = np->ammo;
             local_state.players[0].in_vehicle = np->in_vehicle; 
             local_state.players[0].storm_charges = np->storm_charges;
@@ -1378,7 +1470,13 @@ int main(int argc, char* argv[]) {
     }
     
     int running = 1;
+    unsigned int last_frame_ms = SDL_GetTicks();
     while(running) {
+        unsigned int now_frame_ms = SDL_GetTicks();
+        float dt = (float)(now_frame_ms - last_frame_ms) / 1000.0f;
+        if (dt < 0.001f) dt = 0.001f;
+        if (dt > 0.050f) dt = 0.050f;
+        last_frame_ms = now_frame_ms;
         SDL_Event e;
         while(SDL_PollEvent(&e)) {
             if(e.type == SDL_QUIT) running = 0;
@@ -1505,6 +1603,11 @@ int main(int argc, char* argv[]) {
                     if (e.type == SDL_KEYDOWN) {
                         if (e.key.keysym.sym == SDLK_TAB) {
                             match_prog.camera_third_person = !match_prog.camera_third_person;
+                            if (match_prog.camera_third_person) {
+                                cam_follow_x = 0.0f;
+                                cam_follow_y = 0.0f;
+                                cam_follow_z = 0.0f;
+                            }
                         }
                         if (app_state == STATE_GAME_LOCAL) {
                             if (e.key.keysym.sym == SDLK_F1) progression_try_allocate(0);
@@ -1639,7 +1742,10 @@ int main(int argc, char* argv[]) {
                 local_state.players[my_client_id].active) {
                 render_p = &local_state.players[my_client_id];
             }
-            draw_scene(render_p);
+            for (int i = 0; i < MAX_CLIENTS; i++) {
+                player_update_run_cycle(&local_state.players[i], dt);
+            }
+            draw_scene(render_p, dt);
             SDL_GL_SwapWindow(win);
         }
         SDL_Delay(16);
