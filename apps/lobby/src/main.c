@@ -597,20 +597,26 @@ void draw_head(int weapon_id) {
 }
 
 void draw_player_3rd(PlayerState *p) {
+    float draw_yaw = norm_yaw_deg(p->yaw);
+    float draw_pitch = clamp_pitch_deg(p->pitch);
+    float draw_recoil = (p->is_shooting > 0) ? 1.0f : p->recoil_anim;
+
     glPushMatrix();
     glTranslatef(p->x, p->y + 0.2f, p->z);
-    glRotatef(-p->yaw, 0, 1, 0);
+    glRotatef(-draw_yaw, 0, 1, 0);
     if (p->in_vehicle) {
         draw_buggy_model();
     } else {
         draw_ronin_shell();
         glPushMatrix();
         glTranslatef(0.0f, 1.85f, 0.0f);
-        glRotatef(p->pitch, 1, 0, 0);
+        glRotatef(draw_pitch, 1, 0, 0);
         draw_storm_mask();
         glPopMatrix();
         glPushMatrix(); glTranslatef(0.6f, 1.1f, 0.55f);
-        glRotatef(p->pitch, 1, 0, 0);
+        glRotatef(draw_pitch, 1, 0, 0);
+        glRotatef(-draw_recoil * 10.0f, 1, 0, 0);
+        glTranslatef(0.0f, 0.0f, -draw_recoil * 0.08f);
         glScalef(0.8f, 0.8f, 0.8f); draw_gun_model(p->current_weapon); glPopMatrix(); 
     }
     glPopMatrix();
@@ -1028,18 +1034,17 @@ void net_process_snapshot(char *buffer, int len) {
             p->storm_charges = np->storm_charges;
             
             // --- SYNC HIT MARKER ---
-            if (id == my_client_id) {
-                if (np->hit_feedback > p->hit_feedback) p->hit_feedback = np->hit_feedback;
-            } else {
-                 p->hit_feedback = np->hit_feedback;
-            }
+            p->hit_feedback = np->hit_feedback;
 
             if (p->is_shooting) p->recoil_anim = 1.0f;
         } else if (id == 0) {
             local_state.players[0].scene_id = np->scene_id;
+            local_state.players[0].yaw = norm_yaw_deg(np->yaw);
+            local_state.players[0].pitch = clamp_pitch_deg(np->pitch);
             local_state.players[0].ammo[local_state.players[0].current_weapon] = np->ammo;
             local_state.players[0].in_vehicle = np->in_vehicle; 
             local_state.players[0].storm_charges = np->storm_charges;
+            local_state.players[0].hit_feedback = np->hit_feedback;
         }
     }
 
@@ -1274,8 +1279,16 @@ int main(int argc, char* argv[]) {
                 if (use && local_state.players[0].vehicle_cooldown == 0 && local_state.transition_timer == 0) {
                     PlayerState *p0 = &local_state.players[0];
                     int in_garage = local_state.scene_id == SCENE_GARAGE_OSAKA;
-                    if (in_garage && scene_portal_triggered(p0, NULL)) {
-                        scene_request_transition(SCENE_STADIUM);
+                    int portal_id = -1;
+                    if (scene_portal_triggered(p0, &portal_id)) {
+                        int dest_scene = -1;
+                        float sx = 0.0f, sy = 0.0f, sz = 0.0f;
+                        if (portal_resolve_destination(p0->scene_id, portal_id, p0->id, &dest_scene, &sx, &sy, &sz)) {
+                            p0->scene_id = dest_scene;
+                            p0->x = sx; p0->y = sy; p0->z = sz;
+                            p0->vx = 0.0f; p0->vy = 0.0f; p0->vz = 0.0f;
+                            scene_request_transition(dest_scene);
+                        }
                     } else if (in_garage && scene_near_vehicle_pad(local_state.scene_id, p0->x, p0->z, 6.0f, NULL)) {
                         p0->in_vehicle = !p0->in_vehicle;
                         p0->vehicle_cooldown = 30;

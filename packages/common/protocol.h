@@ -8,6 +8,7 @@
 
 #define SCENE_GARAGE_OSAKA 0
 #define SCENE_STADIUM 1
+#define SCENE_VOXWORLD 2
 
 #define PACKET_CONNECT 0
 #define PACKET_USERCMD 1

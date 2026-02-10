@@ -93,6 +93,17 @@ static const Box map_geo_garage[] = {
     {10.00, 5.00, -20.00, 12.00, 4.00, 12.00}
 };
 
+
+static const Box map_geo_voxworld[] = {
+    {0.00, -2.00, 0.00, 2400.00, 4.00, 2400.00},
+    {0.00, 100.00, 1200.00, 2400.00, 200.00, 8.00},
+    {0.00, 100.00, -1200.00, 2400.00, 200.00, 8.00},
+    {1200.00, 100.00, 0.00, 8.00, 200.00, 2400.00},
+    {-1200.00, 100.00, 0.00, 8.00, 200.00, 2400.00},
+    {60.00, 3.0, 40.0, 30.0, 6.0, 30.0},
+    {-80.0, 6.0, -100.0, 40.0, 12.0, 40.0}
+};
+
 static const Box *map_geo = map_geo_stadium;
 static int map_count = 0;
 
@@ -103,6 +114,10 @@ static int map_count = 0;
 #define STADIUM_KILL_Y -80.0f
 #define STADIUM_BOUNDS_X 420.0f
 #define STADIUM_BOUNDS_Z 420.0f
+
+#define VOXWORLD_KILL_Y -120.0f
+#define VOXWORLD_BOUNDS_X 1180.0f
+#define VOXWORLD_BOUNDS_Z 1180.0f
 
 #define GARAGE_PORTAL_X 0.0f
 #define GARAGE_PORTAL_Y 6.0f
@@ -119,8 +134,13 @@ static int map_count = 0;
 #define STADIUM_EDGE_TELEPORT_X -360.0f
 #define STADIUM_EDGE_TELEPORT_Y 2.0f
 #define STADIUM_EDGE_TELEPORT_Z 0.0f
+#define VOXWORLD_PORTAL_X -360.0f
+#define VOXWORLD_PORTAL_Y 2.0f
+#define VOXWORLD_PORTAL_Z 0.0f
+#define VOXWORLD_PORTAL_RADIUS 16.0f
 #define PORTAL_ID_GARAGE_EXIT 0
-#define PORTAL_ID_STADIUM_EDGE_TELEPORT 1
+#define PORTAL_ID_STADIUM_TO_VOXWORLD 1
+#define PORTAL_ID_VOXWORLD_TO_STADIUM 2
 
 typedef struct {
     float x;
@@ -144,6 +164,9 @@ static inline void phys_set_scene(int scene_id) {
     if (scene_id == SCENE_GARAGE_OSAKA) {
         map_geo = map_geo_garage;
         map_count = (int)(sizeof(map_geo_garage) / sizeof(Box));
+    } else if (scene_id == SCENE_VOXWORLD) {
+        map_geo = map_geo_voxworld;
+        map_count = (int)(sizeof(map_geo_voxworld) / sizeof(Box));
     } else {
         map_geo = map_geo_stadium;
         map_count = (int)(sizeof(map_geo_stadium) / sizeof(Box));
@@ -157,6 +180,14 @@ static inline void scene_spawn_point(int scene_id, int slot, float *out_x, float
         *out_x = offsets[idx];
         *out_y = 2.0f;
         *out_z = 20.0f;
+        return;
+    }
+    if (scene_id == SCENE_VOXWORLD) {
+        float offsets[] = {-120.0f, -60.0f, 0.0f, 60.0f, 120.0f};
+        int idx = slot % 5;
+        *out_x = offsets[idx];
+        *out_y = 6.0f;
+        *out_z = 0.0f;
         return;
     }
     if (slot % 2 == 0) {
@@ -196,11 +227,19 @@ static inline void scene_safety_check(PlayerState *p) {
             p->z < -STADIUM_BOUNDS_Z || p->z > STADIUM_BOUNDS_Z) {
             scene_force_spawn(p);
         }
+        return;
+    }
+    if (p->scene_id == SCENE_VOXWORLD) {
+        if (p->y < VOXWORLD_KILL_Y ||
+            p->x < -VOXWORLD_BOUNDS_X || p->x > VOXWORLD_BOUNDS_X ||
+            p->z < -VOXWORLD_BOUNDS_Z || p->z > VOXWORLD_BOUNDS_Z) {
+            scene_force_spawn(p);
+        }
     }
 }
 
 static inline int scene_portal_active(int scene_id) {
-    return scene_id == SCENE_GARAGE_OSAKA || scene_id == SCENE_STADIUM;
+    return scene_id == SCENE_GARAGE_OSAKA || scene_id == SCENE_STADIUM || scene_id == SCENE_VOXWORLD;
 }
 
 static inline int portal_resolve_destination(int current_scene, int portal_id, int slot,
@@ -216,11 +255,18 @@ static inline int portal_resolve_destination(int current_scene, int portal_id, i
         scene_spawn_point(*out_scene, slot, out_x, out_y, out_z);
         return 1;
     }
-    if (current_scene == SCENE_STADIUM && portal_id == PORTAL_ID_STADIUM_EDGE_TELEPORT) {
-        *out_scene = SCENE_STADIUM;
+    if (current_scene == SCENE_STADIUM && portal_id == PORTAL_ID_STADIUM_TO_VOXWORLD) {
+        *out_scene = SCENE_VOXWORLD;
         *out_x = STADIUM_EDGE_TELEPORT_X;
         *out_y = STADIUM_EDGE_TELEPORT_Y;
         *out_z = STADIUM_EDGE_TELEPORT_Z;
+        return 1;
+    }
+    if (current_scene == SCENE_VOXWORLD && portal_id == PORTAL_ID_VOXWORLD_TO_STADIUM) {
+        *out_scene = SCENE_STADIUM;
+        *out_x = STADIUM_EDGE_PORTAL_X - 20.0f;
+        *out_y = STADIUM_EDGE_PORTAL_Y;
+        *out_z = STADIUM_EDGE_PORTAL_Z;
         return 1;
     }
     return 0;
@@ -237,6 +283,11 @@ static inline void scene_portal_info(int scene_id, float *out_x, float *out_y, f
         *out_y = STADIUM_PORTAL_Y;
         *out_z = STADIUM_PORTAL_Z;
         *out_radius = STADIUM_PORTAL_RADIUS;
+    } else if (scene_id == SCENE_VOXWORLD) {
+        *out_x = VOXWORLD_PORTAL_X;
+        *out_y = VOXWORLD_PORTAL_Y;
+        *out_z = VOXWORLD_PORTAL_Z;
+        *out_radius = VOXWORLD_PORTAL_RADIUS;
     } else {
         *out_x = 0.0f; *out_y = 0.0f; *out_z = 0.0f; *out_radius = 0.0f;
     }
@@ -267,7 +318,7 @@ static inline int scene_portal_triggered(PlayerState *p, int *out_portal_id) {
         float dz_edge = p->z - STADIUM_EDGE_PORTAL_Z;
         float dist_sq_edge = dx_edge * dx_edge + dz_edge * dz_edge;
         if (dist_sq_edge <= (STADIUM_EDGE_PORTAL_RADIUS * STADIUM_EDGE_PORTAL_RADIUS)) {
-            if (out_portal_id) *out_portal_id = PORTAL_ID_STADIUM_EDGE_TELEPORT;
+            if (out_portal_id) *out_portal_id = PORTAL_ID_STADIUM_TO_VOXWORLD;
             return 1;
         }
         return 0;
@@ -280,7 +331,11 @@ static inline int scene_portal_triggered(PlayerState *p, int *out_portal_id) {
     float dz = p->z - portal_z;
     float dist_sq = dx * dx + dz * dz;
     if (dist_sq <= (portal_radius * portal_radius)) {
-        if (out_portal_id) *out_portal_id = PORTAL_ID_GARAGE_EXIT;
+        if (out_portal_id) {
+            *out_portal_id = (p->scene_id == SCENE_VOXWORLD)
+                ? PORTAL_ID_VOXWORLD_TO_STADIUM
+                : PORTAL_ID_GARAGE_EXIT;
+        }
         return 1;
     }
     return 0;
@@ -474,7 +529,7 @@ void phys_respawn(PlayerState *p, unsigned int now) {
     p->active = 1; p->state = STATE_ALIVE;
     p->health = 100; p->shield = 100; p->respawn_time = 0; p->in_vehicle = 0;
     p->use_was_down = 0;
-    if (p->scene_id != SCENE_GARAGE_OSAKA && p->scene_id != SCENE_STADIUM) {
+    if (p->scene_id != SCENE_GARAGE_OSAKA && p->scene_id != SCENE_STADIUM && p->scene_id != SCENE_VOXWORLD) {
         p->scene_id = SCENE_GARAGE_OSAKA;
     }
     scene_spawn_point(p->scene_id, p->id, &p->x, &p->y, &p->z);
