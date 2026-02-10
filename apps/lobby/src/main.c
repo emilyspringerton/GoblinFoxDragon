@@ -703,6 +703,11 @@ void draw_hud(PlayerState *p) {
     char vel_buf[32]; sprintf(vel_buf, "VEL: %.2f", raw_speed);
     glColor3f(1.0f, 1.0f, 0.0f); draw_string(vel_buf, 1100, 50, 8); 
 
+    if (p->scene_id == SCENE_CITY && (fabsf(p->x) > CITY_SOFT_X || fabsf(p->z) > CITY_SOFT_Z)) {
+        glColor3f(1.0f, 0.55f, 0.2f);
+        draw_string("CITY LIMIT / TURN BACK", 500, 680, 7);
+    }
+
     glEnable(GL_DEPTH_TEST); glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW); glPopMatrix();
 }
 
@@ -848,6 +853,46 @@ void draw_projectiles() {
     glEnd();
 }
 
+static void draw_city_npc_primitive(const CityNpc *n) {
+    float r = 0.5f, g = 0.5f, b = 0.5f;
+    float body_w = 1.4f, body_h = 3.2f, body_d = 1.4f;
+    float head_w = 1.0f, head_h = 1.0f, head_d = 1.0f;
+
+    switch (n->type) {
+        case ENT_PEASANT: r = 0.6f; g = 0.7f; b = 0.45f; body_w = 1.2f; body_h = 3.0f; break;
+        case ENT_GUARD: r = 0.3f; g = 0.45f; b = 0.85f; body_w = 1.4f; body_h = 3.4f; break;
+        case ENT_HUNTER: r = 0.35f; g = 0.55f; b = 0.3f; body_w = 1.2f; body_h = 3.2f; break;
+        case ENT_CULTIST: r = 0.65f; g = 0.15f; b = 0.75f; body_w = 1.1f; body_h = 3.6f; head_h = 1.3f; break;
+        case ENT_GOBLIN: r = 0.2f; g = 0.95f; b = 0.2f; body_w = 1.5f; body_h = 2.2f; head_w = 0.9f; break;
+        case ENT_ORC: r = 0.3f; g = 0.6f; b = 0.25f; body_w = 1.9f; body_h = 4.2f; head_w = 1.2f; head_h = 1.2f; break;
+        case ENT_PILLAGER_MARAUDER: r = 0.85f; g = 0.3f; b = 0.25f; body_w = 1.5f; body_h = 3.5f; break;
+        case ENT_PILLAGER_DESTROYER: r = 0.75f; g = 0.2f; b = 0.2f; body_w = 2.0f; body_h = 4.0f; head_w = 1.4f; break;
+        case ENT_PILLAGER_CORRUPTOR: r = 0.75f; g = 0.1f; b = 0.55f; body_w = 1.4f; body_h = 3.6f; break;
+    }
+
+    glPushMatrix();
+    glTranslatef(n->x, n->y, n->z);
+    glRotatef(n->yaw, 0.0f, 1.0f, 0.0f);
+    glColor3f(r, g, b);
+    glPushMatrix(); glTranslatef(0.0f, body_h * 0.5f, 0.0f); draw_box(body_w, body_h, body_d); draw_box_outline(body_w, body_h, body_d); glPopMatrix();
+    glPushMatrix(); glTranslatef(0.0f, body_h + head_h * 0.5f, 0.0f); draw_box(head_w, head_h, head_d); draw_box_outline(head_w, head_h, head_d); glPopMatrix();
+    if (n->type == ENT_GUARD) {
+        glPushMatrix(); glTranslatef(-0.9f, body_h * 0.85f, 0.0f); draw_box(0.6f, 0.7f, 1.4f); draw_box_outline(0.6f, 0.7f, 1.4f); glPopMatrix();
+        glPushMatrix(); glTranslatef(0.9f, body_h * 0.85f, 0.0f); draw_box(0.6f, 0.7f, 1.4f); draw_box_outline(0.6f, 0.7f, 1.4f); glPopMatrix();
+    } else if (n->type == ENT_CULTIST) {
+        glPushMatrix(); glTranslatef(0.0f, body_h + 0.9f, 0.45f); draw_box(0.35f, 0.45f, 0.35f); draw_box_outline(0.35f, 0.45f, 0.35f); glPopMatrix();
+    }
+    glPopMatrix();
+}
+
+static void draw_city_npcs(void) {
+    if (local_state.scene_id != SCENE_CITY) return;
+    for (int i = 0; i < MAX_CITY_NPCS; i++) {
+        if (!city_npcs.npcs[i].active) continue;
+        draw_city_npc_primitive(&city_npcs.npcs[i]);
+    }
+}
+
 static void client_apply_scene_id(int scene_id, unsigned int now_ms) {
     if (scene_id < 0) return;
     if (local_state.scene_id != scene_id) {
@@ -897,6 +942,7 @@ void draw_scene(PlayerState *render_p) {
     draw_garage_vehicle_pads();
     draw_scene_portals();
     draw_projectiles();
+    draw_city_npcs();
     if (render_p->in_vehicle) draw_player_3rd(render_p);
     for(int i=0; i<MAX_CLIENTS; i++) {
         PlayerState *p = &local_state.players[i];
