@@ -327,7 +327,7 @@ void draw_grid() {
 void draw_map() {
     // Enable blending for that glassy look if we wanted, but solid matte is cleaner for now
     // glDisable(GL_BLEND);
-    
+
     for(int i=1; i<map_count; i++) {
         Box b = map_geo[i];
         

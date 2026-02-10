@@ -94,15 +94,10 @@ static const Box map_geo_garage[] = {
 };
 
 
-static const Box map_geo_voxworld[] = {
-    {0.00, -2.00, 0.00, 2400.00, 4.00, 2400.00},
-    {0.00, 100.00, 1200.00, 2400.00, 200.00, 8.00},
-    {0.00, 100.00, -1200.00, 2400.00, 200.00, 8.00},
-    {1200.00, 100.00, 0.00, 8.00, 200.00, 2400.00},
-    {-1200.00, 100.00, 0.00, 8.00, 200.00, 2400.00},
-    {60.00, 3.0, 40.0, 30.0, 6.0, 30.0},
-    {-80.0, 6.0, -100.0, 40.0, 12.0, 40.0}
-};
+#define CITY_MAX_BOXES 2048
+static Box map_geo_voxworld[CITY_MAX_BOXES];
+static int map_geo_voxworld_count = 0;
+static int map_geo_voxworld_init = 0;
 
 static const Box *map_geo = map_geo_stadium;
 static int map_count = 0;
@@ -118,6 +113,7 @@ static int map_count = 0;
 #define VOXWORLD_KILL_Y -120.0f
 #define VOXWORLD_BOUNDS_X 1180.0f
 #define VOXWORLD_BOUNDS_Z 1180.0f
+#define VOXWORLD_SEED 1337
 
 #define GARAGE_PORTAL_X 0.0f
 #define GARAGE_PORTAL_Y 6.0f
@@ -157,6 +153,42 @@ static const VehiclePad garage_vehicle_pads[] = {
 
 float phys_rand_f() { return ((float)(rand()%1000)/500.0f) - 1.0f; }
 
+static inline void init_voxworld_city_geo() {
+    if (map_geo_voxworld_init) return;
+    map_geo_voxworld_init = 1;
+    map_geo_voxworld_count = 0;
+
+    map_geo_voxworld[map_geo_voxworld_count++] = (Box){0.0f, -2.0f, 0.0f, 2800.0f, 4.0f, 2800.0f};
+    map_geo_voxworld[map_geo_voxworld_count++] = (Box){0.0f, 100.0f, 1400.0f, 2800.0f, 200.0f, 8.0f};
+    map_geo_voxworld[map_geo_voxworld_count++] = (Box){0.0f, 100.0f, -1400.0f, 2800.0f, 200.0f, 8.0f};
+    map_geo_voxworld[map_geo_voxworld_count++] = (Box){1400.0f, 100.0f, 0.0f, 8.0f, 200.0f, 2800.0f};
+    map_geo_voxworld[map_geo_voxworld_count++] = (Box){-1400.0f, 100.0f, 0.0f, 8.0f, 200.0f, 2800.0f};
+
+    const float block = 220.0f;
+    const float road = 50.0f;
+    const float pitch = block + road;
+    for (int gx = -4; gx <= 4; gx++) {
+        for (int gz = -4; gz <= 4; gz++) {
+            float cx = gx * pitch;
+            float cz = gz * pitch;
+            if ((abs(gx) <= 1 && gz == 0) || (abs(gz) <= 1 && gx == 0)) continue;
+
+            float n1 = sinf((float)(gx * 17 + gz * 31 + VOXWORLD_SEED) * 0.13f);
+            float n2 = cosf((float)(gx * 11 - gz * 23 + VOXWORLD_SEED) * 0.19f);
+            float h = 24.0f + (n1 + 1.0f) * 28.0f + (n2 + 1.0f) * 18.0f;
+            float w = 35.0f + (fabsf(n1) * 45.0f);
+            float d = 35.0f + (fabsf(n2) * 45.0f);
+
+            if (map_geo_voxworld_count + 1 < CITY_MAX_BOXES) {
+                map_geo_voxworld[map_geo_voxworld_count++] = (Box){cx, h * 0.5f, cz, w, h, d};
+            }
+            if (map_geo_voxworld_count + 1 < CITY_MAX_BOXES && (gx + gz) % 3 == 0) {
+                map_geo_voxworld[map_geo_voxworld_count++] = (Box){cx + 0.35f * block, (h * 0.35f), cz - 0.3f * block, w * 0.55f, h * 0.7f, d * 0.55f};
+            }
+        }
+    }
+}
+
 static int phys_scene_id = SCENE_STADIUM;
 
 static inline void phys_set_scene(int scene_id) {
@@ -165,8 +197,9 @@ static inline void phys_set_scene(int scene_id) {
         map_geo = map_geo_garage;
         map_count = (int)(sizeof(map_geo_garage) / sizeof(Box));
     } else if (scene_id == SCENE_VOXWORLD) {
+        init_voxworld_city_geo();
         map_geo = map_geo_voxworld;
-        map_count = (int)(sizeof(map_geo_voxworld) / sizeof(Box));
+        map_count = map_geo_voxworld_count;
     } else {
         map_geo = map_geo_stadium;
         map_count = (int)(sizeof(map_geo_stadium) / sizeof(Box));
@@ -400,7 +433,7 @@ void reflect_vector(float *vx, float *vy, float *vz, float nx, float ny, float n
     *vz = *vz - 2.0f * dot * nz;
 }
 
-int trace_map(float x1, float y1, float z1, float x2, float y2, float z2,
+static inline int trace_map_boxes(float x1, float y1, float z1, float x2, float y2, float z2,
               float *out_x, float *out_y, float *out_z, float *nx, float *ny, float *nz) {
     for(int i=1; i<map_count; i++) {
         Box b = map_geo[i];
@@ -427,6 +460,11 @@ int trace_map(float x1, float y1, float z1, float x2, float y2, float z2,
         return 1;
     }
     return 0;
+}
+
+int trace_map(float x1, float y1, float z1, float x2, float y2, float z2,
+              float *out_x, float *out_y, float *out_z, float *nx, float *ny, float *nz) {
+    return trace_map_boxes(x1, y1, z1, x2, y2, z2, out_x, out_y, out_z, nx, ny, nz);
 }
 
 int check_hit_location(float ox, float oy, float oz, float dx, float dy, float dz, PlayerState *target) {
