@@ -121,6 +121,7 @@ static int map_count = 0;
 #define VOXWORLD_BOUNDS_X 1180.0f
 #define VOXWORLD_BOUNDS_Z 1180.0f
 #define VOXWORLD_SEED 1337
+#define VOXWORLD_TRACE_STEP 4.0f
 
 #define CITY_KILL_Y -120.0f
 #define CITY_BOUNDS_X 1180.0f
@@ -458,6 +459,42 @@ static inline void apply_friction_2d(Vec2 *vel, float friction, float dt) {
     vel->y *= ratio;
 }
 
+static inline float vox_hash_noise(float x, float z) {
+    float n = sinf(x * 12.9898f + z * 78.233f + (float)VOXWORLD_SEED * 0.001f) * 43758.5453f;
+    return n - floorf(n);
+}
+
+static inline float phys_vox_height_at(float x, float z) {
+    if (x < -VOXWORLD_BOUNDS_X || x > VOXWORLD_BOUNDS_X ||
+        z < -VOXWORLD_BOUNDS_Z || z > VOXWORLD_BOUNDS_Z) {
+        return -1000.0f;
+    }
+    float base = 5.0f;
+    float waves = sinf((x + (float)VOXWORLD_SEED) * 0.01f) * 3.0f +
+                  cosf((z - (float)VOXWORLD_SEED) * 0.012f) * 2.5f;
+    float detail = (vox_hash_noise(x * 0.2f, z * 0.2f) - 0.5f) * 2.0f;
+    float h = base + waves + detail;
+    if (h < 0.0f) h = 0.0f;
+    return h;
+}
+
+static inline void phys_vox_normal_at(float x, float z, float *nx, float *ny, float *nz) {
+    float hL = phys_vox_height_at(x - 1.0f, z);
+    float hR = phys_vox_height_at(x + 1.0f, z);
+    float hD = phys_vox_height_at(x, z - 1.0f);
+    float hU = phys_vox_height_at(x, z + 1.0f);
+    float gx = hR - hL;
+    float gz = hU - hD;
+    float len = sqrtf(gx * gx + 4.0f + gz * gz);
+    if (len < 0.0001f) {
+        *nx = 0.0f; *ny = 1.0f; *nz = 0.0f;
+        return;
+    }
+    *nx = -gx / len;
+    *ny = 2.0f / len;
+    *nz = -gz / len;
+}
+
 static inline float norm_yaw_deg(float yaw) {
     while (yaw >= 360.0f) yaw -= 360.0f;
     while (yaw < 0.0f) yaw += 360.0f;
@@ -513,6 +550,34 @@ static inline int trace_map_boxes(float x1, float y1, float z1, float x2, float 
     return 0;
 }
 
+static inline int trace_map_vox(float x1, float y1, float z1, float x2, float y2, float z2,
+              float *out_x, float *out_y, float *out_z, float *nx, float *ny, float *nz) {
+    float dx = x2 - x1, dy = y2 - y1, dz = z2 - z1;
+    float dist = sqrtf(dx * dx + dy * dy + dz * dz);
+    int steps = (int)(dist / VOXWORLD_TRACE_STEP) + 2;
+    if (steps < 2) steps = 2;
+    for (int i = 1; i <= steps; i++) {
+        float t = (float)i / (float)steps;
+        float sx = x1 + dx * t;
+        float sy = y1 + dy * t;
+        float sz = z1 + dz * t;
+        float h = phys_vox_height_at(sx, sz);
+        if (sy <= h) {
+            *out_x = sx;
+            *out_y = h + 0.1f;
+            *out_z = sz;
+            phys_vox_normal_at(sx, sz, nx, ny, nz);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int trace_map(float x1, float y1, float z1, float x2, float y2, float z2,
+              float *out_x, float *out_y, float *out_z, float *nx, float *ny, float *nz) {
+    if (phys_scene_id == SCENE_VOXWORLD) {
+        return trace_map_vox(x1, y1, z1, x2, y2, z2, out_x, out_y, out_z, nx, ny, nz);
+    }
 int trace_map(float x1, float y1, float z1, float x2, float y2, float z2,
               float *out_x, float *out_y, float *out_z, float *nx, float *ny, float *nz) {
     return trace_map_boxes(x1, y1, z1, x2, y2, z2, out_x, out_y, out_z, nx, ny, nz);
@@ -592,6 +657,11 @@ void resolve_collision(PlayerState *p) {
     float pw = p->in_vehicle ? 3.0f : PLAYER_WIDTH;
     float ph = p->in_vehicle ? 3.0f : (p->crouching ? (PLAYER_HEIGHT / 2.0f) : PLAYER_HEIGHT);
     p->on_ground = 0;
+    if (phys_scene_id == SCENE_VOXWORLD) {
+        float floor_y = phys_vox_height_at(p->x, p->z);
+        if (p->y < floor_y) { p->y = floor_y; p->vy = 0; p->on_ground = 1; }
+        return;
+    }
     if (p->y < 0) { p->y = 0; p->vy = 0; p->on_ground = 1; }
     for(int i=1; i<map_count; i++) {
         Box b = map_geo[i];

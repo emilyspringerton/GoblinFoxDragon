@@ -327,6 +327,27 @@ void draw_grid() {
 
 // --- NEON BRUTALIST BLOCK RENDERER ---
 void draw_map() {
+    if (local_state.scene_id == SCENE_VOXWORLD) {
+        const float step = 40.0f;
+        for (float x = -1000.0f; x <= 1000.0f; x += step) {
+            for (float z = -1000.0f; z <= 1000.0f; z += step) {
+                float h00 = phys_vox_height_at(x, z);
+                float h10 = phys_vox_height_at(x + step, z);
+                float h11 = phys_vox_height_at(x + step, z + step);
+                float h01 = phys_vox_height_at(x, z + step);
+
+                glColor3f(0.12f + (h00 * 0.01f), 0.45f, 0.2f + (h00 * 0.005f));
+                glBegin(GL_QUADS);
+                glVertex3f(x, h00, z);
+                glVertex3f(x + step, h10, z);
+                glVertex3f(x + step, h11, z + step);
+                glVertex3f(x, h01, z + step);
+                glEnd();
+            }
+        }
+        return;
+    }
+
     // Enable blending for that glassy look if we wanted, but solid matte is cleaner for now
     // glDisable(GL_BLEND);
 
