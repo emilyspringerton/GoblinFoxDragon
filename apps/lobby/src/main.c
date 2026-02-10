@@ -66,16 +66,18 @@ struct sockaddr_in server_addr;
 #define NET_CMD_HISTORY 3
 UserCmd net_cmd_history[NET_CMD_HISTORY];
 int net_cmd_history_count = 0;
+int net_cmd_seq = 0;
 
 void net_connect();
 
 static void reset_client_render_state_for_net() {
     my_client_id = -1;
-    memset(local_state.players, 0, sizeof(local_state.players));
-    memset(local_state.projectiles, 0, sizeof(local_state.projectiles));
+    memset(&local_state, 0, sizeof(local_state));
     memset(net_cmd_history, 0, sizeof(net_cmd_history));
     net_cmd_history_count = 0;
+    net_cmd_seq = 0;
     travel_overlay_until_ms = 0;
+    local_state.pending_scene = -1;
     local_state.scene_id = SCENE_GARAGE_OSAKA;
     phys_set_scene(local_state.scene_id);
 }
@@ -947,7 +949,7 @@ void net_connect() {
 UserCmd client_create_cmd(float fwd, float str, float yaw, float pitch, int shoot, int jump, int crouch, int reload, int use, int ability, int wpn_idx) {
     UserCmd cmd;
     memset(&cmd, 0, sizeof(UserCmd));
-    static int seq = 0; cmd.sequence = ++seq; cmd.timestamp = SDL_GetTicks();
+    cmd.sequence = ++net_cmd_seq; cmd.timestamp = SDL_GetTicks();
     cmd.yaw = yaw; cmd.pitch = pitch;
     cmd.fwd = fwd; cmd.str = str;
     if(shoot) cmd.buttons |= BTN_ATTACK; if(jump) cmd.buttons |= BTN_JUMP;
