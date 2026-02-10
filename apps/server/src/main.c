@@ -197,8 +197,8 @@ void process_user_cmd(int client_id, UserCmd *cmd) {
     if (cmd->sequence <= client_last_seq[client_id]) return;
     printf("[CMD] client=%d seq=%u buttons=%u\n", client_id, cmd->sequence, cmd->buttons);
     PlayerState *p = &local_state.players[client_id];
-    p->yaw = cmd->yaw;
-    p->pitch = cmd->pitch;
+    p->yaw = norm_yaw_deg(cmd->yaw);
+    p->pitch = clamp_pitch_deg(cmd->pitch);
     p->in_fwd = cmd->fwd;
     p->in_strafe = cmd->str;
     p->in_jump = (cmd->buttons & BTN_JUMP);
@@ -312,7 +312,7 @@ void server_broadcast() {
             np.id = (unsigned char)i;
             np.scene_id = (unsigned char)p->scene_id;
             np.x = p->x; np.y = p->y; np.z = p->z;
-            np.yaw = p->yaw; np.pitch = p->pitch;
+            np.yaw = norm_yaw_deg(p->yaw); np.pitch = clamp_pitch_deg(p->pitch);
             np.current_weapon = (unsigned char)p->current_weapon;
             np.state = (unsigned char)p->state;
             np.health = (unsigned char)p->health;

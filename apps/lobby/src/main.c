@@ -1000,7 +1000,7 @@ void net_process_snapshot(char *buffer, int len) {
             p->active = 1;
             p->scene_id = np->scene_id;
             p->x = np->x; p->y = np->y; p->z = np->z;
-            p->yaw = np->yaw; p->pitch = np->pitch;
+            p->yaw = norm_yaw_deg(np->yaw); p->pitch = clamp_pitch_deg(np->pitch);
             p->health = np->health;
             p->current_weapon = np->current_weapon;
             p->is_shooting = np->is_shooting;

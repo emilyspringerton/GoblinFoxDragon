@@ -280,6 +280,18 @@ static inline void apply_friction_2d(Vec2 *vel, float friction, float dt) {
     vel->y *= ratio;
 }
 
+static inline float norm_yaw_deg(float yaw) {
+    while (yaw >= 360.0f) yaw -= 360.0f;
+    while (yaw < 0.0f) yaw += 360.0f;
+    return yaw;
+}
+
+static inline float clamp_pitch_deg(float pitch) {
+    if (pitch > 89.0f) pitch = 89.0f;
+    if (pitch < -89.0f) pitch = -89.0f;
+    return pitch;
+}
+
 static inline float angle_diff(float a, float b) {
     float d = a - b;
     while (d < -180) d += 360;
