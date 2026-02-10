@@ -2,183 +2,73 @@ name: ShankPit Factory
 
 on:
   push:
-    branches: [ "master" ]
-    tags: [ "v*" ]
+    branches: ["master"]
+    tags: ["v*"]
   pull_request:
-    branches: [ "master" ]
+    branches: ["master"]
   workflow_dispatch:
 
-concurrency:
-  group: shankpit-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  build:
-    name: 🏗️ Build, Test & Package
+  build-linux:
+    name: 🏗️ Build (Linux) + Upload Artifacts
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
 
     steps:
-      - uses: actions/checkout@v4
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
 
-      - name: Normalize merged layout
-        shell: bash
+      - name: 🛠️ Install build deps
         run: |
-          set -euo pipefail
-          if [ ! -e apps ] && [ -d apps2 ]; then ln -s apps2 apps; fi
-          if [ ! -e packages ] && [ -d packages2 ]; then ln -s packages2 packages; fi
-          if [ ! -e docs ] && [ -d docs2 ]; then ln -s docs2 docs; fi
-
-          echo "Normalized layout:"
-          ls -al
-          test -e apps && echo "apps OK"
-          test -e packages && echo "packages OK"
-          test -e docs && echo "docs OK" || true
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-
-      - name: Go Tests
-        shell: bash
-        run: |
-          set -euo pipefail
-          go test ./...
-
-      - name: Install Dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y \
-            mingw-w64 \
-            zip \
-            build-essential \
-            libncurses-dev \
-            wget
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config \
+            libsdl2-dev libgl1-mesa-dev libglu1-mesa-dev
 
-          rm -rf sdl2_mingw SDL2-2.28.5 SDL2-devel-2.28.5-mingw.tar.gz || true
-          wget -q https://www.libsdl.org/release/SDL2-devel-2.28.5-mingw.tar.gz
-          tar xzf SDL2-devel-2.28.5-mingw.tar.gz
-          mv SDL2-2.28.5/x86_64-w64-mingw32 ./sdl2_mingw
-
-      - name: Build Windows Client
-        shell: bash
+      - name: 🧹 Clean (best-effort)
         run: |
-          set -euo pipefail
-          test -f apps/lobby/src/main.c
+          make clean || true
 
-          x86_64-w64-mingw32-gcc apps/lobby/src/main.c \
-            -o ShankPit.exe \
-            -O2 -static-libgcc \
-            -I./sdl2_mingw/include \
-            -I. \
-            -Ipackages/common \
-            -Ipackages/simulation \
-            -L./sdl2_mingw/lib \
-            -lmingw32 -lSDL2main -lSDL2 \
-            -lopengl32 -lglu32 -lws2_32 -lwinmm -lgdi32 -lm
-
-      - name: Build Linux Server
-        shell: bash
+      - name: 🔨 Build Lobby + Server (force)
         run: |
-          set -euo pipefail
-          test -f apps/server/src/main.c
+          # Force recipes to run even if Make thinks targets are up to date
+          make -B lobby
+          make -B server
 
-          gcc apps/server/src/main.c \
-            -o ShankServer_Linux \
-            -O2 -static \
-            -I. \
-            -Ipackages/common \
-            -Ipackages/simulation \
-            -lm
-
-      - name: Build Server Control (ncurses)
-        shell: bash
+      - name: ✅ Verify binaries exist
         run: |
-          set -euo pipefail
-          test -f apps/server/serverctl.c
+          ls -lah bin
+          test -x bin/shank_lobby
+          test -x bin/shank_server
+          file bin/shank_lobby
+          file bin/shank_server
 
-          gcc apps/server/serverctl.c \
-            -o shankpit_worldctl \
-            -std=c99 \
-            -O2 \
-            -lncurses
-
-      - name: Generate Source Construct
-        shell: bash
-        run: |
-          set -euo pipefail
-          OUT="SHANKPIT_CONSTRUCT.txt"
-          echo "SHANKPIT BUILD ${{ github.run_number }} CONSTRUCT" > "$OUT"
-          echo "" >> "$OUT"
-
-          # Include merged reality: packages/apps/services/docs (only if present).
-          ROOTS=""
-          for d in packages apps services docs; do
-            if [ -d "$d" ]; then ROOTS="$ROOTS $d"; fi
-          done
-
-          # Deterministic snapshot of sources (exclude vendored deps, build outputs, SDL blobs, git internals).
-          FILES=$(find $ROOTS -type f \
-            \( -name "*.c" -o -name "*.h" -o -name "*.go" -o -name "*.md" -o -name "Makefile" -o -name "*.yml" -o -name "*.yaml" \) \
-            ! -path "*/.git/*" \
-            ! -path "*/vendor/*" \
-            ! -path "*/node_modules/*" \
-            ! -path "*/artifacts/*" \
-            ! -path "*/build/*" \
-            ! -path "*/sdl2_mingw/*" \
-            ! -path "*/SDL2-2.28.5/*" \
-            | sort)
-
-          for file in $FILES; do
-            echo "--- FILE START: $file ---" >> "$OUT"
-            cat "$file" >> "$OUT"
-            echo "" >> "$OUT"
-            echo "--- FILE END: $file ---" >> "$OUT"
-            echo "" >> "$OUT"
-          done
-
-      - name: Bundle Artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-          BUILD="build_${{ github.run_number }}_${GITHUB_SHA::7}"
-
-          rm -rf ShankPit_World ShankPit_Client ShankPit_Bots || true
-          rm -f ShankPit_World*.zip ShankPit_Client*.zip ShankPit_Bots*.zip || true
-
-          mkdir -p ShankPit_World
-          cp ShankServer_Linux ShankPit_World/
-          cp shankpit_worldctl ShankPit_World/
-          cp SHANKPIT_CONSTRUCT.txt ShankPit_World/
-          printf '%s\n' "./shankpit_worldctl" > ShankPit_World/START_WORLD.sh
-          chmod +x ShankPit_World/START_WORLD.sh
-          zip -r "ShankPit_World_${BUILD}.zip" ShankPit_World
-
-          mkdir -p ShankPit_Client
-          cp ShankPit.exe ShankPit_Client/
-          cp sdl2_mingw/bin/SDL2.dll ShankPit_Client/
-          cp SHANKPIT_CONSTRUCT.txt ShankPit_Client/
-          printf '%s\n' "start ShankPit.exe" > ShankPit_Client/PLAY.bat
-          zip -r "ShankPit_Client_${BUILD}.zip" ShankPit_Client
-
-          mkdir -p ShankPit_Bots
-          if [ -f apps/client/bot_main.c ]; then
-            gcc apps/client/bot_main.c -o ShankBot_Linux -O2 -static -I. -Ipackages/common -Ipackages/simulation -lm || true
-            [ -f ShankBot_Linux ] && cp ShankBot_Linux ShankPit_Bots/
-          fi
-          cp SHANKPIT_CONSTRUCT.txt ShankPit_Bots/
-          zip -r "ShankPit_Bots_${BUILD}.zip" ShankPit_Bots
-
-      - name: Upload Artifacts
+      - name: 📦 Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ShankPit_Builds_${{ github.run_number }}_${{ github.sha }}
+          name: shankpit-linux-${{ github.sha }}
           path: |
-            ShankPit_World_*.zip
-            ShankPit_Client_*.zip
-            ShankPit_Bots_*.zip
-            SHANKPIT_CONSTRUCT.txt
+            bin/shank_lobby
+            bin/shank_server
+            Makefile
+          if-no-files-found: error
+
+  # Optional: attach binaries to a GitHub Release when you push a v* tag
+  release:
+    name: 🚀 Release (tagged)
+    runs-on: ubuntu-latest
+    needs: build-linux
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: 📥 Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: shankpit-linux-${{ github.sha }}
+          path: dist
+
+      - name: 📦 Create GitHub Release + upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/bin/shank_lobby
+            dist/bin/shank_server
