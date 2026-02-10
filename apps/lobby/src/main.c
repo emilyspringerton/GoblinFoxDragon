@@ -171,6 +171,8 @@ static void lobby_apply_scene_id(const char *scene_id) {
         scene_load(SCENE_GARAGE_OSAKA);
     } else if (strcmp(scene_id, "STADIUM") == 0) {
         scene_load(SCENE_STADIUM);
+    } else if (strcmp(scene_id, "CITY") == 0) {
+        scene_load(SCENE_CITY);
     }
 }
 
@@ -704,22 +706,27 @@ static int target_in_view(PlayerState *p, float tx, float ty, float tz, float ma
     return dot >= min_dot;
 }
 
-static void draw_garage_portal_frame() {
+static void draw_scene_portals() {
     if (!scene_portal_active(local_state.scene_id)) return;
-    float px = 0.0f, py = 0.0f, pz = 0.0f, pr = 0.0f;
-    scene_portal_info(local_state.scene_id, &px, &py, &pz, &pr);
-
-    glPushMatrix();
-    glTranslatef(px, py, pz);
-    glColor3f(0.2f, 0.9f, 1.0f);
-    glLineWidth(3.0f);
-    glBegin(GL_LINE_LOOP);
-    glVertex3f(-pr, -2.0f, 0.0f);
-    glVertex3f(pr, -2.0f, 0.0f);
-    glVertex3f(pr, 6.0f, 0.0f);
-    glVertex3f(-pr, 6.0f, 0.0f);
-    glEnd();
-    glPopMatrix();
+    PortalDef portals[4];
+    int portal_count = scene_portals(local_state.scene_id, portals, 4);
+    for (int i = 0; i < portal_count; i++) {
+        glPushMatrix();
+        glTranslatef(portals[i].x, portals[i].y, portals[i].z);
+        if (portals[i].portal_id == PORTAL_ID_CITY_GATE) {
+            glColor3f(0.9f, 0.5f, 1.0f);
+        } else {
+            glColor3f(0.2f, 0.9f, 1.0f);
+        }
+        glLineWidth(3.0f);
+        glBegin(GL_LINE_LOOP);
+        glVertex3f(-portals[i].radius, -2.0f, 0.0f);
+        glVertex3f(portals[i].radius, -2.0f, 0.0f);
+        glVertex3f(portals[i].radius, 6.0f, 0.0f);
+        glVertex3f(-portals[i].radius, 6.0f, 0.0f);
+        glEnd();
+        glPopMatrix();
+    }
 }
 
 static void draw_garage_vehicle_pads() {
@@ -751,7 +758,8 @@ static void draw_garage_overlay(PlayerState *p) {
     glColor3f(0.2f, 1.0f, 1.0f);
     draw_string("OSAKA GARAGE", 40, 670, 10);
     glColor3f(0.9f, 0.9f, 0.9f);
-    draw_string("PORTAL -> STADIUM", 40, 640, 6);
+    draw_string("PORTAL A -> STADIUM", 40, 640, 6);
+    draw_string("PORTAL B -> CITY", 40, 620, 6);
 
     int pad_count = 0;
     const VehiclePad *pads = scene_vehicle_pads(local_state.scene_id, &pad_count);
@@ -775,9 +783,15 @@ static void draw_garage_overlay(PlayerState *p) {
         list_y -= 20.0f;
     }
 
-    float portal_x = 0.0f, portal_y = 0.0f, portal_z = 0.0f, portal_r = 0.0f;
-    scene_portal_info(local_state.scene_id, &portal_x, &portal_y, &portal_z, &portal_r);
-    int portal_target = target_in_view(p, portal_x, portal_y, portal_z, 30.0f, 0.75f);
+    int portal_target = 0;
+    PortalDef portals[4];
+    int portal_count = scene_portals(local_state.scene_id, portals, 4);
+    for (int i = 0; i < portal_count; i++) {
+        if (target_in_view(p, portals[i].x, portals[i].y, portals[i].z, 30.0f, 0.75f)) {
+            portal_target = 1;
+            break;
+        }
+    }
     int pad_target = 0;
     if (scene_near_vehicle_pad(local_state.scene_id, p->x, p->z, 12.0f, NULL)) {
         int pad_idx = -1;
@@ -788,7 +802,7 @@ static void draw_garage_overlay(PlayerState *p) {
 
     glColor3f(1.0f, 1.0f, 0.0f);
     if (portal_target) {
-        draw_string("TRAVEL", 600, 350, 8);
+        draw_string("PRESS F TO TRAVEL", 540, 350, 8);
     } else if (pad_target) {
         draw_string(p->in_vehicle ? "EXIT VEHICLE" : "ENTER VEHICLE", 560, 350, 8);
     }
@@ -860,7 +874,7 @@ void draw_scene(PlayerState *render_p) {
     update_and_draw_trails();
     draw_map();
     draw_garage_vehicle_pads();
-    draw_garage_portal_frame();
+    draw_scene_portals();
     draw_projectiles();
     if (render_p->in_vehicle) draw_player_3rd(render_p);
     for(int i=0; i<MAX_CLIENTS; i++) {
