@@ -188,16 +188,16 @@ static void city_fields_step(unsigned int now_ms) {
     float dragon_boost = (now_ms < city_fields.dragon_until_ms) ? 0.35f : 0.0f;
     for (int i = 0; i < CITY_BOIDS; i++) {
         float cx = 0.0f, cz = 0.0f;
-        int near = 0;
+        int near_count = 0;
         for (int j = 0; j < CITY_BOIDS; j++) {
             if (i == j) continue;
             float dx = city_fields.boid_x[j] - city_fields.boid_x[i];
             float dz = city_fields.boid_z[j] - city_fields.boid_z[i];
             float d2 = dx * dx + dz * dz;
             if (d2 > 1800.0f || d2 < 0.0001f) continue;
-            cx += dx; cz += dz; near++;
+            cx += dx; cz += dz; near_count++;
         }
-        if (near > 0) { cx /= (float)near; cz /= (float)near; }
+        if (near_count > 0) { cx /= (float)near_count; cz /= (float)near_count; }
         city_fields.boid_vx[i] = city_fields.boid_vx[i] * 0.95f + cx * 0.0015f + (city_hashf(i, (int)now_ms, city_npcs.seed) - 0.5f) * 0.02f;
         city_fields.boid_vz[i] = city_fields.boid_vz[i] * 0.95f + cz * 0.0015f + (city_hashf(i + 31, (int)now_ms, city_npcs.seed) - 0.5f) * 0.02f;
         city_fields.boid_x[i] += city_fields.boid_vx[i];
