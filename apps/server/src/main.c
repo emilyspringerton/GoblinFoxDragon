@@ -195,6 +195,7 @@ void server_net_init() {
 
 void process_user_cmd(int client_id, UserCmd *cmd) {
     if (cmd->sequence <= client_last_seq[client_id]) return;
+    printf("[CMD] client=%d seq=%u buttons=%u\n", client_id, cmd->sequence, cmd->buttons);
     PlayerState *p = &local_state.players[client_id];
     p->yaw = cmd->yaw;
     p->pitch = cmd->pitch;
@@ -276,7 +277,7 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
         if (size >= cursor + (int)(count * sizeof(UserCmd))) {
             UserCmd *cmds = (UserCmd*)(buffer + cursor);
 
-            // process newest->oldest so last write wins
+            // process oldest->newest to preserve chronological intent
             for (int i = (int)count - 1; i >= 0; i--) {
                 process_user_cmd(client_id, &cmds[i]);
             }
@@ -359,6 +360,9 @@ int main(int argc, char *argv[]) {
     server_net_init();
     int mode = parse_server_mode(argc, argv);
     local_init_match(1, mode);
+    local_state.players[0].active = 0;
+    local_state.players[0].health = 0;
+    local_state.players[0].state = STATE_DEAD;
     printf("SERVER MODE: %s\n", mode == MODE_TDM ? "TEAM DEATHMATCH" : "DEATHMATCH");
 
     int running = 1;
