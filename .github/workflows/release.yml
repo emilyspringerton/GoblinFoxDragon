@@ -24,17 +24,12 @@ jobs:
             build-essential pkg-config \
             libsdl2-dev libgl1-mesa-dev libglu1-mesa-dev
 
-      - name: 🧹 Clean (best-effort)
+      - name: 🔨 Build (force)
         run: |
           make clean || true
+          make -B all
 
-      - name: 🔨 Build Lobby + Server (force)
-        run: |
-          # Force recipes to run even if Make thinks targets are up to date
-          make -B lobby
-          make -B server
-
-      - name: ✅ Verify binaries exist
+      - name: ✅ Verify outputs
         run: |
           ls -lah bin
           test -x bin/shank_lobby
@@ -49,10 +44,8 @@ jobs:
           path: |
             bin/shank_lobby
             bin/shank_server
-            Makefile
           if-no-files-found: error
 
-  # Optional: attach binaries to a GitHub Release when you push a v* tag
   release:
     name: 🚀 Release (tagged)
     runs-on: ubuntu-latest
