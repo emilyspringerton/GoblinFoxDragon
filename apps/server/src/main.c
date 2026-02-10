@@ -195,9 +195,10 @@ void server_net_init() {
 
 void process_user_cmd(int client_id, UserCmd *cmd) {
     if (cmd->sequence <= client_last_seq[client_id]) return;
+    printf("[CMD] client=%d seq=%u buttons=%u\n", client_id, cmd->sequence, cmd->buttons);
     PlayerState *p = &local_state.players[client_id];
-    p->yaw = cmd->yaw;
-    p->pitch = cmd->pitch;
+    p->yaw = norm_yaw_deg(cmd->yaw);
+    p->pitch = clamp_pitch_deg(cmd->pitch);
     p->in_fwd = cmd->fwd;
     p->in_strafe = cmd->str;
     p->in_jump = (cmd->buttons & BTN_JUMP);
@@ -276,7 +277,7 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
         if (size >= cursor + (int)(count * sizeof(UserCmd))) {
             UserCmd *cmds = (UserCmd*)(buffer + cursor);
 
-            // process newest->oldest so last write wins
+            // process oldest->newest to preserve chronological intent
             for (int i = (int)count - 1; i >= 0; i--) {
                 process_user_cmd(client_id, &cmds[i]);
             }
@@ -311,7 +312,7 @@ void server_broadcast() {
             np.id = (unsigned char)i;
             np.scene_id = (unsigned char)p->scene_id;
             np.x = p->x; np.y = p->y; np.z = p->z;
-            np.yaw = p->yaw; np.pitch = p->pitch;
+            np.yaw = norm_yaw_deg(p->yaw); np.pitch = clamp_pitch_deg(p->pitch);
             np.current_weapon = (unsigned char)p->current_weapon;
             np.state = (unsigned char)p->state;
             np.health = (unsigned char)p->health;
@@ -359,6 +360,9 @@ int main(int argc, char *argv[]) {
     server_net_init();
     int mode = parse_server_mode(argc, argv);
     local_init_match(1, mode);
+    local_state.players[0].active = 0;
+    local_state.players[0].health = 0;
+    local_state.players[0].state = STATE_DEAD;
     printf("SERVER MODE: %s\n", mode == MODE_TDM ? "TEAM DEATHMATCH" : "DEATHMATCH");
 
     int running = 1;
