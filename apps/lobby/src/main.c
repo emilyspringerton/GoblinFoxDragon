@@ -65,6 +65,15 @@ struct sockaddr_in server_addr;
 
 void net_connect();
 
+static void reset_client_render_state_for_net() {
+    my_client_id = -1;
+    memset(local_state.players, 0, sizeof(local_state.players));
+    memset(local_state.projectiles, 0, sizeof(local_state.projectiles));
+    travel_overlay_until_ms = 0;
+    local_state.scene_id = SCENE_GARAGE_OSAKA;
+    phys_set_scene(local_state.scene_id);
+}
+
 void draw_string(const char* str, float x, float y, float size) {
     TurtlePen pen = turtle_pen_create(x, y, size);
     turtle_draw_text(&pen, str);
@@ -160,6 +169,7 @@ static void lobby_apply_ui_state() {
     if (!ui_use_server) return;
     if (strcmp(ui_state.active_mode_id, "mode.join") == 0) {
         app_state = STATE_GAME_NET;
+        reset_client_render_state_for_net();
         net_connect();
         return;
     }
@@ -216,6 +226,7 @@ static void lobby_start_action(int action) {
     }
     if (action == LOBBY_JOIN) {
         app_state = STATE_GAME_NET;
+        reset_client_render_state_for_net();
         net_connect();
     } else {
         app_state = STATE_GAME_LOCAL;

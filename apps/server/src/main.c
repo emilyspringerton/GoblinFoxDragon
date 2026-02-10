@@ -195,6 +195,7 @@ void server_net_init() {
 
 void process_user_cmd(int client_id, UserCmd *cmd) {
     if (cmd->sequence <= client_last_seq[client_id]) return;
+    printf("[CMD] client=%d seq=%u buttons=%u\n", client_id, cmd->sequence, cmd->buttons);
     PlayerState *p = &local_state.players[client_id];
     p->yaw = cmd->yaw;
     p->pitch = cmd->pitch;
@@ -276,7 +277,7 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
         if (size >= cursor + (int)(count * sizeof(UserCmd))) {
             UserCmd *cmds = (UserCmd*)(buffer + cursor);
 
-            // process newest->oldest so last write wins
+            // process oldest->newest to preserve chronological intent
             for (int i = (int)count - 1; i >= 0; i--) {
                 process_user_cmd(client_id, &cmds[i]);
             }
