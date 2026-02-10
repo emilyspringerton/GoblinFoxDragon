@@ -13,6 +13,7 @@
 #define PACKET_USERCMD 1
 #define PACKET_SNAPSHOT 2
 #define PACKET_WELCOME  3
+#define PACKET_DISCONNECT 4
 
 #define STATE_ALIVE 0
 #define STATE_DEAD  1

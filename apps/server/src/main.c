@@ -195,9 +195,10 @@ void server_net_init() {
 
 void process_user_cmd(int client_id, UserCmd *cmd) {
     if (cmd->sequence <= client_last_seq[client_id]) return;
+    printf("[CMD] client=%d seq=%u buttons=%u\n", client_id, cmd->sequence, cmd->buttons);
     PlayerState *p = &local_state.players[client_id];
-    p->yaw = cmd->yaw;
-    p->pitch = cmd->pitch;
+    p->yaw = norm_yaw_deg(cmd->yaw);
+    p->pitch = clamp_pitch_deg(cmd->pitch);
     p->in_fwd = cmd->fwd;
     p->in_strafe = cmd->str;
     p->in_jump = (cmd->buttons & BTN_JUMP);
@@ -222,8 +223,33 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
             local_state.clients[i].sin_port == sender->sin_port) {
 
             client_id = i;
-            // Touch only liveness; never memset player here.
             local_state.client_meta[i].last_heard_ms = get_server_time();
+            if (head->type == PACKET_CONNECT) {
+                unsigned int now = get_server_time();
+                PlayerState *p = &local_state.players[i];
+                client_last_seq[i] = 0;
+                p->in_fwd = 0.0f;
+                p->in_strafe = 0.0f;
+                p->in_jump = 0;
+                p->in_shoot = 0;
+                p->in_reload = 0;
+                p->in_use = 0;
+                p->in_ability = 0;
+                p->use_was_down = 0;
+                p->portal_cooldown_until_ms = 0;
+                p->vehicle_cooldown = 0;
+
+                NetHeader h;
+                h.type = PACKET_WELCOME;
+                h.client_id = (unsigned char)i;
+                h.sequence = 0;
+                h.timestamp = now;
+                h.entity_count = 0;
+                h.scene_id = (unsigned char)p->scene_id;
+                sendto(sock, (char*)&h, sizeof(NetHeader), 0,
+                       (struct sockaddr*)sender, sizeof(struct sockaddr_in));
+                printf("CLIENT %d RECONNECTED (seq reset)\n", i);
+            }
             break;
         }
     }
@@ -266,6 +292,11 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
         }
     }
 
+    if (client_id != -1 && head->type == PACKET_DISCONNECT) {
+        server_disconnect(client_id, client_last_seq);
+        return;
+    }
+
     // --- USER COMMANDS ---
     if (client_id != -1 && head->type == PACKET_USERCMD) {
         int cursor = (int)sizeof(NetHeader);
@@ -276,7 +307,7 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
         if (size >= cursor + (int)(count * sizeof(UserCmd))) {
             UserCmd *cmds = (UserCmd*)(buffer + cursor);
 
-            // process newest->oldest so last write wins
+            // process oldest->newest to preserve chronological intent
             for (int i = (int)count - 1; i >= 0; i--) {
                 process_user_cmd(client_id, &cmds[i]);
             }
@@ -311,7 +342,7 @@ void server_broadcast() {
             np.id = (unsigned char)i;
             np.scene_id = (unsigned char)p->scene_id;
             np.x = p->x; np.y = p->y; np.z = p->z;
-            np.yaw = p->yaw; np.pitch = p->pitch;
+            np.yaw = norm_yaw_deg(p->yaw); np.pitch = clamp_pitch_deg(p->pitch);
             np.current_weapon = (unsigned char)p->current_weapon;
             np.state = (unsigned char)p->state;
             np.health = (unsigned char)p->health;
@@ -359,6 +390,9 @@ int main(int argc, char *argv[]) {
     server_net_init();
     int mode = parse_server_mode(argc, argv);
     local_init_match(1, mode);
+    local_state.players[0].active = 0;
+    local_state.players[0].health = 0;
+    local_state.players[0].state = STATE_DEAD;
     printf("SERVER MODE: %s\n", mode == MODE_TDM ? "TEAM DEATHMATCH" : "DEATHMATCH");
 
     int running = 1;
@@ -399,11 +433,12 @@ int main(int argc, char *argv[]) {
             if (p->active && p->state != STATE_DEAD) {
                 phys_set_scene(p->scene_id);
                 int use_pressed = p->in_use && !p->use_was_down;
+                int portal_id = -1;
                 if (use_pressed && now >= p->portal_cooldown_until_ms &&
-                    scene_portal_active(p->scene_id) && scene_portal_triggered(p)) {
+                    scene_portal_active(p->scene_id) && scene_portal_triggered(p, &portal_id)) {
                     int dest_scene = -1;
                     float sx = 0.0f, sy = 0.0f, sz = 0.0f;
-                    if (portal_resolve_destination(p->scene_id, PORTAL_ID_GARAGE_EXIT, p->id,
+                    if (portal_resolve_destination(p->scene_id, portal_id, p->id,
                                                    &dest_scene, &sx, &sy, &sz)) {
                         int from_scene = p->scene_id;
                         p->scene_id = dest_scene;
