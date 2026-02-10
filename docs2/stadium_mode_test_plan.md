@@ -241,3 +241,32 @@ For each class in Stadium:
 - [ ] Verify soft-target lock persists across camera toggle.
 - [ ] Toggle camera while targeting allies; verify highlight remains correct.
 - [ ] Win condition met while player is dead; match still ends cleanly.
+
+
+## 10) Creep Combat / XP Contract (Stadium + City)
+
+This section codifies existing runtime behavior so Stadium and City share one combat loop.
+
+- Creep data contract: `type`, `hp/max_hp`, `alive`, `scene_id`, `team_id`, `spawn_zone`, `respawn_time_ms`.
+- Damage entrypoint is scene-routed NPC damage (`npc_apply_damage(scene_id, hit_pos, damage, attacker_client_id, now_ms)`), which fans into the scene NPC pool.
+- On death (`hp <= 0`):
+  - NPC is deactivated.
+  - `respawn_time_ms` is set from spawn-zone delay.
+  - killer/last-hit ownership is resolved.
+  - XP is awarded via `award_creep_xp`.
+
+### XP distribution
+
+- XP tuning is by creep type (`creep_reward_for_type`):
+  - `base_xp`
+  - `xp_radius`
+  - `team_share_pct`
+- Award rule:
+  - killer gets `base_xp`
+  - same-team players in same scene and inside `xp_radius` get `floor(base_xp * team_share_pct)`.
+
+### UI feedback (minimum)
+
+- HUD progression bar updates immediately for killer and recipients.
+- On creep kill, show floating `+XP` text for each recipient (killer + nearby teammate shares).
+- Optional kill feed line format: `<player> killed <creep type>`.
