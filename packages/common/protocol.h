@@ -143,6 +143,8 @@ typedef struct {
     int ability_cooldown;
     unsigned int stunned_until_ms;
     unsigned int stun_immune_until_ms;
+    float run_phase;
+    float run_weight;
 } PlayerState;
 
 typedef struct {
