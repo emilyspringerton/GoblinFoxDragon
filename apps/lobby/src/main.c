@@ -83,18 +83,6 @@ static void reset_client_render_state_for_net() {
     phys_set_scene(local_state.scene_id);
 }
 
-static void reset_client_render_state_for_net() {
-    my_client_id = -1;
-    memset(&local_state, 0, sizeof(local_state));
-    memset(net_cmd_history, 0, sizeof(net_cmd_history));
-    net_cmd_history_count = 0;
-    net_cmd_seq = 0;
-    travel_overlay_until_ms = 0;
-    local_state.pending_scene = -1;
-    local_state.scene_id = SCENE_GARAGE_OSAKA;
-    phys_set_scene(local_state.scene_id);
-}
-
 void draw_string(const char* str, float x, float y, float size) {
     TurtlePen pen = turtle_pen_create(x, y, size);
     turtle_draw_text(&pen, str);
@@ -944,6 +932,12 @@ void net_init() {
 
 void net_shutdown() {
     if (sock >= 0) {
+        char buffer[128];
+        NetHeader *h = (NetHeader*)buffer;
+        memset(h, 0, sizeof(NetHeader));
+        h->type = PACKET_DISCONNECT;
+        sendto(sock, buffer, sizeof(NetHeader), 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
+
         #ifdef _WIN32
         closesocket(sock);
         #else

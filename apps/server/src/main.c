@@ -292,6 +292,11 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
         }
     }
 
+    if (client_id != -1 && head->type == PACKET_DISCONNECT) {
+        server_disconnect(client_id, client_last_seq);
+        return;
+    }
+
     // --- USER COMMANDS ---
     if (client_id != -1 && head->type == PACKET_USERCMD) {
         int cursor = (int)sizeof(NetHeader);

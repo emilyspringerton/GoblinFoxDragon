@@ -53,9 +53,12 @@ void test_handshake_enums() {
     ASSERT_EQ(PACKET_CONNECT, 0, "Connect is type 0");
     ASSERT_EQ(PACKET_USERCMD, 1, "UserCmd is type 1");
     ASSERT_EQ(PACKET_SNAPSHOT, 2, "Snapshot is type 2");
-    
+    ASSERT_EQ(PACKET_WELCOME, 3, "Welcome is type 3");
+    ASSERT_EQ(PACKET_DISCONNECT, 4, "Disconnect is type 4");
+
     // Verify differentiation
     ASSERT_TRUE(PACKET_CONNECT != PACKET_USERCMD, "Connect != UserCmd");
+    ASSERT_TRUE(PACKET_DISCONNECT != PACKET_USERCMD, "Disconnect != UserCmd");
 }
 
 void test_simulation_delta() {
