@@ -990,6 +990,7 @@ void net_shutdown() {
 }
 
 void net_connect() {
+    reset_client_render_state_for_net();
     if (sock < 0) net_init();
     struct hostent *he = gethostbyname(SERVER_HOST);
     if (he) {
@@ -998,6 +999,7 @@ void net_connect() {
         memcpy(&server_addr.sin_addr, he->h_addr_list[0], he->h_length);
         char buffer[128];
         NetHeader *h = (NetHeader*)buffer;
+        memset(h, 0, sizeof(NetHeader));
         h->type = PACKET_CONNECT;
         h->scene_id = 0;
         sendto(sock, buffer, sizeof(NetHeader), 0, (struct sockaddr*)&server_addr, sizeof(server_addr));

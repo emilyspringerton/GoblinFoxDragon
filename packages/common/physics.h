@@ -127,6 +127,10 @@ static int map_count = 0;
 #define CITY_BOUNDS_X 1180.0f
 #define CITY_BOUNDS_Z 1180.0f
 
+#define CITY_KILL_Y -120.0f
+#define CITY_BOUNDS_X 1180.0f
+#define CITY_BOUNDS_Z 1180.0f
+
 #define GARAGE_PORTAL_X 0.0f
 #define GARAGE_PORTAL_Y 6.0f
 #define GARAGE_PORTAL_Z 56.0f

@@ -26,6 +26,7 @@
 int sock = -1;
 struct sockaddr_in bind_addr;
 unsigned int client_last_seq[MAX_CLIENTS];
+unsigned int client_last_cmd_ms[MAX_CLIENTS];
 
 typedef struct {
     int enabled;
@@ -193,7 +194,23 @@ void server_net_init() {
     }
 }
 
+static int should_reset_client_seq(int client_id, unsigned int incoming_seq, unsigned int now_ms) {
+    unsigned int last_seq = client_last_seq[client_id];
+    if (incoming_seq > last_seq) return 0;
+    if (incoming_seq <= 3 && last_seq > 200) {
+        unsigned int silence = now_ms - client_last_cmd_ms[client_id];
+        if (silence > 250) return 1;
+    }
+    return 0;
+}
+
 void process_user_cmd(int client_id, UserCmd *cmd) {
+    if (!cmd) return;
+    unsigned int now_ms = get_server_time();
+    if (should_reset_client_seq(client_id, cmd->sequence, now_ms)) {
+        printf("[SEQ-RESET] client=%d last=%u incoming=%u\n", client_id, client_last_seq[client_id], cmd->sequence);
+        client_last_seq[client_id] = 0;
+    }
     if (cmd->sequence <= client_last_seq[client_id]) return;
     printf("[CMD] client=%d seq=%u buttons=%u\n", client_id, cmd->sequence, cmd->buttons);
     PlayerState *p = &local_state.players[client_id];
@@ -210,6 +227,7 @@ void process_user_cmd(int client_id, UserCmd *cmd) {
     p->in_ability = (cmd->buttons & BTN_ABILITY_1);
     if (cmd->weapon_idx >= 0 && cmd->weapon_idx < MAX_WEAPONS) p->current_weapon = cmd->weapon_idx;
     client_last_seq[client_id] = cmd->sequence;
+    client_last_cmd_ms[client_id] = now_ms;
 }
 
 void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
@@ -229,6 +247,7 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
                 unsigned int now = get_server_time();
                 PlayerState *p = &local_state.players[i];
                 client_last_seq[i] = 0;
+                client_last_cmd_ms[i] = 0;
                 p->in_fwd = 0.0f;
                 p->in_strafe = 0.0f;
                 p->in_jump = 0;
@@ -276,6 +295,8 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
                     local_state.client_meta[i].active = 1;
                     local_state.client_meta[i].last_heard_ms = get_server_time();
                     local_state.clients[i] = *sender;
+                    client_last_seq[i] = 0;
+                    client_last_cmd_ms[i] = 0;
 
                     phys_respawn(&local_state.players[i], get_server_time());
 
@@ -308,6 +329,8 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
         if (size < cursor + 1) return;
 
         unsigned char count = *(unsigned char*)(buffer + cursor); cursor += 1;
+        if (count == 0) return;
+        if (count > 8) count = 8;
 
         if (size >= cursor + (int)(count * sizeof(UserCmd))) {
             UserCmd *cmds = (UserCmd*)(buffer + cursor);
