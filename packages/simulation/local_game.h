@@ -8,7 +8,7 @@
 ServerState local_state;
 int was_holding_jump = 0;
 
-void local_update(float fwd, float str, float yaw, float pitch, int shoot, int weapon_req, int jump, int crouch, int reload, int ability, void *server_context, unsigned int cmd_time);
+void local_update(float fwd, float str, float yaw, float pitch, int shoot, int weapon_req, int jump, int crouch, int reload, int use, int bike, int ability, void *server_context, unsigned int cmd_time);
 void update_entity(PlayerState *p, float dt, void *server_context, unsigned int cmd_time);
 void local_init_match(int num_players, int mode);
 
@@ -136,13 +136,14 @@ void update_entity(PlayerState *p, float dt, void *server_context, unsigned int 
         p->in_shoot = 0;
         p->in_reload = 0;
         p->in_use = 0;
+        p->in_bike = 0;
         p->in_ability = 0;
         p->vx = 0.0f;
         p->vz = 0.0f;
     }
 
     apply_friction(p);
-    float g = (p->in_jump) ? GRAVITY_FLOAT : GRAVITY_DROP;
+    float g = p->in_vehicle ? ((p->vehicle_type == VEH_BIKE) ? BIKE_GRAVITY : BUGGY_GRAVITY) : ((p->in_jump) ? GRAVITY_FLOAT : GRAVITY_DROP);
     p->vy -= g; 
     p->y += p->vy;
     
@@ -229,7 +230,7 @@ static void update_projectiles(unsigned int now_ms) {
     }
 }
 
-void local_update(float fwd, float str, float yaw, float pitch, int shoot, int weapon_req, int jump, int crouch, int reload, int ability, void *server_context, unsigned int cmd_time) {
+void local_update(float fwd, float str, float yaw, float pitch, int shoot, int weapon_req, int jump, int crouch, int reload, int use, int bike, int ability, void *server_context, unsigned int cmd_time) {
     PlayerState *p0 = &local_state.players[0];
     scene_tick_transition();
     if (local_state.transition_timer > 0) {
@@ -243,15 +244,36 @@ void local_update(float fwd, float str, float yaw, float pitch, int shoot, int w
     }
     p0->yaw = yaw; p0->pitch = pitch;
     if (weapon_req >= 0 && weapon_req < MAX_WEAPONS) p0->current_weapon = weapon_req;
+    p0->in_use = use;
+    p0->in_bike = bike;
     float rad = yaw * 3.14159f / 180.0f;
     float wish_x = sinf(rad) * fwd + cosf(rad) * str;
     float wish_z = cosf(rad) * fwd - sinf(rad) * str;
-    
+    float max_spd = MAX_SPEED;
+    float acc = ACCEL;
+
+    if (p0->in_vehicle && p0->vehicle_type == VEH_BIKE) {
+        wish_x = sinf(rad) * fwd;
+        wish_z = cosf(rad) * fwd;
+
+        float vmag = sqrtf(p0->vx * p0->vx + p0->vz * p0->vz);
+        if (p0->bike_gear < 1) p0->bike_gear = 1;
+        if (p0->bike_gear < BIKE_GEARS && vmag > BIKE_GEAR_MAX[p0->bike_gear] * 0.92f) p0->bike_gear++;
+        if (p0->bike_gear > 1 && vmag < BIKE_GEAR_MAX[p0->bike_gear - 1] * 0.55f) p0->bike_gear--;
+
+        max_spd = BIKE_GEAR_MAX[p0->bike_gear];
+        acc = BIKE_GEAR_ACCEL[p0->bike_gear];
+    } else if (p0->in_vehicle) {
+        wish_x = sinf(rad) * fwd;
+        wish_z = cosf(rad) * fwd;
+        max_spd = BUGGY_MAX_SPEED;
+        acc = BUGGY_ACCEL;
+    }
+
     float wish_speed = sqrtf(wish_x*wish_x + wish_z*wish_z);
     if (wish_speed > 1.0f) { wish_speed = 1.0f; wish_x/=wish_speed; wish_z/=wish_speed; }
-    wish_speed *= MAX_SPEED;
-    accelerate(p0, wish_x, wish_z, wish_speed, ACCEL);
-    
+    wish_speed *= max_spd;
+    accelerate(p0, wish_x, wish_z, wish_speed, acc);
     int fresh_jump_press = (jump && !was_holding_jump);
     // --- PHASE 485: TUNED SLIDE JUMP ---
     if (jump && p0->on_ground) {

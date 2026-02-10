@@ -206,6 +206,7 @@ void process_user_cmd(int client_id, UserCmd *cmd) {
     p->crouching = (cmd->buttons & BTN_CROUCH);
     p->in_reload = (cmd->buttons & BTN_RELOAD);
     p->in_use = (cmd->buttons & BTN_USE);
+    p->in_bike = (cmd->buttons & BTN_VEHICLE_2);
     p->in_ability = (cmd->buttons & BTN_ABILITY_1);
     if (cmd->weapon_idx >= 0 && cmd->weapon_idx < MAX_WEAPONS) p->current_weapon = cmd->weapon_idx;
     client_last_seq[client_id] = cmd->sequence;
@@ -234,9 +235,13 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
                 p->in_shoot = 0;
                 p->in_reload = 0;
                 p->in_use = 0;
+                p->in_bike = 0;
                 p->in_ability = 0;
                 p->use_was_down = 0;
+                p->bike_was_down = 0;
                 p->portal_cooldown_until_ms = 0;
+                p->vehicle_type = VEH_NONE;
+                p->bike_gear = 0;
                 p->vehicle_cooldown = 0;
 
                 NetHeader h;
@@ -446,23 +451,50 @@ int main(int argc, char *argv[]) {
                         p->x = sx; p->y = sy; p->z = sz;
                         p->vx = 0.0f; p->vy = 0.0f; p->vz = 0.0f;
                         p->in_vehicle = 0;
+                        p->vehicle_type = VEH_NONE;
+                        p->bike_gear = 0;
                         p->portal_cooldown_until_ms = now + 1000;
                         p->in_use = 0;
+                        p->in_bike = 0;
                         printf("PORTAL_TRAVEL client=%d from=%d to=%d\n", i, from_scene, dest_scene);
                     }
-                } else if (use_pressed && p->vehicle_cooldown == 0) {
+                } else {
+                    int bike_pressed = p->in_bike && !p->bike_was_down;
+                    int can_toggle_vehicle = p->vehicle_cooldown == 0;
                     int in_garage = p->scene_id == SCENE_GARAGE_OSAKA;
-                    if (in_garage && scene_near_vehicle_pad(p->scene_id, p->x, p->z, 6.0f, NULL)) {
-                        p->in_vehicle = !p->in_vehicle;
+                    int near_pad = scene_near_vehicle_pad(p->scene_id, p->x, p->z, 6.0f, NULL);
+                    int vehicle_allowed = (!in_garage) || near_pad;
+
+                    if (can_toggle_vehicle && vehicle_allowed && use_pressed) {
+                        if (p->vehicle_type == VEH_BUGGY) {
+                            p->vehicle_type = VEH_NONE;
+                            p->in_vehicle = 0;
+                            p->bike_gear = 0;
+                            printf("Client %d Toggle Vehicle: NONE\n", i);
+                        } else {
+                            p->vehicle_type = VEH_BUGGY;
+                            p->in_vehicle = 1;
+                            p->bike_gear = 0;
+                            printf("Client %d Toggle Vehicle: BUGGY\n", i);
+                        }
                         p->vehicle_cooldown = 30;
-                        printf("Client %d Toggle Vehicle: %d\n", i, p->in_vehicle);
-                    } else if (!in_garage) {
-                        p->in_vehicle = !p->in_vehicle;
+                    } else if (can_toggle_vehicle && vehicle_allowed && bike_pressed) {
+                        if (p->vehicle_type == VEH_BIKE) {
+                            p->vehicle_type = VEH_NONE;
+                            p->in_vehicle = 0;
+                            p->bike_gear = 0;
+                            printf("Client %d Toggle Vehicle: NONE\n", i);
+                        } else {
+                            p->vehicle_type = VEH_BIKE;
+                            p->in_vehicle = 1;
+                            p->bike_gear = 1;
+                            printf("Client %d Toggle Vehicle: BIKE (gear %d)\n", i, p->bike_gear);
+                        }
                         p->vehicle_cooldown = 30;
-                        printf("Client %d Toggle Vehicle: %d\n", i, p->in_vehicle);
                     }
                 }
                 p->use_was_down = p->in_use;
+                p->bike_was_down = p->in_bike;
                 if (p->vehicle_cooldown > 0) p->vehicle_cooldown--;
 
                 float rad = p->yaw * 3.14159f / 180.0f;
@@ -470,7 +502,18 @@ int main(int argc, char *argv[]) {
                 float max_spd = MAX_SPEED;
                 float acc = ACCEL;
 
-                if (p->in_vehicle) {
+                if (p->in_vehicle && p->vehicle_type == VEH_BIKE) {
+                    wish_x = sinf(rad) * p->in_fwd;
+                    wish_z = cosf(rad) * p->in_fwd;
+
+                    float vmag = sqrtf(p->vx * p->vx + p->vz * p->vz);
+                    if (p->bike_gear < 1) p->bike_gear = 1;
+                    if (p->bike_gear < BIKE_GEARS && vmag > BIKE_GEAR_MAX[p->bike_gear] * 0.92f) p->bike_gear++;
+                    if (p->bike_gear > 1 && vmag < BIKE_GEAR_MAX[p->bike_gear - 1] * 0.55f) p->bike_gear--;
+
+                    max_spd = BIKE_GEAR_MAX[p->bike_gear];
+                    acc = BIKE_GEAR_ACCEL[p->bike_gear];
+                } else if (p->in_vehicle) {
                     wish_x = sinf(rad) * p->in_fwd;
                     wish_z = cosf(rad) * p->in_fwd;
                     max_spd = BUGGY_MAX_SPEED;
@@ -489,7 +532,7 @@ int main(int argc, char *argv[]) {
 
                 accelerate(p, wish_x, wish_z, wish_speed, acc);
 
-                float g = p->in_vehicle ? BUGGY_GRAVITY : (p->in_jump ? GRAVITY_FLOAT : GRAVITY_DROP);
+                float g = p->in_vehicle ? ((p->vehicle_type == VEH_BIKE) ? BIKE_GRAVITY : BUGGY_GRAVITY) : (p->in_jump ? GRAVITY_FLOAT : GRAVITY_DROP);
                 p->vy -= g;
                 if (p->in_jump && p->on_ground) {
                     p->y += 0.1f;

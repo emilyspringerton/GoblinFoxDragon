@@ -145,6 +145,7 @@ func defaultMenuEntries() []MenuEntry {
 		{ID: "mode.training", Label: "TRAINING", Kind: "action", Enabled: true},
 		{ID: "mode.recorder", Label: "RECORDER", Kind: "action", Enabled: true},
 		{ID: "mode.garage", Label: "OSAKA GARAGE", Kind: "action", Enabled: true},
+		{ID: "mode.city", Label: "CITY", Kind: "action", Enabled: true},
 		{ID: "mode.join", Label: "JOIN S.FARTHQ.COM", Kind: "action", Enabled: true},
 	}
 }
@@ -214,6 +215,10 @@ func (s *Server) handleIntent(intent IntentEnvelope) IntentResult {
 				state.Session.ActiveSceneID = "GARAGE_OSAKA"
 				state.Session.ActiveModeID = "mode.garage"
 				state.Overlay.Environment = "GARAGE_OSAKA"
+			case "mode.city":
+				state.Session.ActiveSceneID = "CITY"
+				state.Session.ActiveModeID = "mode.city"
+				state.Overlay.Environment = "CITY"
 			case "mode.join":
 				state.Session.ActiveModeID = "mode.join"
 			default:
@@ -289,6 +294,7 @@ func (s *Server) handleScenes(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, SceneList{Scenes: []Scene{
 		{SceneID: "GARAGE_OSAKA", Label: "Osaka Garage"},
 		{SceneID: "STADIUM", Label: "Stadium"},
+		{SceneID: "CITY", Label: "City"},
 	}})
 }
 

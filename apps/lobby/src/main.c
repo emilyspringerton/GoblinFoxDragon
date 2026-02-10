@@ -171,6 +171,8 @@ static void lobby_apply_scene_id(const char *scene_id) {
         scene_load(SCENE_GARAGE_OSAKA);
     } else if (strcmp(scene_id, "STADIUM") == 0) {
         scene_load(SCENE_STADIUM);
+    } else if (strcmp(scene_id, "CITY") == 0) {
+        scene_load(SCENE_CITY);
     }
 }
 
@@ -725,22 +727,27 @@ static int target_in_view(PlayerState *p, float tx, float ty, float tz, float ma
     return dot >= min_dot;
 }
 
-static void draw_garage_portal_frame() {
+static void draw_scene_portals() {
     if (!scene_portal_active(local_state.scene_id)) return;
-    float px = 0.0f, py = 0.0f, pz = 0.0f, pr = 0.0f;
-    scene_portal_info(local_state.scene_id, &px, &py, &pz, &pr);
-
-    glPushMatrix();
-    glTranslatef(px, py, pz);
-    glColor3f(0.2f, 0.9f, 1.0f);
-    glLineWidth(3.0f);
-    glBegin(GL_LINE_LOOP);
-    glVertex3f(-pr, -2.0f, 0.0f);
-    glVertex3f(pr, -2.0f, 0.0f);
-    glVertex3f(pr, 6.0f, 0.0f);
-    glVertex3f(-pr, 6.0f, 0.0f);
-    glEnd();
-    glPopMatrix();
+    PortalDef portals[4];
+    int portal_count = scene_portals(local_state.scene_id, portals, 4);
+    for (int i = 0; i < portal_count; i++) {
+        glPushMatrix();
+        glTranslatef(portals[i].x, portals[i].y, portals[i].z);
+        if (portals[i].portal_id == PORTAL_ID_CITY_GATE) {
+            glColor3f(0.9f, 0.5f, 1.0f);
+        } else {
+            glColor3f(0.2f, 0.9f, 1.0f);
+        }
+        glLineWidth(3.0f);
+        glBegin(GL_LINE_LOOP);
+        glVertex3f(-portals[i].radius, -2.0f, 0.0f);
+        glVertex3f(portals[i].radius, -2.0f, 0.0f);
+        glVertex3f(portals[i].radius, 6.0f, 0.0f);
+        glVertex3f(-portals[i].radius, 6.0f, 0.0f);
+        glEnd();
+        glPopMatrix();
+    }
 }
 
 static void draw_garage_vehicle_pads() {
@@ -772,7 +779,8 @@ static void draw_garage_overlay(PlayerState *p) {
     glColor3f(0.2f, 1.0f, 1.0f);
     draw_string("OSAKA GARAGE", 40, 670, 10);
     glColor3f(0.9f, 0.9f, 0.9f);
-    draw_string("PORTAL -> STADIUM", 40, 640, 6);
+    draw_string("PORTAL A -> STADIUM", 40, 640, 6);
+    draw_string("PORTAL B -> CITY", 40, 620, 6);
 
     int pad_count = 0;
     const VehiclePad *pads = scene_vehicle_pads(local_state.scene_id, &pad_count);
@@ -796,9 +804,15 @@ static void draw_garage_overlay(PlayerState *p) {
         list_y -= 20.0f;
     }
 
-    float portal_x = 0.0f, portal_y = 0.0f, portal_z = 0.0f, portal_r = 0.0f;
-    scene_portal_info(local_state.scene_id, &portal_x, &portal_y, &portal_z, &portal_r);
-    int portal_target = target_in_view(p, portal_x, portal_y, portal_z, 30.0f, 0.75f);
+    int portal_target = 0;
+    PortalDef portals[4];
+    int portal_count = scene_portals(local_state.scene_id, portals, 4);
+    for (int i = 0; i < portal_count; i++) {
+        if (target_in_view(p, portals[i].x, portals[i].y, portals[i].z, 30.0f, 0.75f)) {
+            portal_target = 1;
+            break;
+        }
+    }
     int pad_target = 0;
     if (scene_near_vehicle_pad(local_state.scene_id, p->x, p->z, 12.0f, NULL)) {
         int pad_idx = -1;
@@ -809,7 +823,7 @@ static void draw_garage_overlay(PlayerState *p) {
 
     glColor3f(1.0f, 1.0f, 0.0f);
     if (portal_target) {
-        draw_string("TRAVEL", 600, 350, 8);
+        draw_string("PRESS F TO TRAVEL", 540, 350, 8);
     } else if (pad_target) {
         draw_string(p->in_vehicle ? "EXIT VEHICLE" : "ENTER VEHICLE", 560, 350, 8);
     }
@@ -881,7 +895,7 @@ void draw_scene(PlayerState *render_p) {
     update_and_draw_trails();
     draw_map();
     draw_garage_vehicle_pads();
-    draw_garage_portal_frame();
+    draw_scene_portals();
     draw_projectiles();
     if (render_p->in_vehicle) draw_player_3rd(render_p);
     for(int i=0; i<MAX_CLIENTS; i++) {
@@ -993,7 +1007,7 @@ void net_connect() {
     }
 }
 
-UserCmd client_create_cmd(float fwd, float str, float yaw, float pitch, int shoot, int jump, int crouch, int reload, int use, int ability, int wpn_idx) {
+UserCmd client_create_cmd(float fwd, float str, float yaw, float pitch, int shoot, int jump, int crouch, int reload, int use, int bike, int ability, int wpn_idx) {
     UserCmd cmd;
     memset(&cmd, 0, sizeof(UserCmd));
     cmd.sequence = ++net_cmd_seq; cmd.timestamp = SDL_GetTicks();
@@ -1003,6 +1017,7 @@ UserCmd client_create_cmd(float fwd, float str, float yaw, float pitch, int shoo
     if(crouch) cmd.buttons |= BTN_CROUCH;
     if(reload) cmd.buttons |= BTN_RELOAD;
     if(use) cmd.buttons |= BTN_USE;
+    if(bike) cmd.buttons |= BTN_VEHICLE_2;
     if(ability) cmd.buttons |= BTN_ABILITY_1;
     cmd.weapon_idx = wpn_idx; return cmd;
 }
@@ -1283,6 +1298,7 @@ int main(int argc, char* argv[]) {
             int shoot = (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT));
             int reload = k[SDL_SCANCODE_R];
             int use = k[SDL_SCANCODE_F];
+            int bike = k[SDL_SCANCODE_G];
             int ability = k[SDL_SCANCODE_E];
             if(k[SDL_SCANCODE_1]) wpn_req=0; if(k[SDL_SCANCODE_2]) wpn_req=1;
             if(k[SDL_SCANCODE_3]) wpn_req=2; if(k[SDL_SCANCODE_4]) wpn_req=3; if(k[SDL_SCANCODE_5]) wpn_req=4;
@@ -1292,35 +1308,56 @@ int main(int argc, char* argv[]) {
             glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(current_fov, 1280.0/720.0, 0.1, Z_FAR); 
             glMatrixMode(GL_MODELVIEW);
             if (app_state == STATE_GAME_NET) {
-                UserCmd cmd = client_create_cmd(fwd, str, cam_yaw, cam_pitch, shoot, jump, crouch, reload, use, ability, wpn_req);
+                UserCmd cmd = client_create_cmd(fwd, str, cam_yaw, cam_pitch, shoot, jump, crouch, reload, use, bike, ability, wpn_req);
                 net_send_cmd(cmd);
                 net_tick();
             } else {
                 local_state.players[0].in_use = use;
-                if (use && local_state.players[0].vehicle_cooldown == 0 && local_state.transition_timer == 0) {
+                local_state.players[0].in_bike = bike;
+                if (local_state.transition_timer == 0) {
                     PlayerState *p0 = &local_state.players[0];
-                    int in_garage = local_state.scene_id == SCENE_GARAGE_OSAKA;
-                    int portal_id = -1;
-                    if (scene_portal_triggered(p0, &portal_id)) {
-                        int dest_scene = -1;
-                        float sx = 0.0f, sy = 0.0f, sz = 0.0f;
-                        if (portal_resolve_destination(p0->scene_id, portal_id, p0->id, &dest_scene, &sx, &sy, &sz)) {
-                            p0->scene_id = dest_scene;
-                            p0->x = sx; p0->y = sy; p0->z = sz;
-                            p0->vx = 0.0f; p0->vy = 0.0f; p0->vz = 0.0f;
-                            scene_request_transition(dest_scene);
+                    int use_pressed = use && !p0->use_was_down;
+                    int bike_pressed = bike && !p0->bike_was_down;
+                    if (p0->vehicle_cooldown == 0 && use_pressed) {
+                        int in_garage = local_state.scene_id == SCENE_GARAGE_OSAKA;
+                        int portal_id = -1;
+                        if (scene_portal_triggered(p0, &portal_id)) {
+                            int dest_scene = -1;
+                            float sx = 0.0f, sy = 0.0f, sz = 0.0f;
+                            if (portal_resolve_destination(p0->scene_id, portal_id, p0->id, &dest_scene, &sx, &sy, &sz)) {
+                                p0->scene_id = dest_scene;
+                                p0->x = sx; p0->y = sy; p0->z = sz;
+                                p0->vx = 0.0f; p0->vy = 0.0f; p0->vz = 0.0f;
+                                p0->in_vehicle = 0;
+                                p0->vehicle_type = VEH_NONE;
+                                p0->bike_gear = 0;
+                                scene_request_transition(dest_scene);
+                            }
+                        } else if ((in_garage && scene_near_vehicle_pad(local_state.scene_id, p0->x, p0->z, 6.0f, NULL)) || !in_garage) {
+                            if (p0->vehicle_type == VEH_BUGGY) {
+                                p0->vehicle_type = VEH_NONE; p0->in_vehicle = 0;
+                            } else {
+                                p0->vehicle_type = VEH_BUGGY; p0->in_vehicle = 1; p0->bike_gear = 0;
+                            }
+                            p0->vehicle_cooldown = 30;
                         }
-                    } else if (in_garage && scene_near_vehicle_pad(local_state.scene_id, p0->x, p0->z, 6.0f, NULL)) {
-                        p0->in_vehicle = !p0->in_vehicle;
-                        p0->vehicle_cooldown = 30;
-                    } else if (!in_garage) {
-                        p0->in_vehicle = !p0->in_vehicle;
-                        p0->vehicle_cooldown = 30;
+                    } else if (p0->vehicle_cooldown == 0 && bike_pressed) {
+                        int in_garage = local_state.scene_id == SCENE_GARAGE_OSAKA;
+                        if ((in_garage && scene_near_vehicle_pad(local_state.scene_id, p0->x, p0->z, 6.0f, NULL)) || !in_garage) {
+                            if (p0->vehicle_type == VEH_BIKE) {
+                                p0->vehicle_type = VEH_NONE; p0->in_vehicle = 0; p0->bike_gear = 0;
+                            } else {
+                                p0->vehicle_type = VEH_BIKE; p0->in_vehicle = 1; p0->bike_gear = 1;
+                            }
+                            p0->vehicle_cooldown = 30;
+                        }
                     }
+                    p0->use_was_down = use;
+                    p0->bike_was_down = bike;
                 }
                 if(local_state.players[0].vehicle_cooldown > 0) local_state.players[0].vehicle_cooldown--;
                 unsigned int now_ms = SDL_GetTicks();
-                local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn_req, jump, crouch, reload, ability, NULL, now_ms);
+                local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn_req, jump, crouch, reload, use, bike, ability, NULL, now_ms);
             }
             PlayerState *render_p = &local_state.players[0];
             if (app_state == STATE_GAME_NET &&
