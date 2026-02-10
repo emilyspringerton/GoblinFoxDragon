@@ -360,6 +360,9 @@ int main(int argc, char *argv[]) {
     server_net_init();
     int mode = parse_server_mode(argc, argv);
     local_init_match(1, mode);
+    local_state.players[0].active = 0;
+    local_state.players[0].health = 0;
+    local_state.players[0].state = STATE_DEAD;
     printf("SERVER MODE: %s\n", mode == MODE_TDM ? "TEAM DEATHMATCH" : "DEATHMATCH");
 
     int running = 1;
