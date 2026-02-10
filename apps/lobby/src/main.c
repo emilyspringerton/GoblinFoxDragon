@@ -63,12 +63,18 @@ float current_fov = 75.0f;
 int sock = -1;
 struct sockaddr_in server_addr;
 
+#define NET_CMD_HISTORY 3
+UserCmd net_cmd_history[NET_CMD_HISTORY];
+int net_cmd_history_count = 0;
+
 void net_connect();
 
 static void reset_client_render_state_for_net() {
     my_client_id = -1;
     memset(local_state.players, 0, sizeof(local_state.players));
     memset(local_state.projectiles, 0, sizeof(local_state.projectiles));
+    memset(net_cmd_history, 0, sizeof(net_cmd_history));
+    net_cmd_history_count = 0;
     travel_overlay_until_ms = 0;
     local_state.scene_id = SCENE_GARAGE_OSAKA;
     phys_set_scene(local_state.scene_id);
@@ -955,13 +961,26 @@ UserCmd client_create_cmd(float fwd, float str, float yaw, float pitch, int shoo
 void net_send_cmd(UserCmd cmd) {
     char packet_data[256];
     int cursor = 0;
+
+    for (int i = NET_CMD_HISTORY - 1; i > 0; i--) {
+        net_cmd_history[i] = net_cmd_history[i - 1];
+    }
+    net_cmd_history[0] = cmd;
+    if (net_cmd_history_count < NET_CMD_HISTORY) net_cmd_history_count++;
+
     NetHeader head; head.type = PACKET_USERCMD;
-    head.client_id = 0; 
+    head.client_id = 0;
     head.scene_id = 0;
     memcpy(packet_data + cursor, &head, sizeof(NetHeader)); cursor += sizeof(NetHeader);
-    unsigned char count = 1;
+
+    unsigned char count = (unsigned char)net_cmd_history_count;
     memcpy(packet_data + cursor, &count, 1); cursor += 1;
-    memcpy(packet_data + cursor, &cmd, sizeof(UserCmd)); cursor += sizeof(UserCmd);
+
+    for (int i = 0; i < net_cmd_history_count; i++) {
+        memcpy(packet_data + cursor, &net_cmd_history[i], sizeof(UserCmd));
+        cursor += sizeof(UserCmd);
+    }
+
     sendto(sock, packet_data, cursor, 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
 }
 
