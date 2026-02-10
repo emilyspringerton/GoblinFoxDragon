@@ -811,7 +811,7 @@ void draw_hud(PlayerState *p) {
 
     if (p->scene_id == SCENE_CITY && (fabsf(p->x) > CITY_SOFT_X || fabsf(p->z) > CITY_SOFT_Z)) {
         glColor3f(1.0f, 0.55f, 0.2f);
-        draw_string("CITY LIMIT / TURN BACK", 500, 680, 7);
+        draw_string("LEAVING DISTRICT... TURN BACK", 430, 680, 7);
     }
 
     if (app_state == STATE_GAME_LOCAL) {
@@ -1014,7 +1014,7 @@ static void draw_city_npc_primitive(const CityNpc *n) {
 }
 
 static void draw_city_npcs(void) {
-    if (local_state.scene_id != SCENE_CITY) return;
+    if (local_state.scene_id != SCENE_CITY && local_state.scene_id != SCENE_STADIUM) return;
     for (int i = 0; i < MAX_CITY_NPCS; i++) {
         if (!city_npcs.npcs[i].active) continue;
         draw_city_npc_primitive(&city_npcs.npcs[i]);

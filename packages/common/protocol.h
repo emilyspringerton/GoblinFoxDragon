@@ -114,6 +114,7 @@ typedef struct {
     int id;
     int scene_id;
     int active; int is_bot;
+    int team_id;
     float x, y, z; float vx, vy, vz; float yaw, pitch; int on_ground;
     float in_fwd;
     float in_strafe;
@@ -125,6 +126,10 @@ typedef struct {
     int is_shooting; int jump_timer;
     int health; int shield; int shield_regen_timer; int state;
     int kills; int deaths; int hit_feedback; float recoil_anim;
+    int level;
+    int xp;
+    int xp_to_next;
+    unsigned int last_xp_award_time;
     int in_vehicle;
     int vehicle_type;
     int bike_gear;

@@ -130,7 +130,7 @@ static int map_count = 0;
 #define CITY_HARD_Z 3200.0f
 #define CITY_EDGE_PUSH 0.035f
 #define CITY_EDGE_FRICTION 0.975f
-#define CITY_GRID_RADIUS 8
+#define CITY_GRID_RADIUS 12
 #define CITY_BLOCK_SIZE 230.0f
 #define CITY_ROAD_SIZE 54.0f
 #define CITY_DISTRICTS 5
@@ -201,10 +201,6 @@ static inline void init_voxworld_city_geo() {
     const float world_extent = (CITY_GRID_RADIUS + 2) * pitch;
 
     map_geo_voxworld[map_geo_voxworld_count++] = (Box){0.0f, -2.0f, 0.0f, world_extent * 2.0f, 4.0f, world_extent * 2.0f};
-    map_geo_voxworld[map_geo_voxworld_count++] = (Box){0.0f, 140.0f, world_extent, world_extent * 2.0f, 280.0f, 12.0f};
-    map_geo_voxworld[map_geo_voxworld_count++] = (Box){0.0f, 140.0f, -world_extent, world_extent * 2.0f, 280.0f, 12.0f};
-    map_geo_voxworld[map_geo_voxworld_count++] = (Box){world_extent, 140.0f, 0.0f, 12.0f, 280.0f, world_extent * 2.0f};
-    map_geo_voxworld[map_geo_voxworld_count++] = (Box){-world_extent, 140.0f, 0.0f, 12.0f, 280.0f, world_extent * 2.0f};
 
     for (int gx = -CITY_GRID_RADIUS; gx <= CITY_GRID_RADIUS; gx++) {
         for (int gz = -CITY_GRID_RADIUS; gz <= CITY_GRID_RADIUS; gz++) {
@@ -392,9 +388,6 @@ static inline void scene_safety_check(PlayerState *p) {
             p->vx *= 0.992f;
         }
 
-        if (fabsf(p->x) > CITY_HARD_X || fabsf(p->z) > CITY_HARD_Z) {
-            scene_force_spawn(p);
-        }
     }
 }
 
