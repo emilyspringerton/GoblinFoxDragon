@@ -597,20 +597,26 @@ void draw_head(int weapon_id) {
 }
 
 void draw_player_3rd(PlayerState *p) {
+    float draw_yaw = norm_yaw_deg(p->yaw);
+    float draw_pitch = clamp_pitch_deg(p->pitch);
+    float draw_recoil = (p->is_shooting > 0) ? 1.0f : p->recoil_anim;
+
     glPushMatrix();
     glTranslatef(p->x, p->y + 0.2f, p->z);
-    glRotatef(-p->yaw, 0, 1, 0);
+    glRotatef(-draw_yaw, 0, 1, 0);
     if (p->in_vehicle) {
         draw_buggy_model();
     } else {
         draw_ronin_shell();
         glPushMatrix();
         glTranslatef(0.0f, 1.85f, 0.0f);
-        glRotatef(p->pitch, 1, 0, 0);
+        glRotatef(draw_pitch, 1, 0, 0);
         draw_storm_mask();
         glPopMatrix();
         glPushMatrix(); glTranslatef(0.6f, 1.1f, 0.55f);
-        glRotatef(p->pitch, 1, 0, 0);
+        glRotatef(draw_pitch, 1, 0, 0);
+        glRotatef(-draw_recoil * 10.0f, 1, 0, 0);
+        glTranslatef(0.0f, 0.0f, -draw_recoil * 0.08f);
         glScalef(0.8f, 0.8f, 0.8f); draw_gun_model(p->current_weapon); glPopMatrix(); 
     }
     glPopMatrix();
@@ -1028,18 +1034,17 @@ void net_process_snapshot(char *buffer, int len) {
             p->storm_charges = np->storm_charges;
             
             // --- SYNC HIT MARKER ---
-            if (id == my_client_id) {
-                if (np->hit_feedback > p->hit_feedback) p->hit_feedback = np->hit_feedback;
-            } else {
-                 p->hit_feedback = np->hit_feedback;
-            }
+            p->hit_feedback = np->hit_feedback;
 
             if (p->is_shooting) p->recoil_anim = 1.0f;
         } else if (id == 0) {
             local_state.players[0].scene_id = np->scene_id;
+            local_state.players[0].yaw = norm_yaw_deg(np->yaw);
+            local_state.players[0].pitch = clamp_pitch_deg(np->pitch);
             local_state.players[0].ammo[local_state.players[0].current_weapon] = np->ammo;
             local_state.players[0].in_vehicle = np->in_vehicle; 
             local_state.players[0].storm_charges = np->storm_charges;
+            local_state.players[0].hit_feedback = np->hit_feedback;
         }
     }
 
