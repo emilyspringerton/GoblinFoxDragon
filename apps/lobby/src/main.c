@@ -63,7 +63,25 @@ float current_fov = 75.0f;
 int sock = -1;
 struct sockaddr_in server_addr;
 
+#define NET_CMD_HISTORY 3
+UserCmd net_cmd_history[NET_CMD_HISTORY];
+int net_cmd_history_count = 0;
+int net_cmd_seq = 0;
+
 void net_connect();
+void net_shutdown();
+
+static void reset_client_render_state_for_net() {
+    my_client_id = -1;
+    memset(&local_state, 0, sizeof(local_state));
+    memset(net_cmd_history, 0, sizeof(net_cmd_history));
+    net_cmd_history_count = 0;
+    net_cmd_seq = 0;
+    travel_overlay_until_ms = 0;
+    local_state.pending_scene = -1;
+    local_state.scene_id = SCENE_GARAGE_OSAKA;
+    phys_set_scene(local_state.scene_id);
+}
 
 void draw_string(const char* str, float x, float y, float size) {
     TurtlePen pen = turtle_pen_create(x, y, size);
@@ -160,6 +178,7 @@ static void lobby_apply_ui_state() {
     if (!ui_use_server) return;
     if (strcmp(ui_state.active_mode_id, "mode.join") == 0) {
         app_state = STATE_GAME_NET;
+        reset_client_render_state_for_net();
         net_connect();
         return;
     }
@@ -216,6 +235,7 @@ static void lobby_start_action(int action) {
     }
     if (action == LOBBY_JOIN) {
         app_state = STATE_GAME_NET;
+        reset_client_render_state_for_net();
         net_connect();
     } else {
         app_state = STATE_GAME_LOCAL;
@@ -910,7 +930,26 @@ void net_init() {
     #endif
 }
 
+void net_shutdown() {
+    if (sock >= 0) {
+        char buffer[128];
+        NetHeader *h = (NetHeader*)buffer;
+        memset(h, 0, sizeof(NetHeader));
+        h->type = PACKET_DISCONNECT;
+        sendto(sock, buffer, sizeof(NetHeader), 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
+
+        #ifdef _WIN32
+        closesocket(sock);
+        #else
+        close(sock);
+        #endif
+        sock = -1;
+    }
+    reset_client_render_state_for_net();
+}
+
 void net_connect() {
+    if (sock < 0) net_init();
     struct hostent *he = gethostbyname(SERVER_HOST);
     if (he) {
         server_addr.sin_family = AF_INET; 
@@ -930,7 +969,7 @@ void net_connect() {
 UserCmd client_create_cmd(float fwd, float str, float yaw, float pitch, int shoot, int jump, int crouch, int reload, int use, int ability, int wpn_idx) {
     UserCmd cmd;
     memset(&cmd, 0, sizeof(UserCmd));
-    static int seq = 0; cmd.sequence = ++seq; cmd.timestamp = SDL_GetTicks();
+    cmd.sequence = ++net_cmd_seq; cmd.timestamp = SDL_GetTicks();
     cmd.yaw = yaw; cmd.pitch = pitch;
     cmd.fwd = fwd; cmd.str = str;
     if(shoot) cmd.buttons |= BTN_ATTACK; if(jump) cmd.buttons |= BTN_JUMP;
@@ -944,13 +983,26 @@ UserCmd client_create_cmd(float fwd, float str, float yaw, float pitch, int shoo
 void net_send_cmd(UserCmd cmd) {
     char packet_data[256];
     int cursor = 0;
+
+    for (int i = NET_CMD_HISTORY - 1; i > 0; i--) {
+        net_cmd_history[i] = net_cmd_history[i - 1];
+    }
+    net_cmd_history[0] = cmd;
+    if (net_cmd_history_count < NET_CMD_HISTORY) net_cmd_history_count++;
+
     NetHeader head; head.type = PACKET_USERCMD;
-    head.client_id = 0; 
+    head.client_id = 0;
     head.scene_id = 0;
     memcpy(packet_data + cursor, &head, sizeof(NetHeader)); cursor += sizeof(NetHeader);
-    unsigned char count = 1;
+
+    unsigned char count = (unsigned char)net_cmd_history_count;
     memcpy(packet_data + cursor, &count, 1); cursor += 1;
-    memcpy(packet_data + cursor, &cmd, sizeof(UserCmd)); cursor += sizeof(UserCmd);
+
+    for (int i = 0; i < net_cmd_history_count; i++) {
+        memcpy(packet_data + cursor, &net_cmd_history[i], sizeof(UserCmd));
+        cursor += sizeof(UserCmd);
+    }
+
     sendto(sock, packet_data, cursor, 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
 }
 
@@ -968,7 +1020,7 @@ void net_process_snapshot(char *buffer, int len) {
             p->active = 1;
             p->scene_id = np->scene_id;
             p->x = np->x; p->y = np->y; p->z = np->z;
-            p->yaw = np->yaw; p->pitch = np->pitch;
+            p->yaw = norm_yaw_deg(np->yaw); p->pitch = clamp_pitch_deg(np->pitch);
             p->health = np->health;
             p->current_weapon = np->current_weapon;
             p->is_shooting = np->is_shooting;
@@ -1153,6 +1205,7 @@ int main(int argc, char* argv[]) {
                 }
             } else {
                 if(e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) {
+                    if (app_state == STATE_GAME_NET) net_shutdown();
                     app_state = STATE_LOBBY;
                     SDL_SetRelativeMouseMode(SDL_FALSE);
                     setup_lobby_2d();
@@ -1221,8 +1274,16 @@ int main(int argc, char* argv[]) {
                 if (use && local_state.players[0].vehicle_cooldown == 0 && local_state.transition_timer == 0) {
                     PlayerState *p0 = &local_state.players[0];
                     int in_garage = local_state.scene_id == SCENE_GARAGE_OSAKA;
-                    if (in_garage && scene_portal_triggered(p0)) {
-                        scene_request_transition(SCENE_STADIUM);
+                    int portal_id = -1;
+                    if (scene_portal_triggered(p0, &portal_id)) {
+                        int dest_scene = -1;
+                        float sx = 0.0f, sy = 0.0f, sz = 0.0f;
+                        if (portal_resolve_destination(p0->scene_id, portal_id, p0->id, &dest_scene, &sx, &sy, &sz)) {
+                            p0->scene_id = dest_scene;
+                            p0->x = sx; p0->y = sy; p0->z = sz;
+                            p0->vx = 0.0f; p0->vy = 0.0f; p0->vz = 0.0f;
+                            scene_request_transition(dest_scene);
+                        }
                     } else if (in_garage && scene_near_vehicle_pad(local_state.scene_id, p0->x, p0->z, 6.0f, NULL)) {
                         p0->in_vehicle = !p0->in_vehicle;
                         p0->vehicle_cooldown = 30;
