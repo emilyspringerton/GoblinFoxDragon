@@ -22,6 +22,13 @@
 #define BUGGY_FRICTION 0.03f    
 #define BUGGY_GRAVITY 0.15f     
 
+#define BIKE_MAX_SPEED 3.8f
+#define BIKE_FRICTION 0.02f
+#define BIKE_GRAVITY 0.12f
+#define BIKE_GEARS 5
+static const float BIKE_GEAR_MAX[BIKE_GEARS + 1] = {0.0f, 1.2f, 2.0f, 2.7f, 3.3f, 3.8f};
+static const float BIKE_GEAR_ACCEL[BIKE_GEARS + 1] = {0.0f, 0.14f, 0.11f, 0.095f, 0.08f, 0.07f};
+
 #define EYE_HEIGHT 2.59f    
 #define PLAYER_WIDTH 0.97f  
 #define PLAYER_HEIGHT 6.47f 
@@ -497,8 +504,9 @@ void apply_friction(PlayerState *p) {
     
     float drop = 0;
     if (p->in_vehicle) {
-        drop = speed * BUGGY_FRICTION;
-    } 
+        float vehicle_friction = (p->vehicle_type == VEH_BIKE) ? BIKE_FRICTION : BUGGY_FRICTION;
+        drop = speed * vehicle_friction;
+    }
     else if (p->on_ground) {
         if (p->crouching) {
             if (speed > 0.75f) drop = speed * SLIDE_FRICTION;
@@ -519,7 +527,8 @@ void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, fl
         float current_speed = (p->vx * wish_x) + (p->vz * wish_z);
         float add_speed = wish_speed - current_speed;
         if (add_speed <= 0) return;
-        float acc_speed = accel * BUGGY_MAX_SPEED;
+        float vehicle_max_speed = (p->vehicle_type == VEH_BIKE) ? BIKE_MAX_SPEED : BUGGY_MAX_SPEED;
+        float acc_speed = accel * vehicle_max_speed;
         if (acc_speed > add_speed) acc_speed = add_speed;
         p->vx += acc_speed * wish_x; p->vz += acc_speed * wish_z;
         return;
@@ -566,7 +575,11 @@ void resolve_collision(PlayerState *p) {
 void phys_respawn(PlayerState *p, unsigned int now) {
     p->active = 1; p->state = STATE_ALIVE;
     p->health = 100; p->shield = 100; p->respawn_time = 0; p->in_vehicle = 0;
+    p->vehicle_type = VEH_NONE;
+    p->bike_gear = 0;
+    p->in_bike = 0;
     p->use_was_down = 0;
+    p->bike_was_down = 0;
     if (p->scene_id != SCENE_GARAGE_OSAKA && p->scene_id != SCENE_STADIUM && p->scene_id != SCENE_VOXWORLD) {
         p->scene_id = SCENE_GARAGE_OSAKA;
     }
