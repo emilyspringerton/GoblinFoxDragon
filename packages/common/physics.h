@@ -112,7 +112,15 @@ static int map_count = 0;
 #define STADIUM_PORTAL_Y 2.0f
 #define STADIUM_PORTAL_Z 0.0f
 #define STADIUM_PORTAL_RADIUS 16.0f
+#define STADIUM_EDGE_PORTAL_X 406.0f
+#define STADIUM_EDGE_PORTAL_Y 2.0f
+#define STADIUM_EDGE_PORTAL_Z 0.0f
+#define STADIUM_EDGE_PORTAL_RADIUS 14.0f
+#define STADIUM_EDGE_TELEPORT_X -360.0f
+#define STADIUM_EDGE_TELEPORT_Y 2.0f
+#define STADIUM_EDGE_TELEPORT_Z 0.0f
 #define PORTAL_ID_GARAGE_EXIT 0
+#define PORTAL_ID_STADIUM_EDGE_TELEPORT 1
 
 typedef struct {
     float x;
@@ -208,6 +216,13 @@ static inline int portal_resolve_destination(int current_scene, int portal_id, i
         scene_spawn_point(*out_scene, slot, out_x, out_y, out_z);
         return 1;
     }
+    if (current_scene == SCENE_STADIUM && portal_id == PORTAL_ID_STADIUM_EDGE_TELEPORT) {
+        *out_scene = SCENE_STADIUM;
+        *out_x = STADIUM_EDGE_TELEPORT_X;
+        *out_y = STADIUM_EDGE_TELEPORT_Y;
+        *out_z = STADIUM_EDGE_TELEPORT_Z;
+        return 1;
+    }
     return 0;
 }
 
@@ -236,15 +251,39 @@ static inline const VehiclePad *scene_vehicle_pads(int scene_id, int *out_count)
     return NULL;
 }
 
-static inline int scene_portal_triggered(PlayerState *p) {
+static inline int scene_portal_triggered(PlayerState *p, int *out_portal_id) {
     if (!scene_portal_active(p->scene_id)) return 0;
+
+    if (p->scene_id == SCENE_STADIUM) {
+        float dx_main = p->x - STADIUM_PORTAL_X;
+        float dz_main = p->z - STADIUM_PORTAL_Z;
+        float dist_sq_main = dx_main * dx_main + dz_main * dz_main;
+        if (dist_sq_main <= (STADIUM_PORTAL_RADIUS * STADIUM_PORTAL_RADIUS)) {
+            if (out_portal_id) *out_portal_id = PORTAL_ID_GARAGE_EXIT;
+            return 1;
+        }
+
+        float dx_edge = p->x - STADIUM_EDGE_PORTAL_X;
+        float dz_edge = p->z - STADIUM_EDGE_PORTAL_Z;
+        float dist_sq_edge = dx_edge * dx_edge + dz_edge * dz_edge;
+        if (dist_sq_edge <= (STADIUM_EDGE_PORTAL_RADIUS * STADIUM_EDGE_PORTAL_RADIUS)) {
+            if (out_portal_id) *out_portal_id = PORTAL_ID_STADIUM_EDGE_TELEPORT;
+            return 1;
+        }
+        return 0;
+    }
+
     float portal_x = 0.0f, portal_y = 0.0f, portal_z = 0.0f, portal_radius = 0.0f;
     scene_portal_info(p->scene_id, &portal_x, &portal_y, &portal_z, &portal_radius);
     if (portal_radius <= 0.0f) return 0;
     float dx = p->x - portal_x;
     float dz = p->z - portal_z;
     float dist_sq = dx * dx + dz * dz;
-    return dist_sq <= (portal_radius * portal_radius);
+    if (dist_sq <= (portal_radius * portal_radius)) {
+        if (out_portal_id) *out_portal_id = PORTAL_ID_GARAGE_EXIT;
+        return 1;
+    }
+    return 0;
 }
 
 static inline int scene_near_vehicle_pad(int scene_id, float x, float z, float max_dist, int *out_idx) {

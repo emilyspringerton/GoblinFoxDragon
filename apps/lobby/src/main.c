@@ -1274,7 +1274,7 @@ int main(int argc, char* argv[]) {
                 if (use && local_state.players[0].vehicle_cooldown == 0 && local_state.transition_timer == 0) {
                     PlayerState *p0 = &local_state.players[0];
                     int in_garage = local_state.scene_id == SCENE_GARAGE_OSAKA;
-                    if (in_garage && scene_portal_triggered(p0)) {
+                    if (in_garage && scene_portal_triggered(p0, NULL)) {
                         scene_request_transition(SCENE_STADIUM);
                     } else if (in_garage && scene_near_vehicle_pad(local_state.scene_id, p0->x, p0->z, 6.0f, NULL)) {
                         p0->in_vehicle = !p0->in_vehicle;

@@ -433,11 +433,12 @@ int main(int argc, char *argv[]) {
             if (p->active && p->state != STATE_DEAD) {
                 phys_set_scene(p->scene_id);
                 int use_pressed = p->in_use && !p->use_was_down;
+                int portal_id = -1;
                 if (use_pressed && now >= p->portal_cooldown_until_ms &&
-                    scene_portal_active(p->scene_id) && scene_portal_triggered(p)) {
+                    scene_portal_active(p->scene_id) && scene_portal_triggered(p, &portal_id)) {
                     int dest_scene = -1;
                     float sx = 0.0f, sy = 0.0f, sz = 0.0f;
-                    if (portal_resolve_destination(p->scene_id, PORTAL_ID_GARAGE_EXIT, p->id,
+                    if (portal_resolve_destination(p->scene_id, portal_id, p->id,
                                                    &dest_scene, &sx, &sy, &sz)) {
                         int from_scene = p->scene_id;
                         p->scene_id = dest_scene;
