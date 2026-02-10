@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
+#include <math.h>
 #ifndef _WIN32
 #include <netinet/in.h>
 #endif
@@ -79,6 +80,29 @@ void test_button_bits() {
     ASSERT_EQ((btns & BTN_CROUCH), 0, "Crouch bit NOT set");
 }
 
+void test_rotation_wire_roundtrip() {
+    printf("--- Testing Rotation Wire Roundtrip ---\n");
+    char buffer[256];
+    int cursor = 0;
+    NetHeader head;
+    memset(&head, 0, sizeof(head));
+    head.type = PACKET_USERCMD;
+    memcpy(buffer + cursor, &head, sizeof(NetHeader));
+    cursor += (int)sizeof(NetHeader);
+
+    UserCmd in;
+    memset(&in, 0, sizeof(in));
+    in.yaw = 90.0f;
+    in.pitch = 10.0f;
+    memcpy(buffer + cursor, &in, sizeof(UserCmd));
+
+    UserCmd out;
+    memcpy(&out, buffer + sizeof(NetHeader), sizeof(UserCmd));
+
+    ASSERT_TRUE(fabsf(out.yaw - 90.0f) < 0.0001f, "Yaw roundtrips over wire");
+    ASSERT_TRUE(fabsf(out.pitch - 10.0f) < 0.0001f, "Pitch roundtrips over wire");
+}
+
 void test_scene_fields() {
     printf("--- Testing Scene Fields ---\n");
     ASSERT_EQ(sizeof(((NetHeader*)0)->scene_id), 1, "NetHeader scene_id is 1 byte");
@@ -95,6 +119,7 @@ int main() {
     test_simulation_delta();
     test_button_bits();
     test_scene_fields();
+    test_rotation_wire_roundtrip();
     
     printf("\n--------------------------------------\n");
     printf("SUMMARY: %d/%d Tests Passed.\n", tests_passed, tests_run);
