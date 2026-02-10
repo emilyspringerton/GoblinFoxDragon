@@ -122,10 +122,18 @@ static int map_count = 0;
 #define VOXWORLD_BOUNDS_Z 1180.0f
 #define VOXWORLD_SEED 1337
 
+#define CITY_KILL_Y -120.0f
+#define CITY_BOUNDS_X 1180.0f
+#define CITY_BOUNDS_Z 1180.0f
+
 #define GARAGE_PORTAL_X 0.0f
 #define GARAGE_PORTAL_Y 6.0f
 #define GARAGE_PORTAL_Z 56.0f
 #define GARAGE_PORTAL_RADIUS 6.0f
+#define GARAGE_CITY_PORTAL_X -56.0f
+#define GARAGE_CITY_PORTAL_Y 6.0f
+#define GARAGE_CITY_PORTAL_Z 0.0f
+#define GARAGE_CITY_PORTAL_RADIUS 6.0f
 #define STADIUM_PORTAL_X 0.0f
 #define STADIUM_PORTAL_Y 2.0f
 #define STADIUM_PORTAL_Z 0.0f
@@ -141,9 +149,22 @@ static int map_count = 0;
 #define VOXWORLD_PORTAL_Y 2.0f
 #define VOXWORLD_PORTAL_Z 0.0f
 #define VOXWORLD_PORTAL_RADIUS 16.0f
+#define CITY_PORTAL_X 0.0f
+#define CITY_PORTAL_Y 2.0f
+#define CITY_PORTAL_Z 0.0f
+#define CITY_PORTAL_RADIUS 16.0f
 #define PORTAL_ID_GARAGE_EXIT 0
 #define PORTAL_ID_STADIUM_TO_VOXWORLD 1
 #define PORTAL_ID_VOXWORLD_TO_STADIUM 2
+#define PORTAL_ID_CITY_GATE 3
+
+typedef struct {
+    int portal_id;
+    float x;
+    float y;
+    float z;
+    float radius;
+} PortalDef;
 
 typedef struct {
     float x;
@@ -203,7 +224,7 @@ static inline void phys_set_scene(int scene_id) {
     if (scene_id == SCENE_GARAGE_OSAKA) {
         map_geo = map_geo_garage;
         map_count = (int)(sizeof(map_geo_garage) / sizeof(Box));
-    } else if (scene_id == SCENE_VOXWORLD) {
+    } else if (scene_id == SCENE_VOXWORLD || scene_id == SCENE_CITY) {
         init_voxworld_city_geo();
         map_geo = map_geo_voxworld;
         map_count = map_geo_voxworld_count;
@@ -223,6 +244,14 @@ static inline void scene_spawn_point(int scene_id, int slot, float *out_x, float
         return;
     }
     if (scene_id == SCENE_VOXWORLD) {
+        float offsets[] = {-120.0f, -60.0f, 0.0f, 60.0f, 120.0f};
+        int idx = slot % 5;
+        *out_x = offsets[idx];
+        *out_y = 6.0f;
+        *out_z = 0.0f;
+        return;
+    }
+    if (scene_id == SCENE_CITY) {
         float offsets[] = {-120.0f, -60.0f, 0.0f, 60.0f, 120.0f};
         int idx = slot % 5;
         *out_x = offsets[idx];
@@ -275,11 +304,46 @@ static inline void scene_safety_check(PlayerState *p) {
             p->z < -VOXWORLD_BOUNDS_Z || p->z > VOXWORLD_BOUNDS_Z) {
             scene_force_spawn(p);
         }
+        return;
+    }
+    if (p->scene_id == SCENE_CITY) {
+        if (p->y < CITY_KILL_Y ||
+            p->x < -CITY_BOUNDS_X || p->x > CITY_BOUNDS_X ||
+            p->z < -CITY_BOUNDS_Z || p->z > CITY_BOUNDS_Z) {
+            scene_force_spawn(p);
+        }
     }
 }
 
 static inline int scene_portal_active(int scene_id) {
-    return scene_id == SCENE_GARAGE_OSAKA || scene_id == SCENE_STADIUM || scene_id == SCENE_VOXWORLD;
+    return scene_id == SCENE_GARAGE_OSAKA || scene_id == SCENE_STADIUM || scene_id == SCENE_CITY || scene_id == SCENE_VOXWORLD;
+}
+
+static inline int scene_portals(int scene_id, PortalDef *out, int max) {
+    if (!out || max <= 0) return 0;
+    int count = 0;
+    if (scene_id == SCENE_GARAGE_OSAKA) {
+        if (count < max) {
+            out[count++] = (PortalDef){PORTAL_ID_GARAGE_EXIT, GARAGE_PORTAL_X, GARAGE_PORTAL_Y, GARAGE_PORTAL_Z, GARAGE_PORTAL_RADIUS};
+        }
+        if (count < max) {
+            out[count++] = (PortalDef){PORTAL_ID_CITY_GATE, GARAGE_CITY_PORTAL_X, GARAGE_CITY_PORTAL_Y, GARAGE_CITY_PORTAL_Z, GARAGE_CITY_PORTAL_RADIUS};
+        }
+        return count;
+    }
+    if (scene_id == SCENE_STADIUM) {
+        out[count++] = (PortalDef){PORTAL_ID_GARAGE_EXIT, STADIUM_PORTAL_X, STADIUM_PORTAL_Y, STADIUM_PORTAL_Z, STADIUM_PORTAL_RADIUS};
+        return count;
+    }
+    if (scene_id == SCENE_CITY) {
+        out[count++] = (PortalDef){PORTAL_ID_CITY_GATE, CITY_PORTAL_X, CITY_PORTAL_Y, CITY_PORTAL_Z, CITY_PORTAL_RADIUS};
+        return count;
+    }
+    if (scene_id == SCENE_VOXWORLD) {
+        out[count++] = (PortalDef){PORTAL_ID_VOXWORLD_TO_STADIUM, VOXWORLD_PORTAL_X, VOXWORLD_PORTAL_Y, VOXWORLD_PORTAL_Z, VOXWORLD_PORTAL_RADIUS};
+        return count;
+    }
+    return 0;
 }
 
 static inline int portal_resolve_destination(int current_scene, int portal_id, int slot,
@@ -291,6 +355,16 @@ static inline int portal_resolve_destination(int current_scene, int portal_id, i
         return 1;
     }
     if (current_scene == SCENE_STADIUM && portal_id == PORTAL_ID_GARAGE_EXIT) {
+        *out_scene = SCENE_GARAGE_OSAKA;
+        scene_spawn_point(*out_scene, slot, out_x, out_y, out_z);
+        return 1;
+    }
+    if (current_scene == SCENE_GARAGE_OSAKA && portal_id == PORTAL_ID_CITY_GATE) {
+        *out_scene = SCENE_CITY;
+        scene_spawn_point(*out_scene, slot, out_x, out_y, out_z);
+        return 1;
+    }
+    if (current_scene == SCENE_CITY && portal_id == PORTAL_ID_CITY_GATE) {
         *out_scene = SCENE_GARAGE_OSAKA;
         scene_spawn_point(*out_scene, slot, out_x, out_y, out_z);
         return 1;
@@ -313,24 +387,16 @@ static inline int portal_resolve_destination(int current_scene, int portal_id, i
 }
 
 static inline void scene_portal_info(int scene_id, float *out_x, float *out_y, float *out_z, float *out_radius) {
-    if (scene_id == SCENE_GARAGE_OSAKA) {
-        *out_x = GARAGE_PORTAL_X;
-        *out_y = GARAGE_PORTAL_Y;
-        *out_z = GARAGE_PORTAL_Z;
-        *out_radius = GARAGE_PORTAL_RADIUS;
-    } else if (scene_id == SCENE_STADIUM) {
-        *out_x = STADIUM_PORTAL_X;
-        *out_y = STADIUM_PORTAL_Y;
-        *out_z = STADIUM_PORTAL_Z;
-        *out_radius = STADIUM_PORTAL_RADIUS;
-    } else if (scene_id == SCENE_VOXWORLD) {
-        *out_x = VOXWORLD_PORTAL_X;
-        *out_y = VOXWORLD_PORTAL_Y;
-        *out_z = VOXWORLD_PORTAL_Z;
-        *out_radius = VOXWORLD_PORTAL_RADIUS;
-    } else {
-        *out_x = 0.0f; *out_y = 0.0f; *out_z = 0.0f; *out_radius = 0.0f;
+    PortalDef portals[4];
+    int count = scene_portals(scene_id, portals, 4);
+    if (count > 0) {
+        *out_x = portals[0].x;
+        *out_y = portals[0].y;
+        *out_z = portals[0].z;
+        *out_radius = portals[0].radius;
+        return;
     }
+    *out_x = 0.0f; *out_y = 0.0f; *out_z = 0.0f; *out_radius = 0.0f;
 }
 
 static inline const VehiclePad *scene_vehicle_pads(int scene_id, int *out_count) {
@@ -345,38 +411,16 @@ static inline const VehiclePad *scene_vehicle_pads(int scene_id, int *out_count)
 static inline int scene_portal_triggered(PlayerState *p, int *out_portal_id) {
     if (!scene_portal_active(p->scene_id)) return 0;
 
-    if (p->scene_id == SCENE_STADIUM) {
-        float dx_main = p->x - STADIUM_PORTAL_X;
-        float dz_main = p->z - STADIUM_PORTAL_Z;
-        float dist_sq_main = dx_main * dx_main + dz_main * dz_main;
-        if (dist_sq_main <= (STADIUM_PORTAL_RADIUS * STADIUM_PORTAL_RADIUS)) {
-            if (out_portal_id) *out_portal_id = PORTAL_ID_GARAGE_EXIT;
+    PortalDef portals[4];
+    int portal_count = scene_portals(p->scene_id, portals, 4);
+    for (int i = 0; i < portal_count; i++) {
+        float dx = p->x - portals[i].x;
+        float dz = p->z - portals[i].z;
+        float dist_sq = dx * dx + dz * dz;
+        if (dist_sq <= (portals[i].radius * portals[i].radius)) {
+            if (out_portal_id) *out_portal_id = portals[i].portal_id;
             return 1;
         }
-
-        float dx_edge = p->x - STADIUM_EDGE_PORTAL_X;
-        float dz_edge = p->z - STADIUM_EDGE_PORTAL_Z;
-        float dist_sq_edge = dx_edge * dx_edge + dz_edge * dz_edge;
-        if (dist_sq_edge <= (STADIUM_EDGE_PORTAL_RADIUS * STADIUM_EDGE_PORTAL_RADIUS)) {
-            if (out_portal_id) *out_portal_id = PORTAL_ID_STADIUM_TO_VOXWORLD;
-            return 1;
-        }
-        return 0;
-    }
-
-    float portal_x = 0.0f, portal_y = 0.0f, portal_z = 0.0f, portal_radius = 0.0f;
-    scene_portal_info(p->scene_id, &portal_x, &portal_y, &portal_z, &portal_radius);
-    if (portal_radius <= 0.0f) return 0;
-    float dx = p->x - portal_x;
-    float dz = p->z - portal_z;
-    float dist_sq = dx * dx + dz * dz;
-    if (dist_sq <= (portal_radius * portal_radius)) {
-        if (out_portal_id) {
-            *out_portal_id = (p->scene_id == SCENE_VOXWORLD)
-                ? PORTAL_ID_VOXWORLD_TO_STADIUM
-                : PORTAL_ID_GARAGE_EXIT;
-        }
-        return 1;
     }
     return 0;
 }
@@ -580,7 +624,7 @@ void phys_respawn(PlayerState *p, unsigned int now) {
     p->in_bike = 0;
     p->use_was_down = 0;
     p->bike_was_down = 0;
-    if (p->scene_id != SCENE_GARAGE_OSAKA && p->scene_id != SCENE_STADIUM && p->scene_id != SCENE_VOXWORLD) {
+    if (p->scene_id != SCENE_GARAGE_OSAKA && p->scene_id != SCENE_STADIUM && p->scene_id != SCENE_VOXWORLD && p->scene_id != SCENE_CITY) {
         p->scene_id = SCENE_GARAGE_OSAKA;
     }
     scene_spawn_point(p->scene_id, p->id, &p->x, &p->y, &p->z);
