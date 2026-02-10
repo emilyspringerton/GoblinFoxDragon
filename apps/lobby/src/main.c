@@ -58,6 +58,7 @@ unsigned int travel_overlay_until_ms = 0;
 float cam_yaw = 0.0f;
 float cam_pitch = 0.0f;
 float current_fov = 75.0f;
+int g_ads_down = 0;
 static float cam_follow_x = 0.0f;
 static float cam_follow_y = 0.0f;
 static float cam_follow_z = 0.0f;
@@ -931,7 +932,12 @@ void draw_hud(PlayerState *p) {
         glColor3f(0.5f, 0.9f, 0.9f);
         draw_string(ability_buf, 40, 665, 5);
         glColor3f(0.9f, 0.8f, 0.5f);
-        draw_string(match_prog.camera_third_person ? "TAB: 1ST PERSON" : "TAB: 3RD PERSON", 1030, 665, 5);
+        draw_string(match_prog.camera_third_person ? "V: 1ST PERSON" : "V: 3RD PERSON", 1030, 665, 5);
+
+        char cam_dbg[96];
+        snprintf(cam_dbg, sizeof(cam_dbg), "CAM:%s ADS:%d YAW:%0.1f", (match_prog.camera_third_person && !g_ads_down) ? "3P" : "1P", g_ads_down, norm_yaw_deg(cam_yaw));
+        glColor3f(0.7f, 0.9f, 0.4f);
+        draw_string(cam_dbg, 900, 640, 5);
 
         unsigned int now = SDL_GetTicks();
         unsigned int remain = (match_prog.match_end_ms > now) ? (match_prog.match_end_ms - now) : 0;
@@ -1171,7 +1177,7 @@ void draw_scene(PlayerState *render_p, float dt) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); glLoadIdentity();
     local_state.scene_id = render_p->scene_id;
     phys_set_scene(render_p->scene_id);
-    int third_person = (match_prog.camera_third_person && !render_p->in_vehicle);
+    int third_person = (match_prog.camera_third_person && !render_p->in_vehicle && !g_ads_down);
     float yaw_rad = cam_yaw * 0.0174532925f;
     float pitch_rad = cam_pitch * 0.0174532925f;
     float look_x = sinf(yaw_rad) * cosf(pitch_rad);
@@ -1207,8 +1213,14 @@ void draw_scene(PlayerState *render_p, float dt) {
         if (p == render_p) continue;
         draw_player_3rd(p);
     }
-    if (!third_person) draw_weapon_p(render_p);
-    else draw_player_3rd(render_p);
+    if (!third_person) {
+        draw_weapon_p(render_p);
+    } else {
+        PlayerState tmp = *render_p;
+        tmp.yaw = norm_yaw_deg(cam_yaw);
+        tmp.pitch = clamp_pitch_deg(cam_pitch);
+        draw_player_3rd(&tmp);
+    }
     draw_hud(render_p); draw_garage_overlay(render_p);
     draw_travel_overlay();
 }
@@ -1601,7 +1613,7 @@ int main(int argc, char* argv[]) {
                     }
                 } else {
                     if (e.type == SDL_KEYDOWN) {
-                        if (e.key.keysym.sym == SDLK_TAB) {
+                        if (e.key.keysym.sym == SDLK_v || e.key.keysym.sym == SDLK_TAB) {
                             match_prog.camera_third_person = !match_prog.camera_third_person;
                             if (match_prog.camera_third_person) {
                                 cam_follow_x = 0.0f;
@@ -1667,6 +1679,7 @@ int main(int argc, char* argv[]) {
             if(k[SDL_SCANCODE_D]) str+=1; if(k[SDL_SCANCODE_A]) str-=1;
             int jump = k[SDL_SCANCODE_SPACE]; int crouch = k[SDL_SCANCODE_LCTRL];
             int shoot = (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT));
+            g_ads_down = ((SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT)) != 0);
             int reload = k[SDL_SCANCODE_R];
             int use = k[SDL_SCANCODE_F];
             int bike = k[SDL_SCANCODE_G];
@@ -1674,7 +1687,11 @@ int main(int argc, char* argv[]) {
             if(k[SDL_SCANCODE_1]) wpn_req=0; if(k[SDL_SCANCODE_2]) wpn_req=1;
             if(k[SDL_SCANCODE_3]) wpn_req=2; if(k[SDL_SCANCODE_4]) wpn_req=3; if(k[SDL_SCANCODE_5]) wpn_req=4;
 
-            float target_fov = (local_state.players[0].current_weapon == WPN_SNIPER && (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT))) ? 20.0f : 75.0f;
+            float target_fov = 75.0f;
+            if (g_ads_down) {
+                if (local_state.players[0].current_weapon == WPN_SNIPER) target_fov = 20.0f;
+                else target_fov = 55.0f;
+            }
             current_fov += (target_fov - current_fov) * 0.2f;
             glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(current_fov, 1280.0/720.0, 0.1, Z_FAR); 
             glMatrixMode(GL_MODELVIEW);
