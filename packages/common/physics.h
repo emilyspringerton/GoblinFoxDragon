@@ -101,7 +101,7 @@ static const Box map_geo_garage[] = {
 };
 
 
-#define CITY_MAX_BOXES 2048
+#define CITY_MAX_BOXES 8192
 static Box map_geo_voxworld[CITY_MAX_BOXES];
 static int map_geo_voxworld_count = 0;
 static int map_geo_voxworld_init = 0;
@@ -124,12 +124,16 @@ static int map_count = 0;
 #define VOXWORLD_TRACE_STEP 4.0f
 
 #define CITY_KILL_Y -120.0f
-#define CITY_BOUNDS_X 1180.0f
-#define CITY_BOUNDS_Z 1180.0f
-
-#define CITY_KILL_Y -120.0f
-#define CITY_BOUNDS_X 1180.0f
-#define CITY_BOUNDS_Z 1180.0f
+#define CITY_SOFT_X 2400.0f
+#define CITY_SOFT_Z 2400.0f
+#define CITY_HARD_X 3200.0f
+#define CITY_HARD_Z 3200.0f
+#define CITY_EDGE_PUSH 0.035f
+#define CITY_EDGE_FRICTION 0.975f
+#define CITY_GRID_RADIUS 12
+#define CITY_BLOCK_SIZE 230.0f
+#define CITY_ROAD_SIZE 54.0f
+#define CITY_DISTRICTS 5
 
 #define GARAGE_PORTAL_X 0.0f
 #define GARAGE_PORTAL_Y 6.0f
@@ -191,26 +195,43 @@ static inline void init_voxworld_city_geo() {
     map_geo_voxworld_init = 1;
     map_geo_voxworld_count = 0;
 
-    map_geo_voxworld[map_geo_voxworld_count++] = (Box){0.0f, -2.0f, 0.0f, 2800.0f, 4.0f, 2800.0f};
-    map_geo_voxworld[map_geo_voxworld_count++] = (Box){0.0f, 100.0f, 1400.0f, 2800.0f, 200.0f, 8.0f};
-    map_geo_voxworld[map_geo_voxworld_count++] = (Box){0.0f, 100.0f, -1400.0f, 2800.0f, 200.0f, 8.0f};
-    map_geo_voxworld[map_geo_voxworld_count++] = (Box){1400.0f, 100.0f, 0.0f, 8.0f, 200.0f, 2800.0f};
-    map_geo_voxworld[map_geo_voxworld_count++] = (Box){-1400.0f, 100.0f, 0.0f, 8.0f, 200.0f, 2800.0f};
-
-    const float block = 220.0f;
-    const float road = 50.0f;
+    const float block = CITY_BLOCK_SIZE;
+    const float road = CITY_ROAD_SIZE;
     const float pitch = block + road;
-    for (int gx = -4; gx <= 4; gx++) {
-        for (int gz = -4; gz <= 4; gz++) {
+    const float world_extent = (CITY_GRID_RADIUS + 2) * pitch;
+
+    map_geo_voxworld[map_geo_voxworld_count++] = (Box){0.0f, -2.0f, 0.0f, world_extent * 2.0f, 4.0f, world_extent * 2.0f};
+
+    for (int gx = -CITY_GRID_RADIUS; gx <= CITY_GRID_RADIUS; gx++) {
+        for (int gz = -CITY_GRID_RADIUS; gz <= CITY_GRID_RADIUS; gz++) {
             float cx = gx * pitch;
             float cz = gz * pitch;
             if ((abs(gx) <= 1 && gz == 0) || (abs(gz) <= 1 && gx == 0)) continue;
 
+            int district = abs((gx * 131 + gz * 197 + VOXWORLD_SEED * 17) ^ (gx * 53 - gz * 61)) % CITY_DISTRICTS;
+            float district_h_min = 20.0f;
+            float district_h_var = 50.0f;
+            float district_density = 1.0f;
+            float alley_bias = 0.0f;
+            float landmark_prob = 0.03f;
+
+            if (district == 0) { district_h_min = 42.0f; district_h_var = 95.0f; district_density = 1.2f; landmark_prob = 0.11f; }
+            else if (district == 1) { district_h_min = 18.0f; district_h_var = 42.0f; district_density = 1.0f; alley_bias = 0.07f; landmark_prob = 0.04f; }
+            else if (district == 2) { district_h_min = 12.0f; district_h_var = 28.0f; district_density = 0.75f; alley_bias = 0.18f; landmark_prob = 0.06f; }
+            else if (district == 3) { district_h_min = 14.0f; district_h_var = 36.0f; district_density = 0.65f; alley_bias = 0.26f; landmark_prob = 0.03f; }
+            else { district_h_min = 36.0f; district_h_var = 70.0f; district_density = 0.9f; alley_bias = 0.09f; landmark_prob = 0.12f; }
+
             float n1 = sinf((float)(gx * 17 + gz * 31 + VOXWORLD_SEED) * 0.13f);
             float n2 = cosf((float)(gx * 11 - gz * 23 + VOXWORLD_SEED) * 0.19f);
-            float h = 24.0f + (n1 + 1.0f) * 28.0f + (n2 + 1.0f) * 18.0f;
-            float w = 35.0f + (fabsf(n1) * 45.0f);
-            float d = 35.0f + (fabsf(n2) * 45.0f);
+            float n3 = sinf((float)(gx * 37 + gz * 13 + VOXWORLD_SEED) * 0.29f);
+            float h = district_h_min + (n1 + 1.0f) * (district_h_var * 0.6f) + (n2 + 1.0f) * (district_h_var * 0.4f);
+            float w = 34.0f + (fabsf(n1) * 54.0f);
+            float d = 34.0f + (fabsf(n2) * 54.0f);
+
+            if (n3 > (0.58f - alley_bias)) continue;
+            if (district_density < 1.0f && n1 > district_density) continue;
+
+            if (district == 2 && fabsf(n2) > 0.82f) continue; // market plazas
 
             if (map_geo_voxworld_count + 1 < CITY_MAX_BOXES) {
                 map_geo_voxworld[map_geo_voxworld_count++] = (Box){cx, h * 0.5f, cz, w, h, d};
@@ -218,7 +239,24 @@ static inline void init_voxworld_city_geo() {
             if (map_geo_voxworld_count + 1 < CITY_MAX_BOXES && (gx + gz) % 3 == 0) {
                 map_geo_voxworld[map_geo_voxworld_count++] = (Box){cx + 0.35f * block, (h * 0.35f), cz - 0.3f * block, w * 0.55f, h * 0.7f, d * 0.55f};
             }
+            if (map_geo_voxworld_count + 1 < CITY_MAX_BOXES && district == 0 && n3 < -0.72f) {
+                map_geo_voxworld[map_geo_voxworld_count++] = (Box){cx - 0.26f * block, h + 26.0f, cz + 0.22f * block, 24.0f, h * 0.9f, 24.0f};
+            }
+            if (map_geo_voxworld_count + 1 < CITY_MAX_BOXES && district == 1 && ((gx + gz) % 4 == 0)) { // ramps
+                map_geo_voxworld[map_geo_voxworld_count++] = (Box){cx + 0.44f * block, 4.0f, cz, 32.0f, 8.0f, 72.0f};
+            }
+            if (map_geo_voxworld_count + 1 < CITY_MAX_BOXES && district == 3 && ((gx * gz) % 5 == 0)) { // tunnels/ruins
+                map_geo_voxworld[map_geo_voxworld_count++] = (Box){cx, 5.0f, cz - 0.45f * block, 120.0f, 10.0f, 20.0f};
+            }
+            if (map_geo_voxworld_count + 1 < CITY_MAX_BOXES && fabsf(n2) < landmark_prob) {
+                float tower_h = h + 80.0f + fabsf(n1) * 120.0f;
+                map_geo_voxworld[map_geo_voxworld_count++] = (Box){cx, tower_h * 0.5f, cz, 22.0f, tower_h, 22.0f};
+            }
         }
+    }
+
+    if (map_geo_voxworld_count > CITY_MAX_BOXES - 256) {
+        printf("[city] warning: box usage high %d/%d\n", map_geo_voxworld_count, CITY_MAX_BOXES);
     }
 }
 
@@ -257,11 +295,29 @@ static inline void scene_spawn_point(int scene_id, int slot, float *out_x, float
         return;
     }
     if (scene_id == SCENE_CITY) {
-        float offsets[] = {-120.0f, -60.0f, 0.0f, 60.0f, 120.0f};
-        int idx = slot % 5;
-        *out_x = offsets[idx];
+        init_voxworld_city_geo();
+        const float pitch = CITY_BLOCK_SIZE + CITY_ROAD_SIZE;
+        static const int anchors[][2] = {
+            {0, 0}, {2, -1}, {-3, 2}, {4, 3}, {-4, -2}, {1, 4}, {-2, -4}, {6, 0}, {0, -6}
+        };
+        int idx = abs(slot) % (int)(sizeof(anchors) / sizeof(anchors[0]));
+        *out_x = anchors[idx][0] * pitch;
         *out_y = 6.0f;
-        *out_z = 0.0f;
+        *out_z = anchors[idx][1] * pitch;
+
+        for (int attempt = 0; attempt < 8; attempt++) {
+            int collision = 0;
+            for (int i = 1; i < map_geo_voxworld_count; i++) {
+                Box b = map_geo_voxworld[i];
+                if (fabsf(*out_x - b.x) < (b.w * 0.5f + 6.0f) && fabsf(*out_z - b.z) < (b.d * 0.5f + 6.0f) && 6.0f < b.y + b.h * 0.5f) {
+                    collision = 1;
+                    break;
+                }
+            }
+            if (!collision) break;
+            *out_x += 0.5f * pitch;
+            *out_z -= 0.35f * pitch;
+        }
         return;
     }
     if (slot % 2 == 0) {
@@ -312,11 +368,26 @@ static inline void scene_safety_check(PlayerState *p) {
         return;
     }
     if (p->scene_id == SCENE_CITY) {
-        if (p->y < CITY_KILL_Y ||
-            p->x < -CITY_BOUNDS_X || p->x > CITY_BOUNDS_X ||
-            p->z < -CITY_BOUNDS_Z || p->z > CITY_BOUNDS_Z) {
+        if (p->y < CITY_KILL_Y) {
             scene_force_spawn(p);
+            return;
         }
+
+        float out_x = fabsf(p->x) - CITY_SOFT_X;
+        float out_z = fabsf(p->z) - CITY_SOFT_Z;
+        if (out_x > 0.0f) {
+            float dir = (p->x > 0.0f) ? -1.0f : 1.0f;
+            p->vx += dir * CITY_EDGE_PUSH * (1.0f + out_x / 320.0f);
+            p->vx *= CITY_EDGE_FRICTION;
+            p->vz *= 0.992f;
+        }
+        if (out_z > 0.0f) {
+            float dir = (p->z > 0.0f) ? -1.0f : 1.0f;
+            p->vz += dir * CITY_EDGE_PUSH * (1.0f + out_z / 320.0f);
+            p->vz *= CITY_EDGE_FRICTION;
+            p->vx *= 0.992f;
+        }
+
     }
 }
 
@@ -582,8 +653,6 @@ int trace_map(float x1, float y1, float z1, float x2, float y2, float z2,
     if (phys_scene_id == SCENE_VOXWORLD) {
         return trace_map_vox(x1, y1, z1, x2, y2, z2, out_x, out_y, out_z, nx, ny, nz);
     }
-int trace_map(float x1, float y1, float z1, float x2, float y2, float z2,
-              float *out_x, float *out_y, float *out_z, float *nx, float *ny, float *nz) {
     return trace_map_boxes(x1, y1, z1, x2, y2, z2, out_x, out_y, out_z, nx, ny, nz);
 }
 
