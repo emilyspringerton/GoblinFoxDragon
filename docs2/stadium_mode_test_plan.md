@@ -268,4 +268,5 @@ This section codifies existing runtime behavior so Stadium and City share one co
 ### UI feedback (minimum)
 
 - HUD progression bar updates immediately for killer and recipients.
-- Optional feed/floating-text hooks can layer on top of the same XP award events.
+- On creep kill, show floating `+XP` text for each recipient (killer + nearby teammate shares).
+- Optional kill feed line format: `<player> killed <creep type>`.

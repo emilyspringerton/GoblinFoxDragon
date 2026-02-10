@@ -51,6 +51,8 @@ typedef struct {
 #define CITY_FIELD_W 64
 #define CITY_FIELD_H 64
 #define CITY_BOIDS 36
+#define CITY_GOBLIN_AGENTS 18
+#define CITY_FOX_AGENTS 14
 
 typedef struct {
     float market[CITY_FIELD_W * CITY_FIELD_H];
@@ -58,10 +60,18 @@ typedef struct {
     float security[CITY_FIELD_W * CITY_FIELD_H];
     float entropy[CITY_FIELD_W * CITY_FIELD_H];
     float spotlight[CITY_FIELD_W * CITY_FIELD_H];
+    float rubble[CITY_FIELD_W * CITY_FIELD_H];
+    float power[CITY_FIELD_W * CITY_FIELD_H];
+    float city_core[CITY_FIELD_W * CITY_FIELD_H];
+    float dragon_heat[CITY_FIELD_W * CITY_FIELD_H];
     float boid_x[CITY_BOIDS];
     float boid_z[CITY_BOIDS];
     float boid_vx[CITY_BOIDS];
     float boid_vz[CITY_BOIDS];
+    float goblin_x[CITY_GOBLIN_AGENTS];
+    float goblin_z[CITY_GOBLIN_AGENTS];
+    float fox_x[CITY_FOX_AGENTS];
+    float fox_z[CITY_FOX_AGENTS];
     int initialized;
     unsigned int dragon_until_ms;
 } CityFieldSim;
@@ -100,7 +110,10 @@ static const NpcSpawnZone NPC_SPAWN_ZONES[] = {
     {-640.0f,  640.0f, 260.0f, SCENE_CITY, 1, 8, 5500 },
     { 640.0f, -640.0f, 260.0f, SCENE_CITY, 2, 8, 5200 },
     {-640.0f, -640.0f, 260.0f, SCENE_CITY, 3, 8, 5000 },
-    { 1200.0f, 0.0f, 320.0f, SCENE_CITY, 4, 10, 6200 }
+    { 1200.0f, 0.0f, 320.0f, SCENE_CITY, 4, 10, 6200 },
+    { -1200.0f, 0.0f, 300.0f, SCENE_CITY, 1, 9, 5600 },
+    { 0.0f, 1200.0f, 300.0f, SCENE_CITY, 0, 9, 5600 },
+    { 0.0f, -1200.0f, 320.0f, SCENE_CITY, 3, 10, 6000 }
 };
 
 static unsigned int city_hash2(int a, int b, unsigned int seed) {
@@ -129,6 +142,10 @@ static void city_fields_init_if_needed(unsigned int now_ms) {
             city_fields.lane[idx] = city_hashf(x, z, 1667u);
             city_fields.security[idx] = city_hashf(x, z, 3119u);
             city_fields.entropy[idx] = city_hashf(x, z, 7817u);
+            city_fields.rubble[idx] = city_hashf(x, z, 4447u);
+            city_fields.power[idx] = city_hashf(x, z, 9281u);
+            city_fields.city_core[idx] = city_hashf(x, z, 2017u);
+            city_fields.dragon_heat[idx] = 0.0f;
         }
     }
     for (int i = 0; i < CITY_BOIDS; i++) {
@@ -136,6 +153,14 @@ static void city_fields_init_if_needed(unsigned int now_ms) {
         city_fields.boid_z[i] = (city_hashf(i, 2, city_npcs.seed) - 0.5f) * 1800.0f;
         city_fields.boid_vx[i] = (city_hashf(i, 3, city_npcs.seed) - 0.5f) * 0.9f;
         city_fields.boid_vz[i] = (city_hashf(i, 4, city_npcs.seed) - 0.5f) * 0.9f;
+    }
+    for (int i = 0; i < CITY_GOBLIN_AGENTS; i++) {
+        city_fields.goblin_x[i] = (city_hashf(i, 9, city_npcs.seed) - 0.5f) * 1600.0f;
+        city_fields.goblin_z[i] = (city_hashf(i, 11, city_npcs.seed) - 0.5f) * 1600.0f;
+    }
+    for (int i = 0; i < CITY_FOX_AGENTS; i++) {
+        city_fields.fox_x[i] = (city_hashf(i, 13, city_npcs.seed) - 0.5f) * 1400.0f;
+        city_fields.fox_z[i] = (city_hashf(i, 15, city_npcs.seed) - 0.5f) * 1400.0f;
     }
     city_fields.dragon_until_ms = now_ms;
     city_fields.initialized = 1;
@@ -180,11 +205,30 @@ static void city_fields_step(unsigned int now_ms) {
         if (fabsf(city_fields.boid_x[i]) > 2200.0f) city_fields.boid_vx[i] *= -0.9f;
         if (fabsf(city_fields.boid_z[i]) > 2200.0f) city_fields.boid_vz[i] *= -0.9f;
     }
+    for (int i = 0; i < CITY_GOBLIN_AGENTS; i++) {
+        float drift_x = (city_hashf(i, (int)now_ms, city_npcs.seed) - 0.5f) * 8.0f;
+        float drift_z = (city_hashf(i + 77, (int)now_ms, city_npcs.seed) - 0.5f) * 8.0f;
+        city_fields.goblin_x[i] += drift_x;
+        city_fields.goblin_z[i] += drift_z;
+        city_fields_stamp(city_fields.goblin_x[i], city_fields.goblin_z[i], 0.02f, city_fields.rubble);
+        city_fields_stamp(city_fields.goblin_x[i], city_fields.goblin_z[i], 0.015f, city_fields.entropy);
+    }
+    for (int i = 0; i < CITY_FOX_AGENTS; i++) {
+        float lane_bias = city_hashf(i + 313, (int)now_ms, city_npcs.seed) - 0.5f;
+        city_fields.fox_x[i] += lane_bias * 6.0f;
+        city_fields.fox_z[i] += (city_hashf(i + 509, (int)now_ms, city_npcs.seed) - 0.5f) * 6.0f;
+        city_fields_stamp(city_fields.fox_x[i], city_fields.fox_z[i], 0.02f, city_fields.lane);
+        city_fields_stamp(city_fields.fox_x[i], city_fields.fox_z[i], 0.012f, city_fields.security);
+    }
     for (int idx = 0; idx < CITY_FIELD_W * CITY_FIELD_H; idx++) {
         city_fields.market[idx] = city_clampf(city_fields.market[idx] * 0.995f, 0.0f, 1.0f);
         city_fields.lane[idx] = city_clampf(city_fields.lane[idx] * 0.997f, 0.0f, 1.0f);
         city_fields.security[idx] = city_clampf(city_fields.security[idx] * 0.996f, 0.0f, 1.0f);
         city_fields.entropy[idx] = city_clampf(city_fields.entropy[idx] * 0.997f + dragon_boost * 0.0018f, 0.0f, 1.0f);
+        city_fields.rubble[idx] = city_clampf(city_fields.rubble[idx] * 0.994f, 0.0f, 1.0f);
+        city_fields.power[idx] = city_clampf(city_fields.power[idx] * 0.996f, 0.0f, 1.0f);
+        city_fields.city_core[idx] = city_clampf(city_fields.city_core[idx] * 0.998f, 0.0f, 1.0f);
+        city_fields.dragon_heat[idx] = city_clampf(city_fields.dragon_heat[idx] * 0.985f + dragon_boost * 0.02f, 0.0f, 1.0f);
     }
 }
 
@@ -273,6 +317,24 @@ static int city_pick_npc_type(int district, unsigned int roll) {
     return ENT_PILLAGER_CORRUPTOR;
 }
 
+
+static int city_adjust_type_by_fields(float x, float z, int district, int base_type, unsigned int roll) {
+    if (local_state.scene_id != SCENE_CITY || !city_fields.initialized) return base_type;
+    float market = city_fields_sample(x, z, city_fields.market);
+    float entropy = city_fields_sample(x, z, city_fields.entropy);
+    float security = city_fields_sample(x, z, city_fields.security);
+    float lane = city_fields_sample(x, z, city_fields.lane);
+    int bucket = (int)(roll % 100);
+    if (district == 0 && security > 0.62f && bucket < 38) return ENT_GUARD;
+    if (district == 1 && market > 0.64f && bucket < 30) return ENT_PEASANT;
+    if (district == 2 && lane > 0.60f && bucket < 26) return ENT_HUNTER;
+    if (entropy > 0.66f && security < 0.45f) {
+        if (bucket < 34) return ENT_PILLAGER_MARAUDER;
+        if (bucket < 64) return ENT_PILLAGER_CORRUPTOR;
+    }
+    return base_type;
+}
+
 static void city_reset_npcs() {
     memset(&city_npcs, 0, sizeof(city_npcs));
     memset(&city_fields, 0, sizeof(city_fields));
@@ -327,7 +389,7 @@ static void city_spawn_npc(CityNpc *n, const NpcSpawnZone *zone, unsigned int no
     n->vx = 0.0f; n->vz = 0.0f;
     n->yaw = ang * (180.0f / 3.14159f);
     n->home_district = zone->scene_id == SCENE_CITY ? city_district_at(sx, sz) : zone->district_tag;
-    n->type = city_pick_npc_type(n->home_district, h);
+    n->type = city_adjust_type_by_fields(sx, sz, n->home_district, city_pick_npc_type(n->home_district, h), h >> 3);
     n->behavior_mask = city_behavior_mask_for_type(n->type);
     n->state = (n->behavior_mask & NPCB_SEEK_PLAYER) ? NPC_CHASE : NPC_WANDER;
     if (n->type == ENT_GUARD) n->state = NPC_GUARD;
@@ -485,12 +547,24 @@ static int npc_apply_damage(int scene_id, float x, float y, float z, int damage,
     n->last_hit_by_client = attacker_id;
     n->last_hit_by_team = (attacker_id >= 0 && attacker_id < MAX_CLIENTS) ? local_state.players[attacker_id].team_id : 0;
     n->last_hit_time_ms = now_ms;
+    if (n->behavior_mask & NPCB_CALL_FOR_HELP) {
+        for (int i = 0; i < MAX_CITY_NPCS; i++) {
+            CityNpc *ally = &city_npcs.npcs[i];
+            if (!ally->active || ally == n || ally->scene_id != scene_id) continue;
+            if (!(ally->behavior_mask & NPCB_SEEK_PLAYER)) continue;
+            float ax = ally->x - n->x;
+            float az = ally->z - n->z;
+            if ((ax * ax + az * az) > (80.0f * 80.0f)) continue;
+            ally->state = NPC_CHASE;
+            ally->think_tick = now_ms + (i % 6);
+        }
+    }
     if (n->hp <= 0.0f) {
         city_fields_stamp(n->x, n->z, 0.12f, city_fields.entropy);
         city_fields_stamp(n->x, n->z, 0.15f, city_fields.spotlight);
         n->active = 0;
         n->respawn_time_ms = now_ms + NPC_SPAWN_ZONES[n->spawn_zone].respawn_delay_ms;
-        int killer = (now_ms - n->last_hit_time_ms <= 5000) ? n->last_hit_by_client : -1;
+        int killer = ((attacker_id >= 0 && attacker_id < MAX_CLIENTS) || (now_ms - n->last_hit_time_ms <= 5000)) ? n->last_hit_by_client : -1;
         int kteam = (killer >= 0 && killer < MAX_CLIENTS) ? local_state.players[killer].team_id : 0;
         award_creep_xp(n, killer, kteam);
     }

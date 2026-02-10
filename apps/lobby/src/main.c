@@ -822,13 +822,20 @@ void draw_hud(PlayerState *p) {
             int d = city_npcs.npcs[i].home_district;
             if (d >= 0 && d < 5) district_count[d]++;
         }
-        char city_dbg[160];
-        snprintf(city_dbg, sizeof(city_dbg), "CITY ALIVE NPC:%d D0:%d D1:%d D2:%d D3:%d D4:%d", alive, district_count[0], district_count[1], district_count[2], district_count[3], district_count[4]);
+        float sm = city_fields_sample(p->x, p->z, city_fields.market);
+        float se = city_fields_sample(p->x, p->z, city_fields.entropy);
+        float ss = city_fields_sample(p->x, p->z, city_fields.security);
+        char city_dbg[192];
+        snprintf(city_dbg, sizeof(city_dbg), "CITY NPC:%d D0:%d D1:%d D2:%d D3:%d D4:%d M%.2f E%.2f S%.2f", alive, district_count[0], district_count[1], district_count[2], district_count[3], district_count[4], sm, se, ss);
         glColor3f(0.55f, 1.0f, 0.75f);
-        draw_string(city_dbg, 330, 24, 5);
+        draw_string(city_dbg, 260, 24, 5);
+        char city_agents[96];
+        snprintf(city_agents, sizeof(city_agents), "BOIDS:%d GOB:%d FOX:%d", CITY_BOIDS, CITY_GOBLIN_AGENTS, CITY_FOX_AGENTS);
+        glColor3f(0.45f, 0.85f, 1.0f);
+        draw_string(city_agents, 560, 46, 5);
         if (SDL_GetTicks() < city_fields.dragon_until_ms) {
             glColor3f(1.0f, 0.45f, 0.2f);
-            draw_string("DRAGON HEAT EVENT", 560, 46, 6);
+            draw_string("DRAGON HEAT EVENT", 540, 66, 6);
         }
     }
 
