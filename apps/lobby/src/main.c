@@ -34,6 +34,7 @@
 #define STATE_LOBBY 0
 #define STATE_GAME_NET 1
 #define STATE_GAME_LOCAL 2
+#define STATE_RESULTS 3
 #define STATE_LISTEN_SERVER 99
 
 char SERVER_HOST[64] = "s.farthq.com";
@@ -70,6 +71,102 @@ int net_cmd_seq = 0;
 
 void net_connect();
 void net_shutdown();
+
+typedef struct {
+    int level;
+    int xp;
+    int unspent_points;
+    int ability[5];
+    int last_kills;
+    unsigned int last_xp_tick;
+    unsigned int match_start_ms;
+    unsigned int match_end_ms;
+    int camera_third_person;
+} MatchProgression;
+
+static MatchProgression match_prog;
+#define MATCH_LENGTH_MS (8 * 60 * 1000)
+
+static int xp_for_next_level(int level) {
+    return 80 + (level - 1) * 35;
+}
+
+static void progression_reset(unsigned int now_ms) {
+    memset(&match_prog, 0, sizeof(match_prog));
+    match_prog.level = 1;
+    match_prog.last_xp_tick = now_ms;
+    match_prog.match_start_ms = now_ms;
+    match_prog.match_end_ms = now_ms + MATCH_LENGTH_MS;
+    match_prog.camera_third_person = 1;
+}
+
+static void progression_add_xp(int amount) {
+    if (amount <= 0 || match_prog.level >= 10) return;
+    match_prog.xp += amount;
+    while (match_prog.level < 10) {
+        int need = xp_for_next_level(match_prog.level);
+        if (match_prog.xp < need) break;
+        match_prog.xp -= need;
+        match_prog.level++;
+        match_prog.unspent_points++;
+    }
+}
+
+static void progression_apply_bonuses(PlayerState *p) {
+    if (!p) return;
+    int move = match_prog.ability[0];
+    int vitality = match_prog.ability[1];
+    int handling = match_prog.ability[2];
+    int shield = match_prog.ability[3];
+    int storm = match_prog.ability[4];
+
+    if (vitality > 0 && p->health < 100) {
+        if ((SDL_GetTicks() % (70 - vitality * 8)) == 0) p->health += 1;
+        if (p->health > 100) p->health = 100;
+    }
+    if (shield > 0 && p->shield < 100) {
+        if ((SDL_GetTicks() % (80 - shield * 10)) == 0) p->shield += 1;
+        if (p->shield > 100) p->shield = 100;
+    }
+    if (handling > 0 && p->attack_cooldown > 0) {
+        int reduce = handling >= 4 ? 2 : 1;
+        p->attack_cooldown -= reduce;
+        if (p->attack_cooldown < 0) p->attack_cooldown = 0;
+    }
+    if (storm > 0 && p->ability_cooldown > 0 && (SDL_GetTicks() % 3 == 0)) {
+        p->ability_cooldown -= storm;
+        if (p->ability_cooldown < 0) p->ability_cooldown = 0;
+    }
+    if (move > 0 && !p->in_vehicle) {
+        float boost = 1.0f + 0.035f * (float)move;
+        p->vx *= boost;
+        p->vz *= boost;
+    }
+}
+
+static void progression_tick(PlayerState *p, unsigned int now_ms) {
+    if (!p) return;
+    if (match_prog.last_xp_tick == 0) match_prog.last_xp_tick = now_ms;
+    if (now_ms - match_prog.last_xp_tick >= 1000) {
+        progression_add_xp(5);
+        match_prog.last_xp_tick = now_ms;
+    }
+    if (p->kills > match_prog.last_kills) {
+        int delta = p->kills - match_prog.last_kills;
+        progression_add_xp(delta * 60);
+        match_prog.last_kills = p->kills;
+    }
+    progression_apply_bonuses(p);
+}
+
+static void progression_try_allocate(int idx) {
+    if (idx < 0 || idx >= 5) return;
+    if (match_prog.unspent_points <= 0) return;
+    if (match_prog.ability[idx] >= 5) return;
+    match_prog.ability[idx]++;
+    match_prog.unspent_points--;
+}
+
 
 static void reset_client_render_state_for_net() {
     my_client_id = -1;
@@ -214,6 +311,10 @@ static void lobby_apply_ui_state() {
     }
 
     lobby_apply_scene_id(ui_state.active_scene_id);
+    if (local_state.scene_id == SCENE_GARAGE_OSAKA) {
+        scene_load(SCENE_STADIUM);
+    }
+    progression_reset(SDL_GetTicks());
 }
 
 static void setup_lobby_2d() {
@@ -260,6 +361,11 @@ static void lobby_start_action(int action) {
             default:
                 break;
         }
+    }
+
+    if (app_state == STATE_GAME_LOCAL) {
+        scene_load(SCENE_STADIUM);
+        progression_reset(SDL_GetTicks());
     }
 
     if (app_state != STATE_LOBBY) {
@@ -708,6 +814,28 @@ void draw_hud(PlayerState *p) {
         draw_string("CITY LIMIT / TURN BACK", 500, 680, 7);
     }
 
+    if (app_state == STATE_GAME_LOCAL) {
+        char lvl_buf[64];
+        snprintf(lvl_buf, sizeof(lvl_buf), "LVL %d  XP %d/%d  PTS %d", match_prog.level, match_prog.xp, xp_for_next_level(match_prog.level), match_prog.unspent_points);
+        glColor3f(0.9f, 0.9f, 0.3f);
+        draw_string(lvl_buf, 40, 690, 6);
+
+        char ability_buf[192];
+        snprintf(ability_buf, sizeof(ability_buf), "F1 MOB %d  F2 VIT %d  F3 HAND %d  F4 SHLD %d  F5 STORM %d", 
+                 match_prog.ability[0], match_prog.ability[1], match_prog.ability[2], match_prog.ability[3], match_prog.ability[4]);
+        glColor3f(0.5f, 0.9f, 0.9f);
+        draw_string(ability_buf, 40, 665, 5);
+        glColor3f(0.9f, 0.8f, 0.5f);
+        draw_string(match_prog.camera_third_person ? "TAB: 1ST PERSON" : "TAB: 3RD PERSON", 1030, 665, 5);
+
+        unsigned int now = SDL_GetTicks();
+        unsigned int remain = (match_prog.match_end_ms > now) ? (match_prog.match_end_ms - now) : 0;
+        char time_buf[48];
+        snprintf(time_buf, sizeof(time_buf), "MATCH %02u:%02u", (remain / 1000) / 60, (remain / 1000) % 60);
+        glColor3f(1.0f, 0.7f, 0.3f);
+        draw_string(time_buf, 1090, 690, 6);
+    }
+
     glEnable(GL_DEPTH_TEST); glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW); glPopMatrix();
 }
 
@@ -926,13 +1054,14 @@ void draw_scene(PlayerState *render_p) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); glLoadIdentity();
     local_state.scene_id = render_p->scene_id;
     phys_set_scene(render_p->scene_id);
-    float cam_y = render_p->in_vehicle ? 8.0f : (render_p->crouching ? 2.5f : EYE_HEIGHT);
-    float cam_z_off = render_p->in_vehicle ? 10.0f : 0.0f;
-    
+    int third_person = (app_state == STATE_GAME_LOCAL && match_prog.camera_third_person && !render_p->in_vehicle);
+    float cam_y = render_p->in_vehicle ? 8.0f : (third_person ? 5.5f : (render_p->crouching ? 2.5f : EYE_HEIGHT));
+    float cam_z_off = render_p->in_vehicle ? 10.0f : (third_person ? 16.0f : 0.0f);
+
     float rad = -cam_yaw * 0.01745f;
     float cx = sinf(rad) * cam_z_off;
     float cz = cosf(rad) * cam_z_off;
-    
+
     glRotatef(-cam_pitch, 1, 0, 0); glRotatef(-cam_yaw, 0, 1, 0);
     glTranslatef(-(render_p->x - cx), -(render_p->y + cam_y), -(render_p->z - cz));
     
@@ -950,8 +1079,36 @@ void draw_scene(PlayerState *render_p) {
         if (p == render_p) continue;
         draw_player_3rd(p);
     }
-    draw_weapon_p(render_p); draw_hud(render_p); draw_garage_overlay(render_p);
+    if (!third_person) draw_weapon_p(render_p);
+    else draw_player_3rd(render_p);
+    draw_hud(render_p); draw_garage_overlay(render_p);
     draw_travel_overlay();
+}
+
+
+
+static void draw_results_screen(void) {
+    glDisable(GL_DEPTH_TEST);
+    glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
+    glMatrixMode(GL_MODELVIEW); glLoadIdentity();
+    glClearColor(0.01f, 0.02f, 0.04f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    glColor3f(0.9f, 0.9f, 0.2f);
+    draw_string("MATCH COMPLETE", 470, 610, 10);
+
+    PlayerState *p = &local_state.players[0];
+    char line[128];
+    glColor3f(0.5f, 0.9f, 0.9f);
+    snprintf(line, sizeof(line), "KILLS: %d   DEATHS: %d", p->kills, p->deaths);
+    draw_string(line, 470, 540, 7);
+    snprintf(line, sizeof(line), "LEVEL REACHED: %d", match_prog.level);
+    draw_string(line, 470, 505, 7);
+    snprintf(line, sizeof(line), "ABILITIES  MOB:%d VIT:%d HAND:%d SHLD:%d STORM:%d", match_prog.ability[0], match_prog.ability[1], match_prog.ability[2], match_prog.ability[3], match_prog.ability[4]);
+    draw_string(line, 300, 465, 6);
+
+    glColor3f(0.9f, 0.6f, 0.4f);
+    draw_string("ENTER: RETURN TO LOBBY", 450, 380, 7);
 }
 
 static void draw_lobby_buttons(int menu_count, float base_x, float base_y, float gap, float size) {
@@ -1174,6 +1331,7 @@ int main(int argc, char* argv[]) {
     net_init();
     
     local_init_match(1, 0);
+    progression_reset(SDL_GetTicks());
     lobby_init_labels();
     ui_bridge_init("127.0.0.1", 17777);
     if (ui_bridge_fetch_state(&ui_state)) {
@@ -1186,8 +1344,8 @@ int main(int argc, char* argv[]) {
         SDL_Event e;
         while(SDL_PollEvent(&e)) {
             if(e.type == SDL_QUIT) running = 0;
-            if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_FOCUS_GAINED && app_state != STATE_LOBBY) SDL_SetRelativeMouseMode(SDL_TRUE);
-            if (e.type == SDL_MOUSEBUTTONDOWN && app_state != STATE_LOBBY) SDL_SetRelativeMouseMode(SDL_TRUE);
+            if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_FOCUS_GAINED && (app_state == STATE_GAME_LOCAL || app_state == STATE_GAME_NET)) SDL_SetRelativeMouseMode(SDL_TRUE);
+            if (e.type == SDL_MOUSEBUTTONDOWN && (app_state == STATE_GAME_LOCAL || app_state == STATE_GAME_NET)) SDL_SetRelativeMouseMode(SDL_TRUE);
             
             if (app_state == STATE_LOBBY) {
                 if (e.type == SDL_TEXTINPUT && ui_edit_index >= 0) {
@@ -1299,16 +1457,36 @@ int main(int argc, char* argv[]) {
                     SDL_SetRelativeMouseMode(SDL_FALSE);
                     setup_lobby_2d();
                 }
-                if(e.type == SDL_MOUSEMOTION) {
-                    float sens = (current_fov < 50.0f) ? 0.05f : 0.15f; 
-                    cam_yaw -= e.motion.xrel * sens;
-                    if(cam_yaw > 360) cam_yaw -= 360; if(cam_yaw < 0) cam_yaw += 360;
-                    cam_pitch -= e.motion.yrel * sens;
-                    if(cam_pitch > 89) cam_pitch = 89; if(cam_pitch < -89) cam_pitch = -89;
+                if (app_state == STATE_RESULTS) {
+                    if (e.type == SDL_KEYDOWN && (e.key.keysym.sym == SDLK_RETURN || e.key.keysym.sym == SDLK_KP_ENTER)) {
+                        app_state = STATE_LOBBY;
+                        SDL_SetRelativeMouseMode(SDL_FALSE);
+                        setup_lobby_2d();
+                    }
+                } else {
+                    if (e.type == SDL_KEYDOWN) {
+                        if (e.key.keysym.sym == SDLK_TAB) {
+                            match_prog.camera_third_person = !match_prog.camera_third_person;
+                        }
+                        if (app_state == STATE_GAME_LOCAL) {
+                            if (e.key.keysym.sym == SDLK_F1) progression_try_allocate(0);
+                            if (e.key.keysym.sym == SDLK_F2) progression_try_allocate(1);
+                            if (e.key.keysym.sym == SDLK_F3) progression_try_allocate(2);
+                            if (e.key.keysym.sym == SDLK_F4) progression_try_allocate(3);
+                            if (e.key.keysym.sym == SDLK_F5) progression_try_allocate(4);
+                        }
+                    }
+                    if(e.type == SDL_MOUSEMOTION) {
+                        float sens = (current_fov < 50.0f) ? 0.05f : 0.15f; 
+                        cam_yaw -= e.motion.xrel * sens;
+                        if(cam_yaw > 360) cam_yaw -= 360; if(cam_yaw < 0) cam_yaw += 360;
+                        cam_pitch -= e.motion.yrel * sens;
+                        if(cam_pitch > 89) cam_pitch = 89; if(cam_pitch < -89) cam_pitch = -89;
+                    }
                 }
             }
         }
-        if (app_state != STATE_LOBBY) SDL_SetRelativeMouseMode(SDL_TRUE);
+        if (app_state == STATE_GAME_LOCAL || app_state == STATE_GAME_NET) SDL_SetRelativeMouseMode(SDL_TRUE);
         if (app_state == STATE_LOBBY) {
              unsigned int now = SDL_GetTicks();
              if (ui_use_server && (now - ui_last_poll) > 1000) {
@@ -1336,7 +1514,11 @@ int main(int argc, char* argv[]) {
              glColor3f(0.4f, 0.6f, 0.7f);
              draw_string("DOUBLE-CLICK: FAST=OPEN / SLOW=RENAME", 320, 140, 5);
              SDL_GL_SwapWindow(win);
-        } 
+        }
+        else if (app_state == STATE_RESULTS) {
+            draw_results_screen();
+            SDL_GL_SwapWindow(win);
+        }
         else {
             const Uint8 *k = SDL_GetKeyboardState(NULL);
             float fwd=0, str=0;
@@ -1406,6 +1588,12 @@ int main(int argc, char* argv[]) {
                 if(local_state.players[0].vehicle_cooldown > 0) local_state.players[0].vehicle_cooldown--;
                 unsigned int now_ms = SDL_GetTicks();
                 local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn_req, jump, crouch, reload, use, bike, ability, NULL, now_ms);
+                progression_tick(&local_state.players[0], now_ms);
+                if (app_state == STATE_GAME_LOCAL && now_ms >= match_prog.match_end_ms) {
+                    app_state = STATE_RESULTS;
+                    SDL_SetRelativeMouseMode(SDL_FALSE);
+                    setup_lobby_2d();
+                }
             }
             PlayerState *render_p = &local_state.players[0];
             if (app_state == STATE_GAME_NET &&
