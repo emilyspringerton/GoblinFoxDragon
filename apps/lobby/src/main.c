@@ -813,6 +813,24 @@ void draw_hud(PlayerState *p) {
         glColor3f(1.0f, 0.55f, 0.2f);
         draw_string("LEAVING DISTRICT... TURN BACK", 430, 680, 7);
     }
+    if (p->scene_id == SCENE_CITY && city_fields.initialized) {
+        int district_count[5] = {0,0,0,0,0};
+        int alive = 0;
+        for (int i = 0; i < MAX_CITY_NPCS; i++) {
+            if (!city_npcs.npcs[i].active) continue;
+            alive++;
+            int d = city_npcs.npcs[i].home_district;
+            if (d >= 0 && d < 5) district_count[d]++;
+        }
+        char city_dbg[160];
+        snprintf(city_dbg, sizeof(city_dbg), "CITY ALIVE NPC:%d D0:%d D1:%d D2:%d D3:%d D4:%d", alive, district_count[0], district_count[1], district_count[2], district_count[3], district_count[4]);
+        glColor3f(0.55f, 1.0f, 0.75f);
+        draw_string(city_dbg, 330, 24, 5);
+        if (SDL_GetTicks() < city_fields.dragon_until_ms) {
+            glColor3f(1.0f, 0.45f, 0.2f);
+            draw_string("DRAGON HEAT EVENT", 560, 46, 6);
+        }
+    }
 
     if (app_state == STATE_GAME_LOCAL) {
         char lvl_buf[64];
@@ -1013,6 +1031,18 @@ static void draw_city_npc_primitive(const CityNpc *n) {
     glPopMatrix();
 }
 
+static void draw_city_boids(void) {
+    if (local_state.scene_id != SCENE_CITY || !city_fields.initialized) return;
+    glDisable(GL_TEXTURE_2D);
+    glColor3f(0.7f, 0.9f, 1.0f);
+    glPointSize(3.0f);
+    glBegin(GL_POINTS);
+    for (int i = 0; i < CITY_BOIDS; i++) {
+        glVertex3f(city_fields.boid_x[i], 80.0f + sinf((float)i) * 16.0f, city_fields.boid_z[i]);
+    }
+    glEnd();
+}
+
 static void draw_city_npcs(void) {
     if (local_state.scene_id != SCENE_CITY && local_state.scene_id != SCENE_STADIUM) return;
     for (int i = 0; i < MAX_CITY_NPCS; i++) {
@@ -1071,6 +1101,7 @@ void draw_scene(PlayerState *render_p) {
     draw_garage_vehicle_pads();
     draw_scene_portals();
     draw_projectiles();
+    draw_city_boids();
     draw_city_npcs();
     if (render_p->in_vehicle) draw_player_3rd(render_p);
     for(int i=0; i<MAX_CLIENTS; i++) {

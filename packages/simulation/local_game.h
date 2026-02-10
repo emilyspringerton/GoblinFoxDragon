@@ -12,7 +12,18 @@ int was_holding_jump = 0;
 #define MAX_CITY_NPCS 128
 #define NPC_TEAM_NEUTRAL 0
 
-typedef enum { NPC_IDLE = 0, NPC_WANDER, NPC_FLEE, NPC_CHASE, NPC_PATROL, NPC_GUARD } CityNpcBrain;
+typedef enum { NPC_IDLE = 0, NPC_WANDER, NPC_FLEE, NPC_CHASE, NPC_PATROL, NPC_GUARD, NPC_ORBIT, NPC_JOB } CityNpcBrain;
+
+enum {
+    NPCB_WANDER = 1 << 0,
+    NPCB_SEEK_PLAYER = 1 << 1,
+    NPCB_STRAFE_ORBIT = 1 << 2,
+    NPCB_RANGED_POKE = 1 << 3,
+    NPCB_MELEE_LUNGE = 1 << 4,
+    NPCB_FLEE = 1 << 5,
+    NPCB_CALL_FOR_HELP = 1 << 6,
+    NPCB_DISTRICT_JOB = 1 << 7
+};
 
 typedef struct {
     int active;
@@ -20,6 +31,7 @@ typedef struct {
     int state;
     int scene_id;
     int team_id;
+    int behavior_mask;
     float x, y, z;
     float vx, vz;
     float yaw;
@@ -35,6 +47,24 @@ typedef struct {
     unsigned int action_tick;
     unsigned int respawn_time_ms;
 } CityNpc;
+
+#define CITY_FIELD_W 64
+#define CITY_FIELD_H 64
+#define CITY_BOIDS 36
+
+typedef struct {
+    float market[CITY_FIELD_W * CITY_FIELD_H];
+    float lane[CITY_FIELD_W * CITY_FIELD_H];
+    float security[CITY_FIELD_W * CITY_FIELD_H];
+    float entropy[CITY_FIELD_W * CITY_FIELD_H];
+    float spotlight[CITY_FIELD_W * CITY_FIELD_H];
+    float boid_x[CITY_BOIDS];
+    float boid_z[CITY_BOIDS];
+    float boid_vx[CITY_BOIDS];
+    float boid_vz[CITY_BOIDS];
+    int initialized;
+    unsigned int dragon_until_ms;
+} CityFieldSim;
 
 typedef struct {
     float x;
@@ -59,6 +89,7 @@ typedef struct {
 } CityNpcManager;
 
 CityNpcManager city_npcs;
+CityFieldSim city_fields;
 
 static const NpcSpawnZone NPC_SPAWN_ZONES[] = {
     { 0.0f,  360.0f, 170.0f, SCENE_STADIUM, 0, 4, 3500 },
@@ -78,6 +109,83 @@ static unsigned int city_hash2(int a, int b, unsigned int seed) {
     x *= 1274126177u;
     x ^= x >> 16;
     return x;
+}
+
+static float city_hashf(int a, int b, unsigned int seed) {
+    return (float)(city_hash2(a, b, seed) & 65535u) / 65535.0f;
+}
+
+static inline float city_clampf(float v, float mn, float mx) {
+    return (v < mn) ? mn : ((v > mx) ? mx : v);
+}
+
+static void city_fields_init_if_needed(unsigned int now_ms) {
+    if (city_fields.initialized) return;
+    memset(&city_fields, 0, sizeof(city_fields));
+    for (int z = 0; z < CITY_FIELD_H; z++) {
+        for (int x = 0; x < CITY_FIELD_W; x++) {
+            int idx = z * CITY_FIELD_W + x;
+            city_fields.market[idx] = city_hashf(x, z, 991u);
+            city_fields.lane[idx] = city_hashf(x, z, 1667u);
+            city_fields.security[idx] = city_hashf(x, z, 3119u);
+            city_fields.entropy[idx] = city_hashf(x, z, 7817u);
+        }
+    }
+    for (int i = 0; i < CITY_BOIDS; i++) {
+        city_fields.boid_x[i] = (city_hashf(i, 1, city_npcs.seed) - 0.5f) * 1800.0f;
+        city_fields.boid_z[i] = (city_hashf(i, 2, city_npcs.seed) - 0.5f) * 1800.0f;
+        city_fields.boid_vx[i] = (city_hashf(i, 3, city_npcs.seed) - 0.5f) * 0.9f;
+        city_fields.boid_vz[i] = (city_hashf(i, 4, city_npcs.seed) - 0.5f) * 0.9f;
+    }
+    city_fields.dragon_until_ms = now_ms;
+    city_fields.initialized = 1;
+}
+
+static void city_fields_stamp(float wx, float wz, float amount, float *field) {
+    int gx = (int)((wx + CITY_SOFT_X) / (CITY_SOFT_X * 2.0f) * CITY_FIELD_W);
+    int gz = (int)((wz + CITY_SOFT_Z) / (CITY_SOFT_Z * 2.0f) * CITY_FIELD_H);
+    if (gx < 1 || gz < 1 || gx >= CITY_FIELD_W - 1 || gz >= CITY_FIELD_H - 1) return;
+    int idx = gz * CITY_FIELD_W + gx;
+    field[idx] = city_clampf(field[idx] + amount, 0.0f, 1.0f);
+}
+
+static float city_fields_sample(float wx, float wz, float *field) {
+    int gx = (int)((wx + CITY_SOFT_X) / (CITY_SOFT_X * 2.0f) * CITY_FIELD_W);
+    int gz = (int)((wz + CITY_SOFT_Z) / (CITY_SOFT_Z * 2.0f) * CITY_FIELD_H);
+    if (gx < 0 || gz < 0 || gx >= CITY_FIELD_W || gz >= CITY_FIELD_H) return 0.0f;
+    return field[gz * CITY_FIELD_W + gx];
+}
+
+static void city_fields_step(unsigned int now_ms) {
+    if (local_state.scene_id != SCENE_CITY) return;
+    city_fields_init_if_needed(now_ms);
+    if ((city_hash2((int)now_ms, 17, city_npcs.seed) % 1200u) == 0u) city_fields.dragon_until_ms = now_ms + 6000;
+    float dragon_boost = (now_ms < city_fields.dragon_until_ms) ? 0.35f : 0.0f;
+    for (int i = 0; i < CITY_BOIDS; i++) {
+        float cx = 0.0f, cz = 0.0f;
+        int near = 0;
+        for (int j = 0; j < CITY_BOIDS; j++) {
+            if (i == j) continue;
+            float dx = city_fields.boid_x[j] - city_fields.boid_x[i];
+            float dz = city_fields.boid_z[j] - city_fields.boid_z[i];
+            float d2 = dx * dx + dz * dz;
+            if (d2 > 1800.0f || d2 < 0.0001f) continue;
+            cx += dx; cz += dz; near++;
+        }
+        if (near > 0) { cx /= (float)near; cz /= (float)near; }
+        city_fields.boid_vx[i] = city_fields.boid_vx[i] * 0.95f + cx * 0.0015f + (city_hashf(i, (int)now_ms, city_npcs.seed) - 0.5f) * 0.02f;
+        city_fields.boid_vz[i] = city_fields.boid_vz[i] * 0.95f + cz * 0.0015f + (city_hashf(i + 31, (int)now_ms, city_npcs.seed) - 0.5f) * 0.02f;
+        city_fields.boid_x[i] += city_fields.boid_vx[i];
+        city_fields.boid_z[i] += city_fields.boid_vz[i];
+        if (fabsf(city_fields.boid_x[i]) > 2200.0f) city_fields.boid_vx[i] *= -0.9f;
+        if (fabsf(city_fields.boid_z[i]) > 2200.0f) city_fields.boid_vz[i] *= -0.9f;
+    }
+    for (int idx = 0; idx < CITY_FIELD_W * CITY_FIELD_H; idx++) {
+        city_fields.market[idx] = city_clampf(city_fields.market[idx] * 0.995f, 0.0f, 1.0f);
+        city_fields.lane[idx] = city_clampf(city_fields.lane[idx] * 0.997f, 0.0f, 1.0f);
+        city_fields.security[idx] = city_clampf(city_fields.security[idx] * 0.996f, 0.0f, 1.0f);
+        city_fields.entropy[idx] = city_clampf(city_fields.entropy[idx] * 0.997f + dragon_boost * 0.0018f, 0.0f, 1.0f);
+    }
 }
 
 static int city_district_at(float x, float z) {
@@ -114,6 +222,17 @@ static CreepReward creep_reward_for_type(int type) {
 
 static int xp_needed_for_level(int level) {
     return 50 + (level - 1) * 25;
+}
+
+static int city_behavior_mask_for_type(int type) {
+    if (type == ENT_MILITIA || type == ENT_SWARMLING) return NPCB_WANDER | NPCB_SEEK_PLAYER | NPCB_MELEE_LUNGE;
+    if (type == ENT_SCOUT) return NPCB_WANDER | NPCB_SEEK_PLAYER | NPCB_STRAFE_ORBIT;
+    if (type == ENT_RAVAGER || type == ENT_ORC || type == ENT_PILLAGER_MARAUDER) return NPCB_WANDER | NPCB_SEEK_PLAYER | NPCB_MELEE_LUNGE | NPCB_CALL_FOR_HELP;
+    if (type == ENT_HEXBOUND || type == ENT_HUNTER || type == ENT_PILLAGER_CORRUPTOR) return NPCB_SEEK_PLAYER | NPCB_RANGED_POKE | NPCB_STRAFE_ORBIT | NPCB_FLEE;
+    if (type == ENT_BEHEMOTH || type == ENT_PILLAGER_DESTROYER) return NPCB_WANDER | NPCB_SEEK_PLAYER | NPCB_MELEE_LUNGE;
+    if (type == ENT_PEASANT) return NPCB_WANDER | NPCB_DISTRICT_JOB | NPCB_FLEE;
+    if (type == ENT_GUARD) return NPCB_WANDER | NPCB_SEEK_PLAYER | NPCB_CALL_FOR_HELP;
+    return city_is_hostile_type(type) ? (NPCB_WANDER | NPCB_SEEK_PLAYER | NPCB_MELEE_LUNGE) : (NPCB_WANDER | NPCB_DISTRICT_JOB);
 }
 
 static int city_pick_npc_type(int district, unsigned int roll) {
@@ -156,6 +275,7 @@ static int city_pick_npc_type(int district, unsigned int roll) {
 
 static void city_reset_npcs() {
     memset(&city_npcs, 0, sizeof(city_npcs));
+    memset(&city_fields, 0, sizeof(city_fields));
     city_npcs.seed = 0xC17BEEFu;
 }
 
@@ -208,7 +328,8 @@ static void city_spawn_npc(CityNpc *n, const NpcSpawnZone *zone, unsigned int no
     n->yaw = ang * (180.0f / 3.14159f);
     n->home_district = zone->scene_id == SCENE_CITY ? city_district_at(sx, sz) : zone->district_tag;
     n->type = city_pick_npc_type(n->home_district, h);
-    n->state = city_is_hostile_type(n->type) ? NPC_CHASE : NPC_WANDER;
+    n->behavior_mask = city_behavior_mask_for_type(n->type);
+    n->state = (n->behavior_mask & NPCB_SEEK_PLAYER) ? NPC_CHASE : NPC_WANDER;
     if (n->type == ENT_GUARD) n->state = NPC_GUARD;
     n->hp_max = (float)get_entity_stats((EntityType)n->type)->hp_max;
     n->hp = n->hp_max;
@@ -224,6 +345,7 @@ static void city_spawn_npc(CityNpc *n, const NpcSpawnZone *zone, unsigned int no
 }
 
 static void city_npc_update(unsigned int now_tick) {
+    city_fields_step(now_tick);
     PlayerState *focus = &local_state.players[0];
     if (!focus->active) return;
 
@@ -268,10 +390,10 @@ static void city_npc_update(unsigned int now_tick) {
 
         if (n->think_tick <= now_tick) {
             n->think_tick = now_tick + 14 + (i % 9);
-            if (n->type == ENT_PEASANT) n->state = (target->in_shoot && best_d < 90.0f) ? NPC_FLEE : NPC_WANDER;
-            else if (n->type == ENT_GUARD) n->state = (best_d < 120.0f) ? NPC_GUARD : NPC_PATROL;
-            else if (n->type == ENT_HUNTER) n->state = (best_d < 190.0f) ? NPC_CHASE : NPC_WANDER;
-            else if (city_is_hostile_type(n->type)) n->state = (best_d < 220.0f) ? NPC_CHASE : NPC_WANDER;
+            if ((n->behavior_mask & NPCB_FLEE) && (n->hp < n->hp_max * 0.35f || (target->in_shoot && best_d < 90.0f))) n->state = NPC_FLEE;
+            else if ((n->behavior_mask & NPCB_SEEK_PLAYER) && best_d < 220.0f) n->state = (n->behavior_mask & NPCB_STRAFE_ORBIT) ? NPC_ORBIT : NPC_CHASE;
+            else if (n->behavior_mask & NPCB_DISTRICT_JOB) n->state = NPC_JOB;
+            else n->state = NPC_WANDER;
         }
 
         float tx = n->leash_x, tz = n->leash_z, speed = 0.26f;
@@ -284,6 +406,17 @@ static void city_npc_update(unsigned int now_tick) {
                 tx += -best_dz * 0.35f;
                 tz += best_dx * 0.35f;
             }
+        } else if (n->state == NPC_ORBIT) {
+            tx = target->x - best_dz * 28.0f;
+            tz = target->z + best_dx * 28.0f;
+            speed = 0.52f;
+        } else if (n->state == NPC_JOB) {
+            float lane = city_fields_sample(n->x, n->z, city_fields.lane);
+            float market = city_fields_sample(n->x, n->z, city_fields.market);
+            float bias = (market > lane) ? 0.7f : -0.7f;
+            tx = n->leash_x + sinf((float)(i + now_tick) * 0.03f + bias) * 32.0f;
+            tz = n->leash_z + cosf((float)(i + now_tick) * 0.03f + bias) * 32.0f;
+            speed = 0.24f;
         } else if (n->state == NPC_PATROL || n->state == NPC_WANDER) {
             if ((now_tick + i) % 40 == 0) {
                 float wa = (float)((city_hash2(i, now_tick, city_npcs.seed) % 6283)) * 0.001f;
@@ -317,20 +450,23 @@ static void city_npc_update(unsigned int now_tick) {
         n->z += n->vz;
         n->yaw = atan2f(n->vx, n->vz) * (180.0f / 3.14159f);
 
-        if (best_d < ((n->type == ENT_ORC || n->type == ENT_PILLAGER_DESTROYER) ? 9.0f : 6.0f) && (now_tick % 20 == 0)) {
+        if ((n->behavior_mask & NPCB_MELEE_LUNGE) && best_d < ((n->type == ENT_ORC || n->type == ENT_PILLAGER_DESTROYER) ? 9.0f : 6.0f) && (now_tick % 20 == 0)) {
             int dmg = (n->type == ENT_ORC) ? 10 : (n->type == ENT_PILLAGER_DESTROYER ? 14 : 5);
             if (target->health > 1) target->health -= dmg;
         }
-        if (n->type == ENT_HUNTER && best_d < 150.0f && best_d > 22.0f && (now_tick % 34 == 0) && target->health > 1) {
+        if ((n->behavior_mask & NPCB_RANGED_POKE) && best_d < 150.0f && best_d > 22.0f && (now_tick % 34 == 0) && target->health > 1) {
             target->health -= 6;
         }
         if (n->type == ENT_PILLAGER_CORRUPTOR && best_d < 24.0f && (now_tick % 18 == 0) && target->health > 1) {
             target->health -= 2;
         }
+        city_fields_stamp(n->x, n->z, (n->behavior_mask & NPCB_SEEK_PLAYER) ? 0.015f : 0.01f, city_fields.lane);
+        city_fields_stamp(n->x, n->z, (n->behavior_mask & NPCB_DISTRICT_JOB) ? 0.012f : 0.003f, city_fields.market);
     }
 }
 
-static int city_npc_apply_damage(float x, float y, float z, int damage, int attacker_id, unsigned int now_ms, int scene_id) {
+static int npc_apply_damage(int scene_id, float x, float y, float z, int damage, int attacker_id, unsigned int now_ms) {
+    if (scene_id != SCENE_CITY && scene_id != SCENE_STADIUM) return 0;
     int best = -1;
     float best_d2 = 16.0f;
     for (int i = 0; i < MAX_CITY_NPCS; i++) {
@@ -350,6 +486,8 @@ static int city_npc_apply_damage(float x, float y, float z, int damage, int atta
     n->last_hit_by_team = (attacker_id >= 0 && attacker_id < MAX_CLIENTS) ? local_state.players[attacker_id].team_id : 0;
     n->last_hit_time_ms = now_ms;
     if (n->hp <= 0.0f) {
+        city_fields_stamp(n->x, n->z, 0.12f, city_fields.entropy);
+        city_fields_stamp(n->x, n->z, 0.15f, city_fields.spotlight);
         n->active = 0;
         n->respawn_time_ms = now_ms + NPC_SPAWN_ZONES[n->spawn_zone].respawn_delay_ms;
         int killer = (now_ms - n->last_hit_time_ms <= 5000) ? n->last_hit_by_client : -1;
@@ -357,6 +495,25 @@ static int city_npc_apply_damage(float x, float y, float z, int damage, int atta
         award_creep_xp(n, killer, kteam);
     }
     return 1;
+}
+
+
+static void npc_apply_player_shot(PlayerState *p, unsigned int now_ms) {
+    if (!p->active || (p->scene_id != SCENE_CITY && p->scene_id != SCENE_STADIUM)) return;
+    int w = p->current_weapon;
+    if (w < 0 || w >= MAX_WEAPONS) return;
+    if (p->is_shooting != 5 || p->attack_cooldown != WPN_STATS[w].rof) return;
+    float r = -p->yaw * 0.0174533f;
+    float rp = p->pitch * 0.0174533f;
+    float dx = sinf(r) * cosf(rp);
+    float dy = sinf(rp);
+    float dz = -cosf(r) * cosf(rp);
+    float reach = (w == WPN_KNIFE) ? 5.5f : 90.0f;
+    float hx = p->x + dx * reach;
+    float hy = p->y + EYE_HEIGHT + dy * reach;
+    float hz = p->z + dz * reach;
+    int damage = (w == WPN_KNIFE) ? (int)(WPN_STATS[w].dmg * 0.35f) : (int)(WPN_STATS[w].dmg * 0.5f);
+    npc_apply_damage(p->scene_id, hx, hy, hz, damage, p->id, now_ms);
 }
 
 void local_update(float fwd, float str, float yaw, float pitch, int shoot, int weapon_req, int jump, int crouch, int reload, int use, int bike, int ability, void *server_context, unsigned int cmd_time);
@@ -508,6 +665,7 @@ void update_entity(PlayerState *p, float dt, void *server_context, unsigned int 
     if (p->hit_feedback > 0) p->hit_feedback--;
 
     update_weapons(p, local_state.players, local_state.projectiles, p->in_shoot > 0, p->in_reload > 0, p->in_ability > 0);
+    npc_apply_player_shot(p, cmd_time);
     scene_safety_check(p);
 }
 
@@ -577,7 +735,7 @@ static void update_projectiles(unsigned int now_ms) {
                 }
             }
             if (p->active) {
-                if (city_npc_apply_damage(p->x, p->y, p->z, p->damage, p->owner_id, now_ms, p->scene_id)) {
+                if (npc_apply_damage(p->scene_id, p->x, p->y, p->z, p->damage, p->owner_id, now_ms)) {
                     p->active = 0;
                 }
             }
