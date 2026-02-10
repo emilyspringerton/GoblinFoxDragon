@@ -223,8 +223,33 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
             local_state.clients[i].sin_port == sender->sin_port) {
 
             client_id = i;
-            // Touch only liveness; never memset player here.
             local_state.client_meta[i].last_heard_ms = get_server_time();
+            if (head->type == PACKET_CONNECT) {
+                unsigned int now = get_server_time();
+                PlayerState *p = &local_state.players[i];
+                client_last_seq[i] = 0;
+                p->in_fwd = 0.0f;
+                p->in_strafe = 0.0f;
+                p->in_jump = 0;
+                p->in_shoot = 0;
+                p->in_reload = 0;
+                p->in_use = 0;
+                p->in_ability = 0;
+                p->use_was_down = 0;
+                p->portal_cooldown_until_ms = 0;
+                p->vehicle_cooldown = 0;
+
+                NetHeader h;
+                h.type = PACKET_WELCOME;
+                h.client_id = (unsigned char)i;
+                h.sequence = 0;
+                h.timestamp = now;
+                h.entity_count = 0;
+                h.scene_id = (unsigned char)p->scene_id;
+                sendto(sock, (char*)&h, sizeof(NetHeader), 0,
+                       (struct sockaddr*)sender, sizeof(struct sockaddr_in));
+                printf("CLIENT %d RECONNECTED (seq reset)\n", i);
+            }
             break;
         }
     }

@@ -69,6 +69,19 @@ int net_cmd_history_count = 0;
 int net_cmd_seq = 0;
 
 void net_connect();
+void net_shutdown();
+
+static void reset_client_render_state_for_net() {
+    my_client_id = -1;
+    memset(&local_state, 0, sizeof(local_state));
+    memset(net_cmd_history, 0, sizeof(net_cmd_history));
+    net_cmd_history_count = 0;
+    net_cmd_seq = 0;
+    travel_overlay_until_ms = 0;
+    local_state.pending_scene = -1;
+    local_state.scene_id = SCENE_GARAGE_OSAKA;
+    phys_set_scene(local_state.scene_id);
+}
 
 static void reset_client_render_state_for_net() {
     my_client_id = -1;
@@ -929,7 +942,20 @@ void net_init() {
     #endif
 }
 
+void net_shutdown() {
+    if (sock >= 0) {
+        #ifdef _WIN32
+        closesocket(sock);
+        #else
+        close(sock);
+        #endif
+        sock = -1;
+    }
+    reset_client_render_state_for_net();
+}
+
 void net_connect() {
+    if (sock < 0) net_init();
     struct hostent *he = gethostbyname(SERVER_HOST);
     if (he) {
         server_addr.sin_family = AF_INET; 
@@ -1185,6 +1211,7 @@ int main(int argc, char* argv[]) {
                 }
             } else {
                 if(e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) {
+                    if (app_state == STATE_GAME_NET) net_shutdown();
                     app_state = STATE_LOBBY;
                     SDL_SetRelativeMouseMode(SDL_FALSE);
                     setup_lobby_2d();
