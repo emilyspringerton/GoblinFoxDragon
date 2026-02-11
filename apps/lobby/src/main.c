@@ -64,7 +64,9 @@ static float cam_follow_y = 0.0f;
 static float cam_follow_z = 0.0f;
 static float cam_dist = 6.5f;
 static float cam_height = 2.4f;
-static float cam_side = 1.0f;
+static float cam_side = 1.25f;
+static float reticle_dx = 0.0f;
+static float reticle_dy = 0.0f;
 
 #define Z_FAR 8000.0f
 
@@ -201,6 +203,33 @@ static const char* weapon_name(int weapon_id) {
         case WPN_SNIPER: return "SNIPER";
         default: return "UNKNOWN";
     }
+}
+
+static void camera_get_reticle_aim(float *out_yaw, float *out_pitch) {
+    float aim_yaw = cam_yaw;
+    float aim_pitch = cam_pitch;
+
+    if (reticle_dx != 0.0f || reticle_dy != 0.0f) {
+        const float half_w = 1280.0f * 0.5f;
+        const float half_h = 720.0f * 0.5f;
+        float nx = reticle_dx / half_w;
+        float ny = reticle_dy / half_h;
+
+        float fov_rad = current_fov * 0.0174532925f;
+        if (fov_rad < 0.01f) fov_rad = 0.01f;
+        if (fov_rad > 3.0f) fov_rad = 3.0f;
+
+        float tan_half_v = tanf(fov_rad * 0.5f);
+        float tan_half_h = tan_half_v * (1280.0f / 720.0f);
+
+        float yaw_delta = atanf(nx * tan_half_h) * 57.2957795f;
+        float pitch_delta = atanf(ny * tan_half_v) * 57.2957795f;
+        aim_yaw = norm_yaw_deg(aim_yaw + yaw_delta);
+        aim_pitch = clamp_pitch_deg(aim_pitch + pitch_delta);
+    }
+
+    if (out_yaw) *out_yaw = aim_yaw;
+    if (out_pitch) *out_pitch = aim_pitch;
 }
 
 static void player_update_run_cycle(PlayerState *p, float dt) {
@@ -850,21 +879,34 @@ void draw_hud(PlayerState *p) {
     glDisable(GL_DEPTH_TEST);
     glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
     glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
+    float reticle_cx = 640.0f + reticle_dx;
+    float reticle_cy = 360.0f + reticle_dy;
+
     glColor3f(0, 1, 0);
-    if (current_fov < 50.0f) { glBegin(GL_LINES); glVertex2f(0, 360); glVertex2f(1280, 360); glVertex2f(640, 0); glVertex2f(640, 720); glEnd(); } 
-    else { glLineWidth(2.0f); glBegin(GL_LINES); glVertex2f(630, 360); glVertex2f(650, 360); glVertex2f(640, 350); glVertex2f(640, 370); glEnd(); }
-    
+    if (current_fov < 50.0f) {
+        glBegin(GL_LINES);
+        glVertex2f(0, reticle_cy); glVertex2f(1280, reticle_cy);
+        glVertex2f(reticle_cx, 0); glVertex2f(reticle_cx, 720);
+        glEnd();
+    } else {
+        glLineWidth(2.0f);
+        glBegin(GL_LINES);
+        glVertex2f(reticle_cx - 10.0f, reticle_cy); glVertex2f(reticle_cx + 10.0f, reticle_cy);
+        glVertex2f(reticle_cx, reticle_cy - 10.0f); glVertex2f(reticle_cx, reticle_cy + 10.0f);
+        glEnd();
+    }
+
     // --- HIT INDICATORS ---
     if (p->hit_feedback > 0) {
         if (p->hit_feedback >= 25) glColor3f(1.0f, 0.0f, 0.0f); // RED (Kill/High Dmg)
         else glColor3f(0.0f, 1.0f, 0.0f); // GREEN (Normal)
         
         glLineWidth(2.0f);
-        draw_circle(640, 360, 20.0f, 16); // Hit Ring
+        draw_circle(reticle_cx, reticle_cy, 20.0f, 16); // Hit Ring
         
         // DOUBLE RING FOR KILL
         if (p->hit_feedback >= 25) {
-            draw_circle(640, 360, 28.0f, 16); // Outer Kill Ring
+            draw_circle(reticle_cx, reticle_cy, 28.0f, 16); // Outer Kill Ring
         }
     }
 
@@ -961,8 +1003,10 @@ void draw_hud(PlayerState *p) {
 }
 
 static int target_in_view(PlayerState *p, float tx, float ty, float tz, float max_dist, float min_dot) {
-    float rad_yaw = cam_yaw * 0.0174533f;
-    float rad_pitch = cam_pitch * 0.0174533f;
+    float aim_yaw = 0.0f, aim_pitch = 0.0f;
+    camera_get_reticle_aim(&aim_yaw, &aim_pitch);
+    float rad_yaw = aim_yaw * 0.0174533f;
+    float rad_pitch = aim_pitch * 0.0174533f;
     float fx = sinf(rad_yaw) * cosf(rad_pitch);
     float fy = sinf(rad_pitch);
     float fz = cosf(rad_yaw) * cosf(rad_pitch);
@@ -1233,8 +1277,7 @@ void draw_scene(PlayerState *render_p, float dt) {
         draw_weapon_p(render_p);
     } else {
         PlayerState tmp = *render_p;
-        tmp.yaw = norm_yaw_deg(cam_yaw);
-        tmp.pitch = clamp_pitch_deg(cam_pitch);
+        camera_get_reticle_aim(&tmp.yaw, &tmp.pitch);
         draw_player_3rd(&tmp);
     }
     draw_hud(render_p); draw_garage_overlay(render_p);
@@ -1716,8 +1759,10 @@ int main(int argc, char* argv[]) {
             current_fov += (target_fov - current_fov) * 0.2f;
             glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(current_fov, 1280.0/720.0, 0.1, Z_FAR); 
             glMatrixMode(GL_MODELVIEW);
+            float aim_yaw = 0.0f, aim_pitch = 0.0f;
+            camera_get_reticle_aim(&aim_yaw, &aim_pitch);
             if (app_state == STATE_GAME_NET) {
-                UserCmd cmd = client_create_cmd(fwd, str, cam_yaw, cam_pitch, shoot, jump, crouch, reload, use, bike, ability, wpn_req);
+                UserCmd cmd = client_create_cmd(fwd, str, aim_yaw, aim_pitch, shoot, jump, crouch, reload, use, bike, ability, wpn_req);
                 net_send_cmd(cmd);
                 net_tick();
             } else {
@@ -1766,7 +1811,7 @@ int main(int argc, char* argv[]) {
                 }
                 if(local_state.players[0].vehicle_cooldown > 0) local_state.players[0].vehicle_cooldown--;
                 unsigned int now_ms = SDL_GetTicks();
-                local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn_req, jump, crouch, reload, use, bike, ability, NULL, now_ms);
+                local_update(fwd, str, aim_yaw, aim_pitch, shoot, wpn_req, jump, crouch, reload, use, bike, ability, NULL, now_ms);
                 progression_tick(&local_state.players[0], now_ms);
                 if (app_state == STATE_GAME_LOCAL && now_ms >= match_prog.match_end_ms) {
                     app_state = STATE_RESULTS;
