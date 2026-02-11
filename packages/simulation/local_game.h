@@ -577,11 +577,21 @@ static void npc_apply_player_shot(PlayerState *p, unsigned int now_ms) {
     int w = p->current_weapon;
     if (w < 0 || w >= MAX_WEAPONS) return;
     if (p->is_shooting != 5 || p->attack_cooldown != WPN_STATS[w].rof) return;
-    float r = -p->yaw * 0.0174533f;
-    float rp = p->pitch * 0.0174533f;
-    float dx = sinf(r) * cosf(rp);
-    float dy = sinf(rp);
-    float dz = -cosf(r) * cosf(rp);
+    float dx = 0.0f;
+    float dy = 0.0f;
+    float dz = 0.0f;
+    if (w == WPN_KNIFE) {
+        float yaw_rad = p->yaw * 0.0174532925f;
+        dx = sinf(yaw_rad);
+        dy = 0.0f;
+        dz = cosf(yaw_rad);
+    } else {
+        float r = -p->yaw * 0.0174533f;
+        float rp = p->pitch * 0.0174533f;
+        dx = sinf(r) * cosf(rp);
+        dy = sinf(rp);
+        dz = -cosf(r) * cosf(rp);
+    }
     float reach = (w == WPN_KNIFE) ? 5.5f : 90.0f;
     float hx = p->x + dx * reach;
     float hy = p->y + EYE_HEIGHT + dy * reach;

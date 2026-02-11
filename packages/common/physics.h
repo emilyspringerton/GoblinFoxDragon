@@ -996,6 +996,71 @@ static inline void spawn_projectile(Projectile *projectiles, PlayerState *p, int
     }
 }
 
+static inline int melee_try_hit(PlayerState *attacker, PlayerState *targets, float range, float radius, int *out_victim_id) {
+    if (out_victim_id) *out_victim_id = -1;
+    if (!attacker || !targets) return 0;
+
+    float yaw_rad = attacker->yaw * 0.0174532925f;
+    float fwd_x = sinf(yaw_rad);
+    float fwd_z = cosf(yaw_rad);
+
+    float ox = attacker->x;
+    float oy = attacker->y + 1.2f;
+    float oz = attacker->z;
+    float ex = ox + fwd_x * range;
+    float ey = oy;
+    float ez = oz + fwd_z * range;
+
+    float seg_x = ex - ox;
+    float seg_y = ey - oy;
+    float seg_z = ez - oz;
+    float seg_len2 = seg_x * seg_x + seg_y * seg_y + seg_z * seg_z;
+    float best_t = 9999.0f;
+    int best_idx = -1;
+
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        PlayerState *v = &targets[i];
+        if (v == attacker) continue;
+        if (!v->active || v->state == STATE_DEAD) continue;
+        if (v->scene_id != attacker->scene_id) continue;
+
+        float cx = v->x;
+        float cy = v->y + 1.2f;
+        float cz = v->z;
+        float vx = cx - ox;
+        float vy = cy - oy;
+        float vz = cz - oz;
+
+        float front = vx * fwd_x + vz * fwd_z;
+        if (front <= 0.0f) continue;
+
+        float t = 0.0f;
+        if (seg_len2 > 0.00001f) {
+            t = (vx * seg_x + vy * seg_y + vz * seg_z) / seg_len2;
+            if (t < 0.0f) t = 0.0f;
+            if (t > 1.0f) t = 1.0f;
+        }
+        float px = ox + seg_x * t;
+        float py = oy + seg_y * t;
+        float pz = oz + seg_z * t;
+        float dx = cx - px;
+        float dy = cy - py;
+        float dz = cz - pz;
+        float d2 = dx * dx + dy * dy + dz * dz;
+
+        if (d2 <= radius * radius && t < best_t) {
+            best_t = t;
+            best_idx = i;
+        }
+    }
+
+    if (best_idx >= 0) {
+        if (out_victim_id) *out_victim_id = best_idx;
+        return 1;
+    }
+    return 0;
+}
+
 void update_weapons(PlayerState *p, PlayerState *targets, Projectile *projectiles, int shoot, int reload, int ability_press) {
     if (p->in_vehicle) return; 
     if (p->reload_timer > 0) p->reload_timer--;
@@ -1031,6 +1096,28 @@ void update_weapons(PlayerState *p, PlayerState *targets, Projectile *projectile
             p->attack_cooldown = WPN_STATS[w].rof;
             if (w != WPN_KNIFE) p->ammo[w]--;
             
+            if (w == WPN_KNIFE) {
+                int victim = -1;
+                if (melee_try_hit(p, targets, 5.5f, 1.45f, &victim) && victim >= 0) {
+                    int damage = WPN_STATS[w].dmg;
+                    p->accumulated_reward += 10.0f;
+                    targets[victim].shield_regen_timer = SHIELD_REGEN_DELAY;
+                    p->hit_feedback = 10;
+                    if (targets[victim].shield > 0) {
+                        if (targets[victim].shield >= damage) { targets[victim].shield -= damage; damage = 0; }
+                        else { damage -= targets[victim].shield; targets[victim].shield = 0; }
+                    }
+                    targets[victim].health -= damage;
+                    if (targets[victim].health <= 0) {
+                        p->kills++; targets[victim].deaths++;
+                        p->accumulated_reward += 1000.0f;
+                        p->hit_feedback = 30;
+                        phys_respawn(&targets[victim], 0);
+                    }
+                }
+                return;
+            }
+
             float r = -p->yaw * 0.0174533f; float rp = p->pitch * 0.0174533f;
             float dx = sinf(r) * cosf(rp); float dy = sinf(rp); float dz = -cosf(r) * cosf(rp);
             if (WPN_STATS[w].spr > 0) {
@@ -1043,11 +1130,6 @@ void update_weapons(PlayerState *p, PlayerState *targets, Projectile *projectile
                 if (p == &targets[i]) continue;
                 if (!targets[i].active || targets[i].state == STATE_DEAD) continue;
                 if (targets[i].scene_id != p->scene_id) continue;
-                if (w == WPN_KNIFE) {
-                    float kx = p->x - targets[i].x;
-                    float ky = p->y - targets[i].y; float kz = p->z - targets[i].z;
-                    if ((kx*kx + ky*ky + kz*kz) > MELEE_RANGE_SQ + 22.0f ) continue;
-                }
                 int hit_type = check_hit_location(p->x, p->y + EYE_HEIGHT, p->z, dx, dy, dz, &targets[i]);
                 if (hit_type > 0) {
                     printf("🔫 HIT! Dmg: %d on Target %d\n", WPN_STATS[w].dmg, i);

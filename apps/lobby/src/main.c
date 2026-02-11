@@ -62,9 +62,9 @@ int g_ads_down = 0;
 static float cam_follow_x = 0.0f;
 static float cam_follow_y = 0.0f;
 static float cam_follow_z = 0.0f;
-static float cam_dist = 6.0f;
-static float cam_height = 2.2f;
-static float cam_side = 0.6f;
+static float cam_dist = 6.5f;
+static float cam_height = 2.4f;
+static float cam_side = 1.0f;
 
 #define Z_FAR 8000.0f
 
@@ -260,6 +260,7 @@ static void camera_reseed_from_player(const PlayerState *p) {
     cam_follow_x = 0.0f;
     cam_follow_y = 0.0f;
     cam_follow_z = 0.0f;
+    g_ads_down = 0;
 }
 
 typedef enum {
@@ -1195,8 +1196,14 @@ void draw_scene(PlayerState *render_p, float dt) {
 
     if (third_person) {
         camera_update_third_person(render_p, dt);
+        float planar = sqrtf(look_x * look_x + look_z * look_z);
+        float right_x = (planar > 0.0001f) ? (look_z / planar) : 1.0f;
+        float right_z = (planar > 0.0001f) ? (-look_x / planar) : 0.0f;
+        float aim_x = render_p->x - right_x * 0.35f;
+        float aim_y = render_p->y + cam_height;
+        float aim_z = render_p->z - right_z * 0.35f;
         gluLookAt(cam_follow_x, cam_follow_y, cam_follow_z,
-                  render_p->x, render_p->y + cam_height, render_p->z,
+                  aim_x, aim_y, aim_z,
                   0.0f, 1.0f, 0.0f);
     } else {
         float eye_y = render_p->in_vehicle ? 8.0f : (render_p->crouching ? 2.5f : EYE_HEIGHT);
@@ -1643,7 +1650,9 @@ int main(int argc, char* argv[]) {
                         float sens = (current_fov < 50.0f) ? 0.05f : 0.15f; 
                         cam_yaw -= e.motion.xrel * sens;
                         if(cam_yaw > 360) cam_yaw -= 360; if(cam_yaw < 0) cam_yaw += 360;
-                        cam_pitch -= e.motion.yrel * sens;
+                        int third_person = match_prog.camera_third_person && !g_ads_down && !local_state.players[0].in_vehicle;
+                        if (third_person) cam_pitch += e.motion.yrel * sens;
+                        else cam_pitch -= e.motion.yrel * sens;
                         if(cam_pitch > 89) cam_pitch = 89; if(cam_pitch < -89) cam_pitch = -89;
                     }
                 }
