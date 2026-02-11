@@ -164,6 +164,9 @@ narrative scope
 
 Which is exactly how it should be.
 
+## Vertical Slice 0 Acceptance Criteria
+- See `docs2/specs/WEAKNIGHT_VS0_ACCEPTANCE_CRITERIA.md` for the full acceptance gates and Definition of Done used to validate the slice.
+
 ## Unfinished Engineering Tasks (Vertical Slice 0)
 - Server bridge: add authoritative Magnum raycast against world entities/blocks, emit impact feedback + particles, and wire PACKET_IMPACT to the client.
 - Voxel bridge: serialize nearby blocks into PACKET_VOXEL_DATA on the server (chunk scan for logs/leaves) and stream updates to clients.
