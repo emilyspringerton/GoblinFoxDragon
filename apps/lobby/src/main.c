@@ -1685,8 +1685,10 @@ int main(int argc, char* argv[]) {
         else {
             const Uint8 *k = SDL_GetKeyboardState(NULL);
             float fwd=0, str=0;
-            if(k[SDL_SCANCODE_W]) fwd-=1; if(k[SDL_SCANCODE_S]) fwd+=1;
-            if(k[SDL_SCANCODE_D]) str+=1; if(k[SDL_SCANCODE_A]) str-=1;
+            if(k[SDL_SCANCODE_W]) fwd += 1.0f;
+            if(k[SDL_SCANCODE_S]) fwd -= 1.0f;
+            if(k[SDL_SCANCODE_D]) str += 1.0f;
+            if(k[SDL_SCANCODE_A]) str -= 1.0f;
             int jump = k[SDL_SCANCODE_SPACE]; int crouch = k[SDL_SCANCODE_LCTRL];
             int shoot = (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT));
             g_ads_down = ((SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT)) != 0);
