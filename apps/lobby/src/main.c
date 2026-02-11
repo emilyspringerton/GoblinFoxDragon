@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <ctype.h>
 
 #ifdef _WIN32
     #include <winsock2.h>
@@ -57,6 +58,137 @@ unsigned int travel_overlay_until_ms = 0;
 
 float current_fov = 75.0f;
 int g_ads_down = 0;
+
+typedef struct {
+    int ammo_shell_casings;
+    int loaded;
+} ClientSettings;
+
+static ClientSettings g_settings;
+static int g_server_force_shell_casings = -1; /* -1 no override, 0 forced off, 1 forced on */
+static int g_show_settings = 0;
+static int g_settings_selection = 0;
+
+static ClientSettings settings_defaults(void) {
+    ClientSettings s;
+    memset(&s, 0, sizeof(s));
+    s.ammo_shell_casings = 1;
+    s.loaded = 1;
+    return s;
+}
+
+static char* trim_in_place(char *s) {
+    while (*s && isspace((unsigned char)*s)) s++;
+    if (!*s) return s;
+    char *end = s + strlen(s) - 1;
+    while (end > s && isspace((unsigned char)*end)) {
+        *end = '\0';
+        end--;
+    }
+    return s;
+}
+
+static void strip_comment_in_place(char *s) {
+    char *hash = strchr(s, '#');
+    char *slash = strstr(s, "//");
+    char *cut = NULL;
+    if (hash) cut = hash;
+    if (slash && (!cut || slash < cut)) cut = slash;
+    if (cut) *cut = '\0';
+}
+
+static int parse_bool(const char *v, int *out) {
+    if (!v || !out) return 0;
+    if (SDL_strcasecmp(v, "true") == 0 || strcmp(v, "1") == 0) {
+        *out = 1;
+        return 1;
+    }
+    if (SDL_strcasecmp(v, "false") == 0 || strcmp(v, "0") == 0) {
+        *out = 0;
+        return 1;
+    }
+    return 0;
+}
+
+static void settings_load_if_needed(void) {
+    if (g_settings.loaded) return;
+
+    g_settings = settings_defaults();
+
+    FILE *f = fopen("settings.toml", "rb");
+    if (!f) {
+        g_settings.loaded = 1;
+        return;
+    }
+
+    char line[256];
+    while (fgets(line, sizeof(line), f)) {
+        strip_comment_in_place(line);
+        char *trimmed = trim_in_place(line);
+        if (!trimmed[0]) continue;
+
+        char *eq = strchr(trimmed, '=');
+        if (!eq) continue;
+        *eq = '\0';
+
+        char *key = trim_in_place(trimmed);
+        char *value = trim_in_place(eq + 1);
+        if (!key[0] || !value[0]) continue;
+
+        if (strcmp(key, "ammo_shell_casings") == 0) {
+            int parsed = 0;
+            if (parse_bool(value, &parsed)) {
+                g_settings.ammo_shell_casings = parsed;
+            }
+        }
+    }
+
+    fclose(f);
+    g_settings.loaded = 1;
+}
+
+static void settings_save(void) {
+    FILE *f = fopen("settings.toml.tmp", "wb");
+    if (!f) return;
+
+    const char *v = g_settings.ammo_shell_casings ? "true" : "false";
+    fprintf(f, "ammo_shell_casings = %s\n", v);
+    fflush(f);
+    fclose(f);
+
+    remove("settings.toml");
+    if (rename("settings.toml.tmp", "settings.toml") != 0) {
+        remove("settings.toml.tmp");
+    }
+}
+
+static int shell_casings_enabled(void) {
+    settings_load_if_needed();
+    if (g_server_force_shell_casings != -1) return g_server_force_shell_casings;
+    return g_settings.ammo_shell_casings;
+}
+
+static void settings_toggle_selected(void) {
+    settings_load_if_needed();
+    if (g_server_force_shell_casings != -1) return;
+    if (g_settings_selection == 0) {
+        g_settings.ammo_shell_casings = !g_settings.ammo_shell_casings;
+        settings_save();
+    }
+}
+
+static void settings_toggle_overlay(void) {
+    settings_load_if_needed();
+    g_show_settings = !g_show_settings;
+}
+
+static void settings_set_server_shell_casings_override(int v) {
+    if (v < -1 || v > 1) {
+        g_server_force_shell_casings = -1;
+        return;
+    }
+    g_server_force_shell_casings = v;
+}
 
 /*
  * Camera/aim world convention (single source of truth):
@@ -1062,6 +1194,9 @@ void draw_hud(PlayerState *p) {
         snprintf(time_buf, sizeof(time_buf), "MATCH %02u:%02u", (remain / 1000) / 60, (remain / 1000) % 60);
         glColor3f(1.0f, 0.7f, 0.3f);
         draw_string(time_buf, 1090, 690, 6);
+
+        glColor3f(0.7f, 0.85f, 1.0f);
+        draw_string("O: SETTINGS", 1080, 640, 5);
     }
 
     glEnable(GL_DEPTH_TEST); glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW); glPopMatrix();
@@ -1281,6 +1416,54 @@ static void draw_travel_overlay() {
     glEnable(GL_DEPTH_TEST);
 }
 
+static void draw_settings_overlay(void) {
+    if (!g_show_settings) return;
+
+    glDisable(GL_DEPTH_TEST);
+    glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity();
+    glOrtho(0, 1280, 0, 720, -1, 1);
+    glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
+
+    glColor3f(0.05f, 0.08f, 0.12f);
+    glRectf(280.0f, 170.0f, 1000.0f, 580.0f);
+    glColor3f(0.2f, 0.8f, 1.0f);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(280.0f, 170.0f);
+    glVertex2f(1000.0f, 170.0f);
+    glVertex2f(1000.0f, 580.0f);
+    glVertex2f(280.0f, 580.0f);
+    glEnd();
+
+    settings_load_if_needed();
+
+    glColor3f(0.9f, 0.95f, 1.0f);
+    draw_string("SETTINGS", 560.0f, 540.0f, 9.0f);
+    draw_string("----------------", 500.0f, 515.0f, 5.0f);
+
+    if (g_settings_selection == 0) {
+        glColor3f(0.95f, 0.9f, 0.25f);
+        draw_string(">", 340.0f, 450.0f, 8.0f);
+    }
+
+    if (g_server_force_shell_casings == 0) {
+        glColor3f(1.0f, 0.5f, 0.5f);
+        draw_string("Ammo shell casings: FORCED OFF (server)", 380.0f, 450.0f, 6.0f);
+    } else if (g_server_force_shell_casings == 1) {
+        glColor3f(1.0f, 0.75f, 0.5f);
+        draw_string("Ammo shell casings: FORCED ON (server)", 380.0f, 450.0f, 6.0f);
+    } else {
+        glColor3f(0.85f, 0.95f, 0.85f);
+        draw_string(shell_casings_enabled() ? "Ammo shell casings: ON" : "Ammo shell casings: OFF", 380.0f, 450.0f, 6.0f);
+    }
+
+    glColor3f(0.75f, 0.85f, 0.95f);
+    draw_string("[W/S] Select  [Enter/Space] Toggle  [O/Esc] Back", 330.0f, 255.0f, 5.0f);
+
+    glMatrixMode(GL_PROJECTION); glPopMatrix();
+    glMatrixMode(GL_MODELVIEW); glPopMatrix();
+    glEnable(GL_DEPTH_TEST);
+}
+
 void draw_scene(PlayerState *render_p, float dt) {
     glClearColor(0.02f, 0.02f, 0.05f, 1.0f); // DEEP SPACE BLUE BG
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); glLoadIdentity();
@@ -1332,6 +1515,7 @@ void draw_scene(PlayerState *render_p, float dt) {
     }
     draw_hud(render_p); draw_garage_overlay(render_p);
     draw_travel_overlay();
+    draw_settings_overlay();
 }
 
 
@@ -1583,6 +1767,8 @@ int main(int argc, char* argv[]) {
     
     local_init_match(1, 0);
     progression_reset(SDL_GetTicks());
+    settings_load_if_needed();
+    settings_set_server_shell_casings_override(-1);
     lobby_init_labels();
     ui_bridge_init("127.0.0.1", 17777);
     if (ui_bridge_fetch_state(&ui_state)) {
@@ -1708,46 +1894,64 @@ int main(int argc, char* argv[]) {
                     }
                 }
             } else {
-                if(e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) {
-                    if (app_state == STATE_GAME_NET) net_shutdown();
-                    app_state = STATE_LOBBY;
-                    SDL_SetRelativeMouseMode(SDL_FALSE);
-                    setup_lobby_2d();
+                if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_o &&
+                    (app_state == STATE_GAME_LOCAL || app_state == STATE_GAME_NET)) {
+                    settings_toggle_overlay();
                 }
-                if (app_state == STATE_RESULTS) {
-                    if (e.type == SDL_KEYDOWN && (e.key.keysym.sym == SDLK_RETURN || e.key.keysym.sym == SDLK_KP_ENTER)) {
+                if (g_show_settings) {
+                    if (e.type == SDL_KEYDOWN) {
+                        if (e.key.keysym.sym == SDLK_ESCAPE || e.key.keysym.sym == SDLK_o) {
+                            g_show_settings = 0;
+                        } else if (e.key.keysym.sym == SDLK_w || e.key.keysym.sym == SDLK_UP ||
+                                   e.key.keysym.sym == SDLK_s || e.key.keysym.sym == SDLK_DOWN) {
+                            g_settings_selection = 0;
+                        } else if (e.key.keysym.sym == SDLK_RETURN || e.key.keysym.sym == SDLK_KP_ENTER ||
+                                   e.key.keysym.sym == SDLK_SPACE) {
+                            settings_toggle_selected();
+                        }
+                    }
+                } else {
+                    if(e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) {
+                        if (app_state == STATE_GAME_NET) net_shutdown();
                         app_state = STATE_LOBBY;
                         SDL_SetRelativeMouseMode(SDL_FALSE);
                         setup_lobby_2d();
                     }
-                } else {
-                    if (e.type == SDL_KEYDOWN) {
-                        if (e.key.keysym.sym == SDLK_v || e.key.keysym.sym == SDLK_TAB) {
-                            match_prog.camera_third_person = !match_prog.camera_third_person;
-                            if (match_prog.camera_third_person) {
-                                int cam_id = (app_state == STATE_GAME_NET && my_client_id > 0 && my_client_id < MAX_CLIENTS && local_state.players[my_client_id].active)
-                                    ? my_client_id
-                                    : 0;
-                                camera_reseed_from_player(&local_state.players[cam_id]);
+                    if (app_state == STATE_RESULTS) {
+                        if (e.type == SDL_KEYDOWN && (e.key.keysym.sym == SDLK_RETURN || e.key.keysym.sym == SDLK_KP_ENTER)) {
+                            app_state = STATE_LOBBY;
+                            SDL_SetRelativeMouseMode(SDL_FALSE);
+                            setup_lobby_2d();
+                        }
+                    } else {
+                        if (e.type == SDL_KEYDOWN) {
+                            if (e.key.keysym.sym == SDLK_v || e.key.keysym.sym == SDLK_TAB) {
+                                match_prog.camera_third_person = !match_prog.camera_third_person;
+                                if (match_prog.camera_third_person) {
+                                    int cam_id = (app_state == STATE_GAME_NET && my_client_id > 0 && my_client_id < MAX_CLIENTS && local_state.players[my_client_id].active)
+                                        ? my_client_id
+                                        : 0;
+                                    camera_reseed_from_player(&local_state.players[cam_id]);
+                                }
+                            }
+                            if (app_state == STATE_GAME_LOCAL) {
+                                if (e.key.keysym.sym == SDLK_F1) progression_try_allocate(0);
+                                if (e.key.keysym.sym == SDLK_F2) progression_try_allocate(1);
+                                if (e.key.keysym.sym == SDLK_F3) progression_try_allocate(2);
+                                if (e.key.keysym.sym == SDLK_F4) progression_try_allocate(3);
+                                if (e.key.keysym.sym == SDLK_F5) progression_try_allocate(4);
                             }
                         }
-                        if (app_state == STATE_GAME_LOCAL) {
-                            if (e.key.keysym.sym == SDLK_F1) progression_try_allocate(0);
-                            if (e.key.keysym.sym == SDLK_F2) progression_try_allocate(1);
-                            if (e.key.keysym.sym == SDLK_F3) progression_try_allocate(2);
-                            if (e.key.keysym.sym == SDLK_F4) progression_try_allocate(3);
-                            if (e.key.keysym.sym == SDLK_F5) progression_try_allocate(4);
+                        if(e.type == SDL_MOUSEMOTION) {
+                            float sens = (current_fov < 50.0f) ? 0.05f : 0.15f;
+                            g_cam.yaw = norm_yaw_deg(g_cam.yaw - e.motion.xrel * sens);
+                            g_cam.pitch = clamp_pitch_deg(g_cam.pitch - e.motion.yrel * sens);
                         }
-                    }
-                    if(e.type == SDL_MOUSEMOTION) {
-                        float sens = (current_fov < 50.0f) ? 0.05f : 0.15f; 
-                        g_cam.yaw = norm_yaw_deg(g_cam.yaw - e.motion.xrel * sens);
-                        g_cam.pitch = clamp_pitch_deg(g_cam.pitch - e.motion.yrel * sens);
                     }
                 }
             }
         }
-        if (app_state == STATE_GAME_LOCAL || app_state == STATE_GAME_NET) SDL_SetRelativeMouseMode(SDL_TRUE);
+        if (app_state == STATE_GAME_LOCAL || app_state == STATE_GAME_NET) SDL_SetRelativeMouseMode(g_show_settings ? SDL_FALSE : SDL_TRUE);
         if (app_state == STATE_LOBBY) {
              unsigned int now = SDL_GetTicks();
              if (ui_use_server && (now - ui_last_poll) > 1000) {
@@ -1783,20 +1987,25 @@ int main(int argc, char* argv[]) {
         else {
             const Uint8 *k = SDL_GetKeyboardState(NULL);
             float fwd=0, str=0;
-            if(k[SDL_SCANCODE_W]) fwd += 1.0f;
-            if(k[SDL_SCANCODE_S]) fwd -= 1.0f;
-            if(k[SDL_SCANCODE_D]) str -= 1.0f;
-            if(k[SDL_SCANCODE_A]) str += 1.0f;
-            int jump = k[SDL_SCANCODE_SPACE]; int crouch = k[SDL_SCANCODE_LCTRL];
-            int shoot = (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT));
-            g_cam.ads_down = ((SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT)) != 0);
+            if (!g_show_settings) {
+                if(k[SDL_SCANCODE_W]) fwd += 1.0f;
+                if(k[SDL_SCANCODE_S]) fwd -= 1.0f;
+                if(k[SDL_SCANCODE_D]) str -= 1.0f;
+                if(k[SDL_SCANCODE_A]) str += 1.0f;
+            }
+            int jump = (!g_show_settings && k[SDL_SCANCODE_SPACE]);
+            int crouch = (!g_show_settings && k[SDL_SCANCODE_LCTRL]);
+            int shoot = (!g_show_settings && (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT)));
+            g_cam.ads_down = (!g_show_settings && ((SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT)) != 0));
             g_ads_down = g_cam.ads_down;
-            int reload = k[SDL_SCANCODE_R];
-            int use = k[SDL_SCANCODE_F];
-            int bike = k[SDL_SCANCODE_G];
-            int ability = k[SDL_SCANCODE_E];
-            if(k[SDL_SCANCODE_1]) wpn_req=0; if(k[SDL_SCANCODE_2]) wpn_req=1;
-            if(k[SDL_SCANCODE_3]) wpn_req=2; if(k[SDL_SCANCODE_4]) wpn_req=3; if(k[SDL_SCANCODE_5]) wpn_req=4;
+            int reload = (!g_show_settings && k[SDL_SCANCODE_R]);
+            int use = (!g_show_settings && k[SDL_SCANCODE_F]);
+            int bike = (!g_show_settings && k[SDL_SCANCODE_G]);
+            int ability = (!g_show_settings && k[SDL_SCANCODE_E]);
+            if (!g_show_settings) {
+                if(k[SDL_SCANCODE_1]) wpn_req=0; if(k[SDL_SCANCODE_2]) wpn_req=1;
+                if(k[SDL_SCANCODE_3]) wpn_req=2; if(k[SDL_SCANCODE_4]) wpn_req=3; if(k[SDL_SCANCODE_5]) wpn_req=4;
+            }
 
             float target_fov = 75.0f;
             if (g_cam.ads_down) {
