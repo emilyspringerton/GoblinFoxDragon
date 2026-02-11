@@ -164,15 +164,38 @@ narrative scope
 
 Which is exactly how it should be.
 
+## Vertical Slice 0 Acceptance Criteria
+- See `docs2/specs/WEAKNIGHT_VS0_ACCEPTANCE_CRITERIA.md` for the full acceptance gates and Definition of Done used to validate the slice.
+
 ## Unfinished Engineering Tasks (Vertical Slice 0)
-- Server bridge: add authoritative Magnum raycast against world entities/blocks, emit impact feedback + particles, and wire PACKET_IMPACT to the client.
-- Voxel bridge: serialize nearby blocks into PACKET_VOXEL_DATA on the server (chunk scan for logs/leaves) and stream updates to clients.
-- Client renderer: load `texture_log.png` / `texture_leaves.png`, enable alpha cutout for leaves, and render received voxel packets in-world.
-- Chunk streaming: verify live chunk updates <50ms and fix desync corruption in multiplayer.
-- Destruction: propagate terrain/tree damage across clients with consistent state and replay protection.
-- Physics: validate high-speed F1 handling and stability at 60+ FPS; tune for skill-based racing feel.
-- Systems: integrate boids/trade routes/power cascades/city healing into the authoritative server sim loop.
-- Multiplayer: harden client connect flow (welcome, slot assignment) and maintain world consistency with 20+ agents.
+
+### Hardest-first execution order
+1. **Authoritative systems simulation loop**
+   - Integrate boids, trade routes, power cascades, self-healing cities, and evolving factions into one deterministic server tick.
+   - Add instrumentation to verify that outcomes emerge from shared state + agent behavior (not scripts).
+2. **F1 handling and high-speed physics**
+   - Implement/tune tire grip curves, downforce by speed, slip-angle behavior, lock-up risk, and momentum conservation.
+   - Validate that low-speed handling is stable while high-speed control is punishing and precision-based.
+3. **Deterministic multiplayer sync under load**
+   - Harden connect flow (welcome, slot assignment, reconciliation) and maintain consistent world state with 20+ active agents.
+   - Eliminate singleplayer assumptions in race/destruction/system code paths.
+4. **Live chunk streaming + corruption prevention**
+   - Verify live chunk update delay under 50 ms and remove visual desync corruption across clients.
+   - Ensure chunk ownership and state handoff are deterministic at high player speed.
+5. **Destruction propagation and replay safety**
+   - Propagate terrain/tree damage across clients with consistent ordering and replay protection.
+   - Ensure debris/block updates affect gameplay state (racing line, traversal, AI routes).
+6. **Bridge payloads (voxel + impact) from authoritative server**
+   - Add authoritative Magnum raycast against entities/blocks and emit `PACKET_IMPACT` + particles.
+   - Serialize nearby blocks into `PACKET_VOXEL_DATA` and stream updates incrementally.
+7. **Client rendering integration for streamed voxels**
+   - Load `texture_log.png` / `texture_leaves.png`, enable alpha cutout, and render streamed voxel packets in-world.
+   - Validate that visuals reflect server-authoritative state without client-side hacks.
+
+### Dependency notes
+- Tasks 1–3 are the critical path. If they are unstable, defer polish work.
+- Task 4 must be stable before performance certification.
+- Tasks 6–7 can run in parallel after task 4 API contracts are locked.
 
 ## Dragonfly Server Integration Plan (Go Modules)
 We will run DragonsNShit as a fork of Dragonfly and wire the fork into this repo via Go modules.
