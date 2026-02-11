@@ -220,6 +220,8 @@ static CameraState g_cam = {
 
 static float reticle_dx = 0.0f;
 static float reticle_dy = 0.0f;
+static const float third_person_reticle_dx = 170.0f;
+static const float third_person_reticle_dy = 34.0f;
 
 #define Z_FAR 8000.0f
 
@@ -383,6 +385,18 @@ static CamMode get_cam_mode(const PlayerState *me) {
     if (me->in_vehicle) return CAM_THIRD;
     if (match_prog.camera_third_person && !g_cam.ads_down) return CAM_THIRD;
     return CAM_FIRST;
+}
+
+static void update_aim_reticle_for_mode(const PlayerState *me) {
+    CamMode mode = get_cam_mode(me);
+    g_cam.mode = mode;
+    if (mode == CAM_THIRD) {
+        reticle_dx = third_person_reticle_dx;
+        reticle_dy = third_person_reticle_dy;
+    } else {
+        reticle_dx = 0.0f;
+        reticle_dy = 0.0f;
+    }
 }
 
 static AimRay get_aim_ray(const CameraState *cam, const PlayerState *me) {
@@ -2038,6 +2052,7 @@ int main(int argc, char* argv[]) {
             int shoot = (!g_show_settings && (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT)));
             g_cam.ads_down = (!g_show_settings && ((SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT)) != 0));
             g_ads_down = g_cam.ads_down;
+            update_aim_reticle_for_mode(&local_state.players[0]);
             int reload = (!g_show_settings && k[SDL_SCANCODE_R]);
             int use = (!g_show_settings && k[SDL_SCANCODE_F]);
             int bike = (!g_show_settings && k[SDL_SCANCODE_G]);
