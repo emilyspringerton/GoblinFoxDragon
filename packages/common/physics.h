@@ -211,8 +211,19 @@ static inline void init_voxworld_city_geo() {
     const float road = CITY_ROAD_SIZE;
     const float pitch = block + road;
     const float world_extent = (CITY_GRID_RADIUS + 2) * pitch;
+    const float HIGHWAY_Y = 34.0f;
+    const float HIGHWAY_W = 18.0f;
+    const float HIGHWAY_THICK = 2.5f;
+    const float RING_R = 520.0f;
+    const float SEG_LEN = 80.0f;
 
-    map_geo_voxworld[map_geo_voxworld_count++] = (Box){0.0f, -2.0f, 0.0f, world_extent * 2.0f, 4.0f, world_extent * 2.0f};
+#define PUSH_CITY_BOX(...) do { \
+    if (map_geo_voxworld_count + 1 < CITY_MAX_BOXES) { \
+        map_geo_voxworld[map_geo_voxworld_count++] = (__VA_ARGS__); \
+    } \
+} while (0)
+
+    PUSH_CITY_BOX((Box){0.0f, -2.0f, 0.0f, world_extent * 2.0f, 4.0f, world_extent * 2.0f});
 
     for (int gx = -CITY_GRID_RADIUS; gx <= CITY_GRID_RADIUS; gx++) {
         for (int gz = -CITY_GRID_RADIUS; gz <= CITY_GRID_RADIUS; gz++) {
@@ -245,9 +256,7 @@ static inline void init_voxworld_city_geo() {
 
             if (district == 2 && fabsf(n2) > 0.82f) continue; // market plazas
 
-            if (map_geo_voxworld_count + 1 < CITY_MAX_BOXES) {
-                map_geo_voxworld[map_geo_voxworld_count++] = (Box){cx, h * 0.5f, cz, w, h, d};
-            }
+            PUSH_CITY_BOX((Box){cx, h * 0.5f, cz, w, h, d});
             if (map_geo_voxworld_count + 1 < CITY_MAX_BOXES && (gx + gz) % 3 == 0) {
                 map_geo_voxworld[map_geo_voxworld_count++] = (Box){cx + 0.35f * block, (h * 0.35f), cz - 0.3f * block, w * 0.55f, h * 0.7f, d * 0.55f};
             }
@@ -266,6 +275,119 @@ static inline void init_voxworld_city_geo() {
             }
         }
     }
+
+    // Elevated ring-highway loop (rounded-square), supports, ramps, and guardrails.
+    const float ring_inner = RING_R - SEG_LEN;
+    const float guard_h = 3.0f;
+    const float guard_w = 1.5f;
+    const float guard_y = HIGHWAY_Y + (HIGHWAY_THICK * 0.5f) + (guard_h * 0.5f);
+    const float PILLAR_SPACING = 64.0f;
+    const int corner_steps = 4;
+
+    const float straight_len = 2.0f * ring_inner;
+    // Ring straights: north/south (east-west lanes), east/west (north-south lanes).
+    PUSH_CITY_BOX((Box){0.0f, HIGHWAY_Y, -RING_R, straight_len, HIGHWAY_THICK, HIGHWAY_W});
+    PUSH_CITY_BOX((Box){0.0f, HIGHWAY_Y, RING_R, straight_len, HIGHWAY_THICK, HIGHWAY_W});
+    PUSH_CITY_BOX((Box){RING_R, HIGHWAY_Y, 0.0f, HIGHWAY_W, HIGHWAY_THICK, straight_len});
+    PUSH_CITY_BOX((Box){-RING_R, HIGHWAY_Y, 0.0f, HIGHWAY_W, HIGHWAY_THICK, straight_len});
+
+    // Guardrails on ring straights.
+    PUSH_CITY_BOX((Box){0.0f, guard_y, -RING_R - (HIGHWAY_W * 0.5f), straight_len, guard_h, guard_w});
+    PUSH_CITY_BOX((Box){0.0f, guard_y, -RING_R + (HIGHWAY_W * 0.5f), straight_len, guard_h, guard_w});
+    PUSH_CITY_BOX((Box){0.0f, guard_y, RING_R - (HIGHWAY_W * 0.5f), straight_len, guard_h, guard_w});
+    PUSH_CITY_BOX((Box){0.0f, guard_y, RING_R + (HIGHWAY_W * 0.5f), straight_len, guard_h, guard_w});
+    PUSH_CITY_BOX((Box){RING_R - (HIGHWAY_W * 0.5f), guard_y, 0.0f, guard_w, guard_h, straight_len});
+    PUSH_CITY_BOX((Box){RING_R + (HIGHWAY_W * 0.5f), guard_y, 0.0f, guard_w, guard_h, straight_len});
+    PUSH_CITY_BOX((Box){-RING_R - (HIGHWAY_W * 0.5f), guard_y, 0.0f, guard_w, guard_h, straight_len});
+    PUSH_CITY_BOX((Box){-RING_R + (HIGHWAY_W * 0.5f), guard_y, 0.0f, guard_w, guard_h, straight_len});
+
+    // Corner staircase segments to round the square loop.
+    const float corner_span = SEG_LEN * 0.56f;
+    for (int i = 0; i < corner_steps; i++) {
+        float t = (float)(i + 1) / (float)(corner_steps + 1);
+        float a = ring_inner + (RING_R - ring_inner) * t;
+        float b = -RING_R + (RING_R - ring_inner) * t;
+        PUSH_CITY_BOX((Box){a, HIGHWAY_Y, b, corner_span, HIGHWAY_THICK, corner_span});   // NE
+        PUSH_CITY_BOX((Box){a, HIGHWAY_Y, -b, corner_span, HIGHWAY_THICK, corner_span});  // SE
+        PUSH_CITY_BOX((Box){-a, HIGHWAY_Y, b, corner_span, HIGHWAY_THICK, corner_span});  // NW
+        PUSH_CITY_BOX((Box){-a, HIGHWAY_Y, -b, corner_span, HIGHWAY_THICK, corner_span}); // SW
+    }
+
+    // Elevated spurs heading toward the city core.
+    const float spur_len = 220.0f;
+    const float spur_center = (RING_R - spur_len) * 0.5f;
+    PUSH_CITY_BOX((Box){0.0f, HIGHWAY_Y, -spur_center, HIGHWAY_W, HIGHWAY_THICK, spur_len});
+    PUSH_CITY_BOX((Box){0.0f, HIGHWAY_Y, spur_center, HIGHWAY_W, HIGHWAY_THICK, spur_len});
+    PUSH_CITY_BOX((Box){spur_center, HIGHWAY_Y, 0.0f, spur_len, HIGHWAY_THICK, HIGHWAY_W});
+    PUSH_CITY_BOX((Box){-spur_center, HIGHWAY_Y, 0.0f, spur_len, HIGHWAY_THICK, HIGHWAY_W});
+
+    // Pillars along the ring straights and spurs.
+    const float pillar_w = 4.0f;
+    for (float x = -ring_inner; x <= ring_inner; x += PILLAR_SPACING) {
+        PUSH_CITY_BOX((Box){x, HIGHWAY_Y * 0.5f, -RING_R, pillar_w, HIGHWAY_Y, pillar_w});
+        PUSH_CITY_BOX((Box){x, HIGHWAY_Y * 0.5f, RING_R, pillar_w, HIGHWAY_Y, pillar_w});
+    }
+    for (float z = -ring_inner; z <= ring_inner; z += PILLAR_SPACING) {
+        PUSH_CITY_BOX((Box){RING_R, HIGHWAY_Y * 0.5f, z, pillar_w, HIGHWAY_Y, pillar_w});
+        PUSH_CITY_BOX((Box){-RING_R, HIGHWAY_Y * 0.5f, z, pillar_w, HIGHWAY_Y, pillar_w});
+    }
+    for (float z = -spur_len + 10.0f; z <= -20.0f; z += PILLAR_SPACING) {
+        PUSH_CITY_BOX((Box){0.0f, HIGHWAY_Y * 0.5f, z, pillar_w, HIGHWAY_Y, pillar_w});
+        PUSH_CITY_BOX((Box){0.0f, HIGHWAY_Y * 0.5f, -z, pillar_w, HIGHWAY_Y, pillar_w});
+    }
+    for (float x = -spur_len + 10.0f; x <= -20.0f; x += PILLAR_SPACING) {
+        PUSH_CITY_BOX((Box){x, HIGHWAY_Y * 0.5f, 0.0f, pillar_w, HIGHWAY_Y, pillar_w});
+        PUSH_CITY_BOX((Box){-x, HIGHWAY_Y * 0.5f, 0.0f, pillar_w, HIGHWAY_Y, pillar_w});
+    }
+
+    // Intentional on/off-ramps as vertical stair-steps (collision-friendly).
+    const int ramp_steps = 14;
+    const float ramp_thick = 1.8f;
+    const float ramp_step_len = 22.0f;
+    const float ground_y = 2.0f;
+    const float lane_sep = 14.0f;
+
+    // North ramps (approach/depart along +Z outside loop).
+    for (int k = 0; k < ramp_steps; k++) {
+        float t = (float)k / (float)(ramp_steps - 1);
+        float y_up = ground_y + (HIGHWAY_Y - ground_y) * t;
+        float y_dn = HIGHWAY_Y - (HIGHWAY_Y - ground_y) * t;
+        float z = (-RING_R - 180.0f) + (180.0f * t);
+        PUSH_CITY_BOX((Box){lane_sep, y_up, z, 10.0f, ramp_thick, ramp_step_len});
+        PUSH_CITY_BOX((Box){-lane_sep, y_dn, z, 10.0f, ramp_thick, ramp_step_len});
+    }
+
+    // South ramps.
+    for (int k = 0; k < ramp_steps; k++) {
+        float t = (float)k / (float)(ramp_steps - 1);
+        float y_up = ground_y + (HIGHWAY_Y - ground_y) * t;
+        float y_dn = HIGHWAY_Y - (HIGHWAY_Y - ground_y) * t;
+        float z = (RING_R + 180.0f) - (180.0f * t);
+        PUSH_CITY_BOX((Box){-lane_sep, y_up, z, 10.0f, ramp_thick, ramp_step_len});
+        PUSH_CITY_BOX((Box){lane_sep, y_dn, z, 10.0f, ramp_thick, ramp_step_len});
+    }
+
+    // East ramps.
+    for (int k = 0; k < ramp_steps; k++) {
+        float t = (float)k / (float)(ramp_steps - 1);
+        float y_up = ground_y + (HIGHWAY_Y - ground_y) * t;
+        float y_dn = HIGHWAY_Y - (HIGHWAY_Y - ground_y) * t;
+        float x = (RING_R + 180.0f) - (180.0f * t);
+        PUSH_CITY_BOX((Box){x, y_up, -lane_sep, ramp_step_len, ramp_thick, 10.0f});
+        PUSH_CITY_BOX((Box){x, y_dn, lane_sep, ramp_step_len, ramp_thick, 10.0f});
+    }
+
+    // West ramps.
+    for (int k = 0; k < ramp_steps; k++) {
+        float t = (float)k / (float)(ramp_steps - 1);
+        float y_up = ground_y + (HIGHWAY_Y - ground_y) * t;
+        float y_dn = HIGHWAY_Y - (HIGHWAY_Y - ground_y) * t;
+        float x = (-RING_R - 180.0f) + (180.0f * t);
+        PUSH_CITY_BOX((Box){x, y_up, lane_sep, ramp_step_len, ramp_thick, 10.0f});
+        PUSH_CITY_BOX((Box){x, y_dn, -lane_sep, ramp_step_len, ramp_thick, 10.0f});
+    }
+
+#undef PUSH_CITY_BOX
 
     if (map_geo_voxworld_count > CITY_MAX_BOXES - 256) {
         printf("[city] warning: box usage high %d/%d\n", map_geo_voxworld_count, CITY_MAX_BOXES);
