@@ -332,6 +332,14 @@ static float kick_shake_y(void) {
     return sinf(g_kick.shake_t * 47.0f) * g_kick.shake_amp;
 }
 
+#define HUD_LOG_LINES 8
+#define HUD_LOG_LINE_LEN 96
+
+static char hud_log[HUD_LOG_LINES][HUD_LOG_LINE_LEN];
+static unsigned int hud_log_time[HUD_LOG_LINES];
+static int hud_log_head = 0;
+static int was_dragon_heat = 0;
+
 #define Z_FAR 8000.0f
 
 int sock = -1;
@@ -496,16 +504,28 @@ static CamMode get_cam_mode(const PlayerState *me) {
     return CAM_FIRST;
 }
 
-static void update_aim_reticle_for_mode(const PlayerState *me) {
+static void reticle_update_visual(const PlayerState *me, float dt) {
     CamMode mode = get_cam_mode(me);
     g_cam.mode = mode;
-    if (mode == CAM_THIRD) {
-        reticle_dx = third_person_reticle_dx;
-        reticle_dy = third_person_reticle_dy;
-    } else {
-        reticle_dx = 0.0f;
-        reticle_dy = 0.0f;
+
+    float target_x = 0.0f;
+    float target_y = 0.0f;
+    if (mode == CAM_THIRD && !g_cam.ads_down) {
+        target_x = 180.0f;
+        target_y = 40.0f;
     }
+
+    float safe_dt = dt;
+    if (!isfinite(safe_dt) || safe_dt < 0.0f) safe_dt = 0.0f;
+    if (safe_dt > 0.25f) safe_dt = 0.25f;
+    float alpha = 1.0f - expf(-18.0f * safe_dt);
+    reticle_dx += (target_x - reticle_dx) * alpha;
+    reticle_dy += (target_y - reticle_dy) * alpha;
+
+    if (reticle_dx > 420.0f) reticle_dx = 420.0f;
+    if (reticle_dx < -420.0f) reticle_dx = -420.0f;
+    if (reticle_dy > 220.0f) reticle_dy = 220.0f;
+    if (reticle_dy < -220.0f) reticle_dy = -220.0f;
 }
 
 static AimRay get_aim_ray(const CameraState *cam, const PlayerState *me) {
@@ -1264,6 +1284,49 @@ void draw_circle(float x, float y, float r, int segments) {
     glEnd();
 }
 
+static void hud_log_push(const char *msg) {
+    if (!msg || !msg[0]) return;
+    snprintf(hud_log[hud_log_head], HUD_LOG_LINE_LEN, "%s", msg);
+    hud_log_time[hud_log_head] = SDL_GetTicks();
+    hud_log_head = (hud_log_head + 1) % HUD_LOG_LINES;
+}
+
+static void hud_log_draw(void) {
+    float x0 = 18.0f, y0 = 180.0f;
+    float w = 420.0f, h = 120.0f;
+
+    glColor3f(0.05f, 0.06f, 0.08f);
+    glRectf(x0, y0, x0 + w, y0 + h);
+
+    glColor3f(0.25f, 0.8f, 1.0f);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(x0, y0);
+    glVertex2f(x0 + w, y0);
+    glVertex2f(x0 + w, y0 + h);
+    glVertex2f(x0, y0 + h);
+    glEnd();
+
+    glColor3f(0.75f, 0.85f, 0.95f);
+    draw_string("LOG", x0 + 10.0f, y0 + h - 16.0f, 5);
+
+    float line_y = y0 + 14.0f;
+    int idx = (hud_log_head - 1 + HUD_LOG_LINES) % HUD_LOG_LINES;
+
+    for (int i = 0; i < HUD_LOG_LINES; i++) {
+        const char *line = hud_log[idx];
+        if (line[0]) {
+            unsigned int age_ms = SDL_GetTicks() - hud_log_time[idx];
+            float fade = 1.0f - ((float)age_ms / 15000.0f);
+            if (fade < 0.45f) fade = 0.45f;
+            glColor3f(0.85f * fade, 0.9f * fade, 0.95f * fade);
+            draw_string(line, x0 + 10.0f, line_y, 4);
+            line_y += 12.0f;
+            if (line_y > y0 + h - 24.0f) break;
+        }
+        idx = (idx - 1 + HUD_LOG_LINES) % HUD_LOG_LINES;
+    }
+}
+
 void draw_hud(PlayerState *p) {
     glDisable(GL_DEPTH_TEST);
     glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
@@ -1360,10 +1423,11 @@ void draw_hud(PlayerState *p) {
         snprintf(city_agents, sizeof(city_agents), "BOIDS:%d GOB:%d FOX:%d", CITY_BOIDS, CITY_GOBLIN_AGENTS, CITY_FOX_AGENTS);
         glColor3f(0.45f, 0.85f, 1.0f);
         draw_string(city_agents, 560, 46, 5);
-        if (SDL_GetTicks() < city_fields.dragon_until_ms) {
-            glColor3f(1.0f, 0.45f, 0.2f);
-            draw_string("DRAGON HEAT EVENT", 540, 66, 6);
+        int is_dragon_heat = (SDL_GetTicks() < city_fields.dragon_until_ms);
+        if (is_dragon_heat && !was_dragon_heat) {
+            hud_log_push("DRAGON HEAT EVENT");
         }
+        was_dragon_heat = is_dragon_heat;
     }
 
     if (app_state == STATE_GAME_LOCAL) {
@@ -1395,6 +1459,8 @@ void draw_hud(PlayerState *p) {
         glColor3f(0.7f, 0.85f, 1.0f);
         draw_string("O: SETTINGS", 1080, 640, 5);
     }
+
+    hud_log_draw();
 
     glEnable(GL_DEPTH_TEST); glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW); glPopMatrix();
 }
@@ -2206,7 +2272,7 @@ int main(int argc, char* argv[]) {
             g_kick.prev_shoot_down = shoot;
             g_cam.ads_down = (!g_show_settings && ((SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT)) != 0));
             g_ads_down = g_cam.ads_down;
-            update_aim_reticle_for_mode(&local_state.players[0]);
+            reticle_update_visual(&local_state.players[0], dt);
             int reload = (!g_show_settings && k[SDL_SCANCODE_R]);
             int use = (!g_show_settings && k[SDL_SCANCODE_F]);
             int bike = (!g_show_settings && k[SDL_SCANCODE_G]);
