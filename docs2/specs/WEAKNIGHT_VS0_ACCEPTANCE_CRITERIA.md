@@ -235,6 +235,30 @@ If it fails:
 
 ---
 
+## Implementation Iteration Order (Hardest Tasks First)
+
+1. **Deterministic authoritative simulation**
+   - Build one server-authoritative tick loop for boids, trade routes, power grid, self-healing city logic, and faction trait evolution.
+   - Add determinism checks to confirm consistent outcomes across equivalent runs.
+
+2. **F1-grade high-speed physics**
+   - Implement/tune tire force curves, speed-scaled downforce, slip-angle behavior, lock-up risk, and momentum conservation.
+   - Run handling playtests until low-speed accessibility and high-speed mastery difficulty both hold true.
+
+3. **Multiplayer consistency under stress**
+   - Validate world-state consistency with 20+ agents and high-speed vehicles in the same arena.
+   - Remove any singleplayer-only assumptions in connection, replication, or recovery paths.
+
+4. **Chunk streaming and destruction sync reliability**
+   - Hold sub-50 ms visible chunk update latency while preserving deterministic state ordering.
+   - Ensure terrain/tree destruction remains consistent for all clients during packet jitter/loss scenarios.
+
+5. **Bridge and rendering completion**
+   - Finalize authoritative impact + voxel packets and align client rendering to server truth.
+   - Use this stage for integration hardening, not as a substitute for upstream system correctness.
+
+Execution rule: do not advance to the next stage if the prior stage cannot pass its acceptance gates reliably.
+
 ## Final Philosophy
 WEAKNIGHT is not:
 - A Minecraft clone.
