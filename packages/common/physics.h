@@ -114,9 +114,12 @@ static const Box map_geo_garage[] = {
 
 
 #define CITY_MAX_BOXES 8192
+#define CITY_MAX_PROPS 512
 static Box map_geo_voxworld[CITY_MAX_BOXES];
 static int map_geo_voxworld_count = 0;
 static int map_geo_voxworld_init = 0;
+static Box map_geo_props[CITY_MAX_PROPS];
+static int map_geo_props_count = 0;
 
 static const Box *map_geo = map_geo_stadium;
 static int map_count = 0;
@@ -146,6 +149,11 @@ static int map_count = 0;
 #define CITY_BLOCK_SIZE 230.0f
 #define CITY_ROAD_SIZE 54.0f
 #define CITY_DISTRICTS 5
+#define HYDRANT_COUNT_MAX 320
+#define HYDRANT_SPACING_MIN 22.0f
+#define HYDRANT_CURB_OFFSET 2.0f
+#define HYDRANT_HEIGHT 1.0f
+#define HYDRANT_RADIUS 0.35f
 
 #define GARAGE_PORTAL_X 0.0f
 #define GARAGE_PORTAL_Y 6.0f
@@ -202,10 +210,33 @@ static const VehiclePad garage_vehicle_pads[] = {
 
 float phys_rand_f() { return ((float)(rand()%1000)/500.0f) - 1.0f; }
 
+static inline unsigned int city_geo_hash(unsigned int x) {
+    x ^= x >> 16;
+    x *= 0x7feb352du;
+    x ^= x >> 15;
+    x *= 0x846ca68bu;
+    x ^= x >> 16;
+    return x;
+}
+
+static inline int city_hydrant_blocked(float x, float z) {
+    for (int i = 1; i < map_geo_voxworld_count; i++) {
+        Box b = map_geo_voxworld[i];
+        float b_bottom = b.y - b.h * 0.5f;
+        if (b_bottom > HYDRANT_HEIGHT + 1.5f) continue;
+        if (fabsf(x - b.x) < (b.w * 0.5f + HYDRANT_RADIUS) &&
+            fabsf(z - b.z) < (b.d * 0.5f + HYDRANT_RADIUS)) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static inline void init_voxworld_city_geo() {
     if (map_geo_voxworld_init) return;
     map_geo_voxworld_init = 1;
     map_geo_voxworld_count = 0;
+    map_geo_props_count = 0;
 
     const float block = CITY_BLOCK_SIZE;
     const float road = CITY_ROAD_SIZE;
@@ -386,6 +417,46 @@ static inline void init_voxworld_city_geo() {
         PUSH_CITY_BOX((Box){x, y_up, lane_sep, ramp_step_len, ramp_thick, 10.0f});
         PUSH_CITY_BOX((Box){x, y_dn, -lane_sep, ramp_step_len, ramp_thick, 10.0f});
     }
+
+
+    const float curb = road * 0.5f + HYDRANT_CURB_OFFSET;
+    const float road_extent = (CITY_GRID_RADIUS + 1) * pitch;
+    const float intersection_clear = 16.0f;
+
+    for (int line = -CITY_GRID_RADIUS; line <= CITY_GRID_RADIUS && map_geo_props_count < HYDRANT_COUNT_MAX; line++) {
+        float road_center = line * pitch;
+        int max_step = (int)((road_extent * 2.0f) / HYDRANT_SPACING_MIN);
+
+        for (int step = 0; step <= max_step && map_geo_props_count < HYDRANT_COUNT_MAX; step++) {
+            float along = -road_extent + step * HYDRANT_SPACING_MIN;
+            unsigned int base_h = city_geo_hash((unsigned int)(line * 92821 + step * 68917 + VOXWORLD_SEED * 197));
+            float jitter = ((float)(base_h & 1023u) / 1023.0f - 0.5f) * 8.0f;
+            float z = along + jitter;
+            float nearest_cross = roundf(z / pitch) * pitch;
+            if (fabsf(z - nearest_cross) < intersection_clear) continue;
+
+            if ((base_h & 7u) >= 2u) continue;
+            int side = (base_h & 8u) ? 1 : -1;
+            float x = road_center + side * curb;
+            if (!city_hydrant_blocked(x, z) && map_geo_props_count < CITY_MAX_PROPS) {
+                map_geo_props[map_geo_props_count++] = (Box){x, HYDRANT_HEIGHT * 0.5f, z, HYDRANT_RADIUS * 2.0f, HYDRANT_HEIGHT, HYDRANT_RADIUS * 2.0f};
+            }
+
+            unsigned int ortho_h = city_geo_hash(base_h ^ 0x9e3779b9u);
+            if ((ortho_h & 1u) != 0u) continue;
+
+            float x2 = z;
+            float z2 = road_center + (((ortho_h & 2u) != 0u) ? curb : -curb);
+            float nearest_cross_x = roundf(x2 / pitch) * pitch;
+            if (fabsf(x2 - nearest_cross_x) < intersection_clear) continue;
+            if (!city_hydrant_blocked(x2, z2) && map_geo_props_count < CITY_MAX_PROPS) {
+                map_geo_props[map_geo_props_count++] = (Box){x2, HYDRANT_HEIGHT * 0.5f, z2, HYDRANT_RADIUS * 2.0f, HYDRANT_HEIGHT, HYDRANT_RADIUS * 2.0f};
+            }
+        }
+    }
+
+    if (map_geo_props_count > HYDRANT_COUNT_MAX) map_geo_props_count = HYDRANT_COUNT_MAX;
+    printf("HYDRANTS: %d\n", map_geo_props_count);
 
 #undef PUSH_CITY_BOX
 
@@ -751,6 +822,25 @@ static inline int trace_map_boxes(float x1, float y1, float z1, float x2, float 
             return 1;
         }
     }
+    for(int i=0; i<map_geo_props_count; i++) {
+        Box b = map_geo_props[i];
+        if (x2 > b.x - b.w/2 && x2 < b.x + b.w/2 &&
+            z2 > b.z - b.d/2 && z2 < b.z + b.d/2 &&
+            y2 > b.y - b.h/2 && y2 < b.y + b.h/2) {
+            float dx = x1 - b.x; float dz = z1 - b.z;
+            float w = b.w; float d = b.d;
+            if (fabs(dx)/w > fabs(dz)/d) {
+                *nx = (dx > 0) ? 1.0f : -1.0f; *ny = 0.0f; *nz = 0.0f;
+                *out_x = (dx > 0) ? b.x + b.w/2 + 0.1f : b.x - b.w/2 - 0.1f;
+                *out_y = y2; *out_z = z2;
+            } else {
+                *nx = 0.0f; *ny = 0.0f; *nz = (dz > 0) ? 1.0f : -1.0f;
+                *out_x = x2; *out_y = y2;
+                *out_z = (dz > 0) ? b.z + b.d/2 + 0.1f : b.z - b.d/2 - 0.1f;
+            }
+            return 1;
+        }
+    }
     if (y2 < 0.0f) {
         *nx = 0.0f; *ny = 1.0f; *nz = 0.0f;
         *out_x = x2; *out_y = 0.1f; *out_z = z2;
@@ -940,6 +1030,27 @@ void resolve_collision(PlayerState *p) {
                     if (fabs(dx)/w > fabs(dz)/d) { 
                         p->vx = 0; p->x = (dx > 0) ? b.x + b.w/2 + pw : b.x - b.w/2 - pw;
                     } else { 
+                        p->vz = 0; p->z = (dz > 0) ? b.z + b.d/2 + pw : b.z - b.d/2 - pw;
+                    }
+                }
+            }
+        }
+    }
+    for(int i=0; i<map_geo_props_count; i++) {
+        Box b = map_geo_props[i];
+        if (p->x + pw > b.x - b.w/2 && p->x - pw < b.x + b.w/2 &&
+            p->z + pw > b.z - b.d/2 && p->z - pw < b.z + b.d/2) {
+            if (p->y < b.y + b.h/2 && p->y + ph > b.y - b.h/2) {
+                float prev_y = p->y - p->vy;
+                if (prev_y >= b.y + b.h/2) {
+                    p->y = b.y + b.h/2; p->vy = 0; p->on_ground = 1;
+                } else {
+                    float dx = p->x - b.x; float dz = p->z - b.z;
+                    float w = (b.w > 0.1f) ? b.w : 1.0f;
+                    float d = (b.d > 0.1f) ? b.d : 1.0f;
+                    if (fabs(dx)/w > fabs(dz)/d) {
+                        p->vx = 0; p->x = (dx > 0) ? b.x + b.w/2 + pw : b.x - b.w/2 - pw;
+                    } else {
                         p->vz = 0; p->z = (dz > 0) ? b.z + b.d/2 + pw : b.z - b.d/2 - pw;
                     }
                 }

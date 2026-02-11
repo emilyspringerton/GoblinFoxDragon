@@ -735,6 +735,44 @@ void draw_grid() {
     glEnd();
 }
 
+static void draw_box_primitive(float w, float h, float d) {
+    glPushMatrix();
+    glScalef(w, h, d);
+    glBegin(GL_QUADS);
+    glVertex3f(-0.5f, 0.5f, 0.5f); glVertex3f(0.5f, 0.5f, 0.5f); glVertex3f(0.5f, 0.5f, -0.5f); glVertex3f(-0.5f, 0.5f, -0.5f);
+    glVertex3f(-0.5f, -0.5f, 0.5f); glVertex3f(0.5f, -0.5f, 0.5f); glVertex3f(0.5f, -0.5f, -0.5f); glVertex3f(-0.5f, -0.5f, -0.5f);
+    glVertex3f(-0.5f, -0.5f, 0.5f); glVertex3f(0.5f, -0.5f, 0.5f); glVertex3f(0.5f, 0.5f, 0.5f); glVertex3f(-0.5f, 0.5f, 0.5f);
+    glVertex3f(-0.5f, -0.5f, -0.5f); glVertex3f(0.5f, -0.5f, -0.5f); glVertex3f(0.5f, 0.5f, -0.5f); glVertex3f(-0.5f, 0.5f, -0.5f);
+    glVertex3f(-0.5f, -0.5f, -0.5f); glVertex3f(-0.5f, -0.5f, 0.5f); glVertex3f(-0.5f, 0.5f, 0.5f); glVertex3f(-0.5f, 0.5f, -0.5f);
+    glVertex3f(0.5f, -0.5f, 0.5f); glVertex3f(0.5f, -0.5f, -0.5f); glVertex3f(0.5f, 0.5f, -0.5f); glVertex3f(0.5f, 0.5f, 0.5f);
+    glEnd();
+    glPopMatrix();
+}
+
+static void draw_hydrants(void) {
+    if (local_state.scene_id != SCENE_CITY) return;
+    for (int i = 0; i < map_geo_props_count; i++) {
+        Box h = map_geo_props[i];
+        glPushMatrix();
+        glTranslatef(h.x, 0.0f, h.z);
+
+        glColor3f(0.85f, 0.08f, 0.08f);
+        glPushMatrix(); glTranslatef(0.0f, 0.18f, 0.0f); draw_box_primitive(0.72f, 0.26f, 0.72f); glPopMatrix();
+
+        glColor3f(0.93f, 0.15f, 0.13f);
+        glPushMatrix(); glTranslatef(0.0f, 0.58f, 0.0f); draw_box_primitive(0.50f, 0.54f, 0.50f); glPopMatrix();
+
+        glColor3f(1.0f, 0.35f, 0.35f);
+        glPushMatrix(); glTranslatef(0.0f, 0.89f, 0.0f); draw_box_primitive(0.44f, 0.16f, 0.44f); glPopMatrix();
+
+        glColor3f(0.8f, 0.08f, 0.08f);
+        glPushMatrix(); glTranslatef(0.34f, 0.62f, 0.0f); draw_box_primitive(0.18f, 0.14f, 0.18f); glPopMatrix();
+        glPushMatrix(); glTranslatef(-0.34f, 0.62f, 0.0f); draw_box_primitive(0.18f, 0.14f, 0.18f); glPopMatrix();
+
+        glPopMatrix();
+    }
+}
+
 // --- NEON BRUTALIST BLOCK RENDERER ---
 void draw_map() {
     if (local_state.scene_id == SCENE_VOXWORLD) {
@@ -824,6 +862,8 @@ void draw_map() {
 
         glPopMatrix();
     }
+
+    draw_hydrants();
 }
 
 void draw_buggy_model() {
