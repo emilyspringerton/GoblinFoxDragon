@@ -55,16 +55,37 @@ int ui_last_click_index = -1;
 char ui_edit_buffer[64];
 unsigned int travel_overlay_until_ms = 0;
 
-float cam_yaw = 0.0f;
-float cam_pitch = 0.0f;
 float current_fov = 75.0f;
 int g_ads_down = 0;
-static float cam_follow_x = 0.0f;
-static float cam_follow_y = 0.0f;
-static float cam_follow_z = 0.0f;
-static float cam_dist = 6.5f;
-static float cam_height = 2.4f;
-static float cam_side = 1.25f;
+
+/*
+ * Camera/aim world convention (single source of truth):
+ * +Y is up.
+ * Yaw 0 faces +Z.
+ * Positive yaw rotates toward +X.
+ * Forward(yaw) = (sin(yaw), 0, cos(yaw)).
+ * Right(yaw) = (cos(yaw), 0, -sin(yaw)).
+ * Positive pitch looks up.
+ */
+typedef struct { float x, y, z; } CameraVec3;
+typedef struct { CameraVec3 origin, dir; } AimRay;
+typedef enum { CAM_FIRST = 0, CAM_THIRD = 1 } CamMode;
+typedef struct {
+    float yaw, pitch;
+    float dist, height, side;
+    CameraVec3 pos;
+    int ads_down;
+    CamMode mode;
+} CameraState;
+
+static CameraState g_cam = {
+    0.0f, 0.0f,
+    6.5f, 2.4f, 1.25f,
+    {0.0f, 0.0f, 0.0f},
+    0,
+    CAM_THIRD
+};
+
 static float reticle_dx = 0.0f;
 static float reticle_dy = 0.0f;
 
@@ -205,31 +226,113 @@ static const char* weapon_name(int weapon_id) {
     }
 }
 
-static void camera_get_reticle_aim(float *out_yaw, float *out_pitch) {
-    float aim_yaw = cam_yaw;
-    float aim_pitch = cam_pitch;
+static CameraVec3 forward_from_yaw(float yaw_deg) {
+    float yaw = yaw_deg * 0.0174532925f;
+    CameraVec3 v = { sinf(yaw), 0.0f, cosf(yaw) };
+    return v;
+}
 
+static CameraVec3 right_from_yaw(float yaw_deg) {
+    float yaw = yaw_deg * 0.0174532925f;
+    CameraVec3 v = { cosf(yaw), 0.0f, -sinf(yaw) };
+    return v;
+}
+
+static CameraVec3 forward_from_yaw_pitch(float yaw_deg, float pitch_deg) {
+    float yaw = yaw_deg * 0.0174532925f;
+    float pitch = pitch_deg * 0.0174532925f;
+    float cp = cosf(pitch);
+    CameraVec3 v = { sinf(yaw) * cp, sinf(pitch), cosf(yaw) * cp };
+    return v;
+}
+
+static CamMode get_cam_mode(const PlayerState *me) {
+    if (!me) return CAM_FIRST;
+    if (me->in_vehicle) return CAM_THIRD;
+    if (match_prog.camera_third_person && !g_cam.ads_down) return CAM_THIRD;
+    return CAM_FIRST;
+}
+
+static AimRay get_aim_ray(const CameraState *cam, const PlayerState *me) {
+    AimRay ray = {0};
+    if (!cam || !me) return ray;
+
+    float aim_yaw = cam->yaw;
+    float aim_pitch = cam->pitch;
     if (reticle_dx != 0.0f || reticle_dy != 0.0f) {
         const float half_w = 1280.0f * 0.5f;
         const float half_h = 720.0f * 0.5f;
         float nx = reticle_dx / half_w;
         float ny = reticle_dy / half_h;
-
         float fov_rad = current_fov * 0.0174532925f;
         if (fov_rad < 0.01f) fov_rad = 0.01f;
         if (fov_rad > 3.0f) fov_rad = 3.0f;
-
         float tan_half_v = tanf(fov_rad * 0.5f);
         float tan_half_h = tan_half_v * (1280.0f / 720.0f);
+        aim_yaw = norm_yaw_deg(aim_yaw + atanf(nx * tan_half_h) * 57.2957795f);
+        aim_pitch = clamp_pitch_deg(aim_pitch + atanf(ny * tan_half_v) * 57.2957795f);
+    }
+    ray.dir = forward_from_yaw_pitch(aim_yaw, aim_pitch);
 
-        float yaw_delta = atanf(nx * tan_half_h) * 57.2957795f;
-        float pitch_delta = atanf(ny * tan_half_v) * 57.2957795f;
-        aim_yaw = norm_yaw_deg(aim_yaw + yaw_delta);
-        aim_pitch = clamp_pitch_deg(aim_pitch + pitch_delta);
+    float eye_y = me->in_vehicle ? 8.0f : (me->crouching ? 2.5f : EYE_HEIGHT);
+    if (cam->mode == CAM_THIRD) {
+        ray.origin = cam->pos;
+    } else {
+        ray.origin.x = me->x;
+        ray.origin.y = me->y + eye_y;
+        ray.origin.z = me->z;
+    }
+    return ray;
+}
+
+
+static void yaw_pitch_from_dir(CameraVec3 dir, float *yaw_out, float *pitch_out) {
+    float yaw = atan2f(dir.x, dir.z) * 57.2957795f;
+    float planar = sqrtf(dir.x * dir.x + dir.z * dir.z);
+    float pitch = atan2f(dir.y, (planar > 0.0001f) ? planar : 0.0001f) * 57.2957795f;
+    if (yaw_out) *yaw_out = norm_yaw_deg(yaw);
+    if (pitch_out) *pitch_out = clamp_pitch_deg(pitch);
+}
+
+static void camera_update(CameraState *cam, const PlayerState *p, float dt) {
+    if (!cam || !p) return;
+    cam->mode = get_cam_mode(p);
+    if (!isfinite(cam->yaw)) cam->yaw = 0.0f;
+    if (!isfinite(cam->pitch)) cam->pitch = 0.0f;
+    cam->yaw = norm_yaw_deg(cam->yaw);
+    cam->pitch = clamp_pitch_deg(cam->pitch);
+
+    if (cam->mode != CAM_THIRD) return;
+
+    float pivot_x = p->x;
+    float pivot_y = p->y + cam->height;
+    float pivot_z = p->z;
+
+    if (cam->pitch > 70.0f) cam->pitch = 70.0f;
+    if (cam->pitch < -70.0f) cam->pitch = -70.0f;
+
+    CameraVec3 forward = forward_from_yaw_pitch(cam->yaw, cam->pitch);
+    CameraVec3 right = right_from_yaw(cam->yaw);
+
+    float desired_x = pivot_x - forward.x * cam->dist + right.x * cam->side;
+    float desired_y = pivot_y - forward.y * cam->dist;
+    float desired_z = pivot_z - forward.z * cam->dist + right.z * cam->side;
+
+    float dx = cam->pos.x - desired_x;
+    float dy = cam->pos.y - desired_y;
+    float dz = cam->pos.z - desired_z;
+    float dist_err = sqrtf(dx * dx + dy * dy + dz * dz);
+    if (dist_err > 30.0f || (cam->pos.x == 0.0f && cam->pos.y == 0.0f && cam->pos.z == 0.0f)) {
+        cam->pos.x = desired_x;
+        cam->pos.y = desired_y;
+        cam->pos.z = desired_z;
+        return;
     }
 
-    if (out_yaw) *out_yaw = aim_yaw;
-    if (out_pitch) *out_pitch = aim_pitch;
+    float alpha = 1.0f - expf(-14.0f * dt);
+    cam->pos.x += (desired_x - cam->pos.x) * alpha;
+    cam->pos.y += (desired_y - cam->pos.y) * alpha;
+    cam->pos.z += (desired_z - cam->pos.z) * alpha;
 }
 
 static void player_update_run_cycle(PlayerState *p, float dt) {
@@ -243,52 +346,14 @@ static void player_update_run_cycle(PlayerState *p, float dt) {
     p->run_phase += dt * (6.0f + 6.0f * p->run_weight);
 }
 
-static void camera_update_third_person(const PlayerState *p, float dt) {
-    if (!p) return;
-    float pivot_x = p->x;
-    float pivot_y = p->y + cam_height;
-    float pivot_z = p->z;
-
-    if (cam_pitch > 70.0f) cam_pitch = 70.0f;
-    if (cam_pitch < -70.0f) cam_pitch = -70.0f;
-
-    float yaw_rad = cam_yaw * 0.0174532925f;
-    float pitch_rad = cam_pitch * 0.0174532925f;
-    float fx = sinf(yaw_rad) * cosf(pitch_rad);
-    float fy = sinf(pitch_rad);
-    float fz = cosf(yaw_rad) * cosf(pitch_rad);
-    float rl = sqrtf(fx * fx + fz * fz);
-    float rx = (rl > 0.0001f) ? (fz / rl) : 1.0f;
-    float rz = (rl > 0.0001f) ? (-fx / rl) : 0.0f;
-
-    float desired_x = pivot_x - fx * cam_dist + rx * cam_side;
-    float desired_y = pivot_y - fy * cam_dist;
-    float desired_z = pivot_z - fz * cam_dist + rz * cam_side;
-
-    float dx = cam_follow_x - desired_x;
-    float dy = cam_follow_y - desired_y;
-    float dz = cam_follow_z - desired_z;
-    float dist_err = sqrtf(dx * dx + dy * dy + dz * dz);
-    if (dist_err > 30.0f || (cam_follow_x == 0.0f && cam_follow_y == 0.0f && cam_follow_z == 0.0f)) {
-        cam_follow_x = desired_x;
-        cam_follow_y = desired_y;
-        cam_follow_z = desired_z;
-        return;
-    }
-
-    float alpha = 1.0f - expf(-14.0f * dt);
-    cam_follow_x += (desired_x - cam_follow_x) * alpha;
-    cam_follow_y += (desired_y - cam_follow_y) * alpha;
-    cam_follow_z += (desired_z - cam_follow_z) * alpha;
-}
-
 static void camera_reseed_from_player(const PlayerState *p) {
     if (!p) return;
-    cam_yaw = norm_yaw_deg(p->yaw);
-    cam_pitch = clamp_pitch_deg(p->pitch);
-    cam_follow_x = 0.0f;
-    cam_follow_y = 0.0f;
-    cam_follow_z = 0.0f;
+    g_cam.yaw = norm_yaw_deg(p->yaw);
+    g_cam.pitch = clamp_pitch_deg(p->pitch);
+    g_cam.pos.x = 0.0f;
+    g_cam.pos.y = 0.0f;
+    g_cam.pos.z = 0.0f;
+    g_cam.ads_down = 0;
     g_ads_down = 0;
 }
 
@@ -987,7 +1052,7 @@ void draw_hud(PlayerState *p) {
         draw_string(match_prog.camera_third_person ? "V: 1ST PERSON" : "V: 3RD PERSON", 1030, 665, 5);
 
         char cam_dbg[96];
-        snprintf(cam_dbg, sizeof(cam_dbg), "CAM:%s ADS:%d YAW:%0.1f", (match_prog.camera_third_person && !g_ads_down) ? "3P" : "1P", g_ads_down, norm_yaw_deg(cam_yaw));
+        snprintf(cam_dbg, sizeof(cam_dbg), "CAM:%s ADS:%d YAW:%0.1f", (g_cam.mode == CAM_THIRD) ? "3P" : "1P", g_cam.ads_down, norm_yaw_deg(g_cam.yaw));
         glColor3f(0.7f, 0.9f, 0.4f);
         draw_string(cam_dbg, 900, 640, 5);
 
@@ -1003,25 +1068,15 @@ void draw_hud(PlayerState *p) {
 }
 
 static int target_in_view(PlayerState *p, float tx, float ty, float tz, float max_dist, float min_dot) {
-    float aim_yaw = 0.0f, aim_pitch = 0.0f;
-    camera_get_reticle_aim(&aim_yaw, &aim_pitch);
-    float rad_yaw = aim_yaw * 0.0174533f;
-    float rad_pitch = aim_pitch * 0.0174533f;
-    float fx = sinf(rad_yaw) * cosf(rad_pitch);
-    float fy = sinf(rad_pitch);
-    float fz = cosf(rad_yaw) * cosf(rad_pitch);
+    AimRay ray = get_aim_ray(&g_cam, p);
 
-    float ox = p->x;
-    float oy = p->y + EYE_HEIGHT;
-    float oz = p->z;
-
-    float dx = tx - ox;
-    float dy = ty - oy;
-    float dz = tz - oz;
+    float dx = tx - ray.origin.x;
+    float dy = ty - ray.origin.y;
+    float dz = tz - ray.origin.z;
     float dist = sqrtf(dx * dx + dy * dy + dz * dz);
     if (dist > max_dist || dist <= 0.001f) return 0;
     dx /= dist; dy /= dist; dz /= dist;
-    float dot = fx * dx + fy * dy + fz * dz;
+    float dot = ray.dir.x * dx + ray.dir.y * dy + ray.dir.z * dz;
     return dot >= min_dot;
 }
 
@@ -1231,22 +1286,16 @@ void draw_scene(PlayerState *render_p, float dt) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); glLoadIdentity();
     local_state.scene_id = render_p->scene_id;
     phys_set_scene(render_p->scene_id);
-    int third_person = (match_prog.camera_third_person && !render_p->in_vehicle && !g_ads_down);
-    float yaw_rad = cam_yaw * 0.0174532925f;
-    float pitch_rad = cam_pitch * 0.0174532925f;
-    float look_x = sinf(yaw_rad) * cosf(pitch_rad);
-    float look_y = sinf(pitch_rad);
-    float look_z = cosf(yaw_rad) * cosf(pitch_rad);
 
-    if (third_person) {
-        camera_update_third_person(render_p, dt);
-        float planar = sqrtf(look_x * look_x + look_z * look_z);
-        float right_x = (planar > 0.0001f) ? (look_z / planar) : 1.0f;
-        float right_z = (planar > 0.0001f) ? (-look_x / planar) : 0.0f;
-        float aim_x = render_p->x - right_x * 0.35f;
-        float aim_y = render_p->y + cam_height;
-        float aim_z = render_p->z - right_z * 0.35f;
-        gluLookAt(cam_follow_x, cam_follow_y, cam_follow_z,
+    camera_update(&g_cam, render_p, dt);
+    CameraVec3 look = forward_from_yaw_pitch(g_cam.yaw, g_cam.pitch);
+
+    if (g_cam.mode == CAM_THIRD) {
+        CameraVec3 right = right_from_yaw(g_cam.yaw);
+        float aim_x = render_p->x - right.x * 0.35f;
+        float aim_y = render_p->y + g_cam.height;
+        float aim_z = render_p->z - right.z * 0.35f;
+        gluLookAt(g_cam.pos.x, g_cam.pos.y, g_cam.pos.z,
                   aim_x, aim_y, aim_z,
                   0.0f, 1.0f, 0.0f);
     } else {
@@ -1254,7 +1303,7 @@ void draw_scene(PlayerState *render_p, float dt) {
         float eye_x = render_p->x;
         float eye_z = render_p->z;
         gluLookAt(eye_x, render_p->y + eye_y, eye_z,
-                  eye_x + look_x, render_p->y + eye_y + look_y, eye_z + look_z,
+                  eye_x + look.x, render_p->y + eye_y + look.y, eye_z + look.z,
                   0.0f, 1.0f, 0.0f);
     }
     
@@ -1273,11 +1322,12 @@ void draw_scene(PlayerState *render_p, float dt) {
         if (p == render_p) continue;
         draw_player_3rd(p);
     }
-    if (!third_person) {
+    if (g_cam.mode != CAM_THIRD) {
         draw_weapon_p(render_p);
     } else {
         PlayerState tmp = *render_p;
-        camera_get_reticle_aim(&tmp.yaw, &tmp.pitch);
+        AimRay aim_ray = get_aim_ray(&g_cam, render_p);
+        yaw_pitch_from_dir(aim_ray.dir, &tmp.yaw, &tmp.pitch);
         draw_player_3rd(&tmp);
     }
     draw_hud(render_p); draw_garage_overlay(render_p);
@@ -1691,12 +1741,8 @@ int main(int argc, char* argv[]) {
                     }
                     if(e.type == SDL_MOUSEMOTION) {
                         float sens = (current_fov < 50.0f) ? 0.05f : 0.15f; 
-                        cam_yaw -= e.motion.xrel * sens;
-                        if(cam_yaw > 360) cam_yaw -= 360; if(cam_yaw < 0) cam_yaw += 360;
-                        int third_person = match_prog.camera_third_person && !g_ads_down && !local_state.players[0].in_vehicle;
-                        if (third_person) cam_pitch -= e.motion.yrel * sens;
-                        else cam_pitch -= e.motion.yrel * sens;
-                        if(cam_pitch > 89) cam_pitch = 89; if(cam_pitch < -89) cam_pitch = -89;
+                        g_cam.yaw = norm_yaw_deg(g_cam.yaw - e.motion.xrel * sens);
+                        g_cam.pitch = clamp_pitch_deg(g_cam.pitch - e.motion.yrel * sens);
                     }
                 }
             }
@@ -1743,7 +1789,8 @@ int main(int argc, char* argv[]) {
             if(k[SDL_SCANCODE_A]) str += 1.0f;
             int jump = k[SDL_SCANCODE_SPACE]; int crouch = k[SDL_SCANCODE_LCTRL];
             int shoot = (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT));
-            g_ads_down = ((SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT)) != 0);
+            g_cam.ads_down = ((SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT)) != 0);
+            g_ads_down = g_cam.ads_down;
             int reload = k[SDL_SCANCODE_R];
             int use = k[SDL_SCANCODE_F];
             int bike = k[SDL_SCANCODE_G];
@@ -1752,7 +1799,7 @@ int main(int argc, char* argv[]) {
             if(k[SDL_SCANCODE_3]) wpn_req=2; if(k[SDL_SCANCODE_4]) wpn_req=3; if(k[SDL_SCANCODE_5]) wpn_req=4;
 
             float target_fov = 75.0f;
-            if (g_ads_down) {
+            if (g_cam.ads_down) {
                 if (local_state.players[0].current_weapon == WPN_SNIPER) target_fov = 20.0f;
                 else target_fov = 55.0f;
             }
@@ -1760,7 +1807,8 @@ int main(int argc, char* argv[]) {
             glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(current_fov, 1280.0/720.0, 0.1, Z_FAR); 
             glMatrixMode(GL_MODELVIEW);
             float aim_yaw = 0.0f, aim_pitch = 0.0f;
-            camera_get_reticle_aim(&aim_yaw, &aim_pitch);
+            AimRay aim_ray = get_aim_ray(&g_cam, &local_state.players[0]);
+            yaw_pitch_from_dir(aim_ray.dir, &aim_yaw, &aim_pitch);
             if (app_state == STATE_GAME_NET) {
                 UserCmd cmd = client_create_cmd(fwd, str, aim_yaw, aim_pitch, shoot, jump, crouch, reload, use, bike, ability, wpn_req);
                 net_send_cmd(cmd);
