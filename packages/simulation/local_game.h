@@ -725,7 +725,7 @@ void update_entity(PlayerState *p, float dt, void *server_context, unsigned int 
         p->vz = 0.0f;
     }
 
-    apply_friction(p);
+    apply_friction(p, dt);
     float g = p->in_vehicle ? ((p->vehicle_type == VEH_BIKE) ? BIKE_GRAVITY : BUGGY_GRAVITY) : ((p->in_jump) ? GRAVITY_FLOAT : GRAVITY_DROP);
     p->vy -= g; 
     p->y += p->vy;

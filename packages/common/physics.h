@@ -25,6 +25,18 @@
 #define BIKE_MAX_SPEED 3.8f
 #define BIKE_FRICTION 0.02f
 #define BIKE_GRAVITY 0.12f
+
+// --- VEHICLE HANDLING ---
+#define BUGGY_LATERAL_GRIP 10.0f
+#define BUGGY_DRIFT_LATERAL_GRIP 2.0f
+#define BUGGY_ALIGN_RATE 6.0f
+
+#define BIKE_LATERAL_GRIP 14.0f
+#define BIKE_DRIFT_LATERAL_GRIP 4.0f
+#define BIKE_ALIGN_RATE 8.0f
+
+#define VEH_MIN_GRIP_SPEED 2.5f
+
 #define BIKE_GEARS 5
 static const float BIKE_GEAR_MAX[BIKE_GEARS + 1] = {0.0f, 1.2f, 2.0f, 2.7f, 3.3f, 3.8f};
 static const float BIKE_GEAR_ACCEL[BIKE_GEARS + 1] = {0.0f, 0.14f, 0.11f, 0.095f, 0.08f, 0.07f};
@@ -680,10 +692,62 @@ int check_hit_location(float ox, float oy, float oz, float dx, float dy, float d
     return 0;
 }
 
-void apply_friction(PlayerState *p) {
+static void vehicle_stabilize(PlayerState *p, float dt) {
+    if (!p || !p->in_vehicle || dt <= 0.0f) return;
+
+    float speed = sqrtf(p->vx * p->vx + p->vz * p->vz);
+    if (speed < 0.001f) return;
+
+    float yaw_rad = p->yaw * 0.0174532925f;
+    float fwd_x = sinf(yaw_rad);
+    float fwd_z = cosf(yaw_rad);
+    float right_x = cosf(yaw_rad);
+    float right_z = -sinf(yaw_rad);
+
+    float v_fwd = p->vx * fwd_x + p->vz * fwd_z;
+    float v_lat = p->vx * right_x + p->vz * right_z;
+
+    int drifting = p->crouching != 0;
+    float lateral_grip = BUGGY_LATERAL_GRIP;
+    float align_rate = BUGGY_ALIGN_RATE;
+    if (p->vehicle_type == VEH_BIKE) {
+        lateral_grip = BIKE_LATERAL_GRIP;
+        align_rate = BIKE_ALIGN_RATE;
+    }
+    if (drifting) {
+        lateral_grip = (p->vehicle_type == VEH_BIKE) ? BIKE_DRIFT_LATERAL_GRIP : BUGGY_DRIFT_LATERAL_GRIP;
+        align_rate = 0.0f;
+    }
+
+    float lat_damp = expf(-lateral_grip * dt);
+    v_lat *= lat_damp;
+
+    p->vx = fwd_x * v_fwd + right_x * v_lat;
+    p->vz = fwd_z * v_fwd + right_z * v_lat;
+
+    speed = sqrtf(p->vx * p->vx + p->vz * p->vz);
+    if (drifting || speed < VEH_MIN_GRIP_SPEED) return;
+
+    float inv_speed = 1.0f / speed;
+    float vel_x = p->vx * inv_speed;
+    float vel_z = p->vz * inv_speed;
+
+    float blend = 1.0f - expf(-align_rate * dt);
+    float dir_x = vel_x + (fwd_x - vel_x) * blend;
+    float dir_z = vel_z + (fwd_z - vel_z) * blend;
+    float dir_len = sqrtf(dir_x * dir_x + dir_z * dir_z);
+    if (dir_len < 0.001f) return;
+
+    dir_x /= dir_len;
+    dir_z /= dir_len;
+    p->vx = dir_x * speed;
+    p->vz = dir_z * speed;
+}
+
+void apply_friction(PlayerState *p, float dt) {
     float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
     if (speed < 0.001f) { p->vx = 0; p->vz = 0; return; }
-    
+
     float drop = 0;
     if (p->in_vehicle) {
         float vehicle_friction = (p->vehicle_type == VEH_BIKE) ? BIKE_FRICTION : BUGGY_FRICTION;
@@ -692,17 +756,20 @@ void apply_friction(PlayerState *p) {
     else if (p->on_ground) {
         if (p->crouching) {
             if (speed > 0.75f) drop = speed * SLIDE_FRICTION;
-            else drop = speed * (FRICTION * 3.0f); 
+            else drop = speed * (FRICTION * 3.0f);
         } else {
             float control = (speed < STOP_SPEED) ? STOP_SPEED : speed;
-            drop = control * FRICTION; 
+            drop = control * FRICTION;
         }
     }
     float newspeed = speed - drop;
     if (newspeed < 0) newspeed = 0;
     newspeed /= speed;
     p->vx *= newspeed; p->vz *= newspeed;
+
+    if (p->in_vehicle) vehicle_stabilize(p, dt);
 }
+
 
 void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, float accel) {
     if (p->in_vehicle) {
