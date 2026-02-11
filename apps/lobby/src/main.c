@@ -1651,7 +1651,7 @@ int main(int argc, char* argv[]) {
                         cam_yaw -= e.motion.xrel * sens;
                         if(cam_yaw > 360) cam_yaw -= 360; if(cam_yaw < 0) cam_yaw += 360;
                         int third_person = match_prog.camera_third_person && !g_ads_down && !local_state.players[0].in_vehicle;
-                        if (third_person) cam_pitch += e.motion.yrel * sens;
+                        if (third_person) cam_pitch -= e.motion.yrel * sens;
                         else cam_pitch -= e.motion.yrel * sens;
                         if(cam_pitch > 89) cam_pitch = 89; if(cam_pitch < -89) cam_pitch = -89;
                     }
