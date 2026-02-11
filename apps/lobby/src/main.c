@@ -227,7 +227,7 @@ static void camera_update_third_person(const PlayerState *p, float dt) {
     float pitch_rad = cam_pitch * 0.0174532925f;
     float fx = sinf(yaw_rad) * cosf(pitch_rad);
     float fy = sinf(pitch_rad);
-    float fz = -cosf(yaw_rad) * cosf(pitch_rad);
+    float fz = cosf(yaw_rad) * cosf(pitch_rad);
     float rl = sqrtf(fx * fx + fz * fz);
     float rx = (rl > 0.0001f) ? (fz / rl) : 1.0f;
     float rz = (rl > 0.0001f) ? (-fx / rl) : 0.0f;
@@ -251,6 +251,15 @@ static void camera_update_third_person(const PlayerState *p, float dt) {
     cam_follow_x += (desired_x - cam_follow_x) * alpha;
     cam_follow_y += (desired_y - cam_follow_y) * alpha;
     cam_follow_z += (desired_z - cam_follow_z) * alpha;
+}
+
+static void camera_reseed_from_player(const PlayerState *p) {
+    if (!p) return;
+    cam_yaw = norm_yaw_deg(p->yaw);
+    cam_pitch = clamp_pitch_deg(p->pitch);
+    cam_follow_x = 0.0f;
+    cam_follow_y = 0.0f;
+    cam_follow_z = 0.0f;
 }
 
 typedef enum {
@@ -800,7 +809,7 @@ void draw_player_3rd(PlayerState *p) {
 
     glPushMatrix();
     glTranslatef(p->x, p->y + 0.2f, p->z);
-    glRotatef(-draw_yaw, 0, 1, 0);
+    glRotatef(draw_yaw, 0, 1, 0);
     if (p->in_vehicle) {
         draw_buggy_model();
     } else {
@@ -955,7 +964,7 @@ static int target_in_view(PlayerState *p, float tx, float ty, float tz, float ma
     float rad_pitch = cam_pitch * 0.0174533f;
     float fx = sinf(rad_yaw) * cosf(rad_pitch);
     float fy = sinf(rad_pitch);
-    float fz = -cosf(rad_yaw) * cosf(rad_pitch);
+    float fz = cosf(rad_yaw) * cosf(rad_pitch);
 
     float ox = p->x;
     float oy = p->y + EYE_HEIGHT;
@@ -1182,7 +1191,7 @@ void draw_scene(PlayerState *render_p, float dt) {
     float pitch_rad = cam_pitch * 0.0174532925f;
     float look_x = sinf(yaw_rad) * cosf(pitch_rad);
     float look_y = sinf(pitch_rad);
-    float look_z = -cosf(yaw_rad) * cosf(pitch_rad);
+    float look_z = cosf(yaw_rad) * cosf(pitch_rad);
 
     if (third_person) {
         camera_update_third_person(render_p, dt);
@@ -1616,9 +1625,10 @@ int main(int argc, char* argv[]) {
                         if (e.key.keysym.sym == SDLK_v || e.key.keysym.sym == SDLK_TAB) {
                             match_prog.camera_third_person = !match_prog.camera_third_person;
                             if (match_prog.camera_third_person) {
-                                cam_follow_x = 0.0f;
-                                cam_follow_y = 0.0f;
-                                cam_follow_z = 0.0f;
+                                int cam_id = (app_state == STATE_GAME_NET && my_client_id > 0 && my_client_id < MAX_CLIENTS && local_state.players[my_client_id].active)
+                                    ? my_client_id
+                                    : 0;
+                                camera_reseed_from_player(&local_state.players[cam_id]);
                             }
                         }
                         if (app_state == STATE_GAME_LOCAL) {
@@ -1675,8 +1685,10 @@ int main(int argc, char* argv[]) {
         else {
             const Uint8 *k = SDL_GetKeyboardState(NULL);
             float fwd=0, str=0;
-            if(k[SDL_SCANCODE_W]) fwd-=1; if(k[SDL_SCANCODE_S]) fwd+=1;
-            if(k[SDL_SCANCODE_D]) str+=1; if(k[SDL_SCANCODE_A]) str-=1;
+            if(k[SDL_SCANCODE_W]) fwd += 1.0f;
+            if(k[SDL_SCANCODE_S]) fwd -= 1.0f;
+            if(k[SDL_SCANCODE_D]) str += 1.0f;
+            if(k[SDL_SCANCODE_A]) str -= 1.0f;
             int jump = k[SDL_SCANCODE_SPACE]; int crouch = k[SDL_SCANCODE_LCTRL];
             int shoot = (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT));
             g_ads_down = ((SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT)) != 0);
@@ -1753,11 +1765,23 @@ int main(int argc, char* argv[]) {
                     setup_lobby_2d();
                 }
             }
+            static int cam_last_render_id = -1;
+            static int cam_last_deaths = -1;
             PlayerState *render_p = &local_state.players[0];
+            int render_id = 0;
             if (app_state == STATE_GAME_NET &&
                 my_client_id > 0 && my_client_id < MAX_CLIENTS &&
                 local_state.players[my_client_id].active) {
                 render_p = &local_state.players[my_client_id];
+                render_id = my_client_id;
+            }
+            if (render_id != cam_last_render_id) {
+                cam_last_render_id = render_id;
+                cam_last_deaths = render_p->deaths;
+                camera_reseed_from_player(render_p);
+            } else if (render_p->deaths > cam_last_deaths) {
+                cam_last_deaths = render_p->deaths;
+                camera_reseed_from_player(render_p);
             }
             for (int i = 0; i < MAX_CLIENTS; i++) {
                 player_update_run_cycle(&local_state.players[i], dt);
