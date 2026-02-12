@@ -340,6 +340,14 @@ static unsigned int hud_log_time[HUD_LOG_LINES];
 static int hud_log_head = 0;
 static int was_dragon_heat = 0;
 
+#define HUD_LOG_LINES 8
+#define HUD_LOG_LINE_LEN 96
+
+static char hud_log[HUD_LOG_LINES][HUD_LOG_LINE_LEN];
+static unsigned int hud_log_time[HUD_LOG_LINES];
+static int hud_log_head = 0;
+static int was_dragon_heat = 0;
+
 #define Z_FAR 8000.0f
 
 int sock = -1;
@@ -1425,7 +1433,7 @@ void draw_hud(PlayerState *p) {
         draw_string(city_agents, 560, 46, 5);
         int is_dragon_heat = (SDL_GetTicks() < city_fields.dragon_until_ms);
         if (is_dragon_heat && !was_dragon_heat) {
-            hud_log_push("DRAGON HEAT EVENT");
+            hud_log_push("OMENS: DRAGON HEAT");
         }
         was_dragon_heat = is_dragon_heat;
     }
@@ -1614,6 +1622,7 @@ static void draw_city_npc_primitive(const CityNpc *n) {
         case ENT_PILLAGER_MARAUDER: r = 0.85f; g = 0.3f; b = 0.25f; body_w = 1.5f; body_h = 3.5f; break;
         case ENT_PILLAGER_DESTROYER: r = 0.75f; g = 0.2f; b = 0.2f; body_w = 2.0f; body_h = 4.0f; head_w = 1.4f; break;
         case ENT_PILLAGER_CORRUPTOR: r = 0.75f; g = 0.1f; b = 0.55f; body_w = 1.4f; body_h = 3.6f; break;
+        case ENT_DRAGON: r = 0.1f; g = 0.85f; b = 0.25f; body_w = 6.0f; body_h = 9.5f; body_d = 10.0f; head_w = 4.4f; head_h = 3.2f; head_d = 6.2f; break;
     }
 
     glPushMatrix();
@@ -1627,6 +1636,10 @@ static void draw_city_npc_primitive(const CityNpc *n) {
         glPushMatrix(); glTranslatef(0.9f, body_h * 0.85f, 0.0f); draw_box(0.6f, 0.7f, 1.4f); draw_box_outline(0.6f, 0.7f, 1.4f); glPopMatrix();
     } else if (n->type == ENT_CULTIST) {
         glPushMatrix(); glTranslatef(0.0f, body_h + 0.9f, 0.45f); draw_box(0.35f, 0.45f, 0.35f); draw_box_outline(0.35f, 0.45f, 0.35f); glPopMatrix();
+    } else if (n->type == ENT_DRAGON) {
+        glPushMatrix(); glTranslatef(0.0f, body_h * 0.8f, -4.8f); draw_box(2.2f, 1.8f, 4.5f); draw_box_outline(2.2f, 1.8f, 4.5f); glPopMatrix();
+        glPushMatrix(); glTranslatef(-4.5f, body_h * 0.7f, -1.2f); draw_box(3.8f, 0.8f, 2.2f); draw_box_outline(3.8f, 0.8f, 2.2f); glPopMatrix();
+        glPushMatrix(); glTranslatef(4.5f, body_h * 0.7f, -1.2f); draw_box(3.8f, 0.8f, 2.2f); draw_box_outline(3.8f, 0.8f, 2.2f); glPopMatrix();
     }
     glPopMatrix();
 }
