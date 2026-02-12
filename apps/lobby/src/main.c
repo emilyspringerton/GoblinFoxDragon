@@ -221,6 +221,21 @@ static CameraState g_cam = {
 static float reticle_dx = 0.0f;
 static float reticle_dy = 0.0f;
 
+#define HUD_LOG_LINES 8
+#define HUD_LOG_LINE_LEN 96
+
+#ifndef SHANKPIT_HUD_STATE_DECLARED
+#define SHANKPIT_HUD_STATE_DECLARED 1
+static char hud_log[HUD_LOG_LINES][HUD_LOG_LINE_LEN];
+static unsigned int hud_log_time[HUD_LOG_LINES];
+typedef struct {
+    int head;
+    int was_dragon_heat;
+    int was_huntsman_spiderlings;
+} HudState;
+static HudState g_hud_state = {0};
+#endif
+
 #define Z_FAR 8000.0f
 
 int sock = -1;
@@ -383,6 +398,30 @@ static CamMode get_cam_mode(const PlayerState *me) {
     if (me->in_vehicle) return CAM_THIRD;
     if (match_prog.camera_third_person && !g_cam.ads_down) return CAM_THIRD;
     return CAM_FIRST;
+}
+
+static void reticle_update_visual(const PlayerState *me, float dt) {
+    CamMode mode = get_cam_mode(me);
+    g_cam.mode = mode;
+
+    float target_x = 0.0f;
+    float target_y = 0.0f;
+    if (mode == CAM_THIRD && !g_cam.ads_down) {
+        target_x = 180.0f;
+        target_y = 40.0f;
+    }
+
+    float safe_dt = dt;
+    if (!isfinite(safe_dt) || safe_dt < 0.0f) safe_dt = 0.0f;
+    if (safe_dt > 0.25f) safe_dt = 0.25f;
+    float alpha = 1.0f - expf(-18.0f * safe_dt);
+    reticle_dx += (target_x - reticle_dx) * alpha;
+    reticle_dy += (target_y - reticle_dy) * alpha;
+
+    if (reticle_dx > 420.0f) reticle_dx = 420.0f;
+    if (reticle_dx < -420.0f) reticle_dx = -420.0f;
+    if (reticle_dy > 220.0f) reticle_dy = 220.0f;
+    if (reticle_dy < -220.0f) reticle_dy = -220.0f;
 }
 
 static AimRay get_aim_ray(const CameraState *cam, const PlayerState *me) {
@@ -1112,6 +1151,91 @@ void draw_circle(float x, float y, float r, int segments) {
     glEnd();
 }
 
+static void hud_log_push(const char *msg) {
+    if (!msg || !msg[0]) return;
+    snprintf(hud_log[g_hud_state.head], HUD_LOG_LINE_LEN, "%s", msg);
+    hud_log_time[g_hud_state.head] = SDL_GetTicks();
+    g_hud_state.head = (g_hud_state.head + 1) % HUD_LOG_LINES;
+}
+
+static void hud_log_draw(void) {
+    float x0 = 18.0f, y0 = 180.0f;
+    float w = 420.0f, h = 120.0f;
+
+    glColor3f(0.05f, 0.06f, 0.08f);
+    glRectf(x0, y0, x0 + w, y0 + h);
+
+    glColor3f(0.25f, 0.8f, 1.0f);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(x0, y0);
+    glVertex2f(x0 + w, y0);
+    glVertex2f(x0 + w, y0 + h);
+    glVertex2f(x0, y0 + h);
+    glEnd();
+
+    glColor3f(0.75f, 0.85f, 0.95f);
+    draw_string("LOG", x0 + 10.0f, y0 + h - 16.0f, 5);
+
+    float line_y = y0 + 14.0f;
+    int idx = (g_hud_state.head - 1 + HUD_LOG_LINES) % HUD_LOG_LINES;
+
+    for (int i = 0; i < HUD_LOG_LINES; i++) {
+        const char *line = hud_log[idx];
+        if (line[0]) {
+            unsigned int age_ms = SDL_GetTicks() - hud_log_time[idx];
+            float fade = 1.0f - ((float)age_ms / 15000.0f);
+            if (fade < 0.45f) fade = 0.45f;
+            glColor3f(0.85f * fade, 0.9f * fade, 0.95f * fade);
+            draw_string(line, x0 + 10.0f, line_y, 4);
+            line_y += 12.0f;
+            if (line_y > y0 + h - 24.0f) break;
+        }
+        idx = (idx - 1 + HUD_LOG_LINES) % HUD_LOG_LINES;
+    }
+}
+
+static void draw_huntsman_widget(void) {
+    if (local_state.scene_id != SCENE_CITY || !city_huntsman.active) return;
+
+    float x0 = 860.0f, y0 = 168.0f;
+    float w = 395.0f, h = 148.0f;
+    glColor3f(0.05f, 0.04f, 0.06f);
+    glRectf(x0, y0, x0 + w, y0 + h);
+    glColor3f(0.55f, 0.9f, 0.65f);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(x0, y0); glVertex2f(x0 + w, y0); glVertex2f(x0 + w, y0 + h); glVertex2f(x0, y0 + h);
+    glEnd();
+
+    int sacs_alive = HUNTSMAN_SACS - city_huntsman.sacs_destroyed;
+    if (sacs_alive < 0) sacs_alive = 0;
+
+    glColor3f(0.75f, 0.95f, 0.8f);
+    draw_string("GREEN RONIN'S HUNTSMAN", x0 + 10.0f, y0 + h - 16.0f, 5);
+
+    char line[128];
+    snprintf(line, sizeof(line), "PHASE: %d", city_huntsman.phase);
+    glColor3f(0.9f, 0.9f, 0.85f);
+    draw_string(line, x0 + 10.0f, y0 + h - 34.0f, 4);
+
+    snprintf(line, sizeof(line), "ANCHOR CLUSTERS: %d/2", city_huntsman.clusters_cleared);
+    draw_string(line, x0 + 10.0f, y0 + h - 50.0f, 4);
+    snprintf(line, sizeof(line), "SACS ALIVE: %d/3", sacs_alive);
+    draw_string(line, x0 + 10.0f, y0 + h - 66.0f, 4);
+    snprintf(line, sizeof(line), "SPIDERLINGS: %d", city_huntsman.spiderlings_alive);
+    draw_string(line, x0 + 10.0f, y0 + h - 82.0f, 4);
+
+    if (city_huntsman.vulnerable) {
+        unsigned int now = SDL_GetTicks();
+        unsigned int remain = (city_huntsman.vulnerable_until_ms > now) ? (city_huntsman.vulnerable_until_ms - now) : 0;
+        snprintf(line, sizeof(line), "VULNERABLE: %u", remain / 1000);
+        glColor3f(1.0f, 0.45f, 0.25f);
+        draw_string(line, x0 + 10.0f, y0 + 14.0f, 5);
+    } else {
+        glColor3f(0.8f, 0.8f, 0.6f);
+        draw_string("VULNERABLE: LOCKED", x0 + 10.0f, y0 + 14.0f, 4);
+    }
+}
+
 void draw_hud(PlayerState *p) {
     glDisable(GL_DEPTH_TEST);
     glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
@@ -1203,10 +1327,19 @@ void draw_hud(PlayerState *p) {
         snprintf(city_agents, sizeof(city_agents), "BOIDS:%d GOB:%d FOX:%d", CITY_BOIDS, CITY_GOBLIN_AGENTS, CITY_FOX_AGENTS);
         glColor3f(0.45f, 0.85f, 1.0f);
         draw_string(city_agents, 560, 46, 5);
-        if (SDL_GetTicks() < city_fields.dragon_until_ms) {
-            glColor3f(1.0f, 0.45f, 0.2f);
-            draw_string("DRAGON HEAT EVENT", 540, 66, 6);
+        int is_dragon_heat = (SDL_GetTicks() < city_fields.dragon_until_ms);
+        if (is_dragon_heat && !g_hud_state.was_dragon_heat) {
+            hud_log_push("OMENS: DRAGON HEAT");
         }
+        g_hud_state.was_dragon_heat = is_dragon_heat;
+    }
+    if (p->scene_id == SCENE_CITY && city_huntsman.active) {
+        if (city_huntsman.spiderlings_alive > g_hud_state.was_huntsman_spiderlings) {
+            hud_log_push("Egg sac hatched spiderlings");
+        }
+        g_hud_state.was_huntsman_spiderlings = city_huntsman.spiderlings_alive;
+    } else {
+        g_hud_state.was_huntsman_spiderlings = 0;
     }
 
     if (app_state == STATE_GAME_LOCAL) {
@@ -1238,6 +1371,9 @@ void draw_hud(PlayerState *p) {
         glColor3f(0.7f, 0.85f, 1.0f);
         draw_string("O: SETTINGS", 1080, 640, 5);
     }
+
+    hud_log_draw();
+    draw_huntsman_widget();
 
     glEnable(GL_DEPTH_TEST); glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW); glPopMatrix();
 }
@@ -1391,6 +1527,7 @@ static void draw_city_npc_primitive(const CityNpc *n) {
         case ENT_PILLAGER_MARAUDER: r = 0.85f; g = 0.3f; b = 0.25f; body_w = 1.5f; body_h = 3.5f; break;
         case ENT_PILLAGER_DESTROYER: r = 0.75f; g = 0.2f; b = 0.2f; body_w = 2.0f; body_h = 4.0f; head_w = 1.4f; break;
         case ENT_PILLAGER_CORRUPTOR: r = 0.75f; g = 0.1f; b = 0.55f; body_w = 1.4f; body_h = 3.6f; break;
+        case ENT_DRAGON: r = 0.1f; g = 0.85f; b = 0.25f; body_w = 6.0f; body_h = 9.5f; body_d = 10.0f; head_w = 4.4f; head_h = 3.2f; head_d = 6.2f; break;
     }
 
     glPushMatrix();
@@ -1404,6 +1541,10 @@ static void draw_city_npc_primitive(const CityNpc *n) {
         glPushMatrix(); glTranslatef(0.9f, body_h * 0.85f, 0.0f); draw_box(0.6f, 0.7f, 1.4f); draw_box_outline(0.6f, 0.7f, 1.4f); glPopMatrix();
     } else if (n->type == ENT_CULTIST) {
         glPushMatrix(); glTranslatef(0.0f, body_h + 0.9f, 0.45f); draw_box(0.35f, 0.45f, 0.35f); draw_box_outline(0.35f, 0.45f, 0.35f); glPopMatrix();
+    } else if (n->type == ENT_DRAGON) {
+        glPushMatrix(); glTranslatef(0.0f, body_h * 0.8f, -4.8f); draw_box(2.2f, 1.8f, 4.5f); draw_box_outline(2.2f, 1.8f, 4.5f); glPopMatrix();
+        glPushMatrix(); glTranslatef(-4.5f, body_h * 0.7f, -1.2f); draw_box(3.8f, 0.8f, 2.2f); draw_box_outline(3.8f, 0.8f, 2.2f); glPopMatrix();
+        glPushMatrix(); glTranslatef(4.5f, body_h * 0.7f, -1.2f); draw_box(3.8f, 0.8f, 2.2f); draw_box_outline(3.8f, 0.8f, 2.2f); glPopMatrix();
     }
     glPopMatrix();
 }
@@ -1420,8 +1561,45 @@ static void draw_city_boids(void) {
     glEnd();
 }
 
+static void draw_huntsman_arena_fx(void) {
+    if (local_state.scene_id != SCENE_CITY || !city_huntsman.active) return;
+
+    glLineWidth(2.0f);
+    glColor3f(0.6f, 0.8f, 0.7f);
+    for (int i = 0; i < HUNTSMAN_ANCHORS; i++) {
+        if (city_huntsman.anchors_hp[i] <= 0) continue;
+        glPushMatrix();
+        glTranslatef(HUNTSMAN_ANCHOR_POS[i][0], 42.0f, HUNTSMAN_ANCHOR_POS[i][1]);
+        draw_box(3.0f, 3.0f, 3.0f);
+        draw_box_outline(3.0f, 3.0f, 3.0f);
+        glPopMatrix();
+    }
+
+    glColor3f(0.8f, 0.85f, 0.9f);
+    glBegin(GL_LINES);
+    for (int c = 0; c < 4; c++) {
+        int a = c * 2;
+        int b = a + 1;
+        if (city_huntsman.anchors_hp[a] <= 0 || city_huntsman.anchors_hp[b] <= 0) continue;
+        glVertex3f(HUNTSMAN_ANCHOR_POS[a][0], 42.0f, HUNTSMAN_ANCHOR_POS[a][1]);
+        glVertex3f(HUNTSMAN_ANCHOR_POS[b][0], 42.0f, HUNTSMAN_ANCHOR_POS[b][1]);
+    }
+    glEnd();
+
+    glColor3f(0.9f, 0.95f, 0.8f);
+    for (int i = 0; i < HUNTSMAN_SACS; i++) {
+        if (city_huntsman.sacs_hp[i] <= 0) continue;
+        glPushMatrix();
+        glTranslatef(HUNTSMAN_SAC_POS[i][0], 6.0f, HUNTSMAN_SAC_POS[i][1]);
+        draw_box(5.0f, 7.0f, 5.0f);
+        draw_box_outline(5.0f, 7.0f, 5.0f);
+        glPopMatrix();
+    }
+}
+
 static void draw_city_npcs(void) {
     if (local_state.scene_id != SCENE_CITY && local_state.scene_id != SCENE_STADIUM) return;
+    draw_huntsman_arena_fx();
     for (int i = 0; i < MAX_CITY_NPCS; i++) {
         if (!city_npcs.npcs[i].active) continue;
         draw_city_npc_primitive(&city_npcs.npcs[i]);
@@ -2038,6 +2216,7 @@ int main(int argc, char* argv[]) {
             int shoot = (!g_show_settings && (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT)));
             g_cam.ads_down = (!g_show_settings && ((SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT)) != 0));
             g_ads_down = g_cam.ads_down;
+            reticle_update_visual(&local_state.players[0], dt);
             int reload = (!g_show_settings && k[SDL_SCANCODE_R]);
             int use = (!g_show_settings && k[SDL_SCANCODE_F]);
             int bike = (!g_show_settings && k[SDL_SCANCODE_G]);
