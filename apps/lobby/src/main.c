@@ -375,6 +375,21 @@ typedef struct {
 static HudState g_hud_state = {0};
 #endif
 
+#define HUD_LOG_LINES 8
+#define HUD_LOG_LINE_LEN 96
+
+#ifndef SHANKPIT_HUD_STATE_DECLARED
+#define SHANKPIT_HUD_STATE_DECLARED 1
+static char hud_log[HUD_LOG_LINES][HUD_LOG_LINE_LEN];
+static unsigned int hud_log_time[HUD_LOG_LINES];
+typedef struct {
+    int head;
+    int was_dragon_heat;
+    int was_huntsman_spiderlings;
+} ShankpitHudRuntimeState;
+static ShankpitHudRuntimeState g_hud_runtime = {0};
+#endif
+
 #define Z_FAR 8000.0f
 
 int sock = -1;
@@ -1321,9 +1336,9 @@ void draw_circle(float x, float y, float r, int segments) {
 
 static void hud_log_push(const char *msg) {
     if (!msg || !msg[0]) return;
-    snprintf(hud_log[g_hud_state.head], HUD_LOG_LINE_LEN, "%s", msg);
-    hud_log_time[g_hud_state.head] = SDL_GetTicks();
-    g_hud_state.head = (g_hud_state.head + 1) % HUD_LOG_LINES;
+    snprintf(hud_log[g_hud_runtime.head], HUD_LOG_LINE_LEN, "%s", msg);
+    hud_log_time[g_hud_runtime.head] = SDL_GetTicks();
+    g_hud_runtime.head = (g_hud_runtime.head + 1) % HUD_LOG_LINES;
 }
 
 static void hud_log_draw(void) {
@@ -1345,7 +1360,7 @@ static void hud_log_draw(void) {
     draw_string("LOG", x0 + 10.0f, y0 + h - 16.0f, 5);
 
     float line_y = y0 + 14.0f;
-    int idx = (g_hud_state.head - 1 + HUD_LOG_LINES) % HUD_LOG_LINES;
+    int idx = (g_hud_runtime.head - 1 + HUD_LOG_LINES) % HUD_LOG_LINES;
 
     for (int i = 0; i < HUD_LOG_LINES; i++) {
         const char *line = hud_log[idx];
@@ -1501,18 +1516,18 @@ void draw_hud(PlayerState *p) {
         glColor3f(0.45f, 0.85f, 1.0f);
         draw_string(city_agents, 560, 46, 5);
         int is_dragon_heat = (SDL_GetTicks() < city_fields.dragon_until_ms);
-        if (is_dragon_heat && !g_hud_state.was_dragon_heat) {
+        if (is_dragon_heat && !g_hud_runtime.was_dragon_heat) {
             hud_log_push("OMENS: DRAGON HEAT");
         }
-        g_hud_state.was_dragon_heat = is_dragon_heat;
+        g_hud_runtime.was_dragon_heat = is_dragon_heat;
     }
     if (p->scene_id == SCENE_CITY && city_huntsman.active) {
-        if (city_huntsman.spiderlings_alive > g_hud_state.was_huntsman_spiderlings) {
+        if (city_huntsman.spiderlings_alive > g_hud_runtime.was_huntsman_spiderlings) {
             hud_log_push("Egg sac hatched spiderlings");
         }
-        g_hud_state.was_huntsman_spiderlings = city_huntsman.spiderlings_alive;
+        g_hud_runtime.was_huntsman_spiderlings = city_huntsman.spiderlings_alive;
     } else {
-        g_hud_state.was_huntsman_spiderlings = 0;
+        g_hud_runtime.was_huntsman_spiderlings = 0;
     }
 
     if (app_state == STATE_GAME_LOCAL) {
