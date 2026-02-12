@@ -218,10 +218,10 @@ static CameraState g_cam = {
     CAM_THIRD
 };
 
+static const float SHOULDER_LOOK_OFFSET = 0.65f;
+
 static float reticle_dx = 0.0f;
 static float reticle_dy = 0.0f;
-static const float third_person_reticle_dx = 170.0f;
-static const float third_person_reticle_dy = 34.0f;
 
 typedef struct {
     float cam_pitch_kick;
@@ -511,25 +511,9 @@ static CamMode get_cam_mode(const PlayerState *me) {
 static void reticle_update_visual(const PlayerState *me, float dt) {
     CamMode mode = get_cam_mode(me);
     g_cam.mode = mode;
-
-    float target_x = 0.0f;
-    float target_y = 0.0f;
-    if (mode == CAM_THIRD && !g_cam.ads_down) {
-        target_x = 180.0f;
-        target_y = 40.0f;
-    }
-
-    float safe_dt = dt;
-    if (!isfinite(safe_dt) || safe_dt < 0.0f) safe_dt = 0.0f;
-    if (safe_dt > 0.25f) safe_dt = 0.25f;
-    float alpha = 1.0f - expf(-18.0f * safe_dt);
-    reticle_dx += (target_x - reticle_dx) * alpha;
-    reticle_dy += (target_y - reticle_dy) * alpha;
-
-    if (reticle_dx > 420.0f) reticle_dx = 420.0f;
-    if (reticle_dx < -420.0f) reticle_dx = -420.0f;
-    if (reticle_dy > 220.0f) reticle_dy = 220.0f;
-    if (reticle_dy < -220.0f) reticle_dy = -220.0f;
+    (void)dt;
+    reticle_dx = 0.0f;
+    reticle_dy = 0.0f;
 }
 
 static AimRay get_aim_ray(const CameraState *cam, const PlayerState *me) {
@@ -1377,8 +1361,8 @@ void draw_hud(PlayerState *p) {
     glDisable(GL_DEPTH_TEST);
     glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
     glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
-    float reticle_cx = 640.0f + reticle_dx;
-    float reticle_cy = 360.0f + reticle_dy;
+    float reticle_cx = 640.0f;
+    float reticle_cy = 360.0f;
 
     glColor3f(0, 1, 0);
     if (current_fov < 50.0f) {
@@ -1843,9 +1827,9 @@ void draw_scene(PlayerState *render_p, float dt) {
 
     if (g_cam.mode == CAM_THIRD) {
         CameraVec3 right = right_from_yaw(visual_yaw);
-        float aim_x = render_p->x - right.x * 0.35f;
+        float aim_x = render_p->x + right.x * SHOULDER_LOOK_OFFSET;
         float aim_y = render_p->y + g_cam.height;
-        float aim_z = render_p->z - right.z * 0.35f;
+        float aim_z = render_p->z + right.z * SHOULDER_LOOK_OFFSET;
         gluLookAt(g_cam.pos.x + kick_shake_x() * 0.3f, g_cam.pos.y + kick_shake_y() * 0.3f, g_cam.pos.z,
                   aim_x, aim_y, aim_z,
                   0.0f, 1.0f, 0.0f);
