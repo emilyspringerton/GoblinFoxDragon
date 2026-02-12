@@ -1826,12 +1826,11 @@ void draw_scene(PlayerState *render_p, float dt) {
     CameraVec3 look = forward_from_yaw_pitch(visual_yaw, visual_pitch);
 
     if (g_cam.mode == CAM_THIRD) {
-        CameraVec3 right = right_from_yaw(visual_yaw);
-        float aim_x = render_p->x + right.x * SHOULDER_LOOK_OFFSET;
-        float aim_y = render_p->y + g_cam.height;
-        float aim_z = render_p->z + right.z * SHOULDER_LOOK_OFFSET;
-        gluLookAt(g_cam.pos.x + kick_shake_x() * 0.3f, g_cam.pos.y + kick_shake_y() * 0.3f, g_cam.pos.z,
-                  aim_x, aim_y, aim_z,
+        float eye_x = g_cam.pos.x + kick_shake_x() * 0.3f;
+        float eye_y = g_cam.pos.y + kick_shake_y() * 0.3f;
+        float eye_z = g_cam.pos.z;
+        gluLookAt(eye_x, eye_y, eye_z,
+                  eye_x + look.x, eye_y + look.y, eye_z + look.z,
                   0.0f, 1.0f, 0.0f);
     } else {
         float eye_y = render_p->in_vehicle ? 8.0f : (render_p->crouching ? 2.5f : EYE_HEIGHT);
@@ -1861,7 +1860,10 @@ void draw_scene(PlayerState *render_p, float dt) {
         draw_weapon_p(render_p);
     } else {
         PlayerState tmp = *render_p;
-        AimRay aim_ray = get_aim_ray(&g_cam, render_p);
+        CameraState aim_cam = g_cam;
+        aim_cam.yaw = visual_yaw;
+        aim_cam.pitch = visual_pitch;
+        AimRay aim_ray = get_aim_ray(&aim_cam, render_p);
         yaw_pitch_from_dir(aim_ray.dir, &tmp.yaw, &tmp.pitch);
         draw_player_3rd(&tmp);
     }
@@ -2390,7 +2392,10 @@ int main(int argc, char* argv[]) {
             glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(current_fov, 1280.0/720.0, 0.1, Z_FAR); 
             glMatrixMode(GL_MODELVIEW);
             float aim_yaw = 0.0f, aim_pitch = 0.0f;
-            AimRay aim_ray = get_aim_ray(&g_cam, &local_state.players[0]);
+            CameraState aim_cam = g_cam;
+            aim_cam.yaw = norm_yaw_deg(g_cam.yaw + g_kick.cam_yaw_off + kick_shake_x());
+            aim_cam.pitch = clamp_pitch_deg(g_cam.pitch + g_kick.cam_pitch_off + kick_shake_y());
+            AimRay aim_ray = get_aim_ray(&aim_cam, &local_state.players[0]);
             yaw_pitch_from_dir(aim_ray.dir, &aim_yaw, &aim_pitch);
             if (app_state == STATE_GAME_NET) {
                 UserCmd cmd = client_create_cmd(fwd, str, aim_yaw, aim_pitch, shoot, jump, crouch, reload, use, bike, ability, wpn_req);
