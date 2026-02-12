@@ -101,6 +101,9 @@ typedef struct {
 CityNpcManager city_npcs;
 CityFieldSim city_fields;
 
+#define CITY_DRAGON_HP_MAX 3000.0f
+#define CITY_DRAGON_SPAWN_ZONE_INDEX 4
+
 static const NpcSpawnZone NPC_SPAWN_ZONES[] = {
     { 0.0f,  360.0f, 170.0f, SCENE_STADIUM, 0, 4, 3500 },
     { 0.0f, -360.0f, 170.0f, SCENE_STADIUM, 3, 4, 3500 },
@@ -261,6 +264,7 @@ static CreepReward creep_reward_for_type(int type) {
     else if (type == ENT_PILLAGER_MARAUDER) r = (CreepReward){35, 8, 0.5f, 130.0f};
     else if (type == ENT_PILLAGER_DESTROYER) r = (CreepReward){55, 10, 0.5f, 135.0f};
     else if (type == ENT_PILLAGER_CORRUPTOR) r = (CreepReward){45, 9, 0.5f, 130.0f};
+    else if (type == ENT_DRAGON) r = (CreepReward){220, 60, 0.6f, 220.0f};
     return r;
 }
 
@@ -406,8 +410,63 @@ static void city_spawn_npc(CityNpc *n, const NpcSpawnZone *zone, unsigned int no
     n->respawn_time_ms = 0;
 }
 
+static int city_find_dragon_npc(void) {
+    for (int i = 0; i < MAX_CITY_NPCS; i++) {
+        CityNpc *n = &city_npcs.npcs[i];
+        if (!n->active) continue;
+        if (n->scene_id != SCENE_CITY) continue;
+        if (n->type == ENT_DRAGON) return i;
+    }
+    return -1;
+}
+
+static void city_spawn_green_ronin(unsigned int now_tick) {
+    if (local_state.scene_id != SCENE_CITY) return;
+    if (city_find_dragon_npc() >= 0) return;
+
+    int slot = -1;
+    for (int i = 0; i < MAX_CITY_NPCS; i++) {
+        if (city_npcs.npcs[i].active) continue;
+        if (city_npcs.npcs[i].respawn_time_ms != 0 && now_tick < city_npcs.npcs[i].respawn_time_ms) continue;
+        slot = i;
+        break;
+    }
+    if (slot < 0) return;
+
+    CityNpc *n = &city_npcs.npcs[slot];
+    memset(n, 0, sizeof(*n));
+    n->active = 1;
+    n->type = ENT_DRAGON;
+    n->scene_id = SCENE_CITY;
+    n->x = 0.0f;
+    n->y = 2.0f;
+    n->z = -1180.0f;
+    n->leash_x = n->x;
+    n->leash_z = n->z;
+    n->yaw = 0.0f;
+    n->state = NPC_CHASE;
+    n->team_id = NPC_TEAM_NEUTRAL;
+    n->behavior_mask = NPCB_SEEK_PLAYER | NPCB_MELEE_LUNGE | NPCB_RANGED_POKE | NPCB_CALL_FOR_HELP;
+    n->hp_max = CITY_DRAGON_HP_MAX;
+    n->hp = n->hp_max;
+    n->home_district = city_district_at(n->x, n->z);
+    n->spawn_zone = CITY_DRAGON_SPAWN_ZONE_INDEX;
+    n->last_hit_by_client = -1;
+    n->last_hit_by_team = 0;
+    n->last_hit_time_ms = 0;
+    n->think_tick = now_tick + 8;
+    n->action_tick = now_tick;
+    n->respawn_time_ms = now_tick + 180000;
+}
+
 static void city_npc_update(unsigned int now_tick) {
+    unsigned int dragon_before = city_fields.dragon_until_ms;
+    int was_dragon_heat = (dragon_before > now_tick);
     city_fields_step(now_tick);
+    int is_dragon_heat = (city_fields.dragon_until_ms > now_tick);
+    if (local_state.scene_id == SCENE_CITY && is_dragon_heat && !was_dragon_heat) {
+        city_spawn_green_ronin(now_tick);
+    }
     PlayerState *focus = &local_state.players[0];
     if (!focus->active) return;
 
@@ -463,6 +522,12 @@ static void city_npc_update(unsigned int now_tick) {
         else if (n->state == NPC_CHASE || n->state == NPC_GUARD) {
             tx = target->x; tz = target->z;
             speed = (n->type == ENT_GOBLIN) ? 0.76f : (n->type == ENT_ORC ? 0.38f : 0.48f);
+            if (n->type == ENT_DRAGON) {
+                speed = 0.30f;
+                if (best_d > 70.0f) speed = 0.40f;
+                tx += -best_dz * 0.10f;
+                tz += best_dx * 0.10f;
+            }
             if (n->type == ENT_HUNTER && best_d < 40.0f) { tx = n->x - best_dx; tz = n->z - best_dz; speed = 0.52f; }
             if (n->type == ENT_PILLAGER_MARAUDER) {
                 tx += -best_dz * 0.35f;
@@ -512,12 +577,19 @@ static void city_npc_update(unsigned int now_tick) {
         n->z += n->vz;
         n->yaw = atan2f(n->vx, n->vz) * (180.0f / 3.14159f);
 
-        if ((n->behavior_mask & NPCB_MELEE_LUNGE) && best_d < ((n->type == ENT_ORC || n->type == ENT_PILLAGER_DESTROYER) ? 9.0f : 6.0f) && (now_tick % 20 == 0)) {
-            int dmg = (n->type == ENT_ORC) ? 10 : (n->type == ENT_PILLAGER_DESTROYER ? 14 : 5);
-            if (target->health > 1) target->health -= dmg;
+        float melee_range = (n->type == ENT_ORC || n->type == ENT_PILLAGER_DESTROYER) ? 9.0f : 6.0f;
+        int melee_dmg = (n->type == ENT_ORC) ? 10 : (n->type == ENT_PILLAGER_DESTROYER ? 14 : 5);
+        if (n->type == ENT_DRAGON) {
+            melee_range = 14.0f;
+            melee_dmg = 22;
         }
+        if ((n->behavior_mask & NPCB_MELEE_LUNGE) && best_d < melee_range && (now_tick % ((n->type == ENT_DRAGON) ? 24 : 20) == 0)) {
+            if (target->health > 1) target->health -= melee_dmg;
+        }
+
         if ((n->behavior_mask & NPCB_RANGED_POKE) && best_d < 150.0f && best_d > 22.0f && (now_tick % 34 == 0) && target->health > 1) {
-            target->health -= 6;
+            int poke_dmg = (n->type == ENT_DRAGON) ? 24 : 6;
+            target->health -= poke_dmg;
         }
         if (n->type == ENT_PILLAGER_CORRUPTOR && best_d < 24.0f && (now_tick % 18 == 0) && target->health > 1) {
             target->health -= 2;
