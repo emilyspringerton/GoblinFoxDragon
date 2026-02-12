@@ -360,6 +360,21 @@ typedef struct {
 } HudState;
 static HudState g_hud_state = {0};
 
+#define HUD_LOG_LINES 8
+#define HUD_LOG_LINE_LEN 96
+
+#ifndef SHANKPIT_HUD_STATE_DECLARED
+#define SHANKPIT_HUD_STATE_DECLARED 1
+static char hud_log[HUD_LOG_LINES][HUD_LOG_LINE_LEN];
+static unsigned int hud_log_time[HUD_LOG_LINES];
+typedef struct {
+    int head;
+    int was_dragon_heat;
+    int was_huntsman_spiderlings;
+} HudState;
+static HudState g_hud_state = {0};
+#endif
+
 #define Z_FAR 8000.0f
 
 int sock = -1;
