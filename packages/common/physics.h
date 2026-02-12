@@ -880,6 +880,56 @@ int trace_map(float x1, float y1, float z1, float x2, float y2, float z2,
     return trace_map_boxes(x1, y1, z1, x2, y2, z2, out_x, out_y, out_z, nx, ny, nz);
 }
 
+
+static inline float ray_sphere_hit_t(float ox, float oy, float oz,
+                                     float dx, float dy, float dz,
+                                     float cx, float cy, float cz,
+                                     float radius) {
+    float lx = ox - cx;
+    float ly = oy - cy;
+    float lz = oz - cz;
+    float b = 2.0f * (dx * lx + dy * ly + dz * lz);
+    float c = lx * lx + ly * ly + lz * lz - radius * radius;
+    float disc = b * b - 4.0f * c;
+    if (disc < 0.0f) return -1.0f;
+    float sq = sqrtf(disc);
+    float t0 = (-b - sq) * 0.5f;
+    float t1 = (-b + sq) * 0.5f;
+    if (t0 > 0.0f) return t0;
+    if (t1 > 0.0f) return t1;
+    return -1.0f;
+}
+
+static inline int raycast_player_hit(float ox, float oy, float oz,
+                                     float dx, float dy, float dz,
+                                     float max_t,
+                                     PlayerState *target,
+                                     int *out_hit_type,
+                                     float *out_t) {
+    if (!target || !target->active || target->state == STATE_DEAD) return 0;
+
+    float h_size = target->in_vehicle ? 4.0f : HEAD_SIZE;
+    float h_off = target->in_vehicle ? 2.0f : HEAD_OFFSET;
+    float head_t = ray_sphere_hit_t(ox, oy, oz, dx, dy, dz,
+                                    target->x, target->y + h_off, target->z, h_size);
+    float body_t = ray_sphere_hit_t(ox, oy, oz, dx, dy, dz,
+                                    target->x, target->y + 2.0f, target->z, sqrtf(7.2f));
+
+    int hit_type = 0;
+    float t = -1.0f;
+    if (head_t > 0.0f && head_t <= max_t) {
+        hit_type = 2;
+        t = head_t;
+    }
+    if (body_t > 0.0f && body_t <= max_t && (t < 0.0f || body_t < t)) {
+        hit_type = 1;
+        t = body_t;
+    }
+    if (hit_type == 0) return 0;
+    if (out_hit_type) *out_hit_type = hit_type;
+    if (out_t) *out_t = t;
+    return 1;
+}
 int check_hit_location(float ox, float oy, float oz, float dx, float dy, float dz, PlayerState *target) {
     if (!target->active) return 0;
     float tx = target->x; float tz = target->z;
@@ -1237,30 +1287,67 @@ void update_weapons(PlayerState *p, PlayerState *targets, Projectile *projectile
                 dz += phys_rand_f() * WPN_STATS[w].spr;
             }
 
-            for(int i=0; i<MAX_CLIENTS; i++) {
+            {
+                float dlen = sqrtf(dx * dx + dy * dy + dz * dz);
+                if (dlen > 0.00001f) {
+                    dx /= dlen; dy /= dlen; dz /= dlen;
+                }
+            }
+
+            float ox = p->x;
+            float oy = p->y + EYE_HEIGHT;
+            float oz = p->z;
+            float max_range = 2000.0f;
+            float wall_x = ox + dx * max_range;
+            float wall_y = oy + dy * max_range;
+            float wall_z = oz + dz * max_range;
+            float nnx = 0.0f, nny = 0.0f, nnz = 0.0f;
+            int wall_hit = trace_map(ox, oy, oz, wall_x, wall_y, wall_z, &wall_x, &wall_y, &wall_z, &nnx, &nny, &nnz);
+            float wall_t = max_range;
+            if (wall_hit) {
+                float wx = wall_x - ox;
+                float wy = wall_y - oy;
+                float wz = wall_z - oz;
+                wall_t = sqrtf(wx * wx + wy * wy + wz * wz);
+            }
+
+            int best_idx = -1;
+            int best_hit_type = 0;
+            float best_t = wall_t;
+            for (int i = 0; i < MAX_CLIENTS; i++) {
                 if (p == &targets[i]) continue;
                 if (!targets[i].active || targets[i].state == STATE_DEAD) continue;
                 if (targets[i].scene_id != p->scene_id) continue;
-                int hit_type = check_hit_location(p->x, p->y + EYE_HEIGHT, p->z, dx, dy, dz, &targets[i]);
-                if (hit_type > 0) {
-                    printf("🔫 HIT! Dmg: %d on Target %d\n", WPN_STATS[w].dmg, i);
-                    int damage = WPN_STATS[w].dmg;
-                    p->accumulated_reward += 10.0f;
-                    targets[i].shield_regen_timer = SHIELD_REGEN_DELAY;
-                    if (hit_type == 2 && targets[i].shield <= 0) { damage *= 3; p->hit_feedback = 20;
-                    } else { p->hit_feedback = 10; } 
-                    
-                    if (targets[i].shield > 0) {
-                        if (targets[i].shield >= damage) { targets[i].shield -= damage; damage = 0; } 
-                        else { damage -= targets[i].shield; targets[i].shield = 0; }
-                    }
-                    targets[i].health -= damage;
-                    if(targets[i].health <= 0) {
-                        p->kills++; targets[i].deaths++; 
-                        p->accumulated_reward += 1000.0f;
-                        p->hit_feedback = 30; // KILL CONFIRM (Triggers Double Ring)
-                        phys_respawn(&targets[i], 0);
-                    }
+
+                int hit_type = 0;
+                float hit_t = 0.0f;
+                if (!raycast_player_hit(ox, oy, oz, dx, dy, dz, wall_t, &targets[i], &hit_type, &hit_t)) continue;
+                if (hit_t < best_t) {
+                    best_t = hit_t;
+                    best_idx = i;
+                    best_hit_type = hit_type;
+                }
+            }
+
+            if (best_idx >= 0) {
+                printf("[SHOT] shooter=%d org=(%.2f,%.2f,%.2f) dir=(%.3f,%.3f,%.3f) wall_t=%.2f hit=%d hit_t=%.2f\n",
+                       p->id, ox, oy, oz, dx, dy, dz, wall_t, best_idx, best_t);
+                int damage = WPN_STATS[w].dmg;
+                p->accumulated_reward += 10.0f;
+                targets[best_idx].shield_regen_timer = SHIELD_REGEN_DELAY;
+                if (best_hit_type == 2 && targets[best_idx].shield <= 0) { damage *= 3; p->hit_feedback = 20;
+                } else { p->hit_feedback = 10; }
+
+                if (targets[best_idx].shield > 0) {
+                    if (targets[best_idx].shield >= damage) { targets[best_idx].shield -= damage; damage = 0; }
+                    else { damage -= targets[best_idx].shield; targets[best_idx].shield = 0; }
+                }
+                targets[best_idx].health -= damage;
+                if(targets[best_idx].health <= 0) {
+                    p->kills++; targets[best_idx].deaths++;
+                    p->accumulated_reward += 1000.0f;
+                    p->hit_feedback = 30; // KILL CONFIRM (Triggers Double Ring)
+                    phys_respawn(&targets[best_idx], 0);
                 }
             }
         }
