@@ -101,6 +101,35 @@ typedef struct {
 CityNpcManager city_npcs;
 CityFieldSim city_fields;
 
+#define CITY_DRAGON_HP_MAX 3500.0f
+#define CITY_DRAGON_SPAWN_ZONE_INDEX 4
+#define HUNTSMAN_ANCHORS 8
+#define HUNTSMAN_SACS 3
+
+typedef struct {
+    int active;
+    int phase;
+    int vulnerable;
+    unsigned int vulnerable_until_ms;
+    int anchors_hp[HUNTSMAN_ANCHORS];
+    int sacs_hp[HUNTSMAN_SACS];
+    int clusters_cleared;
+    int sacs_destroyed;
+    int spiderlings_alive;
+    unsigned int next_spiderling_spawn_ms;
+} HuntsmanEncounter;
+
+HuntsmanEncounter city_huntsman;
+
+static const float HUNTSMAN_ANCHOR_POS[HUNTSMAN_ANCHORS][2] = {
+    {-1240.0f, -760.0f}, {-1240.0f, 760.0f}, {-520.0f, -1280.0f}, {-520.0f, 1280.0f},
+    {520.0f, -1280.0f}, {520.0f, 1280.0f}, {1240.0f, -760.0f}, {1240.0f, 760.0f}
+};
+
+static const float HUNTSMAN_SAC_POS[HUNTSMAN_SACS][2] = {
+    {-1400.0f, 0.0f}, {0.0f, 1380.0f}, {1400.0f, 0.0f}
+};
+
 static const NpcSpawnZone NPC_SPAWN_ZONES[] = {
     { 0.0f,  360.0f, 170.0f, SCENE_STADIUM, 0, 4, 3500 },
     { 0.0f, -360.0f, 170.0f, SCENE_STADIUM, 3, 4, 3500 },
@@ -261,6 +290,7 @@ static CreepReward creep_reward_for_type(int type) {
     else if (type == ENT_PILLAGER_MARAUDER) r = (CreepReward){35, 8, 0.5f, 130.0f};
     else if (type == ENT_PILLAGER_DESTROYER) r = (CreepReward){55, 10, 0.5f, 135.0f};
     else if (type == ENT_PILLAGER_CORRUPTOR) r = (CreepReward){45, 9, 0.5f, 130.0f};
+    else if (type == ENT_DRAGON) r = (CreepReward){220, 60, 0.6f, 220.0f};
     return r;
 }
 
@@ -335,9 +365,35 @@ static int city_adjust_type_by_fields(float x, float z, int district, int base_t
     return base_type;
 }
 
+static void huntsman_start(unsigned int now_tick) {
+    memset(&city_huntsman, 0, sizeof(city_huntsman));
+    city_huntsman.active = 1;
+    city_huntsman.phase = 1;
+    for (int i = 0; i < HUNTSMAN_ANCHORS; i++) city_huntsman.anchors_hp[i] = 250;
+    for (int i = 0; i < HUNTSMAN_SACS; i++) city_huntsman.sacs_hp[i] = 400;
+    city_huntsman.next_spiderling_spawn_ms = now_tick + 4000;
+}
+
+static int huntsman_anchor_cluster_cleared(int cluster) {
+    int a = cluster * 2;
+    int b = a + 1;
+    if (a < 0 || b >= HUNTSMAN_ANCHORS) return 0;
+    return city_huntsman.anchors_hp[a] <= 0 && city_huntsman.anchors_hp[b] <= 0;
+}
+
+static void huntsman_recount_progress(void) {
+    int clusters = 0;
+    for (int c = 0; c < 4; c++) if (huntsman_anchor_cluster_cleared(c)) clusters++;
+    city_huntsman.clusters_cleared = clusters;
+    int sacs = 0;
+    for (int i = 0; i < HUNTSMAN_SACS; i++) if (city_huntsman.sacs_hp[i] <= 0) sacs++;
+    city_huntsman.sacs_destroyed = sacs;
+}
+
 static void city_reset_npcs() {
     memset(&city_npcs, 0, sizeof(city_npcs));
     memset(&city_fields, 0, sizeof(city_fields));
+    memset(&city_huntsman, 0, sizeof(city_huntsman));
     city_npcs.seed = 0xC17BEEFu;
 }
 
@@ -406,10 +462,149 @@ static void city_spawn_npc(CityNpc *n, const NpcSpawnZone *zone, unsigned int no
     n->respawn_time_ms = 0;
 }
 
+static int city_find_dragon_npc(void) {
+    for (int i = 0; i < MAX_CITY_NPCS; i++) {
+        CityNpc *n = &city_npcs.npcs[i];
+        if (!n->active) continue;
+        if (n->scene_id != SCENE_CITY) continue;
+        if (n->type == ENT_DRAGON) return i;
+    }
+    return -1;
+}
+
+static void city_spawn_green_ronin(unsigned int now_tick) {
+    if (local_state.scene_id != SCENE_CITY) return;
+    if (city_find_dragon_npc() >= 0) return;
+
+    int slot = -1;
+    for (int i = 0; i < MAX_CITY_NPCS; i++) {
+        if (city_npcs.npcs[i].active) continue;
+        if (city_npcs.npcs[i].respawn_time_ms != 0 && now_tick < city_npcs.npcs[i].respawn_time_ms) continue;
+        slot = i;
+        break;
+    }
+    if (slot < 0) return;
+
+    CityNpc *n = &city_npcs.npcs[slot];
+    memset(n, 0, sizeof(*n));
+    n->active = 1;
+    n->type = ENT_DRAGON;
+    n->scene_id = SCENE_CITY;
+    n->x = 0.0f;
+    n->y = 2.0f;
+    n->z = -1180.0f;
+    n->leash_x = n->x;
+    n->leash_z = n->z;
+    n->yaw = 0.0f;
+    n->state = NPC_CHASE;
+    n->team_id = NPC_TEAM_NEUTRAL;
+    n->behavior_mask = NPCB_SEEK_PLAYER | NPCB_MELEE_LUNGE | NPCB_RANGED_POKE | NPCB_CALL_FOR_HELP;
+    n->hp_max = CITY_DRAGON_HP_MAX;
+    n->hp = n->hp_max;
+    n->home_district = city_district_at(n->x, n->z);
+    n->spawn_zone = CITY_DRAGON_SPAWN_ZONE_INDEX;
+    n->last_hit_by_client = -1;
+    n->last_hit_by_team = 0;
+    n->last_hit_time_ms = 0;
+    n->think_tick = now_tick + 8;
+    n->action_tick = now_tick;
+    n->respawn_time_ms = now_tick + 180000;
+}
+
 static void city_npc_update(unsigned int now_tick) {
+    unsigned int dragon_before = city_fields.dragon_until_ms;
+    int was_dragon_heat = (dragon_before > now_tick);
     city_fields_step(now_tick);
+    int is_dragon_heat = (city_fields.dragon_until_ms > now_tick);
+    if (local_state.scene_id == SCENE_CITY && is_dragon_heat && !was_dragon_heat) {
+        city_spawn_green_ronin(now_tick);
+        if (!city_huntsman.active) huntsman_start(now_tick);
+    }
     PlayerState *focus = &local_state.players[0];
     if (!focus->active) return;
+
+    if (local_state.scene_id == SCENE_CITY && city_huntsman.active) {
+        int sacs_alive = 0;
+        for (int i = 0; i < HUNTSMAN_SACS; i++) if (city_huntsman.sacs_hp[i] > 0) sacs_alive++;
+
+        for (int p = 0; p < MAX_CLIENTS; p++) {
+            PlayerState *pl = &local_state.players[p];
+            if (!pl->active || pl->scene_id != SCENE_CITY || pl->state == STATE_DEAD) continue;
+
+            if (pl->in_shoot > 0) {
+                int best_anchor = -1;
+                float best_anchor_d2 = 220.0f * 220.0f;
+                for (int a = 0; a < HUNTSMAN_ANCHORS; a++) {
+                    if (city_huntsman.anchors_hp[a] <= 0) continue;
+                    float dx = HUNTSMAN_ANCHOR_POS[a][0] - pl->x;
+                    float dz = HUNTSMAN_ANCHOR_POS[a][1] - pl->z;
+                    float d2 = dx * dx + dz * dz;
+                    if (d2 < best_anchor_d2) { best_anchor = a; best_anchor_d2 = d2; }
+                }
+                if (best_anchor >= 0 && (now_tick % 4u) == 0u) city_huntsman.anchors_hp[best_anchor] -= 10;
+
+                int best_sac = -1;
+                float best_sac_d2 = 240.0f * 240.0f;
+                for (int i = 0; i < HUNTSMAN_SACS; i++) {
+                    if (city_huntsman.sacs_hp[i] <= 0) continue;
+                    float dx = HUNTSMAN_SAC_POS[i][0] - pl->x;
+                    float dz = HUNTSMAN_SAC_POS[i][1] - pl->z;
+                    float d2 = dx * dx + dz * dz;
+                    if (d2 < best_sac_d2) { best_sac = i; best_sac_d2 = d2; }
+                }
+                if (best_sac >= 0 && (now_tick % 4u) == 0u) city_huntsman.sacs_hp[best_sac] -= 8;
+            }
+
+            if (pl->in_use > 0) {
+                for (int a = 0; a < HUNTSMAN_ANCHORS; a++) {
+                    if (city_huntsman.anchors_hp[a] <= 0) continue;
+                    float dx = HUNTSMAN_ANCHOR_POS[a][0] - pl->x;
+                    float dz = HUNTSMAN_ANCHOR_POS[a][1] - pl->z;
+                    if ((dx * dx + dz * dz) < (95.0f * 95.0f) && (now_tick % 3u) == 0u) city_huntsman.anchors_hp[a] -= 15;
+                }
+            }
+
+            if (city_huntsman.spiderlings_alive > 0 && (now_tick % 60u) == 0u) {
+                pl->attack_cooldown += 2;
+                if (pl->attack_cooldown > 24) pl->attack_cooldown = 24;
+            }
+        }
+
+        for (int a = 0; a < HUNTSMAN_ANCHORS; a++) if (city_huntsman.anchors_hp[a] < 0) city_huntsman.anchors_hp[a] = 0;
+        for (int i = 0; i < HUNTSMAN_SACS; i++) if (city_huntsman.sacs_hp[i] < 0) city_huntsman.sacs_hp[i] = 0;
+        huntsman_recount_progress();
+
+        if (city_huntsman.phase == 1) {
+            int dragon_idx = city_find_dragon_npc();
+            if (dragon_idx >= 0) {
+                CityNpc *d = &city_npcs.npcs[dragon_idx];
+                if (d->hp <= d->hp_max * 0.70f || city_huntsman.clusters_cleared >= 2) city_huntsman.phase = 2;
+            }
+        }
+        if (city_huntsman.phase == 2) {
+            if (now_tick >= city_huntsman.next_spiderling_spawn_ms) {
+                city_huntsman.next_spiderling_spawn_ms = now_tick + 4000;
+                city_huntsman.spiderlings_alive += sacs_alive;
+                if (city_huntsman.spiderlings_alive > 24) city_huntsman.spiderlings_alive = 24;
+            }
+            if (city_huntsman.spiderlings_alive > 0 && (now_tick % 50u) == 0u) city_huntsman.spiderlings_alive--;
+            int dragon_idx = city_find_dragon_npc();
+            if (dragon_idx >= 0) {
+                CityNpc *d = &city_npcs.npcs[dragon_idx];
+                if (d->hp <= d->hp_max * 0.35f) city_huntsman.phase = 3;
+            }
+        }
+
+        if (city_huntsman.phase >= 3 && !city_huntsman.vulnerable && city_huntsman.clusters_cleared >= 2 && city_huntsman.sacs_destroyed >= 2 && city_huntsman.spiderlings_alive <= 4) {
+            city_huntsman.vulnerable = 1;
+            city_huntsman.vulnerable_until_ms = now_tick + 35000;
+        }
+        if (city_huntsman.vulnerable && now_tick >= city_huntsman.vulnerable_until_ms) {
+            city_huntsman.vulnerable = 0;
+            city_huntsman.spiderlings_alive += 6;
+            if (city_huntsman.spiderlings_alive > 24) city_huntsman.spiderlings_alive = 24;
+        }
+    }
 
     for (int z = 0; z < (int)(sizeof(NPC_SPAWN_ZONES)/sizeof(NPC_SPAWN_ZONES[0])); z++) {
         const NpcSpawnZone *zone = &NPC_SPAWN_ZONES[z];
@@ -463,6 +658,12 @@ static void city_npc_update(unsigned int now_tick) {
         else if (n->state == NPC_CHASE || n->state == NPC_GUARD) {
             tx = target->x; tz = target->z;
             speed = (n->type == ENT_GOBLIN) ? 0.76f : (n->type == ENT_ORC ? 0.38f : 0.48f);
+            if (n->type == ENT_DRAGON) {
+                speed = 0.30f;
+                if (best_d > 70.0f) speed = 0.40f;
+                tx += -best_dz * 0.10f;
+                tz += best_dx * 0.10f;
+            }
             if (n->type == ENT_HUNTER && best_d < 40.0f) { tx = n->x - best_dx; tz = n->z - best_dz; speed = 0.52f; }
             if (n->type == ENT_PILLAGER_MARAUDER) {
                 tx += -best_dz * 0.35f;
@@ -512,12 +713,19 @@ static void city_npc_update(unsigned int now_tick) {
         n->z += n->vz;
         n->yaw = atan2f(n->vx, n->vz) * (180.0f / 3.14159f);
 
-        if ((n->behavior_mask & NPCB_MELEE_LUNGE) && best_d < ((n->type == ENT_ORC || n->type == ENT_PILLAGER_DESTROYER) ? 9.0f : 6.0f) && (now_tick % 20 == 0)) {
-            int dmg = (n->type == ENT_ORC) ? 10 : (n->type == ENT_PILLAGER_DESTROYER ? 14 : 5);
-            if (target->health > 1) target->health -= dmg;
+        float melee_range = (n->type == ENT_ORC || n->type == ENT_PILLAGER_DESTROYER) ? 9.0f : 6.0f;
+        int melee_dmg = (n->type == ENT_ORC) ? 10 : (n->type == ENT_PILLAGER_DESTROYER ? 14 : 5);
+        if (n->type == ENT_DRAGON) {
+            melee_range = 14.0f;
+            melee_dmg = 22;
         }
+        if ((n->behavior_mask & NPCB_MELEE_LUNGE) && best_d < melee_range && (now_tick % ((n->type == ENT_DRAGON) ? 24 : 20) == 0)) {
+            if (target->health > 1) target->health -= melee_dmg;
+        }
+
         if ((n->behavior_mask & NPCB_RANGED_POKE) && best_d < 150.0f && best_d > 22.0f && (now_tick % 34 == 0) && target->health > 1) {
-            target->health -= 6;
+            int poke_dmg = (n->type == ENT_DRAGON) ? 24 : 6;
+            target->health -= poke_dmg;
         }
         if (n->type == ENT_PILLAGER_CORRUPTOR && best_d < 24.0f && (now_tick % 18 == 0) && target->health > 1) {
             target->health -= 2;
@@ -543,6 +751,9 @@ static int npc_apply_damage(int scene_id, float x, float y, float z, int damage,
     if (best < 0) return 0;
 
     CityNpc *n = &city_npcs.npcs[best];
+    if (n->type == ENT_DRAGON && city_huntsman.active && !city_huntsman.vulnerable) {
+        return 0;
+    }
     n->hp -= (float)damage;
     n->last_hit_by_client = attacker_id;
     n->last_hit_by_team = (attacker_id >= 0 && attacker_id < MAX_CLIENTS) ? local_state.players[attacker_id].team_id : 0;
@@ -563,6 +774,7 @@ static int npc_apply_damage(int scene_id, float x, float y, float z, int damage,
         city_fields_stamp(n->x, n->z, 0.12f, city_fields.entropy);
         city_fields_stamp(n->x, n->z, 0.15f, city_fields.spotlight);
         n->active = 0;
+        if (n->type == ENT_DRAGON) city_huntsman.active = 0;
         n->respawn_time_ms = now_ms + NPC_SPAWN_ZONES[n->spawn_zone].respawn_delay_ms;
         int killer = ((attacker_id >= 0 && attacker_id < MAX_CLIENTS) || (now_ms - n->last_hit_time_ms <= 5000)) ? n->last_hit_by_client : -1;
         int kteam = (killer >= 0 && killer < MAX_CLIENTS) ? local_state.players[killer].team_id : 0;
