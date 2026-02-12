@@ -218,6 +218,8 @@ static CameraState g_cam = {
     CAM_THIRD
 };
 
+static const float SHOULDER_LOOK_OFFSET = 0.65f;
+
 static float reticle_dx = 0.0f;
 static float reticle_dy = 0.0f;
 
