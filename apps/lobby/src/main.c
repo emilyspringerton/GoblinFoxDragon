@@ -348,6 +348,18 @@ static unsigned int hud_log_time[HUD_LOG_LINES];
 static int hud_log_head = 0;
 static int was_dragon_heat = 0;
 
+#define HUD_LOG_LINES 8
+#define HUD_LOG_LINE_LEN 96
+
+static char hud_log[HUD_LOG_LINES][HUD_LOG_LINE_LEN];
+static unsigned int hud_log_time[HUD_LOG_LINES];
+typedef struct {
+    int head;
+    int was_dragon_heat;
+    int was_huntsman_spiderlings;
+} HudState;
+static HudState g_hud_state = {0};
+
 #define Z_FAR 8000.0f
 
 int sock = -1;
@@ -1294,9 +1306,9 @@ void draw_circle(float x, float y, float r, int segments) {
 
 static void hud_log_push(const char *msg) {
     if (!msg || !msg[0]) return;
-    snprintf(hud_log[hud_log_head], HUD_LOG_LINE_LEN, "%s", msg);
-    hud_log_time[hud_log_head] = SDL_GetTicks();
-    hud_log_head = (hud_log_head + 1) % HUD_LOG_LINES;
+    snprintf(hud_log[g_hud_state.head], HUD_LOG_LINE_LEN, "%s", msg);
+    hud_log_time[g_hud_state.head] = SDL_GetTicks();
+    g_hud_state.head = (g_hud_state.head + 1) % HUD_LOG_LINES;
 }
 
 static void hud_log_draw(void) {
@@ -1318,7 +1330,7 @@ static void hud_log_draw(void) {
     draw_string("LOG", x0 + 10.0f, y0 + h - 16.0f, 5);
 
     float line_y = y0 + 14.0f;
-    int idx = (hud_log_head - 1 + HUD_LOG_LINES) % HUD_LOG_LINES;
+    int idx = (g_hud_state.head - 1 + HUD_LOG_LINES) % HUD_LOG_LINES;
 
     for (int i = 0; i < HUD_LOG_LINES; i++) {
         const char *line = hud_log[idx];
@@ -1332,6 +1344,48 @@ static void hud_log_draw(void) {
             if (line_y > y0 + h - 24.0f) break;
         }
         idx = (idx - 1 + HUD_LOG_LINES) % HUD_LOG_LINES;
+    }
+}
+
+static void draw_huntsman_widget(void) {
+    if (local_state.scene_id != SCENE_CITY || !city_huntsman.active) return;
+
+    float x0 = 860.0f, y0 = 168.0f;
+    float w = 395.0f, h = 148.0f;
+    glColor3f(0.05f, 0.04f, 0.06f);
+    glRectf(x0, y0, x0 + w, y0 + h);
+    glColor3f(0.55f, 0.9f, 0.65f);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(x0, y0); glVertex2f(x0 + w, y0); glVertex2f(x0 + w, y0 + h); glVertex2f(x0, y0 + h);
+    glEnd();
+
+    int sacs_alive = HUNTSMAN_SACS - city_huntsman.sacs_destroyed;
+    if (sacs_alive < 0) sacs_alive = 0;
+
+    glColor3f(0.75f, 0.95f, 0.8f);
+    draw_string("GREEN RONIN'S HUNTSMAN", x0 + 10.0f, y0 + h - 16.0f, 5);
+
+    char line[128];
+    snprintf(line, sizeof(line), "PHASE: %d", city_huntsman.phase);
+    glColor3f(0.9f, 0.9f, 0.85f);
+    draw_string(line, x0 + 10.0f, y0 + h - 34.0f, 4);
+
+    snprintf(line, sizeof(line), "ANCHOR CLUSTERS: %d/2", city_huntsman.clusters_cleared);
+    draw_string(line, x0 + 10.0f, y0 + h - 50.0f, 4);
+    snprintf(line, sizeof(line), "SACS ALIVE: %d/3", sacs_alive);
+    draw_string(line, x0 + 10.0f, y0 + h - 66.0f, 4);
+    snprintf(line, sizeof(line), "SPIDERLINGS: %d", city_huntsman.spiderlings_alive);
+    draw_string(line, x0 + 10.0f, y0 + h - 82.0f, 4);
+
+    if (city_huntsman.vulnerable) {
+        unsigned int now = SDL_GetTicks();
+        unsigned int remain = (city_huntsman.vulnerable_until_ms > now) ? (city_huntsman.vulnerable_until_ms - now) : 0;
+        snprintf(line, sizeof(line), "VULNERABLE: %u", remain / 1000);
+        glColor3f(1.0f, 0.45f, 0.25f);
+        draw_string(line, x0 + 10.0f, y0 + 14.0f, 5);
+    } else {
+        glColor3f(0.8f, 0.8f, 0.6f);
+        draw_string("VULNERABLE: LOCKED", x0 + 10.0f, y0 + 14.0f, 4);
     }
 }
 
@@ -1432,10 +1486,18 @@ void draw_hud(PlayerState *p) {
         glColor3f(0.45f, 0.85f, 1.0f);
         draw_string(city_agents, 560, 46, 5);
         int is_dragon_heat = (SDL_GetTicks() < city_fields.dragon_until_ms);
-        if (is_dragon_heat && !was_dragon_heat) {
+        if (is_dragon_heat && !g_hud_state.was_dragon_heat) {
             hud_log_push("OMENS: DRAGON HEAT");
         }
-        was_dragon_heat = is_dragon_heat;
+        g_hud_state.was_dragon_heat = is_dragon_heat;
+    }
+    if (p->scene_id == SCENE_CITY && city_huntsman.active) {
+        if (city_huntsman.spiderlings_alive > g_hud_state.was_huntsman_spiderlings) {
+            hud_log_push("Egg sac hatched spiderlings");
+        }
+        g_hud_state.was_huntsman_spiderlings = city_huntsman.spiderlings_alive;
+    } else {
+        g_hud_state.was_huntsman_spiderlings = 0;
     }
 
     if (app_state == STATE_GAME_LOCAL) {
@@ -1469,6 +1531,7 @@ void draw_hud(PlayerState *p) {
     }
 
     hud_log_draw();
+    draw_huntsman_widget();
 
     glEnable(GL_DEPTH_TEST); glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW); glPopMatrix();
 }
@@ -1656,8 +1719,45 @@ static void draw_city_boids(void) {
     glEnd();
 }
 
+static void draw_huntsman_arena_fx(void) {
+    if (local_state.scene_id != SCENE_CITY || !city_huntsman.active) return;
+
+    glLineWidth(2.0f);
+    glColor3f(0.6f, 0.8f, 0.7f);
+    for (int i = 0; i < HUNTSMAN_ANCHORS; i++) {
+        if (city_huntsman.anchors_hp[i] <= 0) continue;
+        glPushMatrix();
+        glTranslatef(HUNTSMAN_ANCHOR_POS[i][0], 42.0f, HUNTSMAN_ANCHOR_POS[i][1]);
+        draw_box(3.0f, 3.0f, 3.0f);
+        draw_box_outline(3.0f, 3.0f, 3.0f);
+        glPopMatrix();
+    }
+
+    glColor3f(0.8f, 0.85f, 0.9f);
+    glBegin(GL_LINES);
+    for (int c = 0; c < 4; c++) {
+        int a = c * 2;
+        int b = a + 1;
+        if (city_huntsman.anchors_hp[a] <= 0 || city_huntsman.anchors_hp[b] <= 0) continue;
+        glVertex3f(HUNTSMAN_ANCHOR_POS[a][0], 42.0f, HUNTSMAN_ANCHOR_POS[a][1]);
+        glVertex3f(HUNTSMAN_ANCHOR_POS[b][0], 42.0f, HUNTSMAN_ANCHOR_POS[b][1]);
+    }
+    glEnd();
+
+    glColor3f(0.9f, 0.95f, 0.8f);
+    for (int i = 0; i < HUNTSMAN_SACS; i++) {
+        if (city_huntsman.sacs_hp[i] <= 0) continue;
+        glPushMatrix();
+        glTranslatef(HUNTSMAN_SAC_POS[i][0], 6.0f, HUNTSMAN_SAC_POS[i][1]);
+        draw_box(5.0f, 7.0f, 5.0f);
+        draw_box_outline(5.0f, 7.0f, 5.0f);
+        glPopMatrix();
+    }
+}
+
 static void draw_city_npcs(void) {
     if (local_state.scene_id != SCENE_CITY && local_state.scene_id != SCENE_STADIUM) return;
+    draw_huntsman_arena_fx();
     for (int i = 0; i < MAX_CITY_NPCS; i++) {
         if (!city_npcs.npcs[i].active) continue;
         draw_city_npc_primitive(&city_npcs.npcs[i]);
