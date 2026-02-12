@@ -218,7 +218,12 @@ static CameraState g_cam = {
     CAM_THIRD
 };
 
-static const float SHOULDER_LOOK_OFFSET = 0.65f;
+/* +1 = right shoulder camera (player appears left), -1 = left shoulder camera. */
+#define SHOULDER_SIDE (+1.0f)
+static const float THIRD_PERSON_RETICLE_DX = 210.0f;
+static const float THIRD_PERSON_RETICLE_DY = -36.0f;
+static const float RETICLE_LERP_RATE = 14.0f;
+static const float AIM_RANGE = 2000.0f;
 
 static float reticle_dx = 0.0f;
 static float reticle_dy = 0.0f;
@@ -501,6 +506,27 @@ static CameraVec3 forward_from_yaw_pitch(float yaw_deg, float pitch_deg) {
     return v;
 }
 
+static CameraVec3 vec3_cross(CameraVec3 a, CameraVec3 b) {
+    CameraVec3 out = {
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x
+    };
+    return out;
+}
+
+static CameraVec3 vec3_normalize(CameraVec3 v) {
+    float len = sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
+    if (len < 0.00001f) {
+        CameraVec3 fallback = {0.0f, 0.0f, 1.0f};
+        return fallback;
+    }
+    v.x /= len;
+    v.y /= len;
+    v.z /= len;
+    return v;
+}
+
 static CamMode get_cam_mode(const PlayerState *me) {
     if (!me) return CAM_FIRST;
     if (me->in_vehicle) return CAM_THIRD;
@@ -511,18 +537,39 @@ static CamMode get_cam_mode(const PlayerState *me) {
 static void reticle_update_visual(const PlayerState *me, float dt) {
     CamMode mode = get_cam_mode(me);
     g_cam.mode = mode;
-    (void)dt;
-    reticle_dx = 0.0f;
-    reticle_dy = 0.0f;
+    {
+        float target_dx = 0.0f;
+        float target_dy = 0.0f;
+        if (mode == CAM_THIRD && !g_cam.ads_down) {
+            target_dx = THIRD_PERSON_RETICLE_DX * SHOULDER_SIDE;
+            target_dy = THIRD_PERSON_RETICLE_DY;
+        }
+        if (dt <= 0.00001f) {
+            reticle_dx = target_dx;
+            reticle_dy = target_dy;
+        } else {
+            float alpha = 1.0f - expf(-RETICLE_LERP_RATE * dt);
+            reticle_dx += (target_dx - reticle_dx) * alpha;
+            reticle_dy += (target_dy - reticle_dy) * alpha;
+        }
+    }
 }
 
 static AimRay get_aim_ray(const CameraState *cam, const PlayerState *me) {
     AimRay ray = {0};
     if (!cam || !me) return ray;
 
-    float aim_yaw = cam->yaw;
-    float aim_pitch = cam->pitch;
-    if (reticle_dx != 0.0f || reticle_dy != 0.0f) {
+    float eye_y = me->in_vehicle ? 8.0f : (me->crouching ? 2.5f : EYE_HEIGHT);
+    CameraVec3 shot_origin = { me->x, me->y + eye_y, me->z };
+
+    {
+        CameraVec3 cam_origin = cam->pos;
+        if (cam->mode != CAM_THIRD) cam_origin = shot_origin;
+        CameraVec3 forward = vec3_normalize(forward_from_yaw_pitch(cam->yaw, cam->pitch));
+        CameraVec3 world_up = {0.0f, 1.0f, 0.0f};
+        CameraVec3 right = vec3_normalize(vec3_cross(forward, world_up));
+        CameraVec3 up = vec3_normalize(vec3_cross(right, forward));
+
         const float half_w = 1280.0f * 0.5f;
         const float half_h = 720.0f * 0.5f;
         float nx = reticle_dx / half_w;
@@ -532,19 +579,37 @@ static AimRay get_aim_ray(const CameraState *cam, const PlayerState *me) {
         if (fov_rad > 3.0f) fov_rad = 3.0f;
         float tan_half_v = tanf(fov_rad * 0.5f);
         float tan_half_h = tan_half_v * (1280.0f / 720.0f);
-        aim_yaw = norm_yaw_deg(aim_yaw + atanf(nx * tan_half_h) * 57.2957795f);
-        aim_pitch = clamp_pitch_deg(aim_pitch + atanf(ny * tan_half_v) * 57.2957795f);
-    }
-    ray.dir = forward_from_yaw_pitch(aim_yaw, aim_pitch);
 
-    float eye_y = me->in_vehicle ? 8.0f : (me->crouching ? 2.5f : EYE_HEIGHT);
-    if (cam->mode == CAM_THIRD) {
-        ray.origin = cam->pos;
-    } else {
-        ray.origin.x = me->x;
-        ray.origin.y = me->y + eye_y;
-        ray.origin.z = me->z;
+        CameraVec3 cam_dir = {
+            forward.x + right.x * (nx * tan_half_h) - up.x * (ny * tan_half_v),
+            forward.y + right.y * (nx * tan_half_h) - up.y * (ny * tan_half_v),
+            forward.z + right.z * (nx * tan_half_h) - up.z * (ny * tan_half_v)
+        };
+        cam_dir = vec3_normalize(cam_dir);
+
+        float hx = 0.0f, hy = 0.0f, hz = 0.0f, nnx = 0.0f, nny = 0.0f, nnz = 0.0f;
+        CameraVec3 cam_end = {
+            cam_origin.x + cam_dir.x * AIM_RANGE,
+            cam_origin.y + cam_dir.y * AIM_RANGE,
+            cam_origin.z + cam_dir.z * AIM_RANGE
+        };
+        CameraVec3 aim_point = cam_end;
+        if (trace_map(cam_origin.x, cam_origin.y, cam_origin.z,
+                      cam_end.x, cam_end.y, cam_end.z,
+                      &hx, &hy, &hz, &nnx, &nny, &nnz)) {
+            aim_point.x = hx;
+            aim_point.y = hy;
+            aim_point.z = hz;
+        }
+
+        ray.origin = shot_origin;
+        ray.dir.x = aim_point.x - shot_origin.x;
+        ray.dir.y = aim_point.y - shot_origin.y;
+        ray.dir.z = aim_point.z - shot_origin.z;
+        ray.dir = vec3_normalize(ray.dir);
     }
+
+    ray.origin = shot_origin;
     return ray;
 }
 
@@ -577,9 +642,10 @@ static void camera_update(CameraState *cam, const PlayerState *p, float dt) {
     CameraVec3 forward = forward_from_yaw_pitch(cam->yaw, cam->pitch);
     CameraVec3 right = right_from_yaw(cam->yaw);
 
-    float desired_x = pivot_x - forward.x * cam->dist + right.x * cam->side;
+    float shoulder_side = (SHOULDER_SIDE >= 0.0f) ? 1.0f : -1.0f;
+    float desired_x = pivot_x - forward.x * cam->dist + right.x * fabsf(cam->side) * shoulder_side;
     float desired_y = pivot_y - forward.y * cam->dist;
-    float desired_z = pivot_z - forward.z * cam->dist + right.z * cam->side;
+    float desired_z = pivot_z - forward.z * cam->dist + right.z * fabsf(cam->side) * shoulder_side;
 
     float dx = cam->pos.x - desired_x;
     float dy = cam->pos.y - desired_y;
@@ -1361,8 +1427,8 @@ void draw_hud(PlayerState *p) {
     glDisable(GL_DEPTH_TEST);
     glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
     glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
-    float reticle_cx = 640.0f;
-    float reticle_cy = 360.0f;
+    float reticle_cx = 640.0f + reticle_dx;
+    float reticle_cy = 360.0f + reticle_dy;
 
     glColor3f(0, 1, 0);
     if (current_fov < 50.0f) {
