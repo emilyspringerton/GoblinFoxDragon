@@ -220,6 +220,125 @@ static CameraState g_cam = {
 
 static float reticle_dx = 0.0f;
 static float reticle_dy = 0.0f;
+static const float third_person_reticle_dx = 170.0f;
+static const float third_person_reticle_dy = 34.0f;
+
+typedef struct {
+    float cam_pitch_kick;
+    float cam_yaw_jitter;
+    float cam_return;
+    float cam_damp;
+    float model_back;
+    float model_up;
+    float body_squash;
+    float body_push;
+    float shake;
+    float flash;
+    float fire_hold_ms;
+} KickProfile;
+
+typedef struct {
+    float cam_pitch_vel;
+    float cam_pitch_off;
+    float cam_yaw_off;
+    float model_back_off;
+    float model_up_off;
+    float shake_t;
+    float shake_amp;
+    float fire_t;
+    float dry_t;
+    float empty_blip_t;
+    int prev_shoot_down;
+    int prev_is_shooting;
+} KickState;
+
+static KickState g_kick;
+
+static const KickProfile KICK_PROFILES[MAX_WEAPONS] = {
+    { 1.0f, 0.15f, 22.0f, 11.0f, 0.04f, 0.02f, 0.03f, 0.03f, 0.12f, 0.16f, 70.0f },  /* Knife */
+    { 3.5f, 0.60f, 24.0f, 13.0f, 0.18f, 0.08f, 0.06f, 0.12f, 0.35f, 0.80f, 110.0f }, /* Magnum */
+    { 1.4f, 0.50f, 28.0f, 16.0f, 0.10f, 0.03f, 0.04f, 0.06f, 0.22f, 0.40f, 70.0f },  /* AR */
+    { 6.5f, 1.00f, 14.0f, 8.0f, 0.35f, 0.12f, 0.12f, 0.22f, 0.75f, 1.00f, 190.0f },  /* Shotgun */
+    { 2.4f, 0.40f, 20.0f, 10.0f, 0.14f, 0.06f, 0.05f, 0.08f, 0.28f, 0.55f, 100.0f }  /* Sniper */
+};
+
+static float frand_range(float mn, float mx) {
+    float t = (float)rand() / (float)RAND_MAX;
+    return mn + (mx - mn) * t;
+}
+
+static const KickProfile* kick_profile_for_weapon(int weapon_id) {
+    if (weapon_id < 0 || weapon_id >= MAX_WEAPONS) return &KICK_PROFILES[WPN_MAGNUM];
+    return &KICK_PROFILES[weapon_id];
+}
+
+static void kick_on_fire(int weapon_id) {
+    const KickProfile *k = kick_profile_for_weapon(weapon_id);
+    g_kick.cam_pitch_vel += k->cam_pitch_kick * 20.0f;
+    g_kick.cam_yaw_off += frand_range(-k->cam_yaw_jitter, k->cam_yaw_jitter);
+    g_kick.model_back_off += k->model_back;
+    g_kick.model_up_off += k->model_up;
+    if (g_kick.shake_amp < k->shake) g_kick.shake_amp = k->shake;
+    g_kick.shake_t = 0.0f;
+    {
+        float hold = k->fire_hold_ms / 1000.0f;
+        if (g_kick.fire_t < hold) g_kick.fire_t = hold;
+    }
+}
+
+static void kick_on_dry_fire(void) {
+    g_kick.dry_t = 0.13f;
+    g_kick.cam_pitch_vel -= 10.0f;
+    if (g_kick.shake_amp < 0.08f) g_kick.shake_amp = 0.08f;
+    g_kick.shake_t = 0.0f;
+    g_kick.empty_blip_t = 0.35f;
+}
+
+static void kick_update(float dt, int weapon_id) {
+    const KickProfile *k = kick_profile_for_weapon(weapon_id);
+    g_kick.cam_pitch_vel += (-g_kick.cam_pitch_off * k->cam_return) * dt;
+    g_kick.cam_pitch_vel *= expf(-k->cam_damp * dt);
+    g_kick.cam_pitch_off += g_kick.cam_pitch_vel * dt;
+
+    g_kick.model_back_off *= expf(-18.0f * dt);
+    g_kick.model_up_off *= expf(-18.0f * dt);
+    g_kick.cam_yaw_off *= expf(-14.0f * dt);
+
+    if (g_kick.shake_amp > 0.001f) {
+        g_kick.shake_t += dt;
+        g_kick.shake_amp *= expf(-6.0f * dt);
+    } else {
+        g_kick.shake_amp = 0.0f;
+    }
+    if (g_kick.fire_t > 0.0f) {
+        g_kick.fire_t -= dt;
+        if (g_kick.fire_t < 0.0f) g_kick.fire_t = 0.0f;
+    }
+    if (g_kick.dry_t > 0.0f) {
+        g_kick.dry_t -= dt;
+        if (g_kick.dry_t < 0.0f) g_kick.dry_t = 0.0f;
+    }
+    if (g_kick.empty_blip_t > 0.0f) {
+        g_kick.empty_blip_t -= dt;
+        if (g_kick.empty_blip_t < 0.0f) g_kick.empty_blip_t = 0.0f;
+    }
+}
+
+static float kick_shake_x(void) {
+    return sinf(g_kick.shake_t * 35.0f) * g_kick.shake_amp;
+}
+
+static float kick_shake_y(void) {
+    return sinf(g_kick.shake_t * 47.0f) * g_kick.shake_amp;
+}
+
+#define HUD_LOG_LINES 8
+#define HUD_LOG_LINE_LEN 96
+
+static char hud_log[HUD_LOG_LINES][HUD_LOG_LINE_LEN];
+static unsigned int hud_log_time[HUD_LOG_LINES];
+static int hud_log_head = 0;
+static int was_dragon_heat = 0;
 
 #define HUD_LOG_LINES 8
 #define HUD_LOG_LINE_LEN 96
@@ -1068,16 +1187,31 @@ static void draw_storm_mask(void) {
 
 void draw_weapon_p(PlayerState *p) {
     if (p->in_vehicle) return; 
+    const KickProfile *kp = kick_profile_for_weapon(p->current_weapon);
+    float fire_bias = (kp->fire_hold_ms > 0.0f) ? fminf(1.0f, g_kick.fire_t / (kp->fire_hold_ms / 1000.0f)) : 0.0f;
+    float dry_phase = (g_kick.dry_t > 0.0f) ? sinf((0.13f - g_kick.dry_t) * 30.0f) : 0.0f;
     glPushMatrix();
     glLoadIdentity();
-    float kick = p->recoil_anim * 0.2f;
+    float kick = p->recoil_anim * 0.1f + g_kick.model_up_off * 0.5f;
     float reload_dip = (p->reload_timer > 0) ? sinf(p->reload_timer * 0.2f) * 0.5f - 0.5f : 0.0f;
     float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
     float bob = sinf(SDL_GetTicks() * 0.015f) * speed * 0.15f; 
     float x_offset = (current_fov < 50.0f) ? 0.25f : 0.4f;
-    glTranslatef(x_offset, -0.5f + kick + reload_dip + (bob * 0.5f), -1.2f + (kick * 0.5f) + bob);
-    glRotatef(-p->recoil_anim * 10.0f, 1, 0, 0);
+    glTranslatef(x_offset, -0.5f + kick + reload_dip + (bob * 0.5f) - dry_phase * 0.03f,
+                 -1.2f + (kick * 0.5f) + bob - g_kick.model_back_off + dry_phase * 0.02f);
+    glRotatef(-(p->recoil_anim * 6.0f + g_kick.cam_pitch_off * 0.5f), 1, 0, 0);
+    glScalef(1.0f + fire_bias * 0.03f, 1.0f - fire_bias * 0.03f, 1.0f + fire_bias * 0.03f);
     draw_gun_model(p->current_weapon);
+    if (fire_bias > 0.01f) {
+        glPushMatrix();
+        glTranslatef(0.0f, 0.0f, -0.45f);
+        glColor4f(1.0f, 0.85f, 0.3f, 0.75f * fire_bias * kp->flash);
+        glBegin(GL_QUADS);
+        glVertex3f(-0.11f, -0.06f, 0.0f); glVertex3f(0.11f, -0.06f, 0.0f);
+        glVertex3f(0.11f, 0.06f, 0.0f); glVertex3f(-0.11f, 0.06f, 0.0f);
+        glEnd();
+        glPopMatrix();
+    }
     glPopMatrix();
 }
 
@@ -1105,6 +1239,7 @@ void draw_player_3rd(PlayerState *p) {
     float draw_yaw = norm_yaw_deg(p->yaw);
     float draw_pitch = clamp_pitch_deg(p->pitch);
     float draw_recoil = (p->is_shooting > 0) ? 1.0f : p->recoil_anim;
+    const KickProfile *kp = kick_profile_for_weapon(p->current_weapon);
 
     glPushMatrix();
     glTranslatef(p->x, p->y + 0.2f, p->z);
@@ -1114,8 +1249,10 @@ void draw_player_3rd(PlayerState *p) {
     } else {
         float s = fabsf(sinf(p->run_phase));
         float amp = 0.10f * p->run_weight;
-        float scale_y = 1.0f - amp * s;
-        float scale_xz = 1.0f + amp * 0.6f * s;
+        float recoil_squash = kp->body_squash * draw_recoil;
+        float scale_y = 1.0f - amp * s - recoil_squash;
+        float scale_xz = 1.0f + amp * 0.6f * s + recoil_squash * 0.7f;
+        glTranslatef(0.0f, 0.0f, kp->body_push * draw_recoil);
         glScalef(scale_xz, scale_y, scale_xz);
         draw_ronin_shell();
         glPushMatrix();
@@ -1125,9 +1262,20 @@ void draw_player_3rd(PlayerState *p) {
         glPopMatrix();
         glPushMatrix(); glTranslatef(0.6f, 1.1f, 0.55f);
         glRotatef(draw_pitch, 1, 0, 0);
-        glRotatef(-draw_recoil * 10.0f, 1, 0, 0);
-        glTranslatef(0.0f, 0.0f, -draw_recoil * 0.08f);
-        glScalef(0.8f, 0.8f, 0.8f); draw_gun_model(p->current_weapon); glPopMatrix(); 
+        glRotatef(-draw_recoil * (6.0f + kp->cam_pitch_kick * 1.2f), 1, 0, 0);
+        glTranslatef(0.0f, 0.0f, -(0.05f + kp->model_back * 0.25f) * draw_recoil);
+        glScalef(0.8f + draw_recoil * 0.03f, 0.8f - draw_recoil * 0.03f, 0.8f + draw_recoil * 0.03f);
+        draw_gun_model(p->current_weapon);
+        if (draw_recoil > 0.2f) {
+            float puff = fminf(1.0f, draw_recoil) * kp->flash;
+            glTranslatef(0.0f, 0.0f, -0.65f);
+            glColor4f(1.0f, 0.75f, 0.2f, 0.65f * puff);
+            glBegin(GL_QUADS);
+            glVertex3f(-0.10f, -0.06f, 0.0f); glVertex3f(0.10f, -0.06f, 0.0f);
+            glVertex3f(0.10f, 0.06f, 0.0f); glVertex3f(-0.10f, 0.06f, 0.0f);
+            glEnd();
+        }
+        glPopMatrix(); 
     }
     glPopMatrix();
 }
@@ -1253,6 +1401,11 @@ void draw_hud(PlayerState *p) {
     snprintf(ammo_buf, sizeof(ammo_buf), "%s AMMO: %d", weapon_name(wpn), ammo);
     glColor3f(0.95f, 0.95f, 0.95f);
     draw_string(ammo_buf, 960, 100, 8);
+    if (g_kick.empty_blip_t > 0.0f) {
+        float pulse = 0.4f + 0.6f * fabsf(sinf((0.35f - g_kick.empty_blip_t) * 30.0f));
+        glColor3f(1.0f, 0.2f * pulse, 0.2f * pulse);
+        draw_string("EMPTY", 1140, 122, 8);
+    }
 
     if (p->scene_id == SCENE_CITY && (fabsf(p->x) > CITY_SOFT_X || fabsf(p->z) > CITY_SOFT_Z)) {
         glColor3f(1.0f, 0.55f, 0.2f);
@@ -1594,14 +1747,22 @@ void draw_scene(PlayerState *render_p, float dt) {
     phys_set_scene(render_p->scene_id);
 
     camera_update(&g_cam, render_p, dt);
-    CameraVec3 look = forward_from_yaw_pitch(g_cam.yaw, g_cam.pitch);
+    if (app_state == STATE_GAME_NET && render_p->is_shooting > 0 && !g_kick.prev_is_shooting) {
+        kick_on_fire(render_p->current_weapon);
+    }
+    g_kick.prev_is_shooting = (render_p->is_shooting > 0);
+    kick_update(dt, render_p->current_weapon);
+
+    float visual_yaw = norm_yaw_deg(g_cam.yaw + g_kick.cam_yaw_off + kick_shake_x());
+    float visual_pitch = clamp_pitch_deg(g_cam.pitch + g_kick.cam_pitch_off + kick_shake_y());
+    CameraVec3 look = forward_from_yaw_pitch(visual_yaw, visual_pitch);
 
     if (g_cam.mode == CAM_THIRD) {
-        CameraVec3 right = right_from_yaw(g_cam.yaw);
+        CameraVec3 right = right_from_yaw(visual_yaw);
         float aim_x = render_p->x - right.x * 0.35f;
         float aim_y = render_p->y + g_cam.height;
         float aim_z = render_p->z - right.z * 0.35f;
-        gluLookAt(g_cam.pos.x, g_cam.pos.y, g_cam.pos.z,
+        gluLookAt(g_cam.pos.x + kick_shake_x() * 0.3f, g_cam.pos.y + kick_shake_y() * 0.3f, g_cam.pos.z,
                   aim_x, aim_y, aim_z,
                   0.0f, 1.0f, 0.0f);
     } else {
@@ -1841,6 +2002,7 @@ void net_process_snapshot(char *buffer, int len) {
             local_state.players[0].pitch = clamp_pitch_deg(np->pitch);
             local_state.players[0].current_weapon = np->current_weapon;
             local_state.players[0].ammo[local_state.players[0].current_weapon] = np->ammo;
+            local_state.players[0].is_shooting = np->is_shooting;
             local_state.players[0].in_vehicle = np->in_vehicle; 
             local_state.players[0].storm_charges = np->storm_charges;
             local_state.players[0].hit_feedback = np->hit_feedback;
@@ -2119,6 +2281,8 @@ int main(int argc, char* argv[]) {
             int jump = (!g_show_settings && k[SDL_SCANCODE_SPACE]);
             int crouch = (!g_show_settings && k[SDL_SCANCODE_LCTRL]);
             int shoot = (!g_show_settings && (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT)));
+            int shoot_pressed = shoot && !g_kick.prev_shoot_down;
+            g_kick.prev_shoot_down = shoot;
             g_cam.ads_down = (!g_show_settings && ((SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT)) != 0));
             g_ads_down = g_cam.ads_down;
             reticle_update_visual(&local_state.players[0], dt);
@@ -2129,6 +2293,24 @@ int main(int argc, char* argv[]) {
             if (!g_show_settings) {
                 if(k[SDL_SCANCODE_1]) wpn_req=0; if(k[SDL_SCANCODE_2]) wpn_req=1;
                 if(k[SDL_SCANCODE_3]) wpn_req=2; if(k[SDL_SCANCODE_4]) wpn_req=3; if(k[SDL_SCANCODE_5]) wpn_req=4;
+            }
+
+            if (app_state == STATE_GAME_LOCAL) {
+                PlayerState *p0 = &local_state.players[0];
+                int w = p0->current_weapon;
+                if (w < 0 || w >= MAX_WEAPONS) w = WPN_MAGNUM;
+                int can_attempt = shoot && !g_show_settings && p0->attack_cooldown == 0 && p0->reload_timer == 0 && !p0->in_vehicle;
+                int has_ammo = (w == WPN_KNIFE) || (p0->ammo[w] > 0);
+                if (can_attempt && has_ammo) {
+                    kick_on_fire(w);
+                } else if (shoot_pressed && can_attempt && !has_ammo) {
+                    kick_on_dry_fire();
+                }
+            } else if (shoot_pressed) {
+                PlayerState *p0 = &local_state.players[0];
+                int w = p0->current_weapon;
+                if (w < 0 || w >= MAX_WEAPONS) w = WPN_MAGNUM;
+                if (w != WPN_KNIFE && p0->ammo[w] <= 0) kick_on_dry_fire();
             }
 
             float target_fov = 75.0f;
