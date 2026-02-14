@@ -798,11 +798,11 @@ static void npc_apply_player_shot(PlayerState *p, unsigned int now_ms) {
         dy = 0.0f;
         dz = cosf(yaw_rad);
     } else {
-        float r = -p->yaw * 0.0174533f;
-        float rp = p->pitch * 0.0174533f;
-        dx = sinf(r) * cosf(rp);
-        dy = sinf(rp);
-        dz = -cosf(r) * cosf(rp);
+        float yaw_rad = p->yaw * 0.0174532925f;
+        float pitch_rad = p->pitch * 0.0174532925f;
+        dx = sinf(yaw_rad) * cosf(pitch_rad);
+        dy = sinf(pitch_rad);
+        dz = cosf(yaw_rad) * cosf(pitch_rad);
     }
     float reach = (w == WPN_KNIFE) ? 5.5f : 90.0f;
     float hx = p->x + dx * reach;
