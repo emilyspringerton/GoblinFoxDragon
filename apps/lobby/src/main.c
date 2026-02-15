@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <assert.h>
 
 #ifdef _WIN32
     #include <winsock2.h>
@@ -1013,39 +1014,44 @@ void net_send_cmd(UserCmd cmd) {
 }
 
 void net_process_snapshot(char *buffer, int len) {
-    int cursor = sizeof(NetHeader);
-    unsigned char count = *(unsigned char*)(buffer + cursor); cursor++;
-    
-    for(int i=0; i<count; i++) {
-        NetPlayer *np = (NetPlayer*)(buffer + cursor);
-        cursor += sizeof(NetPlayer);
-        
-        int id = np->id;
-        if (id > 0 && id < MAX_CLIENTS) {
-            PlayerState *p = &local_state.players[id];
-            p->active = 1;
-            p->scene_id = np->scene_id;
-            p->x = np->x; p->y = np->y; p->z = np->z;
-            p->yaw = norm_yaw_deg(np->yaw); p->pitch = clamp_pitch_deg(np->pitch);
-            p->health = np->health;
-            p->current_weapon = np->current_weapon;
-            p->is_shooting = np->is_shooting;
-            p->in_vehicle = np->in_vehicle;
-            p->storm_charges = np->storm_charges;
-            
-            // --- SYNC HIT MARKER ---
-            p->hit_feedback = np->hit_feedback;
+    if (len < (int)sizeof(NetHeader)) return;
+    if (len < (int)sizeof(NetHeader) + 1) return;
 
-            if (p->is_shooting) p->recoil_anim = 1.0f;
-        } else if (id == 0) {
-            local_state.players[0].scene_id = np->scene_id;
-            local_state.players[0].yaw = norm_yaw_deg(np->yaw);
-            local_state.players[0].pitch = clamp_pitch_deg(np->pitch);
-            local_state.players[0].ammo[local_state.players[0].current_weapon] = np->ammo;
-            local_state.players[0].in_vehicle = np->in_vehicle; 
-            local_state.players[0].storm_charges = np->storm_charges;
-            local_state.players[0].hit_feedback = np->hit_feedback;
+    int cursor = (int)sizeof(NetHeader);
+    unsigned char count = *(unsigned char*)(buffer + cursor); cursor++;
+
+    int needed = (int)sizeof(NetHeader) + 1 + (int)count * (int)sizeof(NetPlayer);
+    if (len < needed) return;
+
+    for(int i=0; i<count; i++) {
+        if (cursor + (int)sizeof(NetPlayer) > len) break;
+
+        NetPlayer *np = (NetPlayer*)(buffer + cursor);
+        cursor += (int)sizeof(NetPlayer);
+
+        int id = np->id;
+        if (id <= 0 || id >= MAX_CLIENTS) continue;
+
+        PlayerState *p = &local_state.players[id];
+        p->active = 1;
+        p->scene_id = np->scene_id;
+        p->x = np->x; p->y = np->y; p->z = np->z;
+        p->yaw = norm_yaw_deg(np->yaw); p->pitch = clamp_pitch_deg(np->pitch);
+        p->health = np->health;
+
+        int safe_weapon = np->current_weapon;
+        if (safe_weapon < 0 || safe_weapon >= MAX_WEAPONS) {
+            safe_weapon = WPN_MAGNUM;
         }
+        p->current_weapon = safe_weapon;
+
+        p->is_shooting = np->is_shooting;
+        p->in_vehicle = np->in_vehicle;
+        p->storm_charges = np->storm_charges;
+        p->hit_feedback = np->hit_feedback;
+        p->ammo[p->current_weapon] = np->ammo;
+
+        if (p->is_shooting) p->recoil_anim = 1.0f;
     }
 
     int render_id = (my_client_id > 0 && my_client_id < MAX_CLIENTS && local_state.players[my_client_id].active)
@@ -1054,12 +1060,18 @@ void net_process_snapshot(char *buffer, int len) {
     client_apply_scene_id(local_state.players[render_id].scene_id, SDL_GetTicks());
 }
 
+
 void net_tick() {
     char buffer[4096];
     struct sockaddr_in sender;
     socklen_t slen = sizeof(sender);
     int len = recvfrom(sock, buffer, 4096, 0, (struct sockaddr*)&sender, &slen);
     while (len > 0) {
+        if (len < (int)sizeof(NetHeader)) {
+            len = recvfrom(sock, buffer, 4096, 0, (struct sockaddr*)&sender, &slen);
+            continue;
+        }
+
         NetHeader *head = (NetHeader*)buffer;
         if (head->type == PACKET_SNAPSHOT) {
             net_process_snapshot(buffer, len);
@@ -1076,6 +1088,7 @@ void net_tick() {
         len = recvfrom(sock, buffer, 4096, 0, (struct sockaddr*)&sender, &slen);
     }
 }
+
 
 int main(int argc, char* argv[]) {
     for(int i=1; i<argc; i++) {
@@ -1266,14 +1279,20 @@ int main(int argc, char* argv[]) {
             if(k[SDL_SCANCODE_1]) wpn_req=0; if(k[SDL_SCANCODE_2]) wpn_req=1;
             if(k[SDL_SCANCODE_3]) wpn_req=2; if(k[SDL_SCANCODE_4]) wpn_req=3; if(k[SDL_SCANCODE_5]) wpn_req=4;
 
-            float target_fov = (local_state.players[0].current_weapon == WPN_SNIPER && (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT))) ? 20.0f : 75.0f;
+            int net_local_pid = (my_client_id > 0 && my_client_id < MAX_CLIENTS) ? my_client_id : -1;
+            int fov_pid = (app_state == STATE_GAME_NET && net_local_pid > 0 && local_state.players[net_local_pid].active)
+                ? net_local_pid
+                : 0;
+            float target_fov = (local_state.players[fov_pid].current_weapon == WPN_SNIPER && (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT))) ? 20.0f : 75.0f;
             current_fov += (target_fov - current_fov) * 0.2f;
             glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(current_fov, 1280.0/720.0, 0.1, Z_FAR); 
             glMatrixMode(GL_MODELVIEW);
             if (app_state == STATE_GAME_NET) {
-                UserCmd cmd = client_create_cmd(fwd, str, cam_yaw, cam_pitch, shoot, jump, crouch, reload, use, ability, wpn_req);
-                net_send_cmd(cmd);
                 net_tick();
+                if (net_local_pid > 0) {
+                    UserCmd cmd = client_create_cmd(fwd, str, cam_yaw, cam_pitch, shoot, jump, crouch, reload, use, ability, wpn_req);
+                    net_send_cmd(cmd);
+                }
             } else {
                 local_state.players[0].in_use = use;
                 if (use && local_state.players[0].vehicle_cooldown == 0 && local_state.transition_timer == 0) {
@@ -1301,12 +1320,20 @@ int main(int argc, char* argv[]) {
                 unsigned int now_ms = SDL_GetTicks();
                 local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn_req, jump, crouch, reload, ability, NULL, now_ms);
             }
-            PlayerState *render_p = &local_state.players[0];
+            int render_pid = 0;
             if (app_state == STATE_GAME_NET &&
                 my_client_id > 0 && my_client_id < MAX_CLIENTS &&
                 local_state.players[my_client_id].active) {
-                render_p = &local_state.players[my_client_id];
+                render_pid = my_client_id;
             }
+            int sim_pid = (app_state == STATE_GAME_NET) ? net_local_pid : 0;
+            if (app_state == STATE_GAME_NET && my_client_id >= 1) {
+                if (sim_pid != render_pid) {
+                    printf("my_client_id=%d sim_pid=%d render_pid=%d\n", my_client_id, sim_pid, render_pid);
+                }
+                assert(sim_pid == render_pid);
+            }
+            PlayerState *render_p = &local_state.players[render_pid];
             draw_scene(render_p);
             SDL_GL_SwapWindow(win);
         }
