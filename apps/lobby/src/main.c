@@ -220,6 +220,13 @@ static CameraState g_cam = {
 
 /* +1 = right shoulder camera (player appears left), -1 = left shoulder camera. */
 #define SHOULDER_SIDE (+1.0f)
+static const float THIRD_PERSON_SIDE_BASE = 1.25f;
+static const float THIRD_PERSON_SIDE_MIN = 0.70f;
+static const float THIRD_PERSON_SIDE_MAX = 1.65f;
+static const float THIRD_PERSON_SIDE_STRAFE_SWAY = 0.35f;
+static const float THIRD_PERSON_SIDE_RECOIL_SWAY = 0.20f;
+static const float THIRD_PERSON_SIDE_BREATHE_SWAY = 0.08f;
+static const float THIRD_PERSON_SIDE_LERP_RATE = 10.0f;
 static const float THIRD_PERSON_RETICLE_DX = 210.0f;
 static const float THIRD_PERSON_RETICLE_DY = -36.0f;
 static const float RETICLE_LERP_RATE = 14.0f;
@@ -620,7 +627,9 @@ static void yaw_pitch_from_dir(CameraVec3 dir, float *yaw_out, float *pitch_out)
 
 static void camera_update(CameraState *cam, const PlayerState *p, float dt) {
     if (!cam || !p) return;
+
     cam->mode = get_cam_mode(p);
+
     if (!isfinite(cam->yaw)) cam->yaw = 0.0f;
     if (!isfinite(cam->pitch)) cam->pitch = 0.0f;
     cam->yaw = norm_yaw_deg(cam->yaw);
@@ -632,22 +641,60 @@ static void camera_update(CameraState *cam, const PlayerState *p, float dt) {
     float pivot_y = p->y + cam->height;
     float pivot_z = p->z;
 
+    // clamp 3p pitch
     if (cam->pitch > 70.0f) cam->pitch = 70.0f;
     if (cam->pitch < -70.0f) cam->pitch = -70.0f;
 
     CameraVec3 forward = forward_from_yaw_pitch(cam->yaw, cam->pitch);
-    CameraVec3 right = right_from_yaw(cam->yaw);
+    CameraVec3 right   = right_from_yaw(cam->yaw);
 
+    // Shoulder side must be stable (only toggled by input)
     float shoulder_side = (SHOULDER_SIDE >= 0.0f) ? 1.0f : -1.0f;
-    float desired_x = pivot_x - forward.x * cam->dist + right.x * fabsf(cam->side) * shoulder_side;
+
+    // Compute sway inputs (magnitude-only effects)
+    float right_speed = p->vx * right.x + p->vz * right.z;
+    float strafe_norm = fabsf(right_speed) / ((MAX_SPEED > 0.001f) ? MAX_SPEED : 1.0f);
+    if (strafe_norm > 1.0f) strafe_norm = 1.0f;
+
+    float recoil_norm = fabsf(g_kick.cam_pitch_off) / 10.0f;
+    if (recoil_norm > 1.0f) recoil_norm = 1.0f;
+
+    float breathe = sinf(p->run_phase * 0.5f) * THIRD_PERSON_SIDE_BREATHE_SWAY;
+
+    float side_mag_target =
+        THIRD_PERSON_SIDE_BASE
+        - (strafe_norm * THIRD_PERSON_SIDE_STRAFE_SWAY)
+        + (recoil_norm * THIRD_PERSON_SIDE_RECOIL_SWAY)
+        + breathe;
+
+    if (side_mag_target < THIRD_PERSON_SIDE_MIN) side_mag_target = THIRD_PERSON_SIDE_MIN;
+    if (side_mag_target > THIRD_PERSON_SIDE_MAX) side_mag_target = THIRD_PERSON_SIDE_MAX;
+
+    float side_target_signed = side_mag_target * shoulder_side;
+
+    if (dt > 0.00001f) {
+        float side_alpha = 1.0f - expf(-THIRD_PERSON_SIDE_LERP_RATE * dt);
+        cam->side += (side_target_signed - cam->side) * side_alpha;
+    } else {
+        cam->side = side_target_signed;
+    }
+
+    // Guarantee we never cross to the other side
+    if (cam->side * shoulder_side < THIRD_PERSON_SIDE_MIN) {
+        cam->side = THIRD_PERSON_SIDE_MIN * shoulder_side;
+    }
+
+    float desired_x = pivot_x - forward.x * cam->dist + right.x * cam->side;
     float desired_y = pivot_y - forward.y * cam->dist;
-    float desired_z = pivot_z - forward.z * cam->dist + right.z * fabsf(cam->side) * shoulder_side;
+    float desired_z = pivot_z - forward.z * cam->dist + right.z * cam->side;
 
     float dx = cam->pos.x - desired_x;
     float dy = cam->pos.y - desired_y;
     float dz = cam->pos.z - desired_z;
     float dist_err = sqrtf(dx * dx + dy * dy + dz * dz);
-    if (dist_err > 30.0f || (cam->pos.x == 0.0f && cam->pos.y == 0.0f && cam->pos.z == 0.0f)) {
+
+    if (dist_err > 30.0f ||
+        (cam->pos.x == 0.0f && cam->pos.y == 0.0f && cam->pos.z == 0.0f)) {
         cam->pos.x = desired_x;
         cam->pos.y = desired_y;
         cam->pos.z = desired_z;
