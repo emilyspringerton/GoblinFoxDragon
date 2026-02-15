@@ -28,6 +28,15 @@ struct sockaddr_in bind_addr;
 unsigned int client_last_seq[MAX_CLIENTS];
 
 typedef struct {
+    int active;
+    struct sockaddr_in addr;
+    double last_heard;
+    int player_id;
+} ClientSlot;
+
+static ClientSlot slots[MAX_CLIENTS];
+
+typedef struct {
     int enabled;
     FILE *file;
     int target_id;
@@ -53,6 +62,88 @@ unsigned int get_server_time() {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (unsigned int)(ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
+}
+
+static double now_seconds(void) {
+    return (double)get_server_time() / 1000.0;
+}
+
+static int addr_equal(const struct sockaddr_in *a, const struct sockaddr_in *b) {
+    return a->sin_addr.s_addr == b->sin_addr.s_addr && a->sin_port == b->sin_port;
+}
+
+static int find_slot_by_addr(const struct sockaddr_in *addr) {
+    for (int i = 1; i < MAX_CLIENTS; i++) {
+        if (slots[i].active && addr_equal(&slots[i].addr, addr)) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+static int alloc_slot(const struct sockaddr_in *addr) {
+    for (int i = 1; i < MAX_CLIENTS; i++) {
+        if (!slots[i].active) {
+            memset(&local_state.players[i], 0, sizeof(PlayerState));
+            local_state.players[i].id = i;
+            local_state.players[i].scene_id = SCENE_GARAGE_OSAKA;
+            local_state.players[i].active = 1;
+            phys_respawn(&local_state.players[i], get_server_time());
+
+            slots[i].active = 1;
+            slots[i].addr = *addr;
+            slots[i].last_heard = now_seconds();
+            slots[i].player_id = i;
+
+            local_state.clients[i] = *addr;
+            local_state.client_meta[i].active = 1;
+            local_state.client_meta[i].last_heard_ms = get_server_time();
+            client_last_seq[i] = 0;
+
+            return i;
+        }
+    }
+    return -1;
+}
+
+static void free_slot(int slot) {
+    if (slot <= 0 || slot >= MAX_CLIENTS) return;
+    slots[slot].active = 0;
+    memset(&slots[slot].addr, 0, sizeof(struct sockaddr_in));
+    slots[slot].last_heard = 0.0;
+    slots[slot].player_id = -1;
+    server_disconnect(slot, client_last_seq);
+}
+
+static void send_welcome(const struct sockaddr_in *addr, int client_id) {
+    unsigned int now = get_server_time();
+    NetHeader h;
+    h.type = PACKET_WELCOME;
+    h.client_id = (unsigned char)client_id;
+    h.sequence = 0;
+    h.timestamp = now;
+    h.entity_count = 0;
+    h.scene_id = (unsigned char)local_state.players[client_id].scene_id;
+    sendto(sock, (char*)&h, sizeof(NetHeader), 0,
+           (const struct sockaddr*)addr, sizeof(struct sockaddr_in));
+}
+
+static int ensure_slot_for_sender(const struct sockaddr_in *sender) {
+    int slot = find_slot_by_addr(sender);
+    if (slot != -1) {
+        slots[slot].last_heard = now_seconds();
+        local_state.client_meta[slot].last_heard_ms = get_server_time();
+        return slot;
+    }
+
+    int new_slot = alloc_slot(sender);
+    if (new_slot != -1) {
+        char ip_buf[INET_ADDRSTRLEN] = {0};
+        inet_ntop(AF_INET, &sender->sin_addr, ip_buf, sizeof(ip_buf));
+        printf("CLIENT %d CONNECTED (%s:%d)\n", new_slot, ip_buf, ntohs(sender->sin_port));
+        send_welcome(sender, new_slot);
+    }
+    return new_slot;
 }
 
 static int recorder_pick_target() {
@@ -214,86 +305,27 @@ void process_user_cmd(int client_id, UserCmd *cmd) {
 void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
     if (size < (int)sizeof(NetHeader)) return;
     NetHeader *head = (NetHeader*)buffer;
-    int client_id = -1;
+    int client_id = ensure_slot_for_sender(sender);
+    if (client_id == -1) return;
 
-    // --- FIND EXISTING CLIENT BY SENDER (DO NOT RESET PLAYER STATE) ---
-    for(int i=1; i<MAX_CLIENTS; i++) {
-        if (local_state.client_meta[i].active &&
-            memcmp(&local_state.clients[i].sin_addr, &sender->sin_addr, sizeof(struct in_addr)) == 0 &&
-            local_state.clients[i].sin_port == sender->sin_port) {
-
-            client_id = i;
-            local_state.client_meta[i].last_heard_ms = get_server_time();
-            if (head->type == PACKET_CONNECT) {
-                unsigned int now = get_server_time();
-                PlayerState *p = &local_state.players[i];
-                client_last_seq[i] = 0;
-                p->in_fwd = 0.0f;
-                p->in_strafe = 0.0f;
-                p->in_jump = 0;
-                p->in_shoot = 0;
-                p->in_reload = 0;
-                p->in_use = 0;
-                p->in_ability = 0;
-                p->use_was_down = 0;
-                p->portal_cooldown_until_ms = 0;
-                p->vehicle_cooldown = 0;
-
-                NetHeader h;
-                h.type = PACKET_WELCOME;
-                h.client_id = (unsigned char)i;
-                h.sequence = 0;
-                h.timestamp = now;
-                h.entity_count = 0;
-                h.scene_id = (unsigned char)p->scene_id;
-                sendto(sock, (char*)&h, sizeof(NetHeader), 0,
-                       (struct sockaddr*)sender, sizeof(struct sockaddr_in));
-                printf("CLIENT %d RECONNECTED (seq reset)\n", i);
-            }
-            break;
-        }
-    }
-
-    // --- NEW CONNECTION PATH ---
-    if (client_id == -1) {
-        if (head->type == PACKET_CONNECT) {
-            char *ip_str = inet_ntoa(sender->sin_addr);
-            for(int i=1; i<MAX_CLIENTS; i++) {
-                if (!local_state.client_meta[i].active) {
-                    client_id = i;
-
-                    // Allocate + initialize player ONCE here.
-                    memset(&local_state.players[i], 0, sizeof(PlayerState));
-                    local_state.players[i].id = i;
-                    local_state.players[i].scene_id = SCENE_GARAGE_OSAKA;
-                    local_state.players[i].active = 1;
-
-                    local_state.client_meta[i].active = 1;
-                    local_state.client_meta[i].last_heard_ms = get_server_time();
-                    local_state.clients[i] = *sender;
-
-                    phys_respawn(&local_state.players[i], get_server_time());
-
-                    printf("CLIENT %d CONNECTED (%s)\n", client_id, ip_str);
-
-                    NetHeader h;
-                    h.type = PACKET_WELCOME;
-                    h.client_id = (unsigned char)client_id;
-                    h.sequence = 0;
-                    h.timestamp = get_server_time();
-                    h.entity_count = 0;
-                    h.scene_id = (unsigned char)local_state.players[i].scene_id;
-
-                    sendto(sock, (char*)&h, sizeof(NetHeader), 0,
-                           (struct sockaddr*)sender, sizeof(struct sockaddr_in));
-                    break;
-                }
-            }
-        }
+    if (head->type == PACKET_CONNECT) {
+        PlayerState *p = &local_state.players[client_id];
+        client_last_seq[client_id] = 0;
+        p->in_fwd = 0.0f;
+        p->in_strafe = 0.0f;
+        p->in_jump = 0;
+        p->in_shoot = 0;
+        p->in_reload = 0;
+        p->in_use = 0;
+        p->in_ability = 0;
+        p->use_was_down = 0;
+        p->portal_cooldown_until_ms = 0;
+        p->vehicle_cooldown = 0;
+        send_welcome(sender, client_id);
     }
 
     if (client_id != -1 && head->type == PACKET_DISCONNECT) {
-        server_disconnect(client_id, client_last_seq);
+        free_slot(client_id);
         return;
     }
 
@@ -312,6 +344,7 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
                 process_user_cmd(client_id, &cmds[i]);
             }
 
+            slots[client_id].last_heard = now_seconds();
             local_state.client_meta[client_id].last_heard_ms = get_server_time();
             local_state.players[client_id].active = 1;
         }
@@ -329,17 +362,17 @@ void server_broadcast() {
     head.scene_id = 0;
 
     unsigned char count = 0;
-    for(int i=0; i<MAX_CLIENTS; i++) if (local_state.players[i].active) count++;
+    for(int i=1; i<MAX_CLIENTS; i++) if (slots[i].active && local_state.players[i].active) count++;
     head.entity_count = count;
 
     memcpy(buffer + cursor, &head, sizeof(NetHeader)); cursor += (int)sizeof(NetHeader);
     memcpy(buffer + cursor, &count, 1); cursor += 1;
 
-    for(int i=0; i<MAX_CLIENTS; i++) {
+    for(int i=1; i<MAX_CLIENTS; i++) {
         PlayerState *p = &local_state.players[i];
-        if (p->active) {
+        if (slots[i].active && p->active) {
             NetPlayer np;
-            np.id = (unsigned char)i;
+            np.id = (unsigned char)slots[i].player_id;
             np.scene_id = (unsigned char)p->scene_id;
             np.x = p->x; np.y = p->y; np.z = p->z;
             np.yaw = norm_yaw_deg(p->yaw); np.pitch = clamp_pitch_deg(p->pitch);
@@ -361,9 +394,9 @@ void server_broadcast() {
     }
 
     for(int i=1; i<MAX_CLIENTS; i++) {
-        if (local_state.client_meta[i].active) {
+        if (slots[i].active) {
             sendto(sock, buffer, cursor, 0,
-                   (struct sockaddr*)&local_state.clients[i],
+                   (struct sockaddr*)&slots[i].addr,
                    sizeof(struct sockaddr_in));
         }
     }
@@ -412,9 +445,8 @@ int main(int argc, char *argv[]) {
         unsigned int now = get_server_time();
         // TIMEOUT_SWEEP
         for (int i = 1; i < MAX_CLIENTS; i++) {
-            if (local_state.client_meta[i].active &&
-                now - local_state.client_meta[i].last_heard_ms > 5000) {
-                server_disconnect(i, client_last_seq);
+            if (slots[i].active && now_seconds() - slots[i].last_heard > 5.0) {
+                free_slot(i);
             }
         }
 
