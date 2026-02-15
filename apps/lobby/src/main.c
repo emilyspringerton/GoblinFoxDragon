@@ -82,6 +82,7 @@ static void reset_client_render_state_for_net() {
     local_state.pending_scene = -1;
     local_state.scene_id = SCENE_GARAGE_OSAKA;
     phys_set_scene(local_state.scene_id);
+    local_state.players[0].scene_id = local_state.scene_id;
 }
 
 void draw_string(const char* str, float x, float y, float size) {
@@ -1057,7 +1058,11 @@ void net_process_snapshot(char *buffer, int len) {
     int render_id = (my_client_id > 0 && my_client_id < MAX_CLIENTS && local_state.players[my_client_id].active)
         ? my_client_id
         : 0;
-    client_apply_scene_id(local_state.players[render_id].scene_id, SDL_GetTicks());
+    int scene_id = local_state.players[render_id].scene_id;
+    if (scene_id < 0) {
+        scene_id = local_state.scene_id;
+    }
+    client_apply_scene_id(scene_id, SDL_GetTicks());
 }
 
 
@@ -1081,7 +1086,9 @@ void net_tick() {
             if (my_client_id > 0 && my_client_id < MAX_CLIENTS) {
                 local_state.players[my_client_id].active = 1;
                 local_state.players[my_client_id].scene_id = head->scene_id;
-                client_apply_scene_id(head->scene_id, SDL_GetTicks());
+                if (head->scene_id >= 0) {
+                    client_apply_scene_id(head->scene_id, SDL_GetTicks());
+                }
             }
             printf("✅ JOINED SERVER AS CLIENT ID: %d\n", my_client_id);
         }
