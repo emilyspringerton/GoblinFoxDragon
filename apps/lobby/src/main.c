@@ -537,21 +537,18 @@ static CamMode get_cam_mode(const PlayerState *me) {
 static void reticle_update_visual(const PlayerState *me, float dt) {
     CamMode mode = get_cam_mode(me);
     g_cam.mode = mode;
-    {
-        float target_dx = 0.0f;
-        float target_dy = 0.0f;
-        if (mode == CAM_THIRD && !g_cam.ads_down) {
-            target_dx = THIRD_PERSON_RETICLE_DX * SHOULDER_SIDE;
-            target_dy = THIRD_PERSON_RETICLE_DY;
-        }
-        if (dt <= 0.00001f) {
-            reticle_dx = target_dx;
-            reticle_dy = target_dy;
-        } else {
-            float alpha = 1.0f - expf(-RETICLE_LERP_RATE * dt);
-            reticle_dx += (target_dx - reticle_dx) * alpha;
-            reticle_dy += (target_dy - reticle_dy) * alpha;
-        }
+
+    // Always keep reticle centered (no shoulder offset, ever)
+    float target_dx = 0.0f;
+    float target_dy = 0.0f;
+
+    if (dt <= 0.00001f) {
+        reticle_dx = target_dx;
+        reticle_dy = target_dy;
+    } else {
+        float alpha = 1.0f - expf(-RETICLE_LERP_RATE * dt);
+        reticle_dx += (target_dx - reticle_dx) * alpha;
+        reticle_dy += (target_dy - reticle_dy) * alpha;
     }
 }
 
