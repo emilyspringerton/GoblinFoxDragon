@@ -1014,30 +1014,44 @@ void net_send_cmd(UserCmd cmd) {
 }
 
 void net_process_snapshot(char *buffer, int len) {
-    int cursor = sizeof(NetHeader);
-    unsigned char count = *(unsigned char*)(buffer + cursor); cursor++;
-    
-    for(int i=0; i<count; i++) {
-        NetPlayer *np = (NetPlayer*)(buffer + cursor);
-        cursor += sizeof(NetPlayer);
-        
-        int id = np->id;
-        if (id > 0 && id < MAX_CLIENTS) {
-            PlayerState *p = &local_state.players[id];
-            p->active = 1;
-            p->scene_id = np->scene_id;
-            p->x = np->x; p->y = np->y; p->z = np->z;
-            p->yaw = norm_yaw_deg(np->yaw); p->pitch = clamp_pitch_deg(np->pitch);
-            p->health = np->health;
-            p->current_weapon = np->current_weapon;
-            p->is_shooting = np->is_shooting;
-            p->in_vehicle = np->in_vehicle;
-            p->storm_charges = np->storm_charges;
-            p->hit_feedback = np->hit_feedback;
-            p->ammo[p->current_weapon] = np->ammo;
+    if (len < (int)sizeof(NetHeader)) return;
+    if (len < (int)sizeof(NetHeader) + 1) return;
 
-            if (p->is_shooting) p->recoil_anim = 1.0f;
+    int cursor = (int)sizeof(NetHeader);
+    unsigned char count = *(unsigned char*)(buffer + cursor); cursor++;
+
+    int needed = (int)sizeof(NetHeader) + 1 + (int)count * (int)sizeof(NetPlayer);
+    if (len < needed) return;
+
+    for(int i=0; i<count; i++) {
+        if (cursor + (int)sizeof(NetPlayer) > len) break;
+
+        NetPlayer *np = (NetPlayer*)(buffer + cursor);
+        cursor += (int)sizeof(NetPlayer);
+
+        int id = np->id;
+        if (id <= 0 || id >= MAX_CLIENTS) continue;
+
+        PlayerState *p = &local_state.players[id];
+        p->active = 1;
+        p->scene_id = np->scene_id;
+        p->x = np->x; p->y = np->y; p->z = np->z;
+        p->yaw = norm_yaw_deg(np->yaw); p->pitch = clamp_pitch_deg(np->pitch);
+        p->health = np->health;
+
+        int safe_weapon = np->current_weapon;
+        if (safe_weapon < 0 || safe_weapon >= MAX_WEAPONS) {
+            safe_weapon = WPN_MAGNUM;
         }
+        p->current_weapon = safe_weapon;
+
+        p->is_shooting = np->is_shooting;
+        p->in_vehicle = np->in_vehicle;
+        p->storm_charges = np->storm_charges;
+        p->hit_feedback = np->hit_feedback;
+        p->ammo[p->current_weapon] = np->ammo;
+
+        if (p->is_shooting) p->recoil_anim = 1.0f;
     }
 
     int render_id = (my_client_id > 0 && my_client_id < MAX_CLIENTS && local_state.players[my_client_id].active)
@@ -1046,12 +1060,18 @@ void net_process_snapshot(char *buffer, int len) {
     client_apply_scene_id(local_state.players[render_id].scene_id, SDL_GetTicks());
 }
 
+
 void net_tick() {
     char buffer[4096];
     struct sockaddr_in sender;
     socklen_t slen = sizeof(sender);
     int len = recvfrom(sock, buffer, 4096, 0, (struct sockaddr*)&sender, &slen);
     while (len > 0) {
+        if (len < (int)sizeof(NetHeader)) {
+            len = recvfrom(sock, buffer, 4096, 0, (struct sockaddr*)&sender, &slen);
+            continue;
+        }
+
         NetHeader *head = (NetHeader*)buffer;
         if (head->type == PACKET_SNAPSHOT) {
             net_process_snapshot(buffer, len);
@@ -1068,6 +1088,7 @@ void net_tick() {
         len = recvfrom(sock, buffer, 4096, 0, (struct sockaddr*)&sender, &slen);
     }
 }
+
 
 int main(int argc, char* argv[]) {
     for(int i=1; i<argc; i++) {
