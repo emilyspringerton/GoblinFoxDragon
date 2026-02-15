@@ -22,25 +22,6 @@
 #define BUGGY_FRICTION 0.03f    
 #define BUGGY_GRAVITY 0.15f     
 
-#define BIKE_MAX_SPEED 3.8f
-#define BIKE_FRICTION 0.02f
-#define BIKE_GRAVITY 0.12f
-
-// --- VEHICLE HANDLING ---
-#define BUGGY_LATERAL_GRIP 10.0f
-#define BUGGY_DRIFT_LATERAL_GRIP 2.0f
-#define BUGGY_ALIGN_RATE 6.0f
-
-#define BIKE_LATERAL_GRIP 14.0f
-#define BIKE_DRIFT_LATERAL_GRIP 4.0f
-#define BIKE_ALIGN_RATE 8.0f
-
-#define VEH_MIN_GRIP_SPEED 2.5f
-
-#define BIKE_GEARS 5
-static const float BIKE_GEAR_MAX[BIKE_GEARS + 1] = {0.0f, 1.2f, 2.0f, 2.7f, 3.3f, 3.8f};
-static const float BIKE_GEAR_ACCEL[BIKE_GEARS + 1] = {0.0f, 0.14f, 0.11f, 0.095f, 0.08f, 0.07f};
-
 #define EYE_HEIGHT 2.59f    
 #define PLAYER_WIDTH 0.97f  
 #define PLAYER_HEIGHT 6.47f 
@@ -113,13 +94,10 @@ static const Box map_geo_garage[] = {
 };
 
 
-#define CITY_MAX_BOXES 8192
-#define CITY_MAX_PROPS 512
+#define CITY_MAX_BOXES 2048
 static Box map_geo_voxworld[CITY_MAX_BOXES];
 static int map_geo_voxworld_count = 0;
 static int map_geo_voxworld_init = 0;
-static Box map_geo_props[CITY_MAX_PROPS];
-static int map_geo_props_count = 0;
 
 static const Box *map_geo = map_geo_stadium;
 static int map_count = 0;
@@ -136,33 +114,11 @@ static int map_count = 0;
 #define VOXWORLD_BOUNDS_X 1180.0f
 #define VOXWORLD_BOUNDS_Z 1180.0f
 #define VOXWORLD_SEED 1337
-#define VOXWORLD_TRACE_STEP 4.0f
-
-#define CITY_KILL_Y -120.0f
-#define CITY_SOFT_X 2400.0f
-#define CITY_SOFT_Z 2400.0f
-#define CITY_HARD_X 3200.0f
-#define CITY_HARD_Z 3200.0f
-#define CITY_EDGE_PUSH 0.035f
-#define CITY_EDGE_FRICTION 0.975f
-#define CITY_GRID_RADIUS 12
-#define CITY_BLOCK_SIZE 230.0f
-#define CITY_ROAD_SIZE 54.0f
-#define CITY_DISTRICTS 5
-#define HYDRANT_COUNT_MAX 320
-#define HYDRANT_SPACING_MIN 22.0f
-#define HYDRANT_CURB_OFFSET 2.0f
-#define HYDRANT_HEIGHT 1.0f
-#define HYDRANT_RADIUS 0.35f
 
 #define GARAGE_PORTAL_X 0.0f
 #define GARAGE_PORTAL_Y 6.0f
 #define GARAGE_PORTAL_Z 56.0f
 #define GARAGE_PORTAL_RADIUS 6.0f
-#define GARAGE_CITY_PORTAL_X -56.0f
-#define GARAGE_CITY_PORTAL_Y 6.0f
-#define GARAGE_CITY_PORTAL_Z 0.0f
-#define GARAGE_CITY_PORTAL_RADIUS 6.0f
 #define STADIUM_PORTAL_X 0.0f
 #define STADIUM_PORTAL_Y 2.0f
 #define STADIUM_PORTAL_Z 0.0f
@@ -178,22 +134,9 @@ static int map_count = 0;
 #define VOXWORLD_PORTAL_Y 2.0f
 #define VOXWORLD_PORTAL_Z 0.0f
 #define VOXWORLD_PORTAL_RADIUS 16.0f
-#define CITY_PORTAL_X 0.0f
-#define CITY_PORTAL_Y 2.0f
-#define CITY_PORTAL_Z 0.0f
-#define CITY_PORTAL_RADIUS 16.0f
 #define PORTAL_ID_GARAGE_EXIT 0
 #define PORTAL_ID_STADIUM_TO_VOXWORLD 1
 #define PORTAL_ID_VOXWORLD_TO_STADIUM 2
-#define PORTAL_ID_CITY_GATE 3
-
-typedef struct {
-    int portal_id;
-    float x;
-    float y;
-    float z;
-    float radius;
-} PortalDef;
 
 typedef struct {
     float x;
@@ -210,258 +153,39 @@ static const VehiclePad garage_vehicle_pads[] = {
 
 float phys_rand_f() { return ((float)(rand()%1000)/500.0f) - 1.0f; }
 
-static inline unsigned int city_geo_hash(unsigned int x) {
-    x ^= x >> 16;
-    x *= 0x7feb352du;
-    x ^= x >> 15;
-    x *= 0x846ca68bu;
-    x ^= x >> 16;
-    return x;
-}
-
-static inline int city_hydrant_blocked(float x, float z) {
-    for (int i = 1; i < map_geo_voxworld_count; i++) {
-        Box b = map_geo_voxworld[i];
-        float b_bottom = b.y - b.h * 0.5f;
-        if (b_bottom > HYDRANT_HEIGHT + 1.5f) continue;
-        if (fabsf(x - b.x) < (b.w * 0.5f + HYDRANT_RADIUS) &&
-            fabsf(z - b.z) < (b.d * 0.5f + HYDRANT_RADIUS)) {
-            return 1;
-        }
-    }
-    return 0;
-}
-
 static inline void init_voxworld_city_geo() {
     if (map_geo_voxworld_init) return;
     map_geo_voxworld_init = 1;
     map_geo_voxworld_count = 0;
-    map_geo_props_count = 0;
 
-    const float block = CITY_BLOCK_SIZE;
-    const float road = CITY_ROAD_SIZE;
+    map_geo_voxworld[map_geo_voxworld_count++] = (Box){0.0f, -2.0f, 0.0f, 2800.0f, 4.0f, 2800.0f};
+    map_geo_voxworld[map_geo_voxworld_count++] = (Box){0.0f, 100.0f, 1400.0f, 2800.0f, 200.0f, 8.0f};
+    map_geo_voxworld[map_geo_voxworld_count++] = (Box){0.0f, 100.0f, -1400.0f, 2800.0f, 200.0f, 8.0f};
+    map_geo_voxworld[map_geo_voxworld_count++] = (Box){1400.0f, 100.0f, 0.0f, 8.0f, 200.0f, 2800.0f};
+    map_geo_voxworld[map_geo_voxworld_count++] = (Box){-1400.0f, 100.0f, 0.0f, 8.0f, 200.0f, 2800.0f};
+
+    const float block = 220.0f;
+    const float road = 50.0f;
     const float pitch = block + road;
-    const float world_extent = (CITY_GRID_RADIUS + 2) * pitch;
-    const float HIGHWAY_Y = 34.0f;
-    const float HIGHWAY_W = 18.0f;
-    const float HIGHWAY_THICK = 2.5f;
-    const float RING_R = 520.0f;
-    const float SEG_LEN = 80.0f;
-
-#define PUSH_CITY_BOX(...) do { \
-    if (map_geo_voxworld_count + 1 < CITY_MAX_BOXES) { \
-        map_geo_voxworld[map_geo_voxworld_count++] = (__VA_ARGS__); \
-    } \
-} while (0)
-
-    PUSH_CITY_BOX((Box){0.0f, -2.0f, 0.0f, world_extent * 2.0f, 4.0f, world_extent * 2.0f});
-
-    for (int gx = -CITY_GRID_RADIUS; gx <= CITY_GRID_RADIUS; gx++) {
-        for (int gz = -CITY_GRID_RADIUS; gz <= CITY_GRID_RADIUS; gz++) {
+    for (int gx = -4; gx <= 4; gx++) {
+        for (int gz = -4; gz <= 4; gz++) {
             float cx = gx * pitch;
             float cz = gz * pitch;
             if ((abs(gx) <= 1 && gz == 0) || (abs(gz) <= 1 && gx == 0)) continue;
 
-            int district = abs((gx * 131 + gz * 197 + VOXWORLD_SEED * 17) ^ (gx * 53 - gz * 61)) % CITY_DISTRICTS;
-            float district_h_min = 20.0f;
-            float district_h_var = 50.0f;
-            float district_density = 1.0f;
-            float alley_bias = 0.0f;
-            float landmark_prob = 0.03f;
-
-            if (district == 0) { district_h_min = 42.0f; district_h_var = 95.0f; district_density = 1.2f; landmark_prob = 0.11f; }
-            else if (district == 1) { district_h_min = 18.0f; district_h_var = 42.0f; district_density = 1.0f; alley_bias = 0.07f; landmark_prob = 0.04f; }
-            else if (district == 2) { district_h_min = 12.0f; district_h_var = 28.0f; district_density = 0.75f; alley_bias = 0.18f; landmark_prob = 0.06f; }
-            else if (district == 3) { district_h_min = 14.0f; district_h_var = 36.0f; district_density = 0.65f; alley_bias = 0.26f; landmark_prob = 0.03f; }
-            else { district_h_min = 36.0f; district_h_var = 70.0f; district_density = 0.9f; alley_bias = 0.09f; landmark_prob = 0.12f; }
-
             float n1 = sinf((float)(gx * 17 + gz * 31 + VOXWORLD_SEED) * 0.13f);
             float n2 = cosf((float)(gx * 11 - gz * 23 + VOXWORLD_SEED) * 0.19f);
-            float n3 = sinf((float)(gx * 37 + gz * 13 + VOXWORLD_SEED) * 0.29f);
-            float h = district_h_min + (n1 + 1.0f) * (district_h_var * 0.6f) + (n2 + 1.0f) * (district_h_var * 0.4f);
-            float w = 34.0f + (fabsf(n1) * 54.0f);
-            float d = 34.0f + (fabsf(n2) * 54.0f);
+            float h = 24.0f + (n1 + 1.0f) * 28.0f + (n2 + 1.0f) * 18.0f;
+            float w = 35.0f + (fabsf(n1) * 45.0f);
+            float d = 35.0f + (fabsf(n2) * 45.0f);
 
-            if (n3 > (0.58f - alley_bias)) continue;
-            if (district_density < 1.0f && n1 > district_density) continue;
-
-            if (district == 2 && fabsf(n2) > 0.82f) continue; // market plazas
-
-            PUSH_CITY_BOX((Box){cx, h * 0.5f, cz, w, h, d});
+            if (map_geo_voxworld_count + 1 < CITY_MAX_BOXES) {
+                map_geo_voxworld[map_geo_voxworld_count++] = (Box){cx, h * 0.5f, cz, w, h, d};
+            }
             if (map_geo_voxworld_count + 1 < CITY_MAX_BOXES && (gx + gz) % 3 == 0) {
                 map_geo_voxworld[map_geo_voxworld_count++] = (Box){cx + 0.35f * block, (h * 0.35f), cz - 0.3f * block, w * 0.55f, h * 0.7f, d * 0.55f};
             }
-            if (map_geo_voxworld_count + 1 < CITY_MAX_BOXES && district == 0 && n3 < -0.72f) {
-                map_geo_voxworld[map_geo_voxworld_count++] = (Box){cx - 0.26f * block, h + 26.0f, cz + 0.22f * block, 24.0f, h * 0.9f, 24.0f};
-            }
-            if (map_geo_voxworld_count + 1 < CITY_MAX_BOXES && district == 1 && ((gx + gz) % 4 == 0)) { // ramps
-                map_geo_voxworld[map_geo_voxworld_count++] = (Box){cx + 0.44f * block, 4.0f, cz, 32.0f, 8.0f, 72.0f};
-            }
-            if (map_geo_voxworld_count + 1 < CITY_MAX_BOXES && district == 3 && ((gx * gz) % 5 == 0)) { // tunnels/ruins
-                map_geo_voxworld[map_geo_voxworld_count++] = (Box){cx, 5.0f, cz - 0.45f * block, 120.0f, 10.0f, 20.0f};
-            }
-            if (map_geo_voxworld_count + 1 < CITY_MAX_BOXES && fabsf(n2) < landmark_prob) {
-                float tower_h = h + 80.0f + fabsf(n1) * 120.0f;
-                map_geo_voxworld[map_geo_voxworld_count++] = (Box){cx, tower_h * 0.5f, cz, 22.0f, tower_h, 22.0f};
-            }
         }
-    }
-
-    // Elevated ring-highway loop (rounded-square), supports, ramps, and guardrails.
-    const float ring_inner = RING_R - SEG_LEN;
-    const float guard_h = 3.0f;
-    const float guard_w = 1.5f;
-    const float guard_y = HIGHWAY_Y + (HIGHWAY_THICK * 0.5f) + (guard_h * 0.5f);
-    const float PILLAR_SPACING = 64.0f;
-    const int corner_steps = 4;
-
-    const float straight_len = 2.0f * ring_inner;
-    // Ring straights: north/south (east-west lanes), east/west (north-south lanes).
-    PUSH_CITY_BOX((Box){0.0f, HIGHWAY_Y, -RING_R, straight_len, HIGHWAY_THICK, HIGHWAY_W});
-    PUSH_CITY_BOX((Box){0.0f, HIGHWAY_Y, RING_R, straight_len, HIGHWAY_THICK, HIGHWAY_W});
-    PUSH_CITY_BOX((Box){RING_R, HIGHWAY_Y, 0.0f, HIGHWAY_W, HIGHWAY_THICK, straight_len});
-    PUSH_CITY_BOX((Box){-RING_R, HIGHWAY_Y, 0.0f, HIGHWAY_W, HIGHWAY_THICK, straight_len});
-
-    // Guardrails on ring straights.
-    PUSH_CITY_BOX((Box){0.0f, guard_y, -RING_R - (HIGHWAY_W * 0.5f), straight_len, guard_h, guard_w});
-    PUSH_CITY_BOX((Box){0.0f, guard_y, -RING_R + (HIGHWAY_W * 0.5f), straight_len, guard_h, guard_w});
-    PUSH_CITY_BOX((Box){0.0f, guard_y, RING_R - (HIGHWAY_W * 0.5f), straight_len, guard_h, guard_w});
-    PUSH_CITY_BOX((Box){0.0f, guard_y, RING_R + (HIGHWAY_W * 0.5f), straight_len, guard_h, guard_w});
-    PUSH_CITY_BOX((Box){RING_R - (HIGHWAY_W * 0.5f), guard_y, 0.0f, guard_w, guard_h, straight_len});
-    PUSH_CITY_BOX((Box){RING_R + (HIGHWAY_W * 0.5f), guard_y, 0.0f, guard_w, guard_h, straight_len});
-    PUSH_CITY_BOX((Box){-RING_R - (HIGHWAY_W * 0.5f), guard_y, 0.0f, guard_w, guard_h, straight_len});
-    PUSH_CITY_BOX((Box){-RING_R + (HIGHWAY_W * 0.5f), guard_y, 0.0f, guard_w, guard_h, straight_len});
-
-    // Corner staircase segments to round the square loop.
-    const float corner_span = SEG_LEN * 0.56f;
-    for (int i = 0; i < corner_steps; i++) {
-        float t = (float)(i + 1) / (float)(corner_steps + 1);
-        float a = ring_inner + (RING_R - ring_inner) * t;
-        float b = -RING_R + (RING_R - ring_inner) * t;
-        PUSH_CITY_BOX((Box){a, HIGHWAY_Y, b, corner_span, HIGHWAY_THICK, corner_span});   // NE
-        PUSH_CITY_BOX((Box){a, HIGHWAY_Y, -b, corner_span, HIGHWAY_THICK, corner_span});  // SE
-        PUSH_CITY_BOX((Box){-a, HIGHWAY_Y, b, corner_span, HIGHWAY_THICK, corner_span});  // NW
-        PUSH_CITY_BOX((Box){-a, HIGHWAY_Y, -b, corner_span, HIGHWAY_THICK, corner_span}); // SW
-    }
-
-    // Elevated spurs heading toward the city core.
-    const float spur_len = 220.0f;
-    const float spur_center = (RING_R - spur_len) * 0.5f;
-    PUSH_CITY_BOX((Box){0.0f, HIGHWAY_Y, -spur_center, HIGHWAY_W, HIGHWAY_THICK, spur_len});
-    PUSH_CITY_BOX((Box){0.0f, HIGHWAY_Y, spur_center, HIGHWAY_W, HIGHWAY_THICK, spur_len});
-    PUSH_CITY_BOX((Box){spur_center, HIGHWAY_Y, 0.0f, spur_len, HIGHWAY_THICK, HIGHWAY_W});
-    PUSH_CITY_BOX((Box){-spur_center, HIGHWAY_Y, 0.0f, spur_len, HIGHWAY_THICK, HIGHWAY_W});
-
-    // Pillars along the ring straights and spurs.
-    const float pillar_w = 4.0f;
-    for (float x = -ring_inner; x <= ring_inner; x += PILLAR_SPACING) {
-        PUSH_CITY_BOX((Box){x, HIGHWAY_Y * 0.5f, -RING_R, pillar_w, HIGHWAY_Y, pillar_w});
-        PUSH_CITY_BOX((Box){x, HIGHWAY_Y * 0.5f, RING_R, pillar_w, HIGHWAY_Y, pillar_w});
-    }
-    for (float z = -ring_inner; z <= ring_inner; z += PILLAR_SPACING) {
-        PUSH_CITY_BOX((Box){RING_R, HIGHWAY_Y * 0.5f, z, pillar_w, HIGHWAY_Y, pillar_w});
-        PUSH_CITY_BOX((Box){-RING_R, HIGHWAY_Y * 0.5f, z, pillar_w, HIGHWAY_Y, pillar_w});
-    }
-    for (float z = -spur_len + 10.0f; z <= -20.0f; z += PILLAR_SPACING) {
-        PUSH_CITY_BOX((Box){0.0f, HIGHWAY_Y * 0.5f, z, pillar_w, HIGHWAY_Y, pillar_w});
-        PUSH_CITY_BOX((Box){0.0f, HIGHWAY_Y * 0.5f, -z, pillar_w, HIGHWAY_Y, pillar_w});
-    }
-    for (float x = -spur_len + 10.0f; x <= -20.0f; x += PILLAR_SPACING) {
-        PUSH_CITY_BOX((Box){x, HIGHWAY_Y * 0.5f, 0.0f, pillar_w, HIGHWAY_Y, pillar_w});
-        PUSH_CITY_BOX((Box){-x, HIGHWAY_Y * 0.5f, 0.0f, pillar_w, HIGHWAY_Y, pillar_w});
-    }
-
-    // Intentional on/off-ramps as vertical stair-steps (collision-friendly).
-    const int ramp_steps = 14;
-    const float ramp_thick = 1.8f;
-    const float ramp_step_len = 22.0f;
-    const float ground_y = 2.0f;
-    const float lane_sep = 14.0f;
-
-    // North ramps (approach/depart along +Z outside loop).
-    for (int k = 0; k < ramp_steps; k++) {
-        float t = (float)k / (float)(ramp_steps - 1);
-        float y_up = ground_y + (HIGHWAY_Y - ground_y) * t;
-        float y_dn = HIGHWAY_Y - (HIGHWAY_Y - ground_y) * t;
-        float z = (-RING_R - 180.0f) + (180.0f * t);
-        PUSH_CITY_BOX((Box){lane_sep, y_up, z, 10.0f, ramp_thick, ramp_step_len});
-        PUSH_CITY_BOX((Box){-lane_sep, y_dn, z, 10.0f, ramp_thick, ramp_step_len});
-    }
-
-    // South ramps.
-    for (int k = 0; k < ramp_steps; k++) {
-        float t = (float)k / (float)(ramp_steps - 1);
-        float y_up = ground_y + (HIGHWAY_Y - ground_y) * t;
-        float y_dn = HIGHWAY_Y - (HIGHWAY_Y - ground_y) * t;
-        float z = (RING_R + 180.0f) - (180.0f * t);
-        PUSH_CITY_BOX((Box){-lane_sep, y_up, z, 10.0f, ramp_thick, ramp_step_len});
-        PUSH_CITY_BOX((Box){lane_sep, y_dn, z, 10.0f, ramp_thick, ramp_step_len});
-    }
-
-    // East ramps.
-    for (int k = 0; k < ramp_steps; k++) {
-        float t = (float)k / (float)(ramp_steps - 1);
-        float y_up = ground_y + (HIGHWAY_Y - ground_y) * t;
-        float y_dn = HIGHWAY_Y - (HIGHWAY_Y - ground_y) * t;
-        float x = (RING_R + 180.0f) - (180.0f * t);
-        PUSH_CITY_BOX((Box){x, y_up, -lane_sep, ramp_step_len, ramp_thick, 10.0f});
-        PUSH_CITY_BOX((Box){x, y_dn, lane_sep, ramp_step_len, ramp_thick, 10.0f});
-    }
-
-    // West ramps.
-    for (int k = 0; k < ramp_steps; k++) {
-        float t = (float)k / (float)(ramp_steps - 1);
-        float y_up = ground_y + (HIGHWAY_Y - ground_y) * t;
-        float y_dn = HIGHWAY_Y - (HIGHWAY_Y - ground_y) * t;
-        float x = (-RING_R - 180.0f) + (180.0f * t);
-        PUSH_CITY_BOX((Box){x, y_up, lane_sep, ramp_step_len, ramp_thick, 10.0f});
-        PUSH_CITY_BOX((Box){x, y_dn, -lane_sep, ramp_step_len, ramp_thick, 10.0f});
-    }
-
-
-    const float curb = road * 0.5f + HYDRANT_CURB_OFFSET;
-    const float road_extent = (CITY_GRID_RADIUS + 1) * pitch;
-    const float intersection_clear = 16.0f;
-
-    for (int line = -CITY_GRID_RADIUS; line <= CITY_GRID_RADIUS && map_geo_props_count < HYDRANT_COUNT_MAX; line++) {
-        float road_center = line * pitch;
-        int max_step = (int)((road_extent * 2.0f) / HYDRANT_SPACING_MIN);
-
-        for (int step = 0; step <= max_step && map_geo_props_count < HYDRANT_COUNT_MAX; step++) {
-            float along = -road_extent + step * HYDRANT_SPACING_MIN;
-            unsigned int base_h = city_geo_hash((unsigned int)(line * 92821 + step * 68917 + VOXWORLD_SEED * 197));
-            float jitter = ((float)(base_h & 1023u) / 1023.0f - 0.5f) * 8.0f;
-            float z = along + jitter;
-            float nearest_cross = roundf(z / pitch) * pitch;
-            if (fabsf(z - nearest_cross) < intersection_clear) continue;
-
-            if ((base_h & 7u) >= 2u) continue;
-            int side = (base_h & 8u) ? 1 : -1;
-            float x = road_center + side * curb;
-            if (!city_hydrant_blocked(x, z) && map_geo_props_count < CITY_MAX_PROPS) {
-                map_geo_props[map_geo_props_count++] = (Box){x, HYDRANT_HEIGHT * 0.5f, z, HYDRANT_RADIUS * 2.0f, HYDRANT_HEIGHT, HYDRANT_RADIUS * 2.0f};
-            }
-
-            unsigned int ortho_h = city_geo_hash(base_h ^ 0x9e3779b9u);
-            if ((ortho_h & 1u) != 0u) continue;
-
-            float x2 = z;
-            float z2 = road_center + (((ortho_h & 2u) != 0u) ? curb : -curb);
-            float nearest_cross_x = roundf(x2 / pitch) * pitch;
-            if (fabsf(x2 - nearest_cross_x) < intersection_clear) continue;
-            if (!city_hydrant_blocked(x2, z2) && map_geo_props_count < CITY_MAX_PROPS) {
-                map_geo_props[map_geo_props_count++] = (Box){x2, HYDRANT_HEIGHT * 0.5f, z2, HYDRANT_RADIUS * 2.0f, HYDRANT_HEIGHT, HYDRANT_RADIUS * 2.0f};
-            }
-        }
-    }
-
-    if (map_geo_props_count > HYDRANT_COUNT_MAX) map_geo_props_count = HYDRANT_COUNT_MAX;
-    printf("HYDRANTS: %d\n", map_geo_props_count);
-
-#undef PUSH_CITY_BOX
-
-    if (map_geo_voxworld_count > CITY_MAX_BOXES - 256) {
-        printf("[city] warning: box usage high %d/%d\n", map_geo_voxworld_count, CITY_MAX_BOXES);
     }
 }
 
@@ -472,7 +196,7 @@ static inline void phys_set_scene(int scene_id) {
     if (scene_id == SCENE_GARAGE_OSAKA) {
         map_geo = map_geo_garage;
         map_count = (int)(sizeof(map_geo_garage) / sizeof(Box));
-    } else if (scene_id == SCENE_VOXWORLD || scene_id == SCENE_CITY) {
+    } else if (scene_id == SCENE_VOXWORLD) {
         init_voxworld_city_geo();
         map_geo = map_geo_voxworld;
         map_count = map_geo_voxworld_count;
@@ -497,32 +221,6 @@ static inline void scene_spawn_point(int scene_id, int slot, float *out_x, float
         *out_x = offsets[idx];
         *out_y = 6.0f;
         *out_z = 0.0f;
-        return;
-    }
-    if (scene_id == SCENE_CITY) {
-        init_voxworld_city_geo();
-        const float pitch = CITY_BLOCK_SIZE + CITY_ROAD_SIZE;
-        static const int anchors[][2] = {
-            {0, 0}, {2, -1}, {-3, 2}, {4, 3}, {-4, -2}, {1, 4}, {-2, -4}, {6, 0}, {0, -6}
-        };
-        int idx = abs(slot) % (int)(sizeof(anchors) / sizeof(anchors[0]));
-        *out_x = anchors[idx][0] * pitch;
-        *out_y = 6.0f;
-        *out_z = anchors[idx][1] * pitch;
-
-        for (int attempt = 0; attempt < 8; attempt++) {
-            int collision = 0;
-            for (int i = 1; i < map_geo_voxworld_count; i++) {
-                Box b = map_geo_voxworld[i];
-                if (fabsf(*out_x - b.x) < (b.w * 0.5f + 6.0f) && fabsf(*out_z - b.z) < (b.d * 0.5f + 6.0f) && 6.0f < b.y + b.h * 0.5f) {
-                    collision = 1;
-                    break;
-                }
-            }
-            if (!collision) break;
-            *out_x += 0.5f * pitch;
-            *out_z -= 0.35f * pitch;
-        }
         return;
     }
     if (slot % 2 == 0) {
@@ -570,61 +268,11 @@ static inline void scene_safety_check(PlayerState *p) {
             p->z < -VOXWORLD_BOUNDS_Z || p->z > VOXWORLD_BOUNDS_Z) {
             scene_force_spawn(p);
         }
-        return;
-    }
-    if (p->scene_id == SCENE_CITY) {
-        if (p->y < CITY_KILL_Y) {
-            scene_force_spawn(p);
-            return;
-        }
-
-        float out_x = fabsf(p->x) - CITY_SOFT_X;
-        float out_z = fabsf(p->z) - CITY_SOFT_Z;
-        if (out_x > 0.0f) {
-            float dir = (p->x > 0.0f) ? -1.0f : 1.0f;
-            p->vx += dir * CITY_EDGE_PUSH * (1.0f + out_x / 320.0f);
-            p->vx *= CITY_EDGE_FRICTION;
-            p->vz *= 0.992f;
-        }
-        if (out_z > 0.0f) {
-            float dir = (p->z > 0.0f) ? -1.0f : 1.0f;
-            p->vz += dir * CITY_EDGE_PUSH * (1.0f + out_z / 320.0f);
-            p->vz *= CITY_EDGE_FRICTION;
-            p->vx *= 0.992f;
-        }
-
     }
 }
 
 static inline int scene_portal_active(int scene_id) {
-    return scene_id == SCENE_GARAGE_OSAKA || scene_id == SCENE_STADIUM || scene_id == SCENE_CITY || scene_id == SCENE_VOXWORLD;
-}
-
-static inline int scene_portals(int scene_id, PortalDef *out, int max) {
-    if (!out || max <= 0) return 0;
-    int count = 0;
-    if (scene_id == SCENE_GARAGE_OSAKA) {
-        if (count < max) {
-            out[count++] = (PortalDef){PORTAL_ID_GARAGE_EXIT, GARAGE_PORTAL_X, GARAGE_PORTAL_Y, GARAGE_PORTAL_Z, GARAGE_PORTAL_RADIUS};
-        }
-        if (count < max) {
-            out[count++] = (PortalDef){PORTAL_ID_CITY_GATE, GARAGE_CITY_PORTAL_X, GARAGE_CITY_PORTAL_Y, GARAGE_CITY_PORTAL_Z, GARAGE_CITY_PORTAL_RADIUS};
-        }
-        return count;
-    }
-    if (scene_id == SCENE_STADIUM) {
-        out[count++] = (PortalDef){PORTAL_ID_GARAGE_EXIT, STADIUM_PORTAL_X, STADIUM_PORTAL_Y, STADIUM_PORTAL_Z, STADIUM_PORTAL_RADIUS};
-        return count;
-    }
-    if (scene_id == SCENE_CITY) {
-        out[count++] = (PortalDef){PORTAL_ID_CITY_GATE, CITY_PORTAL_X, CITY_PORTAL_Y, CITY_PORTAL_Z, CITY_PORTAL_RADIUS};
-        return count;
-    }
-    if (scene_id == SCENE_VOXWORLD) {
-        out[count++] = (PortalDef){PORTAL_ID_VOXWORLD_TO_STADIUM, VOXWORLD_PORTAL_X, VOXWORLD_PORTAL_Y, VOXWORLD_PORTAL_Z, VOXWORLD_PORTAL_RADIUS};
-        return count;
-    }
-    return 0;
+    return scene_id == SCENE_GARAGE_OSAKA || scene_id == SCENE_STADIUM || scene_id == SCENE_VOXWORLD;
 }
 
 static inline int portal_resolve_destination(int current_scene, int portal_id, int slot,
@@ -636,16 +284,6 @@ static inline int portal_resolve_destination(int current_scene, int portal_id, i
         return 1;
     }
     if (current_scene == SCENE_STADIUM && portal_id == PORTAL_ID_GARAGE_EXIT) {
-        *out_scene = SCENE_GARAGE_OSAKA;
-        scene_spawn_point(*out_scene, slot, out_x, out_y, out_z);
-        return 1;
-    }
-    if (current_scene == SCENE_GARAGE_OSAKA && portal_id == PORTAL_ID_CITY_GATE) {
-        *out_scene = SCENE_CITY;
-        scene_spawn_point(*out_scene, slot, out_x, out_y, out_z);
-        return 1;
-    }
-    if (current_scene == SCENE_CITY && portal_id == PORTAL_ID_CITY_GATE) {
         *out_scene = SCENE_GARAGE_OSAKA;
         scene_spawn_point(*out_scene, slot, out_x, out_y, out_z);
         return 1;
@@ -668,16 +306,24 @@ static inline int portal_resolve_destination(int current_scene, int portal_id, i
 }
 
 static inline void scene_portal_info(int scene_id, float *out_x, float *out_y, float *out_z, float *out_radius) {
-    PortalDef portals[4];
-    int count = scene_portals(scene_id, portals, 4);
-    if (count > 0) {
-        *out_x = portals[0].x;
-        *out_y = portals[0].y;
-        *out_z = portals[0].z;
-        *out_radius = portals[0].radius;
-        return;
+    if (scene_id == SCENE_GARAGE_OSAKA) {
+        *out_x = GARAGE_PORTAL_X;
+        *out_y = GARAGE_PORTAL_Y;
+        *out_z = GARAGE_PORTAL_Z;
+        *out_radius = GARAGE_PORTAL_RADIUS;
+    } else if (scene_id == SCENE_STADIUM) {
+        *out_x = STADIUM_PORTAL_X;
+        *out_y = STADIUM_PORTAL_Y;
+        *out_z = STADIUM_PORTAL_Z;
+        *out_radius = STADIUM_PORTAL_RADIUS;
+    } else if (scene_id == SCENE_VOXWORLD) {
+        *out_x = VOXWORLD_PORTAL_X;
+        *out_y = VOXWORLD_PORTAL_Y;
+        *out_z = VOXWORLD_PORTAL_Z;
+        *out_radius = VOXWORLD_PORTAL_RADIUS;
+    } else {
+        *out_x = 0.0f; *out_y = 0.0f; *out_z = 0.0f; *out_radius = 0.0f;
     }
-    *out_x = 0.0f; *out_y = 0.0f; *out_z = 0.0f; *out_radius = 0.0f;
 }
 
 static inline const VehiclePad *scene_vehicle_pads(int scene_id, int *out_count) {
@@ -692,16 +338,38 @@ static inline const VehiclePad *scene_vehicle_pads(int scene_id, int *out_count)
 static inline int scene_portal_triggered(PlayerState *p, int *out_portal_id) {
     if (!scene_portal_active(p->scene_id)) return 0;
 
-    PortalDef portals[4];
-    int portal_count = scene_portals(p->scene_id, portals, 4);
-    for (int i = 0; i < portal_count; i++) {
-        float dx = p->x - portals[i].x;
-        float dz = p->z - portals[i].z;
-        float dist_sq = dx * dx + dz * dz;
-        if (dist_sq <= (portals[i].radius * portals[i].radius)) {
-            if (out_portal_id) *out_portal_id = portals[i].portal_id;
+    if (p->scene_id == SCENE_STADIUM) {
+        float dx_main = p->x - STADIUM_PORTAL_X;
+        float dz_main = p->z - STADIUM_PORTAL_Z;
+        float dist_sq_main = dx_main * dx_main + dz_main * dz_main;
+        if (dist_sq_main <= (STADIUM_PORTAL_RADIUS * STADIUM_PORTAL_RADIUS)) {
+            if (out_portal_id) *out_portal_id = PORTAL_ID_GARAGE_EXIT;
             return 1;
         }
+
+        float dx_edge = p->x - STADIUM_EDGE_PORTAL_X;
+        float dz_edge = p->z - STADIUM_EDGE_PORTAL_Z;
+        float dist_sq_edge = dx_edge * dx_edge + dz_edge * dz_edge;
+        if (dist_sq_edge <= (STADIUM_EDGE_PORTAL_RADIUS * STADIUM_EDGE_PORTAL_RADIUS)) {
+            if (out_portal_id) *out_portal_id = PORTAL_ID_STADIUM_TO_VOXWORLD;
+            return 1;
+        }
+        return 0;
+    }
+
+    float portal_x = 0.0f, portal_y = 0.0f, portal_z = 0.0f, portal_radius = 0.0f;
+    scene_portal_info(p->scene_id, &portal_x, &portal_y, &portal_z, &portal_radius);
+    if (portal_radius <= 0.0f) return 0;
+    float dx = p->x - portal_x;
+    float dz = p->z - portal_z;
+    float dist_sq = dx * dx + dz * dz;
+    if (dist_sq <= (portal_radius * portal_radius)) {
+        if (out_portal_id) {
+            *out_portal_id = (p->scene_id == SCENE_VOXWORLD)
+                ? PORTAL_ID_VOXWORLD_TO_STADIUM
+                : PORTAL_ID_GARAGE_EXIT;
+        }
+        return 1;
     }
     return 0;
 }
@@ -737,42 +405,6 @@ static inline void apply_friction_2d(Vec2 *vel, float friction, float dt) {
     float ratio = newspeed / speed;
     vel->x *= ratio;
     vel->y *= ratio;
-}
-
-static inline float vox_hash_noise(float x, float z) {
-    float n = sinf(x * 12.9898f + z * 78.233f + (float)VOXWORLD_SEED * 0.001f) * 43758.5453f;
-    return n - floorf(n);
-}
-
-static inline float phys_vox_height_at(float x, float z) {
-    if (x < -VOXWORLD_BOUNDS_X || x > VOXWORLD_BOUNDS_X ||
-        z < -VOXWORLD_BOUNDS_Z || z > VOXWORLD_BOUNDS_Z) {
-        return -1000.0f;
-    }
-    float base = 5.0f;
-    float waves = sinf((x + (float)VOXWORLD_SEED) * 0.01f) * 3.0f +
-                  cosf((z - (float)VOXWORLD_SEED) * 0.012f) * 2.5f;
-    float detail = (vox_hash_noise(x * 0.2f, z * 0.2f) - 0.5f) * 2.0f;
-    float h = base + waves + detail;
-    if (h < 0.0f) h = 0.0f;
-    return h;
-}
-
-static inline void phys_vox_normal_at(float x, float z, float *nx, float *ny, float *nz) {
-    float hL = phys_vox_height_at(x - 1.0f, z);
-    float hR = phys_vox_height_at(x + 1.0f, z);
-    float hD = phys_vox_height_at(x, z - 1.0f);
-    float hU = phys_vox_height_at(x, z + 1.0f);
-    float gx = hR - hL;
-    float gz = hU - hD;
-    float len = sqrtf(gx * gx + 4.0f + gz * gz);
-    if (len < 0.0001f) {
-        *nx = 0.0f; *ny = 1.0f; *nz = 0.0f;
-        return;
-    }
-    *nx = -gx / len;
-    *ny = 2.0f / len;
-    *nz = -gz / len;
 }
 
 static inline float norm_yaw_deg(float yaw) {
@@ -822,25 +454,6 @@ static inline int trace_map_boxes(float x1, float y1, float z1, float x2, float 
             return 1;
         }
     }
-    for(int i=0; i<map_geo_props_count; i++) {
-        Box b = map_geo_props[i];
-        if (x2 > b.x - b.w/2 && x2 < b.x + b.w/2 &&
-            z2 > b.z - b.d/2 && z2 < b.z + b.d/2 &&
-            y2 > b.y - b.h/2 && y2 < b.y + b.h/2) {
-            float dx = x1 - b.x; float dz = z1 - b.z;
-            float w = b.w; float d = b.d;
-            if (fabs(dx)/w > fabs(dz)/d) {
-                *nx = (dx > 0) ? 1.0f : -1.0f; *ny = 0.0f; *nz = 0.0f;
-                *out_x = (dx > 0) ? b.x + b.w/2 + 0.1f : b.x - b.w/2 - 0.1f;
-                *out_y = y2; *out_z = z2;
-            } else {
-                *nx = 0.0f; *ny = 0.0f; *nz = (dz > 0) ? 1.0f : -1.0f;
-                *out_x = x2; *out_y = y2;
-                *out_z = (dz > 0) ? b.z + b.d/2 + 0.1f : b.z - b.d/2 - 0.1f;
-            }
-            return 1;
-        }
-    }
     if (y2 < 0.0f) {
         *nx = 0.0f; *ny = 1.0f; *nz = 0.0f;
         *out_x = x2; *out_y = 0.1f; *out_z = z2;
@@ -849,87 +462,11 @@ static inline int trace_map_boxes(float x1, float y1, float z1, float x2, float 
     return 0;
 }
 
-static inline int trace_map_vox(float x1, float y1, float z1, float x2, float y2, float z2,
-              float *out_x, float *out_y, float *out_z, float *nx, float *ny, float *nz) {
-    float dx = x2 - x1, dy = y2 - y1, dz = z2 - z1;
-    float dist = sqrtf(dx * dx + dy * dy + dz * dz);
-    int steps = (int)(dist / VOXWORLD_TRACE_STEP) + 2;
-    if (steps < 2) steps = 2;
-    for (int i = 1; i <= steps; i++) {
-        float t = (float)i / (float)steps;
-        float sx = x1 + dx * t;
-        float sy = y1 + dy * t;
-        float sz = z1 + dz * t;
-        float h = phys_vox_height_at(sx, sz);
-        if (sy <= h) {
-            *out_x = sx;
-            *out_y = h + 0.1f;
-            *out_z = sz;
-            phys_vox_normal_at(sx, sz, nx, ny, nz);
-            return 1;
-        }
-    }
-    return 0;
-}
-
 int trace_map(float x1, float y1, float z1, float x2, float y2, float z2,
               float *out_x, float *out_y, float *out_z, float *nx, float *ny, float *nz) {
-    if (phys_scene_id == SCENE_VOXWORLD) {
-        return trace_map_vox(x1, y1, z1, x2, y2, z2, out_x, out_y, out_z, nx, ny, nz);
-    }
     return trace_map_boxes(x1, y1, z1, x2, y2, z2, out_x, out_y, out_z, nx, ny, nz);
 }
 
-
-static inline float ray_sphere_hit_t(float ox, float oy, float oz,
-                                     float dx, float dy, float dz,
-                                     float cx, float cy, float cz,
-                                     float radius) {
-    float lx = ox - cx;
-    float ly = oy - cy;
-    float lz = oz - cz;
-    float b = 2.0f * (dx * lx + dy * ly + dz * lz);
-    float c = lx * lx + ly * ly + lz * lz - radius * radius;
-    float disc = b * b - 4.0f * c;
-    if (disc < 0.0f) return -1.0f;
-    float sq = sqrtf(disc);
-    float t0 = (-b - sq) * 0.5f;
-    float t1 = (-b + sq) * 0.5f;
-    if (t0 > 0.0f) return t0;
-    if (t1 > 0.0f) return t1;
-    return -1.0f;
-}
-
-static inline int raycast_player_hit(float ox, float oy, float oz,
-                                     float dx, float dy, float dz,
-                                     float max_t,
-                                     PlayerState *target,
-                                     int *out_hit_type,
-                                     float *out_t) {
-    if (!target || !target->active || target->state == STATE_DEAD) return 0;
-
-    float h_size = target->in_vehicle ? 4.0f : HEAD_SIZE;
-    float h_off = target->in_vehicle ? 2.0f : HEAD_OFFSET;
-    float head_t = ray_sphere_hit_t(ox, oy, oz, dx, dy, dz,
-                                    target->x, target->y + h_off, target->z, h_size);
-    float body_t = ray_sphere_hit_t(ox, oy, oz, dx, dy, dz,
-                                    target->x, target->y + 2.0f, target->z, sqrtf(7.2f));
-
-    int hit_type = 0;
-    float t = -1.0f;
-    if (head_t > 0.0f && head_t <= max_t) {
-        hit_type = 2;
-        t = head_t;
-    }
-    if (body_t > 0.0f && body_t <= max_t && (t < 0.0f || body_t < t)) {
-        hit_type = 1;
-        t = body_t;
-    }
-    if (hit_type == 0) return 0;
-    if (out_hit_type) *out_hit_type = hit_type;
-    if (out_t) *out_t = t;
-    return 1;
-}
 int check_hit_location(float ox, float oy, float oz, float dx, float dy, float dz, PlayerState *target) {
     if (!target->active) return 0;
     float tx = target->x; float tz = target->z;
@@ -954,92 +491,35 @@ int check_hit_location(float ox, float oy, float oz, float dx, float dy, float d
     return 0;
 }
 
-static void vehicle_stabilize(PlayerState *p, float dt) {
-    if (!p || !p->in_vehicle || dt <= 0.0f) return;
-
-    float speed = sqrtf(p->vx * p->vx + p->vz * p->vz);
-    if (speed < 0.001f) return;
-
-    float yaw_rad = p->yaw * 0.0174532925f;
-    float fwd_x = sinf(yaw_rad);
-    float fwd_z = cosf(yaw_rad);
-    float right_x = cosf(yaw_rad);
-    float right_z = -sinf(yaw_rad);
-
-    float v_fwd = p->vx * fwd_x + p->vz * fwd_z;
-    float v_lat = p->vx * right_x + p->vz * right_z;
-
-    int drifting = p->crouching != 0;
-    float lateral_grip = BUGGY_LATERAL_GRIP;
-    float align_rate = BUGGY_ALIGN_RATE;
-    if (p->vehicle_type == VEH_BIKE) {
-        lateral_grip = BIKE_LATERAL_GRIP;
-        align_rate = BIKE_ALIGN_RATE;
-    }
-    if (drifting) {
-        lateral_grip = (p->vehicle_type == VEH_BIKE) ? BIKE_DRIFT_LATERAL_GRIP : BUGGY_DRIFT_LATERAL_GRIP;
-        align_rate = 0.0f;
-    }
-
-    float lat_damp = expf(-lateral_grip * dt);
-    v_lat *= lat_damp;
-
-    p->vx = fwd_x * v_fwd + right_x * v_lat;
-    p->vz = fwd_z * v_fwd + right_z * v_lat;
-
-    speed = sqrtf(p->vx * p->vx + p->vz * p->vz);
-    if (drifting || speed < VEH_MIN_GRIP_SPEED) return;
-
-    float inv_speed = 1.0f / speed;
-    float vel_x = p->vx * inv_speed;
-    float vel_z = p->vz * inv_speed;
-
-    float blend = 1.0f - expf(-align_rate * dt);
-    float dir_x = vel_x + (fwd_x - vel_x) * blend;
-    float dir_z = vel_z + (fwd_z - vel_z) * blend;
-    float dir_len = sqrtf(dir_x * dir_x + dir_z * dir_z);
-    if (dir_len < 0.001f) return;
-
-    dir_x /= dir_len;
-    dir_z /= dir_len;
-    p->vx = dir_x * speed;
-    p->vz = dir_z * speed;
-}
-
-void apply_friction(PlayerState *p, float dt) {
+void apply_friction(PlayerState *p) {
     float speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
     if (speed < 0.001f) { p->vx = 0; p->vz = 0; return; }
-
+    
     float drop = 0;
     if (p->in_vehicle) {
-        float vehicle_friction = (p->vehicle_type == VEH_BIKE) ? BIKE_FRICTION : BUGGY_FRICTION;
-        drop = speed * vehicle_friction;
-    }
+        drop = speed * BUGGY_FRICTION;
+    } 
     else if (p->on_ground) {
         if (p->crouching) {
             if (speed > 0.75f) drop = speed * SLIDE_FRICTION;
-            else drop = speed * (FRICTION * 3.0f);
+            else drop = speed * (FRICTION * 3.0f); 
         } else {
             float control = (speed < STOP_SPEED) ? STOP_SPEED : speed;
-            drop = control * FRICTION;
+            drop = control * FRICTION; 
         }
     }
     float newspeed = speed - drop;
     if (newspeed < 0) newspeed = 0;
     newspeed /= speed;
     p->vx *= newspeed; p->vz *= newspeed;
-
-    if (p->in_vehicle) vehicle_stabilize(p, dt);
 }
-
 
 void accelerate(PlayerState *p, float wish_x, float wish_z, float wish_speed, float accel) {
     if (p->in_vehicle) {
         float current_speed = (p->vx * wish_x) + (p->vz * wish_z);
         float add_speed = wish_speed - current_speed;
         if (add_speed <= 0) return;
-        float vehicle_max_speed = (p->vehicle_type == VEH_BIKE) ? BIKE_MAX_SPEED : BUGGY_MAX_SPEED;
-        float acc_speed = accel * vehicle_max_speed;
+        float acc_speed = accel * BUGGY_MAX_SPEED;
         if (acc_speed > add_speed) acc_speed = add_speed;
         p->vx += acc_speed * wish_x; p->vz += acc_speed * wish_z;
         return;
@@ -1059,11 +539,6 @@ void resolve_collision(PlayerState *p) {
     float pw = p->in_vehicle ? 3.0f : PLAYER_WIDTH;
     float ph = p->in_vehicle ? 3.0f : (p->crouching ? (PLAYER_HEIGHT / 2.0f) : PLAYER_HEIGHT);
     p->on_ground = 0;
-    if (phys_scene_id == SCENE_VOXWORLD) {
-        float floor_y = phys_vox_height_at(p->x, p->z);
-        if (p->y < floor_y) { p->y = floor_y; p->vy = 0; p->on_ground = 1; }
-        return;
-    }
     if (p->y < 0) { p->y = 0; p->vy = 0; p->on_ground = 1; }
     for(int i=1; i<map_count; i++) {
         Box b = map_geo[i];
@@ -1086,38 +561,13 @@ void resolve_collision(PlayerState *p) {
             }
         }
     }
-    for(int i=0; i<map_geo_props_count; i++) {
-        Box b = map_geo_props[i];
-        if (p->x + pw > b.x - b.w/2 && p->x - pw < b.x + b.w/2 &&
-            p->z + pw > b.z - b.d/2 && p->z - pw < b.z + b.d/2) {
-            if (p->y < b.y + b.h/2 && p->y + ph > b.y - b.h/2) {
-                float prev_y = p->y - p->vy;
-                if (prev_y >= b.y + b.h/2) {
-                    p->y = b.y + b.h/2; p->vy = 0; p->on_ground = 1;
-                } else {
-                    float dx = p->x - b.x; float dz = p->z - b.z;
-                    float w = (b.w > 0.1f) ? b.w : 1.0f;
-                    float d = (b.d > 0.1f) ? b.d : 1.0f;
-                    if (fabs(dx)/w > fabs(dz)/d) {
-                        p->vx = 0; p->x = (dx > 0) ? b.x + b.w/2 + pw : b.x - b.w/2 - pw;
-                    } else {
-                        p->vz = 0; p->z = (dz > 0) ? b.z + b.d/2 + pw : b.z - b.d/2 - pw;
-                    }
-                }
-            }
-        }
-    }
 }
 
 void phys_respawn(PlayerState *p, unsigned int now) {
     p->active = 1; p->state = STATE_ALIVE;
     p->health = 100; p->shield = 100; p->respawn_time = 0; p->in_vehicle = 0;
-    p->vehicle_type = VEH_NONE;
-    p->bike_gear = 0;
-    p->in_bike = 0;
     p->use_was_down = 0;
-    p->bike_was_down = 0;
-    if (p->scene_id != SCENE_GARAGE_OSAKA && p->scene_id != SCENE_STADIUM && p->scene_id != SCENE_VOXWORLD && p->scene_id != SCENE_CITY) {
+    if (p->scene_id != SCENE_GARAGE_OSAKA && p->scene_id != SCENE_STADIUM && p->scene_id != SCENE_VOXWORLD) {
         p->scene_id = SCENE_GARAGE_OSAKA;
     }
     scene_spawn_point(p->scene_id, p->id, &p->x, &p->y, &p->z);
@@ -1157,71 +607,6 @@ static inline void spawn_projectile(Projectile *projectiles, PlayerState *p, int
     }
 }
 
-static inline int melee_try_hit(PlayerState *attacker, PlayerState *targets, float range, float radius, int *out_victim_id) {
-    if (out_victim_id) *out_victim_id = -1;
-    if (!attacker || !targets) return 0;
-
-    float yaw_rad = attacker->yaw * 0.0174532925f;
-    float fwd_x = sinf(yaw_rad);
-    float fwd_z = cosf(yaw_rad);
-
-    float ox = attacker->x;
-    float oy = attacker->y + 1.2f;
-    float oz = attacker->z;
-    float ex = ox + fwd_x * range;
-    float ey = oy;
-    float ez = oz + fwd_z * range;
-
-    float seg_x = ex - ox;
-    float seg_y = ey - oy;
-    float seg_z = ez - oz;
-    float seg_len2 = seg_x * seg_x + seg_y * seg_y + seg_z * seg_z;
-    float best_t = 9999.0f;
-    int best_idx = -1;
-
-    for (int i = 0; i < MAX_CLIENTS; i++) {
-        PlayerState *v = &targets[i];
-        if (v == attacker) continue;
-        if (!v->active || v->state == STATE_DEAD) continue;
-        if (v->scene_id != attacker->scene_id) continue;
-
-        float cx = v->x;
-        float cy = v->y + 1.2f;
-        float cz = v->z;
-        float vx = cx - ox;
-        float vy = cy - oy;
-        float vz = cz - oz;
-
-        float front = vx * fwd_x + vz * fwd_z;
-        if (front <= 0.0f) continue;
-
-        float t = 0.0f;
-        if (seg_len2 > 0.00001f) {
-            t = (vx * seg_x + vy * seg_y + vz * seg_z) / seg_len2;
-            if (t < 0.0f) t = 0.0f;
-            if (t > 1.0f) t = 1.0f;
-        }
-        float px = ox + seg_x * t;
-        float py = oy + seg_y * t;
-        float pz = oz + seg_z * t;
-        float dx = cx - px;
-        float dy = cy - py;
-        float dz = cz - pz;
-        float d2 = dx * dx + dy * dy + dz * dz;
-
-        if (d2 <= radius * radius && t < best_t) {
-            best_t = t;
-            best_idx = i;
-        }
-    }
-
-    if (best_idx >= 0) {
-        if (out_victim_id) *out_victim_id = best_idx;
-        return 1;
-    }
-    return 0;
-}
-
 void update_weapons(PlayerState *p, PlayerState *targets, Projectile *projectiles, int shoot, int reload, int ability_press) {
     if (p->in_vehicle) return; 
     if (p->reload_timer > 0) p->reload_timer--;
@@ -1257,28 +642,6 @@ void update_weapons(PlayerState *p, PlayerState *targets, Projectile *projectile
             p->attack_cooldown = WPN_STATS[w].rof;
             if (w != WPN_KNIFE) p->ammo[w]--;
             
-            if (w == WPN_KNIFE) {
-                int victim = -1;
-                if (melee_try_hit(p, targets, 5.5f, 1.45f, &victim) && victim >= 0) {
-                    int damage = WPN_STATS[w].dmg;
-                    p->accumulated_reward += 10.0f;
-                    targets[victim].shield_regen_timer = SHIELD_REGEN_DELAY;
-                    p->hit_feedback = 10;
-                    if (targets[victim].shield > 0) {
-                        if (targets[victim].shield >= damage) { targets[victim].shield -= damage; damage = 0; }
-                        else { damage -= targets[victim].shield; targets[victim].shield = 0; }
-                    }
-                    targets[victim].health -= damage;
-                    if (targets[victim].health <= 0) {
-                        p->kills++; targets[victim].deaths++;
-                        p->accumulated_reward += 1000.0f;
-                        p->hit_feedback = 30;
-                        phys_respawn(&targets[victim], 0);
-                    }
-                }
-                return;
-            }
-
             float r = -p->yaw * 0.0174533f; float rp = p->pitch * 0.0174533f;
             float dx = sinf(r) * cosf(rp); float dy = sinf(rp); float dz = -cosf(r) * cosf(rp);
             if (WPN_STATS[w].spr > 0) {
@@ -1287,67 +650,35 @@ void update_weapons(PlayerState *p, PlayerState *targets, Projectile *projectile
                 dz += phys_rand_f() * WPN_STATS[w].spr;
             }
 
-            {
-                float dlen = sqrtf(dx * dx + dy * dy + dz * dz);
-                if (dlen > 0.00001f) {
-                    dx /= dlen; dy /= dlen; dz /= dlen;
-                }
-            }
-
-            float ox = p->x;
-            float oy = p->y + EYE_HEIGHT;
-            float oz = p->z;
-            float max_range = 2000.0f;
-            float wall_x = ox + dx * max_range;
-            float wall_y = oy + dy * max_range;
-            float wall_z = oz + dz * max_range;
-            float nnx = 0.0f, nny = 0.0f, nnz = 0.0f;
-            int wall_hit = trace_map(ox, oy, oz, wall_x, wall_y, wall_z, &wall_x, &wall_y, &wall_z, &nnx, &nny, &nnz);
-            float wall_t = max_range;
-            if (wall_hit) {
-                float wx = wall_x - ox;
-                float wy = wall_y - oy;
-                float wz = wall_z - oz;
-                wall_t = sqrtf(wx * wx + wy * wy + wz * wz);
-            }
-
-            int best_idx = -1;
-            int best_hit_type = 0;
-            float best_t = wall_t;
-            for (int i = 0; i < MAX_CLIENTS; i++) {
+            for(int i=0; i<MAX_CLIENTS; i++) {
                 if (p == &targets[i]) continue;
                 if (!targets[i].active || targets[i].state == STATE_DEAD) continue;
                 if (targets[i].scene_id != p->scene_id) continue;
-
-                int hit_type = 0;
-                float hit_t = 0.0f;
-                if (!raycast_player_hit(ox, oy, oz, dx, dy, dz, wall_t, &targets[i], &hit_type, &hit_t)) continue;
-                if (hit_t < best_t) {
-                    best_t = hit_t;
-                    best_idx = i;
-                    best_hit_type = hit_type;
+                if (w == WPN_KNIFE) {
+                    float kx = p->x - targets[i].x;
+                    float ky = p->y - targets[i].y; float kz = p->z - targets[i].z;
+                    if ((kx*kx + ky*ky + kz*kz) > MELEE_RANGE_SQ + 22.0f ) continue;
                 }
-            }
-
-            if (best_idx >= 0) {
-                printf("[SHOT] shooter=%d org=(%.2f,%.2f,%.2f) dir=(%.3f,%.3f,%.3f) wall_t=%.2f hit=%d hit_t=%.2f\n",
-                       p->id, ox, oy, oz, dx, dy, dz, wall_t, best_idx, best_t);
-                int damage = WPN_STATS[w].dmg;
-                p->accumulated_reward += 10.0f;
-                targets[best_idx].shield_regen_timer = SHIELD_REGEN_DELAY;
-                if (best_hit_type == 2 && targets[best_idx].shield <= 0) { damage *= 3; p->hit_feedback = 20;
-                } else { p->hit_feedback = 10; }
-
-                if (targets[best_idx].shield > 0) {
-                    if (targets[best_idx].shield >= damage) { targets[best_idx].shield -= damage; damage = 0; }
-                    else { damage -= targets[best_idx].shield; targets[best_idx].shield = 0; }
-                }
-                targets[best_idx].health -= damage;
-                if(targets[best_idx].health <= 0) {
-                    p->kills++; targets[best_idx].deaths++;
-                    p->accumulated_reward += 1000.0f;
-                    p->hit_feedback = 30; // KILL CONFIRM (Triggers Double Ring)
-                    phys_respawn(&targets[best_idx], 0);
+                int hit_type = check_hit_location(p->x, p->y + EYE_HEIGHT, p->z, dx, dy, dz, &targets[i]);
+                if (hit_type > 0) {
+                    printf("🔫 HIT! Dmg: %d on Target %d\n", WPN_STATS[w].dmg, i);
+                    int damage = WPN_STATS[w].dmg;
+                    p->accumulated_reward += 10.0f;
+                    targets[i].shield_regen_timer = SHIELD_REGEN_DELAY;
+                    if (hit_type == 2 && targets[i].shield <= 0) { damage *= 3; p->hit_feedback = 20;
+                    } else { p->hit_feedback = 10; } 
+                    
+                    if (targets[i].shield > 0) {
+                        if (targets[i].shield >= damage) { targets[i].shield -= damage; damage = 0; } 
+                        else { damage -= targets[i].shield; targets[i].shield = 0; }
+                    }
+                    targets[i].health -= damage;
+                    if(targets[i].health <= 0) {
+                        p->kills++; targets[i].deaths++; 
+                        p->accumulated_reward += 1000.0f;
+                        p->hit_feedback = 30; // KILL CONFIRM (Triggers Double Ring)
+                        phys_respawn(&targets[i], 0);
+                    }
                 }
             }
         }
