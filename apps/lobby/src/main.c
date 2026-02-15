@@ -561,7 +561,6 @@ static AimRay get_aim_ray(const CameraState *cam, const PlayerState *me) {
 
     {
         CameraVec3 cam_origin = cam->pos;
-        if (cam->mode != CAM_THIRD) cam_origin = shot_origin;
         CameraVec3 forward = vec3_normalize(forward_from_yaw_pitch(cam->yaw, cam->pitch));
         CameraVec3 world_up = {0.0f, 1.0f, 0.0f};
         CameraVec3 right = vec3_normalize(vec3_cross(forward, world_up));
