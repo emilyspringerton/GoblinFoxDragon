@@ -1334,9 +1334,12 @@ int main(int argc, char* argv[]) {
                 render_pid = my_client_id;
             }
             int sim_pid = (app_state == STATE_GAME_NET) ? net_local_pid : 0;
-            if (app_state == STATE_GAME_NET && my_client_id >= 1) {
+            if (app_state == STATE_GAME_NET &&
+                my_client_id > 0 && my_client_id < MAX_CLIENTS &&
+                local_state.players[my_client_id].active) {
                 if (sim_pid != render_pid) {
-                    printf("my_client_id=%d sim_pid=%d render_pid=%d\n", my_client_id, sim_pid, render_pid);
+                    printf("PID mismatch (active): my_client_id=%d sim_pid=%d render_pid=%d\n",
+                           my_client_id, sim_pid, render_pid);
                 }
                 assert(sim_pid == render_pid);
             }
