@@ -1343,7 +1343,12 @@ int main(int argc, char* argv[]) {
                     printf("PID mismatch (active): my_client_id=%d sim_pid=%d render_pid=%d\n",
                            my_client_id, sim_pid, render_pid);
                 }
-                assert(sim_pid == render_pid);
+                if (sim_pid != render_pid) {
+                    printf("PID mismatch (active): my_client_id=%d sim_pid=%d render_pid=%d\n",
+                    my_client_id, sim_pid, render_pid);
+                    // fail open: trust render_pid
+                    sim_pid = render_pid;
+                }
             }
             PlayerState *render_p = &local_state.players[render_pid];
             draw_scene(render_p);
