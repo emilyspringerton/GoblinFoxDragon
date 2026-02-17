@@ -68,10 +68,24 @@ struct sockaddr_in server_addr;
 #define NET_CMD_HISTORY 3
 #define CLIENT_USERCMD_HZ 60
 #define CLIENT_USERCMD_INTERVAL_MS (1000 / CLIENT_USERCMD_HZ)
+#define CLIENT_RECON_HISTORY 256
+#define REMOTE_INTERP_DELAY_MS 100
 UserCmd net_cmd_history[NET_CMD_HISTORY];
 int net_cmd_history_count = 0;
 int net_cmd_seq = 0;
 unsigned int net_last_cmd_send_ms = 0;
+UserCmd client_cmd_hist[CLIENT_RECON_HISTORY];
+unsigned int net_latest_seq_sent = 0;
+
+typedef struct {
+    int valid;
+    unsigned int ts;
+    float x, y, z;
+    float yaw, pitch;
+} RemoteSnapshot;
+
+static RemoteSnapshot remote_prev[MAX_CLIENTS];
+static RemoteSnapshot remote_curr[MAX_CLIENTS];
 
 static int net_local_pid = -1;
 static int net_cam_seeded = 0;
@@ -86,6 +100,10 @@ static void reset_client_render_state_for_net() {
     memset(net_cmd_history, 0, sizeof(net_cmd_history));
     net_cmd_history_count = 0;
     net_cmd_seq = 0;
+    memset(client_cmd_hist, 0, sizeof(client_cmd_hist));
+    net_latest_seq_sent = 0;
+    memset(remote_prev, 0, sizeof(remote_prev));
+    memset(remote_curr, 0, sizeof(remote_curr));
     net_last_cmd_send_ms = 0;
     travel_overlay_until_ms = 0;
     local_state.pending_scene = -1;
@@ -995,7 +1013,110 @@ UserCmd client_create_cmd(float fwd, float str, float yaw, float pitch, int shoo
     if(reload) cmd.buttons |= BTN_RELOAD;
     if(use) cmd.buttons |= BTN_USE;
     if(ability) cmd.buttons |= BTN_ABILITY_1;
+    client_cmd_hist[cmd.sequence % CLIENT_RECON_HISTORY] = cmd;
+    net_latest_seq_sent = cmd.sequence;
     cmd.weapon_idx = wpn_idx; return cmd;
+}
+
+static void client_apply_cmd_movement(PlayerState *p, const UserCmd *cmd, unsigned int now_ms) {
+    if (!p || !cmd) return;
+    if (isfinite(cmd->yaw)) p->yaw = norm_yaw_deg(cmd->yaw);
+    if (isfinite(cmd->pitch)) p->pitch = clamp_pitch_deg(cmd->pitch);
+    p->in_fwd = cmd->fwd;
+    p->in_strafe = cmd->str;
+    p->in_jump = (cmd->buttons & BTN_JUMP) != 0;
+    p->crouching = (cmd->buttons & BTN_CROUCH) != 0;
+    p->in_reload = (cmd->buttons & BTN_RELOAD) != 0;
+    p->in_use = (cmd->buttons & BTN_USE) != 0;
+    p->in_ability = (cmd->buttons & BTN_ABILITY_1) != 0;
+    if (cmd->weapon_idx >= 0 && cmd->weapon_idx < MAX_WEAPONS) {
+        p->current_weapon = cmd->weapon_idx;
+    }
+
+    float rad = p->yaw * 3.14159f / 180.0f;
+    float wish_x = sinf(rad) * p->in_fwd + cosf(rad) * p->in_strafe;
+    float wish_z = cosf(rad) * p->in_fwd - sinf(rad) * p->in_strafe;
+    float wish_speed = sqrtf(wish_x * wish_x + wish_z * wish_z);
+    if (wish_speed > 1.0f) {
+        wish_x /= wish_speed;
+        wish_z /= wish_speed;
+        wish_speed = 1.0f;
+    }
+    wish_speed *= MAX_SPEED;
+    accelerate(p, wish_x, wish_z, wish_speed, ACCEL);
+
+    float g = p->in_jump ? GRAVITY_FLOAT : GRAVITY_DROP;
+    p->vy -= g;
+    if (p->in_jump && p->on_ground) {
+        p->y += 0.1f;
+        p->vy += JUMP_FORCE;
+    }
+
+    update_entity(p, 0.016f, NULL, now_ms);
+}
+
+static void client_reconcile_local_player(unsigned int ack_seq, float auth_x, float auth_y, float auth_z, float auth_yaw, float auth_pitch) {
+    if (my_client_id <= 0 || my_client_id >= MAX_CLIENTS) return;
+    PlayerState *p = &local_state.players[my_client_id];
+    if (!p->active) return;
+
+    float dx = p->x - auth_x;
+    float dy = p->y - auth_y;
+    float dz = p->z - auth_z;
+    float err = sqrtf(dx * dx + dy * dy + dz * dz);
+
+    p->x = auth_x; p->y = auth_y; p->z = auth_z;
+    p->yaw = norm_yaw_deg(auth_yaw);
+    p->pitch = clamp_pitch_deg(auth_pitch);
+
+    int replayed = 0;
+    for (unsigned int seq = ack_seq + 1; seq <= net_latest_seq_sent; seq++) {
+        UserCmd cmd = client_cmd_hist[seq % CLIENT_RECON_HISTORY];
+        if (cmd.sequence != seq) continue;
+        client_apply_cmd_movement(p, &cmd, cmd.timestamp);
+        replayed++;
+    }
+
+    static unsigned int last_recon_dbg = 0;
+    unsigned int now = SDL_GetTicks();
+    if (now - last_recon_dbg >= 1000) {
+        last_recon_dbg = now;
+        printf("[NET] reconcile err=%.3f replayed=%d ack=%u latest=%u\n", err, replayed, ack_seq, net_latest_seq_sent);
+    }
+}
+
+static void net_apply_remote_interpolation(unsigned int now_ms) {
+    unsigned int render_ts = (now_ms > REMOTE_INTERP_DELAY_MS) ? (now_ms - REMOTE_INTERP_DELAY_MS) : 0;
+    for (int i = 1; i < MAX_CLIENTS; i++) {
+        if (i == my_client_id) continue;
+        if (!remote_curr[i].valid) continue;
+
+        PlayerState *p = &local_state.players[i];
+        if (!p->active) continue;
+
+        if (!remote_prev[i].valid || remote_curr[i].ts <= remote_prev[i].ts) {
+            p->x = remote_curr[i].x; p->y = remote_curr[i].y; p->z = remote_curr[i].z;
+            p->yaw = remote_curr[i].yaw; p->pitch = remote_curr[i].pitch;
+            continue;
+        }
+
+        float num = (float)((int)render_ts - (int)remote_prev[i].ts);
+        float den = (float)((int)remote_curr[i].ts - (int)remote_prev[i].ts);
+        if (den <= 0.0f) {
+            p->x = remote_curr[i].x; p->y = remote_curr[i].y; p->z = remote_curr[i].z;
+            p->yaw = remote_curr[i].yaw; p->pitch = remote_curr[i].pitch;
+            continue;
+        }
+        float t = num / den;
+        if (t < 0.0f) t = 0.0f;
+        if (t > 1.0f) t = 1.0f;
+
+        p->x = remote_prev[i].x + (remote_curr[i].x - remote_prev[i].x) * t;
+        p->y = remote_prev[i].y + (remote_curr[i].y - remote_prev[i].y) * t;
+        p->z = remote_prev[i].z + (remote_curr[i].z - remote_prev[i].z) * t;
+        p->yaw = norm_yaw_deg(remote_prev[i].yaw + (remote_curr[i].yaw - remote_prev[i].yaw) * t);
+        p->pitch = clamp_pitch_deg(remote_prev[i].pitch + (remote_curr[i].pitch - remote_prev[i].pitch) * t);
+    }
 }
 
 void net_send_cmd(UserCmd cmd) {
@@ -1034,6 +1155,11 @@ void net_process_snapshot(char *buffer, int len) {
     int needed = (int)sizeof(NetHeader) + 1 + (int)count * (int)sizeof(NetPlayer);
     if (len < needed) return;
 
+    int local_seen = 0;
+    unsigned int local_ack_seq = 0;
+    float local_auth_x = 0.0f, local_auth_y = 0.0f, local_auth_z = 0.0f;
+    float local_auth_yaw = 0.0f, local_auth_pitch = 0.0f;
+
     for(int i=0; i<count; i++) {
         if (cursor + (int)sizeof(NetPlayer) > len) break;
 
@@ -1068,6 +1194,29 @@ void net_process_snapshot(char *buffer, int len) {
         p->ammo[p->current_weapon] = np->ammo;
 
         if (p->is_shooting) p->recoil_anim = 1.0f;
+
+        if (id == my_client_id) {
+            local_seen = 1;
+            local_ack_seq = np->last_seq;
+            local_auth_x = np->x;
+            local_auth_y = np->y;
+            local_auth_z = np->z;
+            local_auth_yaw = np->yaw;
+            local_auth_pitch = np->pitch;
+        } else {
+            remote_prev[id] = remote_curr[id];
+            remote_curr[id].valid = 1;
+            remote_curr[id].ts = SDL_GetTicks();
+            remote_curr[id].x = np->x;
+            remote_curr[id].y = np->y;
+            remote_curr[id].z = np->z;
+            remote_curr[id].yaw = norm_yaw_deg(np->yaw);
+            remote_curr[id].pitch = clamp_pitch_deg(np->pitch);
+        }
+    }
+
+    if (local_seen) {
+        client_reconcile_local_player(local_ack_seq, local_auth_x, local_auth_y, local_auth_z, local_auth_yaw, local_auth_pitch);
     }
 
     if (!net_cam_seeded &&
@@ -1373,10 +1522,12 @@ int main(int argc, char* argv[]) {
                     unsigned int now_ms = SDL_GetTicks();
                     if (now_ms - net_last_cmd_send_ms >= CLIENT_USERCMD_INTERVAL_MS) {
                         UserCmd cmd = client_create_cmd(fwd, str, cam_yaw, cam_pitch, shoot, jump, crouch, reload, use, ability, wpn_req);
+                        client_apply_cmd_movement(&local_state.players[net_local_pid], &cmd, now_ms);
                         net_send_cmd(cmd);
                         net_last_cmd_send_ms = now_ms;
                     }
                 }
+                net_apply_remote_interpolation(SDL_GetTicks());
             } else {
                 local_state.players[0].in_use = use;
                 if (use && local_state.players[0].vehicle_cooldown == 0 && local_state.transition_timer == 0) {

@@ -378,6 +378,7 @@ void server_broadcast() {
             NetPlayer np;
             np.id = (unsigned char)i;
             np.scene_id = (unsigned char)p->scene_id;
+            np.last_seq = client_last_seq[i];
             np.x = p->x; np.y = p->y; np.z = p->z;
             np.yaw = norm_yaw_deg(p->yaw); np.pitch = clamp_pitch_deg(p->pitch);
             np.current_weapon = (unsigned char)p->current_weapon;

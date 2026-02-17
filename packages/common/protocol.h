@@ -90,6 +90,7 @@ typedef struct {
 typedef struct {
     unsigned char id; 
     unsigned char scene_id;
+    unsigned int last_seq;
     float x, y, z; float yaw, pitch;
     unsigned char current_weapon;
     unsigned char state;
