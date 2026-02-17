@@ -16,6 +16,7 @@
     #include <unistd.h>
     #include <fcntl.h>
     #include <netdb.h>
+    #include <errno.h>
 #endif
 
 #include <SDL2/SDL.h>
@@ -65,9 +66,12 @@ int sock = -1;
 struct sockaddr_in server_addr;
 
 #define NET_CMD_HISTORY 3
+#define CLIENT_USERCMD_HZ 60
+#define CLIENT_USERCMD_INTERVAL_MS (1000 / CLIENT_USERCMD_HZ)
 UserCmd net_cmd_history[NET_CMD_HISTORY];
 int net_cmd_history_count = 0;
 int net_cmd_seq = 0;
+unsigned int net_last_cmd_send_ms = 0;
 
 static int net_local_pid = -1;
 static int net_cam_seeded = 0;
@@ -82,6 +86,7 @@ static void reset_client_render_state_for_net() {
     memset(net_cmd_history, 0, sizeof(net_cmd_history));
     net_cmd_history_count = 0;
     net_cmd_seq = 0;
+    net_last_cmd_send_ms = 0;
     travel_overlay_until_ms = 0;
     local_state.pending_scene = -1;
     local_state.scene_id = SCENE_GARAGE_OSAKA;
@@ -1111,12 +1116,21 @@ void net_process_snapshot(char *buffer, int len) {
 
 void net_tick() {
     char buffer[4096];
-    struct sockaddr_in sender;
-    socklen_t slen = sizeof(sender);
-    int len = recvfrom(sock, buffer, 4096, 0, (struct sockaddr*)&sender, &slen);
-    while (len > 0) {
+    while (1) {
+        struct sockaddr_in sender;
+        socklen_t slen = sizeof(sender);
+        int len = recvfrom(sock, buffer, 4096, 0, (struct sockaddr*)&sender, &slen);
+        if (len <= 0) {
+            #ifdef _WIN32
+            int e = WSAGetLastError();
+            if (e == WSAEWOULDBLOCK) break;
+            #else
+            if (errno == EAGAIN || errno == EWOULDBLOCK) break;
+            #endif
+            break;
+        }
+
         if (len < (int)sizeof(NetHeader)) {
-            len = recvfrom(sock, buffer, 4096, 0, (struct sockaddr*)&sender, &slen);
             continue;
         }
 
@@ -1151,8 +1165,7 @@ void net_tick() {
 
             printf("[NET] WELCOME my_client_id=%d net_local_pid=%d\n", my_client_id, net_local_pid);
             printf("✅ JOINED SERVER AS CLIENT ID: %d\n", my_client_id);
-    }
-        len = recvfrom(sock, buffer, 4096, 0, (struct sockaddr*)&sender, &slen);
+        }
     }
 }
 
@@ -1357,8 +1370,12 @@ int main(int argc, char* argv[]) {
                 net_local_pid = (my_client_id > 0 && my_client_id < MAX_CLIENTS) ? my_client_id : -1;
                 net_tick();
                 if (net_local_pid > 0) {
-                    UserCmd cmd = client_create_cmd(fwd, str, cam_yaw, cam_pitch, shoot, jump, crouch, reload, use, ability, wpn_req);
-                    net_send_cmd(cmd);
+                    unsigned int now_ms = SDL_GetTicks();
+                    if (now_ms - net_last_cmd_send_ms >= CLIENT_USERCMD_INTERVAL_MS) {
+                        UserCmd cmd = client_create_cmd(fwd, str, cam_yaw, cam_pitch, shoot, jump, crouch, reload, use, ability, wpn_req);
+                        net_send_cmd(cmd);
+                        net_last_cmd_send_ms = now_ms;
+                    }
                 }
             } else {
                 local_state.players[0].in_use = use;

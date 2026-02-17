@@ -50,6 +50,8 @@ typedef struct {
 
 static RecorderState recorder = {0};
 
+#define SERVER_SNAPSHOT_INTERVAL_TICKS 3
+
 #define RECORDER_SHAKE_POS 0.08f
 #define RECORDER_SHAKE_ANGLE 0.35f
 #define RECORDER_SMOOTH_POS 0.08f
@@ -537,7 +539,9 @@ int main(int argc, char *argv[]) {
 
         update_projectiles(now);
         recorder_write_frame(tick, now);
-        server_broadcast();
+        if ((tick % SERVER_SNAPSHOT_INTERVAL_TICKS) == 0) {
+            server_broadcast();
+        }
 
         int connected = 0;
         for (int i = 1; i < MAX_CLIENTS; i++) {
