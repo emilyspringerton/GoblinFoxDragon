@@ -4,6 +4,7 @@
 #include <string.h>
 #include <math.h>
 #include <assert.h>
+#include <stdint.h>
 
 #ifdef _WIN32
     #include <winsock2.h>
@@ -69,7 +70,10 @@ struct sockaddr_in server_addr;
 #define CLIENT_USERCMD_HZ 60
 #define CLIENT_USERCMD_INTERVAL_MS (1000 / CLIENT_USERCMD_HZ)
 #define CLIENT_RECON_HISTORY 256
-#define REMOTE_INTERP_DELAY_MS 100
+#define INTERP_DELAY_MS 100
+#define RECONCILE_SOFT_K 0.15f
+#define RECONCILE_HARD_SNAP_DIST 2.0f
+#define RECONCILE_HARD_SNAP_YAW 45.0f
 UserCmd net_cmd_history[NET_CMD_HISTORY];
 int net_cmd_history_count = 0;
 int net_cmd_seq = 0;
@@ -78,14 +82,22 @@ UserCmd client_cmd_hist[CLIENT_RECON_HISTORY];
 unsigned int net_latest_seq_sent = 0;
 
 typedef struct {
-    int valid;
-    unsigned int ts;
-    float x, y, z;
-    float yaw, pitch;
-} RemoteSnapshot;
+    int has_a;
+    int has_b;
+    NetPlayer a;
+    NetPlayer b;
+    uint32_t a_time_ms;
+    uint32_t b_time_ms;
+} RemoteInterp;
 
-static RemoteSnapshot remote_prev[MAX_CLIENTS];
-static RemoteSnapshot remote_curr[MAX_CLIENTS];
+static RemoteInterp rinterp[MAX_CLIENTS];
+static float reconcile_corr_x = 0.0f;
+static float reconcile_corr_y = 0.0f;
+static float reconcile_corr_z = 0.0f;
+static float reconcile_corr_yaw = 0.0f;
+static float reconcile_corr_pitch = 0.0f;
+static int net_server_time_sync = 0;
+static int32_t net_server_time_offset_ms = 0;
 
 static int net_local_pid = -1;
 static int net_cam_seeded = 0;
@@ -102,8 +114,14 @@ static void reset_client_render_state_for_net() {
     net_cmd_seq = 0;
     memset(client_cmd_hist, 0, sizeof(client_cmd_hist));
     net_latest_seq_sent = 0;
-    memset(remote_prev, 0, sizeof(remote_prev));
-    memset(remote_curr, 0, sizeof(remote_curr));
+    memset(rinterp, 0, sizeof(rinterp));
+    reconcile_corr_x = 0.0f;
+    reconcile_corr_y = 0.0f;
+    reconcile_corr_z = 0.0f;
+    reconcile_corr_yaw = 0.0f;
+    reconcile_corr_pitch = 0.0f;
+    net_server_time_sync = 0;
+    net_server_time_offset_ms = 0;
     net_last_cmd_send_ms = 0;
     travel_overlay_until_ms = 0;
     local_state.pending_scene = -1;
@@ -1055,15 +1073,37 @@ static void client_apply_cmd_movement(PlayerState *p, const UserCmd *cmd, unsign
     update_entity(p, 0.016f, NULL, now_ms);
 }
 
+static float shortest_angle_delta_deg(float from, float to) {
+    float d = to - from;
+    while (d > 180.0f) d -= 360.0f;
+    while (d < -180.0f) d += 360.0f;
+    return d;
+}
+
+static float angle_lerp_deg(float a, float b, float t) {
+    float d = shortest_angle_delta_deg(a, b);
+    return norm_yaw_deg(a + d * t);
+}
+
+static void client_apply_pending_correction(PlayerState *p) {
+    if (!p) return;
+    p->x += reconcile_corr_x * RECONCILE_SOFT_K;
+    p->y += reconcile_corr_y * RECONCILE_SOFT_K;
+    p->z += reconcile_corr_z * RECONCILE_SOFT_K;
+    reconcile_corr_x *= (1.0f - RECONCILE_SOFT_K);
+    reconcile_corr_y *= (1.0f - RECONCILE_SOFT_K);
+    reconcile_corr_z *= (1.0f - RECONCILE_SOFT_K);
+
+    p->yaw = norm_yaw_deg(p->yaw + reconcile_corr_yaw * RECONCILE_SOFT_K);
+    p->pitch = clamp_pitch_deg(p->pitch + reconcile_corr_pitch * RECONCILE_SOFT_K);
+    reconcile_corr_yaw *= (1.0f - RECONCILE_SOFT_K);
+    reconcile_corr_pitch *= (1.0f - RECONCILE_SOFT_K);
+}
+
 static void client_reconcile_local_player(unsigned int ack_seq, float auth_x, float auth_y, float auth_z, float auth_yaw, float auth_pitch) {
     if (my_client_id <= 0 || my_client_id >= MAX_CLIENTS) return;
     PlayerState *p = &local_state.players[my_client_id];
     if (!p->active) return;
-
-    float dx = p->x - auth_x;
-    float dy = p->y - auth_y;
-    float dz = p->z - auth_z;
-    float err = sqrtf(dx * dx + dy * dy + dz * dz);
 
     p->x = auth_x; p->y = auth_y; p->z = auth_z;
     p->yaw = norm_yaw_deg(auth_yaw);
@@ -1077,45 +1117,71 @@ static void client_reconcile_local_player(unsigned int ack_seq, float auth_x, fl
         replayed++;
     }
 
+    float ex = auth_x - p->x;
+    float ey = auth_y - p->y;
+    float ez = auth_z - p->z;
+    float pos_err = sqrtf(ex * ex + ey * ey + ez * ez);
+    float yaw_err = shortest_angle_delta_deg(p->yaw, auth_yaw);
+    float pitch_err = auth_pitch - p->pitch;
+
+    if (pos_err > RECONCILE_HARD_SNAP_DIST || fabsf(yaw_err) > RECONCILE_HARD_SNAP_YAW) {
+        p->x = auth_x; p->y = auth_y; p->z = auth_z;
+        p->yaw = norm_yaw_deg(auth_yaw);
+        p->pitch = clamp_pitch_deg(auth_pitch);
+        reconcile_corr_x = 0.0f;
+        reconcile_corr_y = 0.0f;
+        reconcile_corr_z = 0.0f;
+        reconcile_corr_yaw = 0.0f;
+        reconcile_corr_pitch = 0.0f;
+    } else {
+        reconcile_corr_x += ex;
+        reconcile_corr_y += ey;
+        reconcile_corr_z += ez;
+        reconcile_corr_yaw += yaw_err;
+        reconcile_corr_pitch += pitch_err;
+    }
+
     static unsigned int last_recon_dbg = 0;
     unsigned int now = SDL_GetTicks();
     if (now - last_recon_dbg >= 1000) {
         last_recon_dbg = now;
-        printf("[NET] reconcile err=%.3f replayed=%d ack=%u latest=%u\n", err, replayed, ack_seq, net_latest_seq_sent);
+        printf("[NET] reconcile err=%.3f replayed=%d ack=%u latest=%u\n", pos_err, replayed, ack_seq, net_latest_seq_sent);
     }
 }
 
 static void net_apply_remote_interpolation(unsigned int now_ms) {
-    unsigned int render_ts = (now_ms > REMOTE_INTERP_DELAY_MS) ? (now_ms - REMOTE_INTERP_DELAY_MS) : 0;
+    int32_t synced_now = (int32_t)now_ms + net_server_time_offset_ms;
+    uint32_t render_ts = (synced_now > (int32_t)INTERP_DELAY_MS) ? (uint32_t)(synced_now - (int32_t)INTERP_DELAY_MS) : 0;
     for (int i = 1; i < MAX_CLIENTS; i++) {
         if (i == my_client_id) continue;
-        if (!remote_curr[i].valid) continue;
+        RemoteInterp *ri = &rinterp[i];
+        if (!ri->has_a) continue;
 
         PlayerState *p = &local_state.players[i];
         if (!p->active) continue;
 
-        if (!remote_prev[i].valid || remote_curr[i].ts <= remote_prev[i].ts) {
-            p->x = remote_curr[i].x; p->y = remote_curr[i].y; p->z = remote_curr[i].z;
-            p->yaw = remote_curr[i].yaw; p->pitch = remote_curr[i].pitch;
+        if (!ri->has_b || ri->b_time_ms <= ri->a_time_ms) {
+            p->x = ri->a.x; p->y = ri->a.y; p->z = ri->a.z;
+            p->yaw = norm_yaw_deg(ri->a.yaw); p->pitch = clamp_pitch_deg(ri->a.pitch);
             continue;
         }
 
-        float num = (float)((int)render_ts - (int)remote_prev[i].ts);
-        float den = (float)((int)remote_curr[i].ts - (int)remote_prev[i].ts);
+        float num = (float)((int)render_ts - (int)ri->a_time_ms);
+        float den = (float)((int)ri->b_time_ms - (int)ri->a_time_ms);
         if (den <= 0.0f) {
-            p->x = remote_curr[i].x; p->y = remote_curr[i].y; p->z = remote_curr[i].z;
-            p->yaw = remote_curr[i].yaw; p->pitch = remote_curr[i].pitch;
+            p->x = ri->b.x; p->y = ri->b.y; p->z = ri->b.z;
+            p->yaw = norm_yaw_deg(ri->b.yaw); p->pitch = clamp_pitch_deg(ri->b.pitch);
             continue;
         }
         float t = num / den;
         if (t < 0.0f) t = 0.0f;
         if (t > 1.0f) t = 1.0f;
 
-        p->x = remote_prev[i].x + (remote_curr[i].x - remote_prev[i].x) * t;
-        p->y = remote_prev[i].y + (remote_curr[i].y - remote_prev[i].y) * t;
-        p->z = remote_prev[i].z + (remote_curr[i].z - remote_prev[i].z) * t;
-        p->yaw = norm_yaw_deg(remote_prev[i].yaw + (remote_curr[i].yaw - remote_prev[i].yaw) * t);
-        p->pitch = clamp_pitch_deg(remote_prev[i].pitch + (remote_curr[i].pitch - remote_prev[i].pitch) * t);
+        p->x = ri->a.x + (ri->b.x - ri->a.x) * t;
+        p->y = ri->a.y + (ri->b.y - ri->a.y) * t;
+        p->z = ri->a.z + (ri->b.z - ri->a.z) * t;
+        p->yaw = angle_lerp_deg(ri->a.yaw, ri->b.yaw, t);
+        p->pitch = clamp_pitch_deg(ri->a.pitch + (ri->b.pitch - ri->a.pitch) * t);
     }
 }
 
@@ -1148,6 +1214,14 @@ void net_send_cmd(UserCmd cmd) {
 void net_process_snapshot(char *buffer, int len) {
     if (len < (int)sizeof(NetHeader)) return;
     if (len < (int)sizeof(NetHeader) + 1) return;
+    NetHeader *head = (NetHeader*)buffer;
+    int32_t target_offset = (int32_t)head->timestamp - (int32_t)SDL_GetTicks();
+    if (!net_server_time_sync) {
+        net_server_time_offset_ms = target_offset;
+        net_server_time_sync = 1;
+    } else {
+        net_server_time_offset_ms = (net_server_time_offset_ms * 7 + target_offset) / 8;
+    }
 
     int cursor = (int)sizeof(NetHeader);
     unsigned char count = *(unsigned char*)(buffer + cursor); cursor++;
@@ -1204,14 +1278,21 @@ void net_process_snapshot(char *buffer, int len) {
             local_auth_yaw = np->yaw;
             local_auth_pitch = np->pitch;
         } else {
-            remote_prev[id] = remote_curr[id];
-            remote_curr[id].valid = 1;
-            remote_curr[id].ts = SDL_GetTicks();
-            remote_curr[id].x = np->x;
-            remote_curr[id].y = np->y;
-            remote_curr[id].z = np->z;
-            remote_curr[id].yaw = norm_yaw_deg(np->yaw);
-            remote_curr[id].pitch = clamp_pitch_deg(np->pitch);
+            RemoteInterp *ri = &rinterp[id];
+            if (!ri->has_a) {
+                ri->a = *np;
+                ri->a_time_ms = head->timestamp;
+                ri->has_a = 1;
+            } else if (!ri->has_b && head->timestamp > ri->a_time_ms) {
+                ri->b = *np;
+                ri->b_time_ms = head->timestamp;
+                ri->has_b = 1;
+            } else if (ri->has_b && head->timestamp > ri->b_time_ms) {
+                ri->a = ri->b;
+                ri->a_time_ms = ri->b_time_ms;
+                ri->b = *np;
+                ri->b_time_ms = head->timestamp;
+            }
         }
     }
 
@@ -1226,27 +1307,6 @@ void net_process_snapshot(char *buffer, int len) {
         cam_pitch = local_state.players[my_client_id].pitch;
         net_cam_seeded = 1;
         printf("[NET] seeded camera: yaw=%.2f pitch=%.2f\n", cam_yaw, cam_pitch);
-        printf("[NET] SEED cam_yaw=%.2f cam_pitch=%.2f server_yaw=%.2f server_pitch=%.2f\n",
-               cam_yaw,
-               cam_pitch,
-               local_state.players[my_client_id].yaw,
-               local_state.players[my_client_id].pitch);
-    }
-
-    static unsigned int last_dbg = 0;
-    unsigned int now = SDL_GetTicks();
-    if (now - last_dbg > 1000 && my_client_id > 0 && my_client_id < MAX_CLIENTS) {
-        last_dbg = now;
-        PlayerState *lp = &local_state.players[my_client_id];
-        if (lp->active) {
-            printf("[NET] local snapshot applied id=%d pos=(%.2f,%.2f,%.2f) yaw=%.2f pitch=%.2f\n",
-                   my_client_id,
-                   lp->x,
-                   lp->y,
-                   lp->z,
-                   lp->yaw,
-                   lp->pitch);
-        }
     }
 
     int render_id = (my_client_id > 0 && my_client_id < MAX_CLIENTS && local_state.players[my_client_id].active)
@@ -1526,6 +1586,7 @@ int main(int argc, char* argv[]) {
                         net_send_cmd(cmd);
                         net_last_cmd_send_ms = now_ms;
                     }
+                    client_apply_pending_correction(&local_state.players[net_local_pid]);
                 }
                 net_apply_remote_interpolation(SDL_GetTicks());
             } else {
