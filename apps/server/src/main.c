@@ -237,6 +237,7 @@ static void recorder_write_frame(unsigned int tick, unsigned int now_ms) {
             recorder.cam_x, recorder.cam_y, recorder.cam_z,
             recorder.cam_yaw, recorder.cam_pitch, recorder.cam_zoom);
 
+
     for (int i = 0; i < MAX_CLIENTS; i++) {
         PlayerState *p = &local_state.players[i];
         if (!p->active) continue;
@@ -453,7 +454,6 @@ int main(int argc, char *argv[]) {
 
         for(int i=0; i<MAX_CLIENTS; i++) {
             PlayerState *p = &local_state.players[i];
-            if (p->active) active_count++;
 
             if (i > 0 && p->active && p->state == STATE_DEAD) {
                 if (local_state.game_mode != MODE_SURVIVAL && now > p->respawn_time) {
@@ -535,6 +535,11 @@ int main(int argc, char *argv[]) {
         recorder_write_frame(tick, now);
         server_broadcast();
 
+        int connected = 0;
+        for (int i = 1; i < MAX_CLIENTS; i++) {
+            if (slots[i].active) connected++;
+        }
+        
         if (tick % 300 == 0) printf("[STATUS] Tick: %u | Clients: %d\n", tick, active_count);
 
         local_state.server_tick++;
