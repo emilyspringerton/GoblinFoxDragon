@@ -371,7 +371,7 @@ void server_broadcast() {
         PlayerState *p = &local_state.players[i];
         if (slots[i].active && p->active) {
             NetPlayer np;
-            np.id = (unsigned char)slots[i].player_id;
+            np.id = (unsigned char)i;
             np.scene_id = (unsigned char)p->scene_id;
             np.x = p->x; np.y = p->y; np.z = p->z;
             np.yaw = norm_yaw_deg(p->yaw); np.pitch = clamp_pitch_deg(p->pitch);
