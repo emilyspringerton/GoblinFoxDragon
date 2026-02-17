@@ -69,6 +69,8 @@ UserCmd net_cmd_history[NET_CMD_HISTORY];
 int net_cmd_history_count = 0;
 int net_cmd_seq = 0;
 
+static int net_local_pid = -1;
+
 void net_connect();
 void net_shutdown();
 
