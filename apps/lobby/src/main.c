@@ -609,7 +609,8 @@ void draw_player_3rd(PlayerState *p) {
 
     glPushMatrix();
     glTranslatef(p->x, p->y + 0.2f, p->z);
-    glRotatef(-draw_yaw, 0, 1, 0);
+    // Simulation yaw assumes forward is -Z, but this model is authored facing +Z.
+    glRotatef(180.0f - draw_yaw, 0, 1, 0);
     if (p->in_vehicle) {
         draw_buggy_model();
     } else {

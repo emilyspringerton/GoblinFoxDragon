@@ -89,6 +89,8 @@ static int alloc_slot(const struct sockaddr_in *addr) {
             local_state.players[i].scene_id = SCENE_GARAGE_OSAKA;
             local_state.players[i].active = 1;
             phys_respawn(&local_state.players[i], get_server_time());
+            local_state.players[i].yaw = 0.0f;
+            local_state.players[i].pitch = 0.0f;
 
             slots[i].active = 1;
             slots[i].addr = *addr;
@@ -458,6 +460,8 @@ int main(int argc, char *argv[]) {
             if (i > 0 && p->active && p->state == STATE_DEAD) {
                 if (local_state.game_mode != MODE_SURVIVAL && now > p->respawn_time) {
                     phys_respawn(p, now);
+                    p->yaw = 0.0f;
+                    p->pitch = 0.0f;
                 }
             }
 
