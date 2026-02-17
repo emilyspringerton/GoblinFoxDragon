@@ -455,7 +455,7 @@ int main(int argc, char *argv[]) {
             PlayerState *p = &local_state.players[i];
             if (p->active) active_count++;
 
-            if (p->state == STATE_DEAD) {
+            if (i > 0 && p->active && p->state == STATE_DEAD) {
                 if (local_state.game_mode != MODE_SURVIVAL && now > p->respawn_time) {
                     phys_respawn(p, now);
                 }
