@@ -286,7 +286,6 @@ void server_net_init() {
 
 void process_user_cmd(int client_id, UserCmd *cmd) {
     if (cmd->sequence <= client_last_seq[client_id]) return;
-    printf("[CMD] client=%d seq=%u buttons=%u\n", client_id, cmd->sequence, cmd->buttons);
     PlayerState *p = &local_state.players[client_id];
     if (isfinite(cmd->yaw)) p->yaw = norm_yaw_deg(cmd->yaw);
     if (isfinite(cmd->pitch)) p->pitch = clamp_pitch_deg(cmd->pitch);
