@@ -1041,13 +1041,8 @@ void net_process_snapshot(char *buffer, int len) {
         p->active = 1;
         p->scene_id = np->scene_id;
         p->x = np->x; p->y = np->y; p->z = np->z;
-        if (id != my_client_id) {
-            p->yaw   = norm_yaw_deg(np->yaw);
-            p->pitch = clamp_pitch_deg(np->pitch);
-        } else if (!net_cam_seeded) {
-            p->yaw   = norm_yaw_deg(np->yaw);
-            p->pitch = clamp_pitch_deg(np->pitch);
-        }
+        p->yaw   = norm_yaw_deg(np->yaw);
+        p->pitch = clamp_pitch_deg(np->pitch);
 
         p->state = np->state;
         p->health = np->health;
@@ -1087,8 +1082,16 @@ void net_process_snapshot(char *buffer, int len) {
     unsigned int now = SDL_GetTicks();
     if (now - last_dbg > 1000 && my_client_id > 0 && my_client_id < MAX_CLIENTS) {
         last_dbg = now;
-        printf("[NET] cid=%d cam_yaw=%.1f p.yaw=%.1f\n",
-               my_client_id, cam_yaw, local_state.players[my_client_id].yaw);
+        PlayerState *lp = &local_state.players[my_client_id];
+        if (lp->active) {
+            printf("[NET] local snapshot applied id=%d pos=(%.2f,%.2f,%.2f) yaw=%.2f pitch=%.2f\n",
+                   my_client_id,
+                   lp->x,
+                   lp->y,
+                   lp->z,
+                   lp->yaw,
+                   lp->pitch);
+        }
     }
 
     int render_id = (my_client_id > 0 && my_client_id < MAX_CLIENTS && local_state.players[my_client_id].active)
@@ -1393,13 +1396,14 @@ int main(int argc, char* argv[]) {
             if (app_state == STATE_GAME_NET &&
                 my_client_id > 0 && my_client_id < MAX_CLIENTS &&
                 local_state.players[my_client_id].active) {
-                if (sim_pid != render_pid) {
+                static unsigned int last_pid_mismatch_log = 0;
+                unsigned int now_ms = SDL_GetTicks();
+                if (sim_pid != render_pid && now_ms - last_pid_mismatch_log >= 250) {
+                    last_pid_mismatch_log = now_ms;
                     printf("PID mismatch (active): my_client_id=%d sim_pid=%d render_pid=%d\n",
                            my_client_id, sim_pid, render_pid);
                 }
                 if (sim_pid != render_pid) {
-                    printf("PID mismatch (active): my_client_id=%d sim_pid=%d render_pid=%d\n",
-                    my_client_id, sim_pid, render_pid);
                     // fail open: trust render_pid
                     sim_pid = render_pid;
                 }
