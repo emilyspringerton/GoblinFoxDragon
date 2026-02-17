@@ -70,6 +70,7 @@ int net_cmd_history_count = 0;
 int net_cmd_seq = 0;
 
 static int net_local_pid = -1;
+static int last_applied_scene_id = -999;
 
 void net_connect();
 void net_shutdown();
@@ -1039,7 +1040,10 @@ void net_process_snapshot(char *buffer, int len) {
         p->active = 1;
         p->scene_id = np->scene_id;
         p->x = np->x; p->y = np->y; p->z = np->z;
-        p->yaw = norm_yaw_deg(np->yaw); p->pitch = clamp_pitch_deg(np->pitch);
+        if (id != my_client_id) {
+            p->yaw   = norm_yaw_deg(np->yaw);
+            p->pitch = clamp_pitch_deg(np->pitch);
+        }
         p->health = np->health;
 
         int safe_weapon = np->current_weapon;
@@ -1064,7 +1068,10 @@ void net_process_snapshot(char *buffer, int len) {
     if (scene_id < 0) {
         scene_id = local_state.scene_id;
     }
-    client_apply_scene_id(scene_id, SDL_GetTicks());
+    if (scene_id != last_applied_scene_id && scene_id >= 0) {
+        last_applied_scene_id = scene_id;
+        client_apply_scene_id(scene_id, SDL_GetTicks());
+    }
 }
 
 
