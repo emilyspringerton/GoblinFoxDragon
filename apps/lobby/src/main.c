@@ -1083,15 +1083,28 @@ void net_tick() {
         }
         if (head->type == PACKET_WELCOME) {
             my_client_id = head->client_id;
+
+            // Server-assigned identity becomes our local simulation/render identity
+            net_local_pid = my_client_id;
+
             if (my_client_id > 0 && my_client_id < MAX_CLIENTS) {
-                local_state.players[my_client_id].active = 1;
-                local_state.players[my_client_id].scene_id = head->scene_id;
+                PlayerState *lp = &local_state.players[my_client_id];
+
+                // Pre-warm local slot so camera/render doesn't lag behind.
+                lp->active   = 1;
+                lp->scene_id = head->scene_id;
+
+        
                 if (head->scene_id >= 0) {
                     client_apply_scene_id(head->scene_id, SDL_GetTicks());
                 }
+            } else {
+                 // invalid id => disable local sim/render identity
+                net_local_pid = -1;
             }
+
             printf("✅ JOINED SERVER AS CLIENT ID: %d\n", my_client_id);
-        }
+    }
         len = recvfrom(sock, buffer, 4096, 0, (struct sockaddr*)&sender, &slen);
     }
 }
