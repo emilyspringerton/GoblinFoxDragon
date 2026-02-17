@@ -70,6 +70,7 @@ int net_cmd_history_count = 0;
 int net_cmd_seq = 0;
 
 static int net_local_pid = -1;
+static int net_cam_seeded = 0;
 static int last_applied_scene_id = -999;
 
 void net_connect();
@@ -1043,8 +1044,15 @@ void net_process_snapshot(char *buffer, int len) {
         if (id != my_client_id) {
             p->yaw   = norm_yaw_deg(np->yaw);
             p->pitch = clamp_pitch_deg(np->pitch);
+        } else if (!net_cam_seeded) {
+            p->yaw   = norm_yaw_deg(np->yaw);
+            p->pitch = clamp_pitch_deg(np->pitch);
         }
+
+        p->state = np->state;
         p->health = np->health;
+        p->shield = np->shield;
+        p->crouching = np->crouching;
 
         int safe_weapon = np->current_weapon;
         if (safe_weapon < 0 || safe_weapon >= MAX_WEAPONS) {
@@ -1059,6 +1067,28 @@ void net_process_snapshot(char *buffer, int len) {
         p->ammo[p->current_weapon] = np->ammo;
 
         if (p->is_shooting) p->recoil_anim = 1.0f;
+    }
+
+    if (!net_cam_seeded &&
+        my_client_id > 0 && my_client_id < MAX_CLIENTS &&
+        local_state.players[my_client_id].active) {
+        cam_yaw = local_state.players[my_client_id].yaw;
+        cam_pitch = local_state.players[my_client_id].pitch;
+        net_cam_seeded = 1;
+        printf("[NET] seeded camera: yaw=%.2f pitch=%.2f\n", cam_yaw, cam_pitch);
+        printf("[NET] SEED cam_yaw=%.2f cam_pitch=%.2f server_yaw=%.2f server_pitch=%.2f\n",
+               cam_yaw,
+               cam_pitch,
+               local_state.players[my_client_id].yaw,
+               local_state.players[my_client_id].pitch);
+    }
+
+    static unsigned int last_dbg = 0;
+    unsigned int now = SDL_GetTicks();
+    if (now - last_dbg > 1000 && my_client_id > 0 && my_client_id < MAX_CLIENTS) {
+        last_dbg = now;
+        printf("[NET] cid=%d cam_yaw=%.1f p.yaw=%.1f\n",
+               my_client_id, cam_yaw, local_state.players[my_client_id].yaw);
     }
 
     int render_id = (my_client_id > 0 && my_client_id < MAX_CLIENTS && local_state.players[my_client_id].active)
@@ -1095,6 +1125,8 @@ void net_tick() {
 
             // Server-assigned identity becomes our local simulation/render identity
             net_local_pid = my_client_id;
+            net_cam_seeded = 0;
+            last_applied_scene_id = -999;
 
             if (my_client_id > 0 && my_client_id < MAX_CLIENTS) {
                 PlayerState *lp = &local_state.players[my_client_id];
@@ -1104,7 +1136,8 @@ void net_tick() {
                 lp->scene_id = head->scene_id;
 
         
-                if (head->scene_id >= 0) {
+                if (head->scene_id >= 0 && head->scene_id != last_applied_scene_id) {
+                    last_applied_scene_id = head->scene_id;
                     client_apply_scene_id(head->scene_id, SDL_GetTicks());
                 }
             } else {
@@ -1112,6 +1145,7 @@ void net_tick() {
                 net_local_pid = -1;
             }
 
+            printf("[NET] WELCOME my_client_id=%d net_local_pid=%d\n", my_client_id, net_local_pid);
             printf("✅ JOINED SERVER AS CLIENT ID: %d\n", my_client_id);
     }
         len = recvfrom(sock, buffer, 4096, 0, (struct sockaddr*)&sender, &slen);
