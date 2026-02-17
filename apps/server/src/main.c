@@ -50,6 +50,8 @@ typedef struct {
 
 static RecorderState recorder = {0};
 
+#define SERVER_SNAPSHOT_INTERVAL_TICKS 3
+
 #define RECORDER_SHAKE_POS 0.08f
 #define RECORDER_SHAKE_ANGLE 0.35f
 #define RECORDER_SMOOTH_POS 0.08f
@@ -376,6 +378,7 @@ void server_broadcast() {
             NetPlayer np;
             np.id = (unsigned char)i;
             np.scene_id = (unsigned char)p->scene_id;
+            np.last_seq = client_last_seq[i];
             np.x = p->x; np.y = p->y; np.z = p->z;
             np.yaw = norm_yaw_deg(p->yaw); np.pitch = clamp_pitch_deg(p->pitch);
             np.current_weapon = (unsigned char)p->current_weapon;
@@ -537,7 +540,9 @@ int main(int argc, char *argv[]) {
 
         update_projectiles(now);
         recorder_write_frame(tick, now);
-        server_broadcast();
+        if ((tick % SERVER_SNAPSHOT_INTERVAL_TICKS) == 0) {
+            server_broadcast();
+        }
 
         int connected = 0;
         for (int i = 1; i < MAX_CLIENTS; i++) {
