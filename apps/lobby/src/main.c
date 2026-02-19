@@ -1246,9 +1246,12 @@ void net_process_snapshot(char *buffer, int len) {
         PlayerState *p = &local_state.players[id];
         p->active = 1;
         p->scene_id = np->scene_id;
-        p->x = np->x; p->y = np->y; p->z = np->z;
-        p->yaw   = norm_yaw_deg(np->yaw);
-        p->pitch = clamp_pitch_deg(np->pitch);
+
+        if (id != my_client_id) {
+            p->x = np->x; p->y = np->y; p->z = np->z;
+            p->yaw   = norm_yaw_deg(np->yaw);
+            p->pitch = clamp_pitch_deg(np->pitch);
+        }
 
         p->state = np->state;
         p->health = np->health;
