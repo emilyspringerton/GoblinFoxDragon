@@ -70,8 +70,8 @@ struct sockaddr_in server_addr;
 #define CLIENT_USERCMD_HZ 60
 #define CLIENT_USERCMD_INTERVAL_MS (1000 / CLIENT_USERCMD_HZ)
 #define CLIENT_RECON_HISTORY 256
-#define INTERP_DELAY_MS 100
-#define RECONCILE_SOFT_K 0.15f
+#define INTERP_DELAY_MS 220
+#define RECONCILE_DECAY_LAMBDA 10.0f
 #define RECONCILE_HARD_SNAP_DIST 2.0f
 #define RECONCILE_HARD_SNAP_YAW 45.0f
 UserCmd net_cmd_history[NET_CMD_HISTORY];
@@ -98,6 +98,9 @@ static float reconcile_corr_yaw = 0.0f;
 static float reconcile_corr_pitch = 0.0f;
 static int net_server_time_sync = 0;
 static int32_t net_server_time_offset_ms = 0;
+static uint32_t net_last_snapshot_server_ts = 0;
+static uint32_t net_last_reconciled_ack = 0;
+static uint32_t net_last_corr_decay_ms = 0;
 
 static int net_local_pid = -1;
 static int net_cam_seeded = 0;
@@ -122,6 +125,9 @@ static void reset_client_render_state_for_net() {
     reconcile_corr_pitch = 0.0f;
     net_server_time_sync = 0;
     net_server_time_offset_ms = 0;
+    net_last_snapshot_server_ts = 0;
+    net_last_reconciled_ack = 0;
+    net_last_corr_decay_ms = 0;
     net_last_cmd_send_ms = 0;
     travel_overlay_until_ms = 0;
     local_state.pending_scene = -1;
@@ -901,8 +907,17 @@ void draw_scene(PlayerState *render_p) {
     float cx = sinf(rad) * cam_z_off;
     float cz = cosf(rad) * cam_z_off;
     
+    float reconcile_x = 0.0f;
+    float reconcile_y = 0.0f;
+    float reconcile_z = 0.0f;
+    if (app_state == STATE_GAME_NET && my_client_id > 0 && my_client_id < MAX_CLIENTS && render_p == &local_state.players[my_client_id]) {
+        reconcile_x = reconcile_corr_x;
+        reconcile_y = reconcile_corr_y;
+        reconcile_z = reconcile_corr_z;
+    }
+
     glRotatef(-cam_pitch, 1, 0, 0); glRotatef(-cam_yaw, 0, 1, 0);
-    glTranslatef(-(render_p->x - cx), -(render_p->y + cam_y), -(render_p->z - cz));
+    glTranslatef(-((render_p->x + reconcile_x) - cx), -((render_p->y + reconcile_y) + cam_y), -((render_p->z + reconcile_z) - cz));
     
     draw_grid(); 
     update_and_draw_trails();
@@ -1085,25 +1100,42 @@ static float angle_lerp_deg(float a, float b, float t) {
     return norm_yaw_deg(a + d * t);
 }
 
-static void client_apply_pending_correction(PlayerState *p) {
-    if (!p) return;
-    p->x += reconcile_corr_x * RECONCILE_SOFT_K;
-    p->y += reconcile_corr_y * RECONCILE_SOFT_K;
-    p->z += reconcile_corr_z * RECONCILE_SOFT_K;
-    reconcile_corr_x *= (1.0f - RECONCILE_SOFT_K);
-    reconcile_corr_y *= (1.0f - RECONCILE_SOFT_K);
-    reconcile_corr_z *= (1.0f - RECONCILE_SOFT_K);
+static void client_decay_pending_correction(unsigned int now_ms) {
+    if (net_last_corr_decay_ms == 0) {
+        net_last_corr_decay_ms = now_ms;
+        return;
+    }
+    float dt = (float)(now_ms - net_last_corr_decay_ms) / 1000.0f;
+    if (dt < 0.0f) dt = 0.0f;
+    if (dt > 0.25f) dt = 0.25f;
+    net_last_corr_decay_ms = now_ms;
 
-    p->yaw = norm_yaw_deg(p->yaw + reconcile_corr_yaw * RECONCILE_SOFT_K);
-    p->pitch = clamp_pitch_deg(p->pitch + reconcile_corr_pitch * RECONCILE_SOFT_K);
-    reconcile_corr_yaw *= (1.0f - RECONCILE_SOFT_K);
-    reconcile_corr_pitch *= (1.0f - RECONCILE_SOFT_K);
+    float keep = expf(-RECONCILE_DECAY_LAMBDA * dt);
+    reconcile_corr_x *= keep;
+    reconcile_corr_y *= keep;
+    reconcile_corr_z *= keep;
+    reconcile_corr_yaw *= keep;
+    reconcile_corr_pitch *= keep;
+
+    if (fabsf(reconcile_corr_x) < 0.001f) reconcile_corr_x = 0.0f;
+    if (fabsf(reconcile_corr_y) < 0.001f) reconcile_corr_y = 0.0f;
+    if (fabsf(reconcile_corr_z) < 0.001f) reconcile_corr_z = 0.0f;
+    if (fabsf(reconcile_corr_yaw) < 0.01f) reconcile_corr_yaw = 0.0f;
+    if (fabsf(reconcile_corr_pitch) < 0.01f) reconcile_corr_pitch = 0.0f;
 }
 
 static void client_reconcile_local_player(unsigned int ack_seq, float auth_x, float auth_y, float auth_z, float auth_yaw, float auth_pitch) {
     if (my_client_id <= 0 || my_client_id >= MAX_CLIENTS) return;
+    if (ack_seq <= net_last_reconciled_ack) return;
+
     PlayerState *p = &local_state.players[my_client_id];
     if (!p->active) return;
+
+    float prev_x = p->x;
+    float prev_y = p->y;
+    float prev_z = p->z;
+    float prev_yaw = p->yaw;
+    float prev_pitch = p->pitch;
 
     p->x = auth_x; p->y = auth_y; p->z = auth_z;
     p->yaw = norm_yaw_deg(auth_yaw);
@@ -1117,29 +1149,30 @@ static void client_reconcile_local_player(unsigned int ack_seq, float auth_x, fl
         replayed++;
     }
 
-    float ex = auth_x - p->x;
-    float ey = auth_y - p->y;
-    float ez = auth_z - p->z;
+    float ex = prev_x - p->x;
+    float ey = prev_y - p->y;
+    float ez = prev_z - p->z;
     float pos_err = sqrtf(ex * ex + ey * ey + ez * ez);
-    float yaw_err = shortest_angle_delta_deg(p->yaw, auth_yaw);
-    float pitch_err = auth_pitch - p->pitch;
+    float yaw_err = shortest_angle_delta_deg(p->yaw, prev_yaw);
+    float pitch_err = prev_pitch - p->pitch;
 
     if (pos_err > RECONCILE_HARD_SNAP_DIST || fabsf(yaw_err) > RECONCILE_HARD_SNAP_YAW) {
-        p->x = auth_x; p->y = auth_y; p->z = auth_z;
-        p->yaw = norm_yaw_deg(auth_yaw);
-        p->pitch = clamp_pitch_deg(auth_pitch);
         reconcile_corr_x = 0.0f;
         reconcile_corr_y = 0.0f;
         reconcile_corr_z = 0.0f;
         reconcile_corr_yaw = 0.0f;
         reconcile_corr_pitch = 0.0f;
     } else {
+        if (p->on_ground && fabsf(ey) < 0.15f) {
+            ey = 0.0f;
+        }
         reconcile_corr_x += ex;
         reconcile_corr_y += ey;
         reconcile_corr_z += ez;
         reconcile_corr_yaw += yaw_err;
         reconcile_corr_pitch += pitch_err;
     }
+    net_last_reconciled_ack = ack_seq;
 
     static unsigned int last_recon_dbg = 0;
     unsigned int now = SDL_GetTicks();
@@ -1215,6 +1248,11 @@ void net_process_snapshot(char *buffer, int len) {
     if (len < (int)sizeof(NetHeader)) return;
     if (len < (int)sizeof(NetHeader) + 1) return;
     NetHeader *head = (NetHeader*)buffer;
+    if (net_last_snapshot_server_ts != 0 && head->timestamp <= net_last_snapshot_server_ts) {
+        return;
+    }
+    net_last_snapshot_server_ts = head->timestamp;
+
     int32_t target_offset = (int32_t)head->timestamp - (int32_t)SDL_GetTicks();
     if (!net_server_time_sync) {
         net_server_time_offset_ms = target_offset;
@@ -1589,8 +1627,8 @@ int main(int argc, char* argv[]) {
                         net_send_cmd(cmd);
                         net_last_cmd_send_ms = now_ms;
                     }
-                    client_apply_pending_correction(&local_state.players[net_local_pid]);
                 }
+                client_decay_pending_correction(SDL_GetTicks());
                 net_apply_remote_interpolation(SDL_GetTicks());
             } else {
                 local_state.players[0].in_use = use;
