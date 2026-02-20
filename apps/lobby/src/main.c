@@ -103,7 +103,10 @@ static uint32_t net_last_reconciled_ack = 0;
 static uint32_t net_last_corr_decay_ms = 0;
 
 static int net_local_pid = -1;
-static int net_cam_seeded = 0;
+static int net_spawn_protect_cmds = 0;
+static int net_have_spawn_state = 0;
+static unsigned char net_last_life_state = STATE_DEAD;
+static unsigned char net_last_scene_id = 255;
 static int last_applied_scene_id = -999;
 
 void net_connect();
@@ -129,6 +132,10 @@ static void reset_client_render_state_for_net() {
     net_last_reconciled_ack = 0;
     net_last_corr_decay_ms = 0;
     net_last_cmd_send_ms = 0;
+    net_spawn_protect_cmds = 0;
+    net_have_spawn_state = 0;
+    net_last_life_state = STATE_DEAD;
+    net_last_scene_id = 255;
     travel_overlay_until_ms = 0;
     local_state.pending_scene = -1;
     local_state.scene_id = SCENE_GARAGE_OSAKA;
@@ -1318,6 +1325,34 @@ void net_process_snapshot(char *buffer, int len) {
             local_auth_z = np->z;
             local_auth_yaw = np->yaw;
             local_auth_pitch = np->pitch;
+
+            int spawn_transition = (!net_have_spawn_state)
+                || (net_last_life_state != STATE_ALIVE && np->state == STATE_ALIVE)
+                || (net_last_scene_id != np->scene_id && np->state == STATE_ALIVE);
+            net_have_spawn_state = 1;
+            net_last_life_state = np->state;
+            net_last_scene_id = np->scene_id;
+
+            if (spawn_transition) {
+                cam_yaw = norm_yaw_deg(np->yaw);
+                cam_pitch = clamp_pitch_deg(np->pitch);
+
+                p->yaw = cam_yaw;
+                p->pitch = cam_pitch;
+
+                reconcile_corr_x = 0.0f;
+                reconcile_corr_y = 0.0f;
+                reconcile_corr_z = 0.0f;
+                reconcile_corr_yaw = 0.0f;
+                reconcile_corr_pitch = 0.0f;
+                memset(client_cmd_hist, 0, sizeof(client_cmd_hist));
+                memset(net_cmd_history, 0, sizeof(net_cmd_history));
+                net_cmd_history_count = 0;
+                net_latest_seq_sent = np->last_seq;
+                net_last_reconciled_ack = np->last_seq;
+                net_cmd_seq = (int)np->last_seq;
+                net_spawn_protect_cmds = 3;
+            }
         } else {
             RemoteInterp *ri = &rinterp[id];
             if (!ri->has_a) {
@@ -1339,15 +1374,6 @@ void net_process_snapshot(char *buffer, int len) {
 
     if (local_seen) {
         client_reconcile_local_player(local_ack_seq, local_auth_x, local_auth_y, local_auth_z, local_auth_yaw, local_auth_pitch);
-    }
-
-    if (!net_cam_seeded &&
-        my_client_id > 0 && my_client_id < MAX_CLIENTS &&
-        local_state.players[my_client_id].active) {
-        cam_yaw = local_state.players[my_client_id].yaw;
-        cam_pitch = local_state.players[my_client_id].pitch;
-        net_cam_seeded = 1;
-        printf("[NET] seeded camera: yaw=%.2f pitch=%.2f\n", cam_yaw, cam_pitch);
     }
 
     int render_id = (my_client_id > 0 && my_client_id < MAX_CLIENTS && local_state.players[my_client_id].active)
@@ -1393,7 +1419,10 @@ void net_tick() {
 
             // Server-assigned identity becomes our local simulation/render identity
             net_local_pid = my_client_id;
-            net_cam_seeded = 0;
+            net_spawn_protect_cmds = 0;
+            net_have_spawn_state = 0;
+            net_last_life_state = STATE_DEAD;
+            net_last_scene_id = 255;
             last_applied_scene_id = -999;
 
             if (my_client_id > 0 && my_client_id < MAX_CLIENTS) {
@@ -1559,6 +1588,7 @@ int main(int argc, char* argv[]) {
                     setup_lobby_2d();
                 }
                 if(e.type == SDL_MOUSEMOTION) {
+                    if (app_state == STATE_GAME_NET && net_spawn_protect_cmds > 0) continue;
                     float sens = (current_fov < 50.0f) ? 0.05f : 0.15f; 
                     cam_yaw -= e.motion.xrel * sens;
                     if(cam_yaw > 360) cam_yaw -= 360; if(cam_yaw < 0) cam_yaw += 360;
@@ -1616,7 +1646,7 @@ int main(int argc, char* argv[]) {
             current_fov += (target_fov - current_fov) * 0.2f;
             glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(current_fov, 1280.0/720.0, 0.1, Z_FAR); 
             glMatrixMode(GL_MODELVIEW);
-            if (app_state == STATE_GAME_NET) {\
+            if (app_state == STATE_GAME_NET) {
                 net_local_pid = (my_client_id > 0 && my_client_id < MAX_CLIENTS) ? my_client_id : -1;
                 net_tick();
                 if (net_local_pid > 0) {
@@ -1626,6 +1656,7 @@ int main(int argc, char* argv[]) {
                         client_apply_cmd_movement(&local_state.players[net_local_pid], &cmd, now_ms);
                         net_send_cmd(cmd);
                         net_last_cmd_send_ms = now_ms;
+                        if (net_spawn_protect_cmds > 0) net_spawn_protect_cmds--;
                     }
                 }
                 client_decay_pending_correction(SDL_GetTicks());
