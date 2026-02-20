@@ -504,18 +504,22 @@ int main(int argc, char *argv[]) {
                 if (p->vehicle_cooldown > 0) p->vehicle_cooldown--;
 
                 float rad = p->yaw * 3.14159f / 180.0f;
+                float fwd_x = sinf(rad);
+                float fwd_z = -cosf(rad);
+                float right_x = cosf(rad);
+                float right_z = sinf(rad);
                 float wish_x = 0, wish_z = 0;
                 float max_spd = MAX_SPEED;
                 float acc = ACCEL;
 
                 if (p->in_vehicle) {
-                    wish_x = sinf(rad) * p->in_fwd;
-                    wish_z = cosf(rad) * p->in_fwd;
+                    wish_x = fwd_x * p->in_fwd;
+                    wish_z = fwd_z * p->in_fwd;
                     max_spd = BUGGY_MAX_SPEED;
                     acc = BUGGY_ACCEL;
                 } else {
-                    wish_x = sinf(rad) * p->in_fwd + cosf(rad) * p->in_strafe;
-                    wish_z = cosf(rad) * p->in_fwd - sinf(rad) * p->in_strafe;
+                    wish_x = fwd_x * p->in_fwd + right_x * p->in_strafe;
+                    wish_z = fwd_z * p->in_fwd + right_z * p->in_strafe;
                 }
 
                 float wish_speed = sqrtf(wish_x*wish_x + wish_z*wish_z);
