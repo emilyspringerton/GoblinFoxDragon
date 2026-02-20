@@ -42,6 +42,11 @@ int my_client_id = -1;
 float cam_yaw = 0.0f;
 float cam_pitch = 0.0f;
 float current_fov = 75.0f;
+static unsigned int client_cmd_sequence = 0;
+static int net_spawn_protect_cmds = 0;
+static int net_have_spawn_state = 0;
+static unsigned char net_last_life_state = STATE_DEAD;
+static unsigned char net_last_scene_id = 255;
 
 #define Z_FAR 8000.0f
 
@@ -517,7 +522,7 @@ void net_init() {
 UserCmd client_create_cmd(float fwd, float str, float yaw, float pitch, int shoot, int jump, int crouch, int reload, int use, int wpn_idx) {
     UserCmd cmd;
     memset(&cmd, 0, sizeof(UserCmd));
-    static int seq = 0; cmd.sequence = ++seq; cmd.timestamp = SDL_GetTicks();
+    cmd.sequence = ++client_cmd_sequence; cmd.timestamp = SDL_GetTicks();
     cmd.yaw = yaw; cmd.pitch = pitch;
     cmd.fwd = fwd; cmd.str = str;
     if(shoot) cmd.buttons |= BTN_ATTACK; if(jump) cmd.buttons |= BTN_JUMP;
@@ -576,6 +581,8 @@ void net_process_snapshot(char *buffer, int len) {
             p->active = 1;
             p->x = np->x; p->y = np->y; p->z = np->z;
             p->yaw = np->yaw; p->pitch = np->pitch;
+            p->state = np->state;
+            p->scene_id = np->scene_id;
             p->health = np->health;
             p->current_weapon = np->current_weapon;
             p->is_shooting = np->is_shooting;
@@ -583,6 +590,24 @@ void net_process_snapshot(char *buffer, int len) {
 
             // --- SYNC HIT MARKER ---
             if (id == my_client_id) {
+                int spawn_transition = (!net_have_spawn_state)
+                    || (net_last_life_state != STATE_ALIVE && np->state == STATE_ALIVE)
+                    || (net_last_scene_id != np->scene_id && np->state == STATE_ALIVE);
+                net_have_spawn_state = 1;
+                net_last_life_state = np->state;
+                net_last_scene_id = np->scene_id;
+                if (spawn_transition) {
+                    cam_yaw = np->yaw;
+                    cam_pitch = np->pitch;
+                    if (cam_pitch > 89.0f) cam_pitch = 89.0f;
+                    if (cam_pitch < -89.0f) cam_pitch = -89.0f;
+                    local_state.players[0].yaw = cam_yaw;
+                    local_state.players[0].pitch = cam_pitch;
+                    local_state.players[0].state = np->state;
+                    local_state.players[0].scene_id = np->scene_id;
+                    client_cmd_sequence = np->last_seq;
+                    net_spawn_protect_cmds = 3;
+                }
                 if (np->hit_feedback > p->hit_feedback) p->hit_feedback = np->hit_feedback;
             } else {
                  p->hit_feedback = np->hit_feedback;
@@ -640,6 +665,11 @@ void net_tick() {
         }
         if (head->type == PACKET_WELCOME) {
             my_client_id = head->client_id;
+            client_cmd_sequence = 0;
+            net_spawn_protect_cmds = 0;
+            net_have_spawn_state = 0;
+            net_last_life_state = STATE_DEAD;
+            net_last_scene_id = 255;
             printf("✅ JOINED SERVER AS CLIENT ID: %d\n", my_client_id);
         }
         if (head->type == PACKET_VOXEL_DATA) {
@@ -717,6 +747,7 @@ int main(int argc, char* argv[]) {
                     glDisable(GL_DEPTH_TEST); glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720); glMatrixMode(GL_MODELVIEW);
                 }
                 if(e.type == SDL_MOUSEMOTION) {
+                    if (app_state == STATE_GAME_NET && net_spawn_protect_cmds > 0) continue;
                     float sens = (current_fov < 50.0f) ? 0.05f : 0.15f;
                     cam_yaw -= e.motion.xrel * sens;
                     if(cam_yaw > 360) cam_yaw -= 360; if(cam_yaw < 0) cam_yaw += 360;
@@ -756,10 +787,13 @@ int main(int argc, char* argv[]) {
             glMatrixMode(GL_PROJECTION); glLoadIdentity(); gluPerspective(current_fov, 1280.0/720.0, 0.1, Z_FAR);
             glMatrixMode(GL_MODELVIEW);
             if (app_state == STATE_GAME_NET) {
-                local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn_req, jump, crouch, reload, NULL, 0);
-                UserCmd cmd = client_create_cmd(fwd, str, cam_yaw, cam_pitch, shoot, jump, crouch, reload, use, wpn_req);
-                net_send_cmd(cmd);
                 net_tick();
+                float cmd_yaw = cam_yaw;
+                float cmd_pitch = cam_pitch;
+                local_update(fwd, str, cmd_yaw, cmd_pitch, shoot, wpn_req, jump, crouch, reload, NULL, 0);
+                UserCmd cmd = client_create_cmd(fwd, str, cmd_yaw, cmd_pitch, shoot, jump, crouch, reload, use, wpn_req);
+                net_send_cmd(cmd);
+                if (net_spawn_protect_cmds > 0) net_spawn_protect_cmds--;
             } else {
                 local_state.players[0].in_use = use;
                 if (use && local_state.players[0].vehicle_cooldown == 0) {
