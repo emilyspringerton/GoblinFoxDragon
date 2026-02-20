@@ -107,6 +107,7 @@ static int net_spawn_protect_cmds = 0;
 static int net_have_spawn_state = 0;
 static unsigned char net_last_life_state = STATE_DEAD;
 static unsigned char net_last_scene_id = 255;
+static unsigned char net_prev_is_shooting[MAX_CLIENTS];
 static int last_applied_scene_id = -999;
 
 void net_connect();
@@ -136,6 +137,7 @@ static void reset_client_render_state_for_net() {
     net_have_spawn_state = 0;
     net_last_life_state = STATE_DEAD;
     net_last_scene_id = 255;
+    memset(net_prev_is_shooting, 0, sizeof(net_prev_is_shooting));
     travel_overlay_until_ms = 0;
     local_state.pending_scene = -1;
     local_state.scene_id = SCENE_GARAGE_OSAKA;
@@ -1074,8 +1076,12 @@ static void client_apply_cmd_movement(PlayerState *p, const UserCmd *cmd, unsign
     }
 
     float rad = p->yaw * 3.14159f / 180.0f;
-    float wish_x = sinf(rad) * p->in_fwd + cosf(rad) * p->in_strafe;
-    float wish_z = cosf(rad) * p->in_fwd - sinf(rad) * p->in_strafe;
+    float fwd_x = sinf(rad);
+    float fwd_z = -cosf(rad);
+    float right_x = cosf(rad);
+    float right_z = sinf(rad);
+    float wish_x = fwd_x * p->in_fwd + right_x * p->in_strafe;
+    float wish_z = fwd_z * p->in_fwd + right_z * p->in_strafe;
     float wish_speed = sqrtf(wish_x * wish_x + wish_z * wish_z);
     if (wish_speed > 1.0f) {
         wish_x /= wish_speed;
@@ -1309,13 +1315,17 @@ void net_process_snapshot(char *buffer, int len) {
         }
         p->current_weapon = safe_weapon;
 
-        p->is_shooting = np->is_shooting;
+        unsigned char was_shooting = net_prev_is_shooting[id];
+        unsigned char now_shooting = np->is_shooting;
+        net_prev_is_shooting[id] = now_shooting;
+
+        p->is_shooting = now_shooting;
         p->in_vehicle = np->in_vehicle;
         p->storm_charges = np->storm_charges;
         p->hit_feedback = np->hit_feedback;
         p->ammo[p->current_weapon] = np->ammo;
 
-        if (p->is_shooting) p->recoil_anim = 1.0f;
+        if (now_shooting && !was_shooting) p->recoil_anim = 1.0f;
 
         if (id == my_client_id) {
             local_seen = 1;
@@ -1629,7 +1639,7 @@ int main(int argc, char* argv[]) {
         else {
             const Uint8 *k = SDL_GetKeyboardState(NULL);
             float fwd=0, str=0;
-            if(k[SDL_SCANCODE_W]) fwd-=1; if(k[SDL_SCANCODE_S]) fwd+=1;
+            if(k[SDL_SCANCODE_W]) fwd+=1; if(k[SDL_SCANCODE_S]) fwd-=1;
             if(k[SDL_SCANCODE_D]) str+=1; if(k[SDL_SCANCODE_A]) str-=1;
             int jump = k[SDL_SCANCODE_SPACE]; int crouch = k[SDL_SCANCODE_LCTRL];
             int shoot = (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT));

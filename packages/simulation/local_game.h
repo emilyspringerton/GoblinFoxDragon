@@ -244,8 +244,12 @@ void local_update(float fwd, float str, float yaw, float pitch, int shoot, int w
     p0->yaw = yaw; p0->pitch = pitch;
     if (weapon_req >= 0 && weapon_req < MAX_WEAPONS) p0->current_weapon = weapon_req;
     float rad = yaw * 3.14159f / 180.0f;
-    float wish_x = sinf(rad) * fwd + cosf(rad) * str;
-    float wish_z = cosf(rad) * fwd - sinf(rad) * str;
+    float fwd_x = sinf(rad);
+    float fwd_z = -cosf(rad);
+    float right_x = cosf(rad);
+    float right_z = sinf(rad);
+    float wish_x = fwd_x * fwd + right_x * str;
+    float wish_z = fwd_z * fwd + right_z * str;
     
     float wish_speed = sqrtf(wish_x*wish_x + wish_z*wish_z);
     if (wish_speed > 1.0f) { wish_speed = 1.0f; wish_x/=wish_speed; wish_z/=wish_speed; }
