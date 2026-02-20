@@ -29,6 +29,8 @@ unsigned int client_last_seq[MAX_CLIENTS];
 
 typedef struct {
     int active;
+    int welcomed;
+    int cmd_seen;
     struct sockaddr_in addr;
     double last_heard;
     int player_id;
@@ -89,18 +91,20 @@ static int alloc_slot(const struct sockaddr_in *addr) {
             memset(&local_state.players[i], 0, sizeof(PlayerState));
             local_state.players[i].id = i;
             local_state.players[i].scene_id = SCENE_GARAGE_OSAKA;
-            local_state.players[i].active = 1;
+            local_state.players[i].active = 0;
             phys_respawn(&local_state.players[i], get_server_time());
             local_state.players[i].yaw = 0.0f;
             local_state.players[i].pitch = 0.0f;
 
             slots[i].active = 1;
+            slots[i].welcomed = 0;
+            slots[i].cmd_seen = 0;
             slots[i].addr = *addr;
             slots[i].last_heard = now_seconds();
             slots[i].player_id = i;
 
             local_state.clients[i] = *addr;
-            local_state.client_meta[i].active = 1;
+            local_state.client_meta[i].active = 0;
             local_state.client_meta[i].last_heard_ms = get_server_time();
             client_last_seq[i] = 0;
 
@@ -113,6 +117,8 @@ static int alloc_slot(const struct sockaddr_in *addr) {
 static void free_slot(int slot) {
     if (slot <= 0 || slot >= MAX_CLIENTS) return;
     slots[slot].active = 0;
+    slots[slot].welcomed = 0;
+    slots[slot].cmd_seen = 0;
     memset(&slots[slot].addr, 0, sizeof(struct sockaddr_in));
     slots[slot].last_heard = 0.0;
     slots[slot].player_id = -1;
@@ -130,6 +136,9 @@ static void send_welcome(const struct sockaddr_in *addr, int client_id) {
     h.scene_id = (unsigned char)local_state.players[client_id].scene_id;
     sendto(sock, (char*)&h, sizeof(NetHeader), 0,
            (const struct sockaddr*)addr, sizeof(struct sockaddr_in));
+    if (client_id > 0 && client_id < MAX_CLIENTS) {
+        slots[client_id].welcomed = 1;
+    }
 }
 
 static int ensure_slot_for_sender(const struct sockaddr_in *sender) {
@@ -309,7 +318,11 @@ void process_user_cmd(int client_id, UserCmd *cmd) {
 void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
     if (size < (int)sizeof(NetHeader)) return;
     NetHeader *head = (NetHeader*)buffer;
-    int client_id = ensure_slot_for_sender(sender);
+    int client_id = -1;
+
+    if (head->type == PACKET_CONNECT || head->type == PACKET_USERCMD || head->type == PACKET_DISCONNECT) {
+        client_id = ensure_slot_for_sender(sender);
+    }
     if (client_id == -1) return;
 
     if (head->type == PACKET_CONNECT) {
@@ -350,7 +363,9 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
 
             slots[client_id].last_heard = now_seconds();
             local_state.client_meta[client_id].last_heard_ms = get_server_time();
-            local_state.players[client_id].active = 1;
+            slots[client_id].cmd_seen = 1;
+            local_state.players[client_id].active = slots[client_id].welcomed && slots[client_id].cmd_seen;
+            local_state.client_meta[client_id].active = local_state.players[client_id].active;
         }
     }
 }
@@ -366,7 +381,7 @@ void server_broadcast() {
     head.scene_id = 0;
 
     unsigned char count = 0;
-    for(int i=1; i<MAX_CLIENTS; i++) if (slots[i].active && local_state.players[i].active) count++;
+    for(int i=1; i<MAX_CLIENTS; i++) if (slots[i].active && slots[i].welcomed && slots[i].cmd_seen && local_state.players[i].active) count++;
     head.entity_count = count;
 
     memcpy(buffer + cursor, &head, sizeof(NetHeader)); cursor += (int)sizeof(NetHeader);
@@ -374,7 +389,7 @@ void server_broadcast() {
 
     for(int i=1; i<MAX_CLIENTS; i++) {
         PlayerState *p = &local_state.players[i];
-        if (slots[i].active && p->active) {
+        if (slots[i].active && slots[i].welcomed && slots[i].cmd_seen && p->active) {
             NetPlayer np;
             np.id = (unsigned char)i;
             np.scene_id = (unsigned char)p->scene_id;
@@ -524,8 +539,10 @@ int main(int argc, char *argv[]) {
 
                 float wish_speed = sqrtf(wish_x*wish_x + wish_z*wish_z);
                 if (wish_speed > 1.0f) {
+                    float wish_len = wish_speed;
+                    wish_x /= wish_len;
+                    wish_z /= wish_len;
                     wish_speed = 1.0f;
-                    wish_x/=wish_speed; wish_z/=wish_speed;
                 }
                 wish_speed *= max_spd;
 
@@ -550,10 +567,23 @@ int main(int argc, char *argv[]) {
 
         int connected = 0;
         for (int i = 1; i < MAX_CLIENTS; i++) {
-            if (slots[i].active) connected++;
+            if (slots[i].active && slots[i].welcomed && slots[i].cmd_seen && local_state.players[i].active) connected++;
         }
+        active_count = connected;
         
-        if (tick % 300 == 0) printf("[STATUS] Tick: %u | Clients: %d\n", tick, active_count);
+        if (tick % 60 == 0) {
+            printf("[STATUS] Tick: %u | Clients: %d\n", tick, active_count);
+            for (int i = 1; i < MAX_CLIENTS; i++) {
+                if (!slots[i].active && !slots[i].welcomed && !slots[i].cmd_seen) continue;
+                printf("  slot=%d active=%d welcomed=%d cmd_seen=%d player_active=%d last_heard_ms=%u\n",
+                    i,
+                    slots[i].active,
+                    slots[i].welcomed,
+                    slots[i].cmd_seen,
+                    local_state.players[i].active,
+                    local_state.client_meta[i].last_heard_ms);
+            }
+        }
 
         local_state.server_tick++;
 

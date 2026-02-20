@@ -1084,8 +1084,9 @@ static void client_apply_cmd_movement(PlayerState *p, const UserCmd *cmd, unsign
     float wish_z = fwd_z * p->in_fwd + right_z * p->in_strafe;
     float wish_speed = sqrtf(wish_x * wish_x + wish_z * wish_z);
     if (wish_speed > 1.0f) {
-        wish_x /= wish_speed;
-        wish_z /= wish_speed;
+        float wish_len = wish_speed;
+        wish_x /= wish_len;
+        wish_z /= wish_len;
         wish_speed = 1.0f;
     }
     wish_speed *= MAX_SPEED;
@@ -1258,6 +1259,9 @@ void net_send_cmd(UserCmd cmd) {
 }
 
 void net_process_snapshot(char *buffer, int len) {
+    if (my_client_id <= 0 || my_client_id >= MAX_CLIENTS) {
+        return;
+    }
     if (len < (int)sizeof(NetHeader)) return;
     if (len < (int)sizeof(NetHeader) + 1) return;
     NetHeader *head = (NetHeader*)buffer;
@@ -1281,6 +1285,8 @@ void net_process_snapshot(char *buffer, int len) {
     if (len < needed) return;
 
     int local_seen = 0;
+    unsigned char seen[MAX_CLIENTS];
+    memset(seen, 0, sizeof(seen));
     unsigned int local_ack_seq = 0;
     float local_auth_x = 0.0f, local_auth_y = 0.0f, local_auth_z = 0.0f;
     float local_auth_yaw = 0.0f, local_auth_pitch = 0.0f;
@@ -1293,6 +1299,7 @@ void net_process_snapshot(char *buffer, int len) {
 
         int id = np->id;
         if (id <= 0 || id >= MAX_CLIENTS) continue;
+        seen[id] = 1;
 
         PlayerState *p = &local_state.players[id];
         p->active = 1;
@@ -1384,6 +1391,17 @@ void net_process_snapshot(char *buffer, int len) {
 
     if (local_seen) {
         client_reconcile_local_player(local_ack_seq, local_auth_x, local_auth_y, local_auth_z, local_auth_yaw, local_auth_pitch);
+    }
+
+    for (int id = 1; id < MAX_CLIENTS; id++) {
+        if (id == my_client_id) continue;
+        if (!seen[id]) {
+            local_state.players[id].active = 0;
+            local_state.players[id].is_shooting = 0;
+            net_prev_is_shooting[id] = 0;
+            rinterp[id].has_a = 0;
+            rinterp[id].has_b = 0;
+        }
     }
 
     int render_id = (my_client_id > 0 && my_client_id < MAX_CLIENTS && local_state.players[my_client_id].active)
