@@ -46,3 +46,116 @@ jobs:
         run: |
           set -euo pipefail
           go test ./...
+
+  dragonfly_construct:
+    name: 🐉 Dragonfly Backend Construct
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Normalize merged layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -e apps ] && [ -d apps2 ]; then ln -s apps2 apps; fi
+          if [ ! -e packages ] && [ -d packages2 ]; then ln -s packages2 packages; fi
+          if [ ! -e docs ] && [ -d docs2 ]; then ln -s docs2 docs; fi
+
+          echo "Normalized layout:"
+          ls -al
+          test -e apps2 && echo "apps2 OK" || true
+          test -e packages2 && echo "packages2 OK" || true
+          test -e services && echo "services OK" || true
+          test -e docs2 && echo "docs2 OK" || true
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Go Tests (non-blocking for construct generation)
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test ./... || true
+
+      - name: Generate Dragonfly Manifest + Construct (scoped)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          MANIFEST="DRAGONFLY_MANIFEST.txt"
+          CONSTRUCT="DRAGONFLY_CONSTRUCT.txt"
+
+          echo "DRAGONFLY BACKEND MANIFEST ${{ github.run_number }}" > "$MANIFEST"
+          echo "commit: $GITHUB_SHA" >> "$MANIFEST"
+          echo "generated_utc: $(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> "$MANIFEST"
+          echo "" >> "$MANIFEST"
+
+          echo "DRAGONFLY BACKEND CONSTRUCT ${{ github.run_number }}" > "$CONSTRUCT"
+          echo "commit: $GITHUB_SHA" >> "$CONSTRUCT"
+          echo "" >> "$CONSTRUCT"
+
+          # Scoped roots only (avoid normal ShankPit construct explosion)
+          ROOTS=""
+          for d in apps2 packages2 services docs2; do
+            if [ -d "$d" ]; then ROOTS="$ROOTS $d"; fi
+          done
+
+          # Include top-level Go module files if present
+          EXTRAS=""
+          [ -f go.mod ] && EXTRAS="$EXTRAS go.mod"
+          [ -f go.sum ] && EXTRAS="$EXTRAS go.sum"
+
+          FILES=$(
+            {
+              for f in $EXTRAS; do
+                [ -f "$f" ] && echo "$f"
+              done
+
+              if [ -n "$ROOTS" ]; then
+                find $ROOTS -type f \
+                  \( -name "*.go" -o -name "*.mod" -o -name "*.sum" -o -name "*.md" -o -name "*.txt" -o -name "*.yaml" -o -name "*.yml" -o -name "*.json" \) \
+                  ! -path "*/.git/*" \
+                  ! -path "*/vendor/*" \
+                  ! -path "*/node_modules/*" \
+                  ! -path "*/artifacts/*" \
+                  ! -path "*/build/*"
+              fi
+            } | sort -u
+          )
+
+          echo "files:" >> "$MANIFEST"
+          COUNT=0
+          for file in $FILES; do
+            [ -f "$file" ] || continue
+            SHA=$(sha256sum "$file" | awk '{print $1}')
+            SIZE=$(wc -c < "$file" | tr -d ' ')
+            printf "%s  %s  %s\n" "$SHA" "$SIZE" "$file" >> "$MANIFEST"
+            COUNT=$((COUNT + 1))
+          done
+
+          echo "" >> "$MANIFEST"
+          echo "total_files: $COUNT" >> "$MANIFEST"
+
+          for file in $FILES; do
+            [ -f "$file" ] || continue
+            echo "--- FILE START: $file ---" >> "$CONSTRUCT"
+            cat "$file" >> "$CONSTRUCT"
+            echo "" >> "$CONSTRUCT"
+            echo "--- FILE END: $file ---" >> "$CONSTRUCT"
+            echo "" >> "$CONSTRUCT"
+          done
+
+          gzip -f "$CONSTRUCT"
+
+      - name: Upload Dragonfly Construct Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Dragonfly_Construct_${{ github.run_number }}_${{ github.sha }}
+          path: |
+            DRAGONFLY_MANIFEST.txt
+            DRAGONFLY_CONSTRUCT.txt.gz
