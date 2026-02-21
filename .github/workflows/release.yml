@@ -2,10 +2,10 @@ name: ShankPit Factory
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "main" ]
     tags: [ "v*" ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ "main" ]
   workflow_dispatch:
 
 concurrency:
@@ -182,3 +182,4 @@ jobs:
             ShankPit_Client_*.zip
             ShankPit_Bots_*.zip
             SHANKPIT_CONSTRUCT.txt
+
