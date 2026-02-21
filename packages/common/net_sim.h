@@ -12,6 +12,11 @@ void update_entity(PlayerState *p, float dt, void *server_context, unsigned int 
 static inline void shankpit_apply_usercmd_inputs(PlayerState *p, const UserCmd *cmd) {
     if (!p || !cmd) return;
 
+    // Net movement contract:
+    // 1) Raw command carries intent axes + control yaw/pitch.
+    // 2) Axes are clamped/normalized once here before simulation.
+    // 3) Client prediction/replay and server auth must both call this path.
+
     if (isfinite(cmd->yaw)) p->yaw = norm_yaw_deg(cmd->yaw);
     if (isfinite(cmd->pitch)) p->pitch = clamp_pitch_deg(cmd->pitch);
 
@@ -38,6 +43,12 @@ static inline void shankpit_apply_usercmd_inputs(PlayerState *p, const UserCmd *
 
 static inline void shankpit_simulate_movement_tick(PlayerState *p, unsigned int now_ms) {
     if (!p) return;
+
+    // Net movement contract:
+    // - Intent -> world-space wish conversion is shared (shankpit_move_wish_from_intent).
+    // - Simulation order and fixed dt (SHANKPIT_NET_FIXED_DT) must stay identical for
+    //   server authority and client prediction/replay.
+    // - Reconciliation should only correct transport drift, not hide sim mismatches.
 
     MoveIntent move_intent = {
         .forward = p->in_fwd,
