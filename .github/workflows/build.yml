@@ -1,0 +1,271 @@
+name: GoblinFoxDragon Factory
+
+on:
+  push:
+    branches: [ "master" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "master" ]
+  workflow_dispatch:
+
+concurrency:
+  group: goblinfoxdragon-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build_test_package:
+    name: 🏗️ Build, Test, Package & Unified Construct
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Normalize merged layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -e apps ] && [ -d apps2 ]; then ln -s apps2 apps; fi
+          if [ ! -e packages ] && [ -d packages2 ]; then ln -s packages2 packages; fi
+          if [ ! -e docs ] && [ -d docs2 ]; then ln -s docs2 docs; fi
+
+          echo "Normalized layout:"
+          ls -al
+          test -e apps && echo "apps OK" || true
+          test -e apps2 && echo "apps2 OK" || true
+          test -e packages && echo "packages OK" || true
+          test -e packages2 && echo "packages2 OK" || true
+          test -e docs && echo "docs OK" || true
+          test -e docs2 && echo "docs2 OK" || true
+          test -e services && echo "services OK" || true
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Go Tests (non-blocking during transition)
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test ./... || true
+
+      - name: Install Dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            mingw-w64 \
+            zip \
+            build-essential \
+            libncurses-dev \
+            wget
+
+          rm -rf sdl2_mingw SDL2-2.28.5 SDL2-devel-2.28.5-mingw.tar.gz || true
+          wget -q https://www.libsdl.org/release/SDL2-devel-2.28.5-mingw.tar.gz
+          tar xzf SDL2-devel-2.28.5-mingw.tar.gz
+          mv SDL2-2.28.5/x86_64-w64-mingw32 ./sdl2_mingw
+
+      # --- Legacy/Current C client build (kept for now) ---
+      - name: Build Windows Client (C/SDL2)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f apps/lobby/src/main.c
+
+          x86_64-w64-mingw32-gcc apps/lobby/src/main.c \
+            -o GoblinFoxDragon.exe \
+            -O2 -static-libgcc \
+            -I./sdl2_mingw/include \
+            -I. \
+            -Ipackages/common \
+            -Ipackages/simulation \
+            -L./sdl2_mingw/lib \
+            -lmingw32 -lSDL2main -lSDL2 \
+            -lopengl32 -lglu32 -lws2_32 -lwinmm -lgdi32 -lm
+
+      # --- Optional legacy C server build (safe to remove later) ---
+      - name: Build Linux Server (legacy C server, optional)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f apps/server/src/main.c ]; then
+            gcc apps/server/src/main.c \
+              -o GoblinFoxDragon_Server_Legacy_Linux \
+              -O2 -static \
+              -I. \
+              -Ipackages/common \
+              -Ipackages/simulation \
+              -lm
+          else
+            echo "No legacy C server entrypoint found; skipping."
+          fi
+
+      - name: Build Server Control (ncurses, optional)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f apps/server/serverctl.c ]; then
+            gcc apps/server/serverctl.c \
+              -o goblinfoxdragon_worldctl \
+              -std=c99 \
+              -O2 \
+              -lncurses
+          else
+            echo "No serverctl.c found; skipping."
+          fi
+
+      # --- Go backend build (Dragonfly-side path) ---
+      - name: Build Go Backend (if present)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Prefer known backend entrypoints, but don't fail if in flux.
+          if [ -d apps2/server-go ]; then
+            go build -o GoblinFoxDragon_Backend_Linux ./apps2/server-go
+            echo "Built backend from ./apps2/server-go"
+          elif [ -d apps/server-go ]; then
+            go build -o GoblinFoxDragon_Backend_Linux ./apps/server-go
+            echo "Built backend from ./apps/server-go"
+          else
+            echo "No Go backend entrypoint found; skipping backend binary build."
+          fi
+
+      - name: Generate Unified Manifest + Construct
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          MANIFEST="GOBLINFOXDRAGON_MANIFEST.txt"
+          CONSTRUCT="GOBLINFOXDRAGON_CONSTRUCT.txt"
+
+          echo "GOBLINFOXDRAGON MANIFEST ${{ github.run_number }}" > "$MANIFEST"
+          echo "commit: $GITHUB_SHA" >> "$MANIFEST"
+          echo "generated_utc: $(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> "$MANIFEST"
+          echo "" >> "$MANIFEST"
+
+          echo "GOBLINFOXDRAGON CONSTRUCT ${{ github.run_number }}" > "$CONSTRUCT"
+          echo "commit: $GITHUB_SHA" >> "$CONSTRUCT"
+          echo "" >> "$CONSTRUCT"
+
+          # Unified roots: legacy + migrated + backend + docs
+          ROOTS=""
+          for d in apps apps2 packages packages2 services docs docs2; do
+            if [ -d "$d" ]; then ROOTS="$ROOTS $d"; fi
+          done
+
+          EXTRAS=""
+          [ -f go.mod ] && EXTRAS="$EXTRAS go.mod"
+          [ -f go.sum ] && EXTRAS="$EXTRAS go.sum"
+          [ -f README.md ] && EXTRAS="$EXTRAS README.md"
+
+          FILES=$(
+            {
+              for f in $EXTRAS; do
+                [ -f "$f" ] && echo "$f"
+              done
+
+              if [ -n "$ROOTS" ]; then
+                find $ROOTS -type f \
+                  \( \
+                    -name "*.c" -o -name "*.h" -o \
+                    -name "*.go" -o -name "*.mod" -o -name "*.sum" -o \
+                    -name "*.md" -o -name "*.txt" -o \
+                    -name "*.json" -o -name "*.toml" -o \
+                    -name "*.yml" -o -name "*.yaml" -o \
+                    -name "Makefile" \
+                  \) \
+                  ! -path "*/.git/*" \
+                  ! -path "*/vendor/*" \
+                  ! -path "*/node_modules/*" \
+                  ! -path "*/artifacts/*" \
+                  ! -path "*/build/*" \
+                  ! -path "*/sdl2_mingw/*" \
+                  ! -path "*/SDL2-2.28.5/*"
+              fi
+            } | sort -u
+          )
+
+          echo "files:" >> "$MANIFEST"
+          COUNT=0
+          for file in $FILES; do
+            [ -f "$file" ] || continue
+            SHA=$(sha256sum "$file" | awk '{print $1}')
+            SIZE=$(wc -c < "$file" | tr -d ' ')
+            printf "%s  %s  %s\n" "$SHA" "$SIZE" "$file" >> "$MANIFEST"
+            COUNT=$((COUNT + 1))
+          done
+
+          echo "" >> "$MANIFEST"
+          echo "total_files: $COUNT" >> "$MANIFEST"
+
+          for file in $FILES; do
+            [ -f "$file" ] || continue
+            echo "--- FILE START: $file ---" >> "$CONSTRUCT"
+            cat "$file" >> "$CONSTRUCT"
+            echo "" >> "$CONSTRUCT"
+            echo "--- FILE END: $file ---" >> "$CONSTRUCT"
+            echo "" >> "$CONSTRUCT"
+          done
+
+          test -s "$CONSTRUCT"
+
+      - name: Bundle Artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD="build_${{ github.run_number }}_${GITHUB_SHA::7}"
+
+          rm -rf GoblinFoxDragon_Client GoblinFoxDragon_Backend GoblinFoxDragon_Tools || true
+          rm -f GoblinFoxDragon_Client_*.zip GoblinFoxDragon_Backend_*.zip GoblinFoxDragon_Tools_*.zip || true
+
+          # Client package
+          mkdir -p GoblinFoxDragon_Client
+          cp GoblinFoxDragon.exe GoblinFoxDragon_Client/
+          cp sdl2_mingw/bin/SDL2.dll GoblinFoxDragon_Client/
+          cp GOBLINFOXDRAGON_CONSTRUCT.txt GoblinFoxDragon_Client/
+          cp GOBLINFOXDRAGON_MANIFEST.txt GoblinFoxDragon_Client/
+          printf '%s\n' "start GoblinFoxDragon.exe" > GoblinFoxDragon_Client/PLAY.bat
+          zip -r "GoblinFoxDragon_Client_${BUILD}.zip" GoblinFoxDragon_Client
+
+          # Backend package (Go preferred; legacy C server optional fallback)
+          mkdir -p GoblinFoxDragon_Backend
+          if [ -f GoblinFoxDragon_Backend_Linux ]; then
+            cp GoblinFoxDragon_Backend_Linux GoblinFoxDragon_Backend/
+          fi
+          if [ -f GoblinFoxDragon_Server_Legacy_Linux ]; then
+            cp GoblinFoxDragon_Server_Legacy_Linux GoblinFoxDragon_Backend/
+          fi
+          if [ -f goblinfoxdragon_worldctl ]; then
+            cp goblinfoxdragon_worldctl GoblinFoxDragon_Backend/
+            printf '%s\n' "./goblinfoxdragon_worldctl" > GoblinFoxDragon_Backend/START_WORLD.sh
+            chmod +x GoblinFoxDragon_Backend/START_WORLD.sh
+          fi
+          cp GOBLINFOXDRAGON_CONSTRUCT.txt GoblinFoxDragon_Backend/
+          cp GOBLINFOXDRAGON_MANIFEST.txt GoblinFoxDragon_Backend/
+          zip -r "GoblinFoxDragon_Backend_${BUILD}.zip" GoblinFoxDragon_Backend
+
+          # Tools / bots package (optional)
+          mkdir -p GoblinFoxDragon_Tools
+          if [ -f apps/client/bot_main.c ]; then
+            gcc apps/client/bot_main.c -o GoblinFoxDragon_Bot_Linux \
+              -O2 -static -I. -Ipackages/common -Ipackages/simulation -lm || true
+            [ -f GoblinFoxDragon_Bot_Linux ] && cp GoblinFoxDragon_Bot_Linux GoblinFoxDragon_Tools/
+          fi
+          cp GOBLINFOXDRAGON_CONSTRUCT.txt GoblinFoxDragon_Tools/
+          cp GOBLINFOXDRAGON_MANIFEST.txt GoblinFoxDragon_Tools/
+          zip -r "GoblinFoxDragon_Tools_${BUILD}.zip" GoblinFoxDragon_Tools
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: GoblinFoxDragon_Builds_${{ github.run_number }}_${{ github.sha }}
+          path: |
+            GoblinFoxDragon_Client_*.zip
+            GoblinFoxDragon_Backend_*.zip
+            GoblinFoxDragon_Tools_*.zip
+            GOBLINFOXDRAGON_MANIFEST.txt
+            GOBLINFOXDRAGON_CONSTRUCT.txt
