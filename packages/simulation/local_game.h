@@ -3,6 +3,7 @@
 
 #include "../common/protocol.h"
 #include "../common/physics.h"
+#include "../common/shared_movement.h"
 #include <string.h>
 
 ServerState local_state;
@@ -243,18 +244,15 @@ void local_update(float fwd, float str, float yaw, float pitch, int shoot, int w
     }
     p0->yaw = yaw; p0->pitch = pitch;
     if (weapon_req >= 0 && weapon_req < MAX_WEAPONS) p0->current_weapon = weapon_req;
-    float rad = yaw * 3.14159f / 180.0f;
-    float fwd_x = sinf(rad);
-    float fwd_z = -cosf(rad);
-    float right_x = cosf(rad);
-    float right_z = sinf(rad);
-    float wish_x = fwd_x * fwd + right_x * str;
-    float wish_z = fwd_z * fwd + right_z * str;
-    
-    float wish_speed = sqrtf(wish_x*wish_x + wish_z*wish_z);
-    if (wish_speed > 1.0f) { wish_speed = 1.0f; wish_x/=wish_speed; wish_z/=wish_speed; }
-    wish_speed *= MAX_SPEED;
-    accelerate(p0, wish_x, wish_z, wish_speed, ACCEL);
+    MoveIntent move_intent = {
+        .forward = fwd,
+        .strafe = str,
+        .control_yaw_deg = yaw,
+        .wants_jump = jump,
+        .wants_sprint = 0
+    };
+    MoveWish move_wish = shankpit_move_wish_from_intent(move_intent);
+    accelerate(p0, move_wish.dir_x, move_wish.dir_z, move_wish.magnitude * MAX_SPEED, ACCEL);
     
     int fresh_jump_press = (jump && !was_holding_jump);
     // --- PHASE 485: TUNED SLIDE JUMP ---

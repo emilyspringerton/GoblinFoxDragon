@@ -19,6 +19,7 @@
 
 #include "../../../packages/common/protocol.h"
 #include "../../../packages/common/physics.h"
+#include "../../../packages/common/shared_movement.h"
 #include "../../../packages/simulation/local_game.h"
 #include "server_mode.h"
 #include "server_state.h"
@@ -523,35 +524,20 @@ int main(int argc, char *argv[]) {
                 p->use_was_down = p->in_use;
                 if (p->vehicle_cooldown > 0) p->vehicle_cooldown--;
 
-                float rad = p->yaw * 3.14159f / 180.0f;
-                float fwd_x = sinf(rad);
-                float fwd_z = -cosf(rad);
-                float right_x = cosf(rad);
-                float right_z = sinf(rad);
-                float wish_x = 0, wish_z = 0;
-                float max_spd = MAX_SPEED;
-                float acc = ACCEL;
+                MoveIntent move_intent = {
+                    .forward = p->in_fwd,
+                    .strafe = p->in_vehicle ? 0.0f : p->in_strafe,
+                    .control_yaw_deg = p->yaw,
+                    .wants_jump = p->in_jump,
+                    .wants_sprint = 0
+                };
+                MoveWish move_wish = shankpit_move_wish_from_intent(move_intent);
 
-                if (p->in_vehicle) {
-                    wish_x = fwd_x * p->in_fwd;
-                    wish_z = fwd_z * p->in_fwd;
-                    max_spd = BUGGY_MAX_SPEED;
-                    acc = BUGGY_ACCEL;
-                } else {
-                    wish_x = fwd_x * p->in_fwd + right_x * p->in_strafe;
-                    wish_z = fwd_z * p->in_fwd + right_z * p->in_strafe;
-                }
+                float max_spd = p->in_vehicle ? BUGGY_MAX_SPEED : MAX_SPEED;
+                float acc = p->in_vehicle ? BUGGY_ACCEL : ACCEL;
+                float wish_speed = move_wish.magnitude * max_spd;
 
-                float wish_speed = sqrtf(wish_x*wish_x + wish_z*wish_z);
-                if (wish_speed > 1.0f) {
-                    float wish_len = wish_speed;
-                    wish_x /= wish_len;
-                    wish_z /= wish_len;
-                    wish_speed = 1.0f;
-                }
-                wish_speed *= max_spd;
-
-                accelerate(p, wish_x, wish_z, wish_speed, acc);
+                accelerate(p, move_wish.dir_x, move_wish.dir_z, wish_speed, acc);
 
                 float g = p->in_vehicle ? BUGGY_GRAVITY : (p->in_jump ? GRAVITY_FLOAT : GRAVITY_DROP);
                 p->vy -= g;
