@@ -107,6 +107,7 @@ static uint32_t net_last_corr_decay_ms = 0;
 static int net_local_pid = -1;
 static int net_spawn_protect_cmds = 0;
 static int net_have_spawn_state = 0;
+static int net_have_initial_local_snapshot_sync = 0;
 static unsigned char net_last_life_state = STATE_DEAD;
 static unsigned char net_last_scene_id = 255;
 static unsigned char net_prev_is_shooting[MAX_CLIENTS];
@@ -114,6 +115,91 @@ static int last_applied_scene_id = -999;
 
 #ifndef NET_PARITY_DEBUG
 #define NET_PARITY_DEBUG 0
+#endif
+
+#ifndef NET_JITTER_DIAG
+#define NET_JITTER_DIAG 0
+#endif
+
+#if NET_JITTER_DIAG
+typedef struct {
+    unsigned int window_start_ms;
+    unsigned int interp_t_clamp_zero;
+    unsigned int interp_t_clamp_one;
+    unsigned int interp_missing_pair;
+    unsigned int interp_bad_timestamp;
+    int32_t offset_last_ms;
+    int32_t offset_delta_abs_max_ms;
+    int32_t render_to_latest_snapshot_delta_ms;
+} NetInterpDiagStats;
+
+typedef struct {
+    unsigned int window_start_ms;
+    unsigned int sample_count;
+    float corr_sum;
+    float corr_max;
+    float yaw_corr_sum;
+    float yaw_corr_max;
+    unsigned int replay_sum;
+    unsigned int replay_max;
+    unsigned int last_ack;
+    unsigned int last_latest;
+} NetReconcileDiagStats;
+
+static NetInterpDiagStats net_interp_diag;
+static NetReconcileDiagStats net_reconcile_diag;
+
+static void net_interp_diag_emit(unsigned int now_ms) {
+    if (net_interp_diag.window_start_ms == 0) {
+        net_interp_diag.window_start_ms = now_ms;
+        net_interp_diag.offset_last_ms = net_server_time_offset_ms;
+        return;
+    }
+    if (now_ms - net_interp_diag.window_start_ms < 1000) return;
+    printf("[NET_DIAG_INTERP] t0=%u t1=%u missing_ab=%u bad_ts=%u offset_ms=%d offset_delta_max=%d render_vs_latest_snapshot_ms=%d\n",
+           net_interp_diag.interp_t_clamp_zero,
+           net_interp_diag.interp_t_clamp_one,
+           net_interp_diag.interp_missing_pair,
+           net_interp_diag.interp_bad_timestamp,
+           net_server_time_offset_ms,
+           net_interp_diag.offset_delta_abs_max_ms,
+           net_interp_diag.render_to_latest_snapshot_delta_ms);
+    memset(&net_interp_diag, 0, sizeof(net_interp_diag));
+    net_interp_diag.window_start_ms = now_ms;
+    net_interp_diag.offset_last_ms = net_server_time_offset_ms;
+}
+
+static void net_reconcile_diag_emit(unsigned int now_ms) {
+    if (net_reconcile_diag.window_start_ms == 0) {
+        net_reconcile_diag.window_start_ms = now_ms;
+        return;
+    }
+    if (now_ms - net_reconcile_diag.window_start_ms < 1000) return;
+
+    float corr_avg = net_reconcile_diag.sample_count > 0
+        ? (net_reconcile_diag.corr_sum / (float)net_reconcile_diag.sample_count)
+        : 0.0f;
+    float yaw_avg = net_reconcile_diag.sample_count > 0
+        ? (net_reconcile_diag.yaw_corr_sum / (float)net_reconcile_diag.sample_count)
+        : 0.0f;
+    float replay_avg = net_reconcile_diag.sample_count > 0
+        ? ((float)net_reconcile_diag.replay_sum / (float)net_reconcile_diag.sample_count)
+        : 0.0f;
+
+    printf("[NET_DIAG_RECON] ack=%u latest=%u samples=%u corr_avg=%.4f corr_max=%.4f yaw_avg=%.3f yaw_max=%.3f replay_avg=%.2f replay_max=%u\n",
+           net_reconcile_diag.last_ack,
+           net_reconcile_diag.last_latest,
+           net_reconcile_diag.sample_count,
+           corr_avg,
+           net_reconcile_diag.corr_max,
+           yaw_avg,
+           net_reconcile_diag.yaw_corr_max,
+           replay_avg,
+           net_reconcile_diag.replay_max);
+
+    memset(&net_reconcile_diag, 0, sizeof(net_reconcile_diag));
+    net_reconcile_diag.window_start_ms = now_ms;
+}
 #endif
 
 #if NET_PARITY_DEBUG
@@ -196,6 +282,7 @@ static void reset_client_render_state_for_net() {
     net_last_cmd_send_ms = 0;
     net_spawn_protect_cmds = 0;
     net_have_spawn_state = 0;
+    net_have_initial_local_snapshot_sync = 0;
     net_last_life_state = STATE_DEAD;
     net_last_scene_id = 255;
     memset(net_prev_is_shooting, 0, sizeof(net_prev_is_shooting));
@@ -204,6 +291,47 @@ static void reset_client_render_state_for_net() {
     local_state.scene_id = SCENE_GARAGE_OSAKA;
     phys_set_scene(local_state.scene_id);
     local_state.players[0].scene_id = local_state.scene_id;
+}
+
+static void client_apply_spawn_transition_sync(PlayerState *p, const NetPlayer *np, const char *reason_tag) {
+    if (!p || !np) return;
+
+    cam_yaw = norm_yaw_deg(np->yaw);
+    cam_pitch = clamp_pitch_deg(np->pitch);
+
+    p->x = np->x;
+    p->y = np->y;
+    p->z = np->z;
+    p->yaw = cam_yaw;
+    p->pitch = cam_pitch;
+
+    reconcile_corr_x = 0.0f;
+    reconcile_corr_y = 0.0f;
+    reconcile_corr_z = 0.0f;
+    reconcile_corr_yaw = 0.0f;
+    reconcile_corr_pitch = 0.0f;
+    memset(client_cmd_hist, 0, sizeof(client_cmd_hist));
+    memset(net_cmd_history, 0, sizeof(net_cmd_history));
+    net_cmd_history_count = 0;
+    net_latest_seq_sent = np->last_seq;
+    net_last_reconciled_ack = np->last_seq;
+    net_cmd_seq = (int)np->last_seq;
+    net_spawn_protect_cmds = 3;
+
+    if (!net_have_initial_local_snapshot_sync) {
+        net_have_initial_local_snapshot_sync = 1;
+    }
+
+#if NET_JITTER_DIAG
+    printf("[NET_DIAG_SPAWN_SYNC] reason=%s scene=%u ack=%u yaw=%.2f pitch=%.2f\n",
+           reason_tag ? reason_tag : "unknown",
+           (unsigned int)np->scene_id,
+           np->last_seq,
+           cam_yaw,
+           cam_pitch);
+#else
+    (void)reason_tag;
+#endif
 }
 
 void draw_string(const char* str, float x, float y, float size) {
@@ -1225,6 +1353,23 @@ static void client_reconcile_local_player(unsigned int ack_seq, float auth_x, fl
         printf("[NET] reconcile err=%.3f replayed=%d ack=%u latest=%u\n", pos_err, replayed, ack_seq, net_latest_seq_sent);
     }
 
+#if NET_JITTER_DIAG
+    if (net_reconcile_diag.window_start_ms == 0) {
+        net_reconcile_diag.window_start_ms = now;
+    }
+    net_reconcile_diag.sample_count++;
+    net_reconcile_diag.corr_sum += pos_err;
+    if (pos_err > net_reconcile_diag.corr_max) net_reconcile_diag.corr_max = pos_err;
+    float abs_yaw_err = fabsf(yaw_err);
+    net_reconcile_diag.yaw_corr_sum += abs_yaw_err;
+    if (abs_yaw_err > net_reconcile_diag.yaw_corr_max) net_reconcile_diag.yaw_corr_max = abs_yaw_err;
+    net_reconcile_diag.replay_sum += (unsigned int)replayed;
+    if ((unsigned int)replayed > net_reconcile_diag.replay_max) net_reconcile_diag.replay_max = (unsigned int)replayed;
+    net_reconcile_diag.last_ack = ack_seq;
+    net_reconcile_diag.last_latest = net_latest_seq_sent;
+    net_reconcile_diag_emit(now);
+#endif
+
 #if NET_PARITY_DEBUG
     float pos_err_2d = sqrtf(ex * ex + ez * ez);
     float dvx = p->vx - prev_vx;
@@ -1252,6 +1397,21 @@ static void client_reconcile_local_player(unsigned int ack_seq, float auth_x, fl
 static void net_apply_remote_interpolation(unsigned int now_ms) {
     int32_t synced_now = (int32_t)now_ms + net_server_time_offset_ms;
     uint32_t render_ts = (synced_now > (int32_t)INTERP_DELAY_MS) ? (uint32_t)(synced_now - (int32_t)INTERP_DELAY_MS) : 0;
+
+#if NET_JITTER_DIAG
+    if (net_interp_diag.window_start_ms == 0) {
+        net_interp_diag.window_start_ms = now_ms;
+        net_interp_diag.offset_last_ms = net_server_time_offset_ms;
+    }
+    int32_t offset_delta = net_server_time_offset_ms - net_interp_diag.offset_last_ms;
+    int32_t offset_delta_abs = offset_delta < 0 ? -offset_delta : offset_delta;
+    if (offset_delta_abs > net_interp_diag.offset_delta_abs_max_ms) {
+        net_interp_diag.offset_delta_abs_max_ms = offset_delta_abs;
+    }
+    net_interp_diag.offset_last_ms = net_server_time_offset_ms;
+    net_interp_diag.render_to_latest_snapshot_delta_ms = (int32_t)render_ts - (int32_t)net_last_snapshot_server_ts;
+#endif
+
     for (int i = 1; i < MAX_CLIENTS; i++) {
         if (i == my_client_id) continue;
         RemoteInterp *ri = &rinterp[i];
@@ -1261,6 +1421,9 @@ static void net_apply_remote_interpolation(unsigned int now_ms) {
         if (!p->active) continue;
 
         if (!ri->has_b || ri->b_time_ms <= ri->a_time_ms) {
+#if NET_JITTER_DIAG
+            net_interp_diag.interp_missing_pair++;
+#endif
             p->x = ri->a.x; p->y = ri->a.y; p->z = ri->a.z;
             p->yaw = norm_yaw_deg(ri->a.yaw); p->pitch = clamp_pitch_deg(ri->a.pitch);
             continue;
@@ -1269,13 +1432,26 @@ static void net_apply_remote_interpolation(unsigned int now_ms) {
         float num = (float)((int)render_ts - (int)ri->a_time_ms);
         float den = (float)((int)ri->b_time_ms - (int)ri->a_time_ms);
         if (den <= 0.0f) {
+#if NET_JITTER_DIAG
+            net_interp_diag.interp_bad_timestamp++;
+#endif
             p->x = ri->b.x; p->y = ri->b.y; p->z = ri->b.z;
             p->yaw = norm_yaw_deg(ri->b.yaw); p->pitch = clamp_pitch_deg(ri->b.pitch);
             continue;
         }
         float t = num / den;
-        if (t < 0.0f) t = 0.0f;
-        if (t > 1.0f) t = 1.0f;
+        if (t < 0.0f) {
+#if NET_JITTER_DIAG
+            net_interp_diag.interp_t_clamp_zero++;
+#endif
+            t = 0.0f;
+        }
+        if (t > 1.0f) {
+#if NET_JITTER_DIAG
+            net_interp_diag.interp_t_clamp_one++;
+#endif
+            t = 1.0f;
+        }
 
         p->x = ri->a.x + (ri->b.x - ri->a.x) * t;
         p->y = ri->a.y + (ri->b.y - ri->a.y) * t;
@@ -1283,6 +1459,10 @@ static void net_apply_remote_interpolation(unsigned int now_ms) {
         p->yaw = angle_lerp_deg(ri->a.yaw, ri->b.yaw, t);
         p->pitch = clamp_pitch_deg(ri->a.pitch + (ri->b.pitch - ri->a.pitch) * t);
     }
+
+#if NET_JITTER_DIAG
+    net_interp_diag_emit(now_ms);
+#endif
 }
 
 void net_send_cmd(UserCmd cmd) {
@@ -1319,6 +1499,9 @@ void net_process_snapshot(char *buffer, int len) {
     if (len < (int)sizeof(NetHeader) + 1) return;
     NetHeader *head = (NetHeader*)buffer;
     if (net_last_snapshot_server_ts != 0 && head->timestamp <= net_last_snapshot_server_ts) {
+#if NET_JITTER_DIAG
+        net_interp_diag.interp_bad_timestamp++;
+#endif
         return;
     }
     net_last_snapshot_server_ts = head->timestamp;
@@ -1396,6 +1579,8 @@ void net_process_snapshot(char *buffer, int len) {
             local_auth_yaw = np->yaw;
             local_auth_pitch = np->pitch;
 
+            int first_local_snapshot_sync = !net_have_initial_local_snapshot_sync;
+
             int spawn_transition = (!net_have_spawn_state)
                 || (net_last_life_state != STATE_ALIVE && np->state == STATE_ALIVE)
                 || (net_last_scene_id != np->scene_id && np->state == STATE_ALIVE);
@@ -1403,25 +1588,15 @@ void net_process_snapshot(char *buffer, int len) {
             net_last_life_state = np->state;
             net_last_scene_id = np->scene_id;
 
+            if (first_local_snapshot_sync) {
+                spawn_transition = 1;
+            }
+
             if (spawn_transition) {
-                cam_yaw = norm_yaw_deg(np->yaw);
-                cam_pitch = clamp_pitch_deg(np->pitch);
-
-                p->yaw = cam_yaw;
-                p->pitch = cam_pitch;
-
-                reconcile_corr_x = 0.0f;
-                reconcile_corr_y = 0.0f;
-                reconcile_corr_z = 0.0f;
-                reconcile_corr_yaw = 0.0f;
-                reconcile_corr_pitch = 0.0f;
-                memset(client_cmd_hist, 0, sizeof(client_cmd_hist));
-                memset(net_cmd_history, 0, sizeof(net_cmd_history));
-                net_cmd_history_count = 0;
-                net_latest_seq_sent = np->last_seq;
-                net_last_reconciled_ack = np->last_seq;
-                net_cmd_seq = (int)np->last_seq;
-                net_spawn_protect_cmds = 3;
+                const char *reason = first_local_snapshot_sync
+                    ? "initial_local_snapshot"
+                    : "spawn_transition";
+                client_apply_spawn_transition_sync(p, np, reason);
             }
         } else {
             RemoteInterp *ri = &rinterp[id];
@@ -1502,6 +1677,7 @@ void net_tick() {
             net_local_pid = my_client_id;
             net_spawn_protect_cmds = 0;
             net_have_spawn_state = 0;
+            net_have_initial_local_snapshot_sync = 0;
             net_last_life_state = STATE_DEAD;
             net_last_scene_id = 255;
             last_applied_scene_id = -999;
@@ -1509,9 +1685,9 @@ void net_tick() {
             if (my_client_id > 0 && my_client_id < MAX_CLIENTS) {
                 PlayerState *lp = &local_state.players[my_client_id];
 
-                // Pre-warm local slot so camera/render doesn't lag behind.
-                lp->active   = 1;
+                // Pre-warm local slot data, but keep it inactive until first authoritative local snapshot sync.
                 lp->scene_id = head->scene_id;
+                lp->active = 0;
 
         
                 if (head->scene_id >= 0 && head->scene_id != last_applied_scene_id) {
@@ -1735,7 +1911,7 @@ int main(int argc, char* argv[]) {
             if (app_state == STATE_GAME_NET) {
                 net_local_pid = (my_client_id > 0 && my_client_id < MAX_CLIENTS) ? my_client_id : -1;
                 net_tick();
-                if (net_local_pid > 0) {
+                if (net_local_pid > 0 && net_have_initial_local_snapshot_sync) {
                     unsigned int now_ms = SDL_GetTicks();
                     if (now_ms - net_last_cmd_send_ms >= CLIENT_USERCMD_INTERVAL_MS) {
                         UserCmd cmd = client_create_cmd(fwd, str, cam_yaw, cam_pitch, shoot, jump, crouch, reload, use, ability, wpn_req);
@@ -1797,6 +1973,10 @@ int main(int argc, char* argv[]) {
                 }
             }
             PlayerState *render_p = &local_state.players[render_pid];
+            if (app_state == STATE_GAME_NET && !net_have_initial_local_snapshot_sync) {
+                render_pid = 0;
+                render_p = &local_state.players[render_pid];
+            }
             draw_scene(render_p);
             SDL_GL_SwapWindow(win);
         }
