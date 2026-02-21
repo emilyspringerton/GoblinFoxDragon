@@ -2,10 +2,10 @@ name: ShankPit Factory
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "master" ]
     tags: [ "v*" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "master" ]
   workflow_dispatch:
 
 concurrency:
@@ -68,9 +68,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -f apps/lobby/src/main.c
+          test -f apps/lobby/src/master.c
 
-          x86_64-w64-mingw32-gcc apps/lobby/src/main.c \
+          x86_64-w64-mingw32-gcc apps/lobby/src/master.c \
             -o ShankPit.exe \
             -O2 -static-libgcc \
             -I./sdl2_mingw/include \
@@ -78,16 +78,16 @@ jobs:
             -Ipackages/common \
             -Ipackages/simulation \
             -L./sdl2_mingw/lib \
-            -lmingw32 -lSDL2main -lSDL2 \
+            -lmingw32 -lSDL2master -lSDL2 \
             -lopengl32 -lglu32 -lws2_32 -lwinmm -lgdi32 -lm
 
       - name: Build Linux Server
         shell: bash
         run: |
           set -euo pipefail
-          test -f apps/server/src/main.c
+          test -f apps/server/src/master.c
 
-          gcc apps/server/src/main.c \
+          gcc apps/server/src/master.c \
             -o ShankServer_Linux \
             -O2 -static \
             -I. \
@@ -166,8 +166,8 @@ jobs:
           zip -r "ShankPit_Client_${BUILD}.zip" ShankPit_Client
 
           mkdir -p ShankPit_Bots
-          if [ -f apps/client/bot_main.c ]; then
-            gcc apps/client/bot_main.c -o ShankBot_Linux -O2 -static -I. -Ipackages/common -Ipackages/simulation -lm || true
+          if [ -f apps/client/bot_master.c ]; then
+            gcc apps/client/bot_master.c -o ShankBot_Linux -O2 -static -I. -Ipackages/common -Ipackages/simulation -lm || true
             [ -f ShankBot_Linux ] && cp ShankBot_Linux ShankPit_Bots/
           fi
           cp SHANKPIT_CONSTRUCT.txt ShankPit_Bots/
@@ -182,4 +182,5 @@ jobs:
             ShankPit_Client_*.zip
             ShankPit_Bots_*.zip
             SHANKPIT_CONSTRUCT.txt
+
 
