@@ -1075,7 +1075,8 @@ static void client_apply_cmd_movement(PlayerState *p, const UserCmd *cmd, unsign
         p->current_weapon = cmd->weapon_idx;
     }
 
-    float rad = p->yaw * 3.14159f / 180.0f;
+    float move_yaw = isfinite(cmd->yaw) ? norm_yaw_deg(cmd->yaw) : p->yaw;
+    float rad = move_yaw * 3.14159f / 180.0f;
     float fwd_x = sinf(rad);
     float fwd_z = -cosf(rad);
     float right_x = cosf(rad);
@@ -1659,6 +1660,11 @@ int main(int argc, char* argv[]) {
             float fwd=0, str=0;
             if(k[SDL_SCANCODE_W]) fwd+=1; if(k[SDL_SCANCODE_S]) fwd-=1;
             if(k[SDL_SCANCODE_D]) str+=1; if(k[SDL_SCANCODE_A]) str-=1;
+            float move_len = sqrtf(fwd * fwd + str * str);
+            if (move_len > 1.0f) {
+                fwd /= move_len;
+                str /= move_len;
+            }
             int jump = k[SDL_SCANCODE_SPACE]; int crouch = k[SDL_SCANCODE_LCTRL];
             int shoot = (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT));
             int reload = k[SDL_SCANCODE_R];

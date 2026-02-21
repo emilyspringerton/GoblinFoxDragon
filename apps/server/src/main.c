@@ -305,6 +305,11 @@ void process_user_cmd(int client_id, UserCmd *cmd) {
     if (isfinite(cmd->pitch)) p->pitch = clamp_pitch_deg(cmd->pitch);
     p->in_fwd = cmd->fwd;
     p->in_strafe = cmd->str;
+    float move_len = sqrtf(p->in_fwd * p->in_fwd + p->in_strafe * p->in_strafe);
+    if (move_len > 1.0f) {
+        p->in_fwd /= move_len;
+        p->in_strafe /= move_len;
+    }
     p->in_jump = (cmd->buttons & BTN_JUMP);
     p->in_shoot = (cmd->buttons & BTN_ATTACK);
     p->crouching = (cmd->buttons & BTN_CROUCH);
