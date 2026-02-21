@@ -33,6 +33,7 @@
 #include "../../../packages/common/protocol.h"
 #include "../../../packages/common/physics.h"
 #include "../../../packages/common/shared_movement.h"
+#include "../../../packages/common/net_sim.h"
 #include "../../../packages/simulation/local_game.h"
 
 #define STATE_LOBBY 0
@@ -110,6 +111,65 @@ static unsigned char net_last_life_state = STATE_DEAD;
 static unsigned char net_last_scene_id = 255;
 static unsigned char net_prev_is_shooting[MAX_CLIENTS];
 static int last_applied_scene_id = -999;
+
+#ifndef NET_PARITY_DEBUG
+#define NET_PARITY_DEBUG 0
+#endif
+
+#if NET_PARITY_DEBUG
+typedef struct {
+    unsigned int last_ack_seq;
+    unsigned int last_local_seq;
+    int last_replay_count;
+    float last_pos_corr;
+    float last_pos_corr_2d;
+    float last_yaw_corr;
+    float last_vel_delta;
+    int last_ground_mismatch;
+    int last_jump_mismatch;
+    unsigned int window_start_ms;
+    unsigned int correction_count;
+    float correction_sum;
+    float correction_max;
+    unsigned int grounded_mismatch_count;
+    unsigned int jump_mismatch_count;
+    unsigned int replay_sum;
+} NetParityDebugStats;
+
+static NetParityDebugStats net_parity_stats;
+
+static void net_parity_debug_sample(unsigned int now_ms) {
+    if (net_parity_stats.window_start_ms == 0) {
+        net_parity_stats.window_start_ms = now_ms;
+        return;
+    }
+    if (now_ms - net_parity_stats.window_start_ms < 1000) return;
+    float corr_avg = (net_parity_stats.correction_count > 0)
+        ? (net_parity_stats.correction_sum / (float)net_parity_stats.correction_count)
+        : 0.0f;
+    float replay_avg = (net_parity_stats.correction_count > 0)
+        ? ((float)net_parity_stats.replay_sum / (float)net_parity_stats.correction_count)
+        : 0.0f;
+    printf("[NET_PARITY] ack=%u latest=%u replay=%d corr3d=%.4f corr2d=%.4f yaw=%.3f vel_delta=%.4f g_mis=%d j_mis=%d cps=%u corr_avg=%.4f corr_max=%.4f replay_avg=%.2f g_mis_cnt=%u j_mis_cnt=%u\n",
+           net_parity_stats.last_ack_seq,
+           net_parity_stats.last_local_seq,
+           net_parity_stats.last_replay_count,
+           net_parity_stats.last_pos_corr,
+           net_parity_stats.last_pos_corr_2d,
+           net_parity_stats.last_yaw_corr,
+           net_parity_stats.last_vel_delta,
+           net_parity_stats.last_ground_mismatch,
+           net_parity_stats.last_jump_mismatch,
+           net_parity_stats.correction_count,
+           corr_avg,
+           net_parity_stats.correction_max,
+           replay_avg,
+           net_parity_stats.grounded_mismatch_count,
+           net_parity_stats.jump_mismatch_count);
+    memset(&net_parity_stats, 0, sizeof(net_parity_stats));
+    net_parity_stats.window_start_ms = now_ms;
+}
+#endif
 
 void net_connect();
 void net_shutdown();
@@ -1063,38 +1123,8 @@ UserCmd client_create_cmd(float fwd, float str, float yaw, float pitch, int shoo
 
 static void client_apply_cmd_movement(PlayerState *p, const UserCmd *cmd, unsigned int now_ms) {
     if (!p || !cmd) return;
-    if (isfinite(cmd->yaw)) p->yaw = norm_yaw_deg(cmd->yaw);
-    if (isfinite(cmd->pitch)) p->pitch = clamp_pitch_deg(cmd->pitch);
-    p->in_fwd = cmd->fwd;
-    p->in_strafe = cmd->str;
-    p->in_jump = (cmd->buttons & BTN_JUMP) != 0;
-    p->crouching = (cmd->buttons & BTN_CROUCH) != 0;
-    p->in_reload = (cmd->buttons & BTN_RELOAD) != 0;
-    p->in_use = (cmd->buttons & BTN_USE) != 0;
-    p->in_ability = (cmd->buttons & BTN_ABILITY_1) != 0;
-    if (cmd->weapon_idx >= 0 && cmd->weapon_idx < MAX_WEAPONS) {
-        p->current_weapon = cmd->weapon_idx;
-    }
-
-    float move_yaw = isfinite(cmd->yaw) ? norm_yaw_deg(cmd->yaw) : p->yaw;
-    MoveIntent move_intent = {
-        .forward = p->in_fwd,
-        .strafe = p->in_strafe,
-        .control_yaw_deg = move_yaw,
-        .wants_jump = p->in_jump,
-        .wants_sprint = 0
-    };
-    MoveWish move_wish = shankpit_move_wish_from_intent(move_intent);
-    accelerate(p, move_wish.dir_x, move_wish.dir_z, move_wish.magnitude * MAX_SPEED, ACCEL);
-
-    float g = p->in_jump ? GRAVITY_FLOAT : GRAVITY_DROP;
-    p->vy -= g;
-    if (p->in_jump && p->on_ground) {
-        p->y += 0.1f;
-        p->vy += JUMP_FORCE;
-    }
-
-    update_entity(p, 0.016f, NULL, now_ms);
+    shankpit_apply_usercmd_inputs(p, cmd);
+    shankpit_simulate_movement_tick(p, now_ms);
 }
 
 static float shortest_angle_delta_deg(float from, float to) {
@@ -1145,6 +1175,11 @@ static void client_reconcile_local_player(unsigned int ack_seq, float auth_x, fl
     float prev_z = p->z;
     float prev_yaw = p->yaw;
     float prev_pitch = p->pitch;
+    float prev_vx = p->vx;
+    float prev_vy = p->vy;
+    float prev_vz = p->vz;
+    int prev_ground = p->on_ground;
+    int prev_jump = p->in_jump;
 
     p->x = auth_x; p->y = auth_y; p->z = auth_z;
     p->yaw = norm_yaw_deg(auth_yaw);
@@ -1189,6 +1224,29 @@ static void client_reconcile_local_player(unsigned int ack_seq, float auth_x, fl
         last_recon_dbg = now;
         printf("[NET] reconcile err=%.3f replayed=%d ack=%u latest=%u\n", pos_err, replayed, ack_seq, net_latest_seq_sent);
     }
+
+#if NET_PARITY_DEBUG
+    float pos_err_2d = sqrtf(ex * ex + ez * ez);
+    float dvx = p->vx - prev_vx;
+    float dvy = p->vy - prev_vy;
+    float dvz = p->vz - prev_vz;
+    net_parity_stats.last_ack_seq = ack_seq;
+    net_parity_stats.last_local_seq = net_latest_seq_sent;
+    net_parity_stats.last_replay_count = replayed;
+    net_parity_stats.last_pos_corr = pos_err;
+    net_parity_stats.last_pos_corr_2d = pos_err_2d;
+    net_parity_stats.last_yaw_corr = fabsf(yaw_err);
+    net_parity_stats.last_vel_delta = sqrtf(dvx * dvx + dvy * dvy + dvz * dvz);
+    net_parity_stats.last_ground_mismatch = (p->on_ground != prev_ground) ? 1 : 0;
+    net_parity_stats.last_jump_mismatch = (p->in_jump != prev_jump) ? 1 : 0;
+    net_parity_stats.correction_count++;
+    net_parity_stats.correction_sum += pos_err;
+    if (pos_err > net_parity_stats.correction_max) net_parity_stats.correction_max = pos_err;
+    net_parity_stats.replay_sum += (unsigned int)replayed;
+    if (net_parity_stats.last_ground_mismatch) net_parity_stats.grounded_mismatch_count++;
+    if (net_parity_stats.last_jump_mismatch) net_parity_stats.jump_mismatch_count++;
+    net_parity_debug_sample(now);
+#endif
 }
 
 static void net_apply_remote_interpolation(unsigned int now_ms) {
