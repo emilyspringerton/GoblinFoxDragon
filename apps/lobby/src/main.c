@@ -32,6 +32,7 @@
 
 #include "../../../packages/common/protocol.h"
 #include "../../../packages/common/physics.h"
+#include "../../../packages/common/shared_movement.h"
 #include "../../../packages/simulation/local_game.h"
 
 #define STATE_LOBBY 0
@@ -1076,22 +1077,15 @@ static void client_apply_cmd_movement(PlayerState *p, const UserCmd *cmd, unsign
     }
 
     float move_yaw = isfinite(cmd->yaw) ? norm_yaw_deg(cmd->yaw) : p->yaw;
-    float rad = move_yaw * 3.14159f / 180.0f;
-    float fwd_x = sinf(rad);
-    float fwd_z = -cosf(rad);
-    float right_x = cosf(rad);
-    float right_z = sinf(rad);
-    float wish_x = fwd_x * p->in_fwd + right_x * p->in_strafe;
-    float wish_z = fwd_z * p->in_fwd + right_z * p->in_strafe;
-    float wish_speed = sqrtf(wish_x * wish_x + wish_z * wish_z);
-    if (wish_speed > 1.0f) {
-        float wish_len = wish_speed;
-        wish_x /= wish_len;
-        wish_z /= wish_len;
-        wish_speed = 1.0f;
-    }
-    wish_speed *= MAX_SPEED;
-    accelerate(p, wish_x, wish_z, wish_speed, ACCEL);
+    MoveIntent move_intent = {
+        .forward = p->in_fwd,
+        .strafe = p->in_strafe,
+        .control_yaw_deg = move_yaw,
+        .wants_jump = p->in_jump,
+        .wants_sprint = 0
+    };
+    MoveWish move_wish = shankpit_move_wish_from_intent(move_intent);
+    accelerate(p, move_wish.dir_x, move_wish.dir_z, move_wish.magnitude * MAX_SPEED, ACCEL);
 
     float g = p->in_jump ? GRAVITY_FLOAT : GRAVITY_DROP;
     p->vy -= g;
