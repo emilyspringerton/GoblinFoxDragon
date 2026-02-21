@@ -22,6 +22,7 @@
 #include <GL/glu.h>
 
 #include "render_voxel.h"
+#include "../../../packages/render/proc_tex.h"
 
 #include "../../../packages/common/protocol.h"
 #include "../../../packages/simulation/local_game.h"
@@ -62,6 +63,52 @@ static VoxelPacketBuffer voxel_packet;
 static int voxel_packet_valid = 0;
 static float last_impact_pos[3];
 static int last_impact_type = -1;
+
+static ProcTexture g_title_bg_tex;
+static int g_title_bg_ready = 0;
+static Uint32 g_title_bg_last_refresh_ms = 0;
+
+#define TITLE_TEX_SIZE 128
+#define TITLE_TEX_REFRESH_MS 180
+#define TITLE_TEX_UV_SCALE_X 2.2f
+#define TITLE_TEX_UV_SCALE_Y 1.6f
+
+static void init_title_bg_texture(void) {
+    if (!proc_tex_create(&g_title_bg_tex, TITLE_TEX_SIZE, TITLE_TEX_SIZE)) {
+        g_title_bg_ready = 0;
+        return;
+    }
+    proc_tex_fill_emily_vibe(&g_title_bg_tex, 0.314f, 0.0f);
+    proc_tex_upload(&g_title_bg_tex);
+    g_title_bg_last_refresh_ms = SDL_GetTicks();
+    g_title_bg_ready = 1;
+}
+
+static void update_title_bg_texture(void) {
+    if (!g_title_bg_ready) return;
+    Uint32 now = SDL_GetTicks();
+    if (now - g_title_bg_last_refresh_ms < TITLE_TEX_REFRESH_MS) return;
+
+    proc_tex_fill_emily_vibe(&g_title_bg_tex, 0.314f, now * 0.001f);
+    proc_tex_upload(&g_title_bg_tex);
+    g_title_bg_last_refresh_ms = now;
+}
+
+static void draw_title_bg_texture(void) {
+    if (!g_title_bg_ready) return;
+
+    glEnable(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, g_title_bg_tex.tex_id);
+    glColor3f(0.45f, 0.45f, 0.45f);
+    glBegin(GL_QUADS);
+    glTexCoord2f(0.0f, 0.0f); glVertex2f(0.0f, 0.0f);
+    glTexCoord2f(TITLE_TEX_UV_SCALE_X, 0.0f); glVertex2f(1280.0f, 0.0f);
+    glTexCoord2f(TITLE_TEX_UV_SCALE_X, TITLE_TEX_UV_SCALE_Y); glVertex2f(1280.0f, 720.0f);
+    glTexCoord2f(0.0f, TITLE_TEX_UV_SCALE_Y); glVertex2f(0.0f, 720.0f);
+    glEnd();
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glDisable(GL_TEXTURE_2D);
+}
 
 void draw_char(char c, float x, float y, float s) {
     glLineWidth(2.0f); glBegin(GL_LINES); // Thicker text for Cyberpunk feel
@@ -695,6 +742,7 @@ int main(int argc, char* argv[]) {
     SDL_Init(SDL_INIT_VIDEO);
     SDL_Window *win = SDL_CreateWindow("SHANKPIT [BUILD 181 - CTF RELOADED]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
     SDL_GL_CreateContext(win);
+    init_title_bg_texture();
     net_init();
 
     local_init_match(1, 0);
@@ -758,9 +806,27 @@ int main(int argc, char* argv[]) {
         }
         if (app_state != STATE_LOBBY) SDL_SetRelativeMouseMode(SDL_TRUE);
         if (app_state == STATE_LOBBY) {
+             update_title_bg_texture();
+
+             glDisable(GL_DEPTH_TEST);
+             glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluOrtho2D(0, 1280, 0, 720);
+             glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
+
              glClearColor(0.02f, 0.02f, 0.05f, 1.0f); // Dark Lobby
              glClear(GL_COLOR_BUFFER_BIT);
-             glLoadIdentity(); glColor3f(0, 1, 1); // CYAN TEXT
+
+             draw_title_bg_texture();
+
+             // Slight dark matte overlay so title/menu text remains crisp.
+             glEnable(GL_BLEND);
+             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+             glColor4f(0.0f, 0.0f, 0.0f, 0.45f);
+             glBegin(GL_QUADS);
+             glVertex2f(0.0f, 0.0f); glVertex2f(1280.0f, 0.0f); glVertex2f(1280.0f, 720.0f); glVertex2f(0.0f, 720.0f);
+             glEnd();
+             glDisable(GL_BLEND);
+
+             glColor3f(0, 1, 1); // CYAN TEXT
              draw_string("SHANKPIT [181]", 400, 500, 20);
              draw_string("D: DEMO", 400, 400, 10);
              draw_string("B: BATTLE", 400, 350, 10);
@@ -768,6 +834,10 @@ int main(int argc, char* argv[]) {
              draw_string("C: LAN CTF", 400, 250, 10); // Added Visual
              draw_string("J: JOIN S.FARTHQ.COM", 400, 200, 10);
              draw_string("G: JOIN LOCAL GO SERVER", 400, 150, 10);
+
+             glMatrixMode(GL_MODELVIEW); glPopMatrix();
+             glMatrixMode(GL_PROJECTION); glPopMatrix();
+             glMatrixMode(GL_MODELVIEW);
              SDL_GL_SwapWindow(win);
         }
         else {
@@ -808,6 +878,7 @@ int main(int argc, char* argv[]) {
         }
         SDL_Delay(16);
     }
+    proc_tex_destroy(&g_title_bg_tex);
     SDL_Quit();
     return 0;
 }
