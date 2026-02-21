@@ -20,6 +20,7 @@
 #include "../../../packages/common/protocol.h"
 #include "../../../packages/common/physics.h"
 #include "../../../packages/common/shared_movement.h"
+#include "../../../packages/common/net_sim.h"
 #include "../../../packages/simulation/local_game.h"
 #include "server_mode.h"
 #include "server_state.h"
@@ -302,22 +303,7 @@ void server_net_init() {
 void process_user_cmd(int client_id, UserCmd *cmd) {
     if (cmd->sequence <= client_last_seq[client_id]) return;
     PlayerState *p = &local_state.players[client_id];
-    if (isfinite(cmd->yaw)) p->yaw = norm_yaw_deg(cmd->yaw);
-    if (isfinite(cmd->pitch)) p->pitch = clamp_pitch_deg(cmd->pitch);
-    p->in_fwd = cmd->fwd;
-    p->in_strafe = cmd->str;
-    float move_len = sqrtf(p->in_fwd * p->in_fwd + p->in_strafe * p->in_strafe);
-    if (move_len > 1.0f) {
-        p->in_fwd /= move_len;
-        p->in_strafe /= move_len;
-    }
-    p->in_jump = (cmd->buttons & BTN_JUMP);
-    p->in_shoot = (cmd->buttons & BTN_ATTACK);
-    p->crouching = (cmd->buttons & BTN_CROUCH);
-    p->in_reload = (cmd->buttons & BTN_RELOAD);
-    p->in_use = (cmd->buttons & BTN_USE);
-    p->in_ability = (cmd->buttons & BTN_ABILITY_1);
-    if (cmd->weapon_idx >= 0 && cmd->weapon_idx < MAX_WEAPONS) p->current_weapon = cmd->weapon_idx;
+    shankpit_apply_usercmd_inputs(p, cmd);
     client_last_seq[client_id] = cmd->sequence;
 }
 
@@ -524,30 +510,10 @@ int main(int argc, char *argv[]) {
                 p->use_was_down = p->in_use;
                 if (p->vehicle_cooldown > 0) p->vehicle_cooldown--;
 
-                MoveIntent move_intent = {
-                    .forward = p->in_fwd,
-                    .strafe = p->in_vehicle ? 0.0f : p->in_strafe,
-                    .control_yaw_deg = p->yaw,
-                    .wants_jump = p->in_jump,
-                    .wants_sprint = 0
-                };
-                MoveWish move_wish = shankpit_move_wish_from_intent(move_intent);
-
-                float max_spd = p->in_vehicle ? BUGGY_MAX_SPEED : MAX_SPEED;
-                float acc = p->in_vehicle ? BUGGY_ACCEL : ACCEL;
-                float wish_speed = move_wish.magnitude * max_spd;
-
-                accelerate(p, move_wish.dir_x, move_wish.dir_z, wish_speed, acc);
-
-                float g = p->in_vehicle ? BUGGY_GRAVITY : (p->in_jump ? GRAVITY_FLOAT : GRAVITY_DROP);
-                p->vy -= g;
-                if (p->in_jump && p->on_ground) {
-                    p->y += 0.1f;
-                    p->vy += JUMP_FORCE;
-                }
+                shankpit_simulate_movement_tick(p, now);
+            } else {
+                update_entity(p, SHANKPIT_NET_FIXED_DT, NULL, now);
             }
-
-            update_entity(p, 0.016f, NULL, now);
         }
 
         update_projectiles(now);
