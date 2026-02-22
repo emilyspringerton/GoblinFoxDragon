@@ -1,13 +1,11 @@
 #include "town_debug_ui.h"
 #include <stdio.h>
-#include <string.h>
 #include <SDL2/SDL_opengl.h>
 #include "../ui/turtle_text.h"
 #include "crisis_mock_state.h"
 
 static void draw_string2(const char *str, float x, float y, float size) {
-    TurtlePen pen;
-    turtle_pen_begin(&pen, x, y, size);
+    TurtlePen pen = turtle_pen_create(x, y, size);
     turtle_draw_text(&pen, str);
 }
 
