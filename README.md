@@ -102,3 +102,22 @@ As things get real, plans may change. That’s intentional.
 
 Umbrella name: **GoblinFoxDragon**  
 Project names and branding beneath the umbrella may change over time as products take shape.
+
+### Naming exploration: 鬼狐竜 (Kiko-ryū)
+
+Possible combined Japanese rendering for the creature/archetype vibe:
+
+- **鬼 (ki)** = demon/oni spirit energy
+- **狐 (ko)** = fox
+- **竜 / 龍 (ryū)** = dragon
+
+That gives shorthand interpretations like:
+
+- **Demon Fox Dragon**
+- **Oni-Fox Dragon** (strong fantasy flavor)
+- **Fiend Fox Dragon** (darker boss tone)
+
+Why it works:
+
+- compact, mythic cadence in Japanese
+- reads like a proper named creature/class instead of a flat literal phrase
