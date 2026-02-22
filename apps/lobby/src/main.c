@@ -35,6 +35,9 @@
 #include "../../../packages/common/shared_movement.h"
 #include "../../../packages/common/net_sim.h"
 #include "../../../packages/simulation/local_game.h"
+#include "../../../packages/world/town_render.h"
+#include "../../../packages/world/town_debug_ui.h"
+#include "../../../packages/world/crisis_mock_state.h"
 
 #define STATE_LOBBY 0
 #define STATE_GAME_NET 1
@@ -62,6 +65,7 @@ unsigned int travel_overlay_until_ms = 0;
 float cam_yaw = 0.0f;
 float cam_pitch = 0.0f;
 float current_fov = 75.0f;
+CrisisMockState crisis_mock_state;
 
 #define Z_FAR 8000.0f
 
@@ -422,6 +426,8 @@ static void lobby_apply_scene_id(const char *scene_id) {
         scene_load(SCENE_GARAGE_OSAKA);
     } else if (strcmp(scene_id, "STADIUM") == 0) {
         scene_load(SCENE_STADIUM);
+    } else if (strcmp(scene_id, "NEW_HANCLINGTON_MOCKUP") == 0) {
+        scene_load(SCENE_CITY);
     }
 }
 
@@ -1114,14 +1120,23 @@ void draw_scene(PlayerState *render_p) {
         reconcile_z = reconcile_corr_z;
     }
 
-    glRotatef(-cam_pitch, 1, 0, 0); glRotatef(-cam_yaw, 0, 1, 0);
-    glTranslatef(-((render_p->x + reconcile_x) - cx), -((render_p->y + reconcile_y) + cam_y), -((render_p->z + reconcile_z) - cz));
+    if (render_p->scene_id == SCENE_CITY && crisis_mock_state.topdown_on) {
+        glRotatef(-90.0f, 1, 0, 0);
+        glTranslatef(-50.0f, -140.0f, -50.0f);
+    } else {
+        glRotatef(-cam_pitch, 1, 0, 0); glRotatef(-cam_yaw, 0, 1, 0);
+        glTranslatef(-((render_p->x + reconcile_x) - cx), -((render_p->y + reconcile_y) + cam_y), -((render_p->z + reconcile_z) - cz));
+    }
     
-    draw_grid(); 
-    update_and_draw_trails();
-    draw_map();
-    draw_garage_vehicle_pads();
-    draw_garage_portal_frame();
+    if (render_p->scene_id == SCENE_CITY) {
+        town_render_world(&crisis_mock_state);
+    } else {
+        draw_grid(); 
+        update_and_draw_trails();
+        draw_map();
+        draw_garage_vehicle_pads();
+        draw_garage_portal_frame();
+    }
     draw_projectiles();
     if (render_p->in_vehicle) draw_player_3rd(render_p);
     for(int i=0; i<MAX_CLIENTS; i++) {
@@ -1131,6 +1146,11 @@ void draw_scene(PlayerState *render_p) {
         draw_player_3rd(p);
     }
     draw_weapon_p(render_p); draw_hud(render_p); draw_garage_overlay(render_p);
+    if (render_p->scene_id == SCENE_CITY) {
+        char route_line[256] = {0};
+        town_render_route_distances(render_p->x, render_p->z, route_line, sizeof(route_line));
+        town_debug_ui_draw(&crisis_mock_state, route_line);
+    }
     draw_travel_overlay();
 }
 
@@ -1716,6 +1736,7 @@ int main(int argc, char* argv[]) {
     SDL_Init(SDL_INIT_VIDEO);
     SDL_Window *win = SDL_CreateWindow("SHANKPIT [BUILD 181 - CTF RELOADED]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
     SDL_GL_CreateContext(win);
+    crisis_mock_state_init(&crisis_mock_state);
     net_init();
     
     local_init_match(1, 0);
@@ -1838,6 +1859,12 @@ int main(int argc, char* argv[]) {
                     }
                 }
             } else {
+                if (e.type == SDL_KEYDOWN) {
+                    crisis_mock_state_handle_key(&crisis_mock_state, e.key.keysym.sym);
+                    if (e.key.keysym.sym == SDLK_F9) {
+                        scene_load(SCENE_CITY);
+                    }
+                }
                 if(e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) {
                     if (app_state == STATE_GAME_NET) net_shutdown();
                     app_state = STATE_LOBBY;
@@ -1948,7 +1975,17 @@ int main(int argc, char* argv[]) {
                 }
                 if(local_state.players[0].vehicle_cooldown > 0) local_state.players[0].vehicle_cooldown--;
                 unsigned int now_ms = SDL_GetTicks();
-                local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn_req, jump, crouch, reload, ability, NULL, now_ms);
+                if (local_state.players[0].scene_id == SCENE_CITY && crisis_mock_state.noclip_on) {
+                    float rad = cam_yaw * 0.01745f;
+                    float speed = 0.9f;
+                    local_state.players[0].x += (sinf(rad) * fwd + cosf(rad) * str) * speed;
+                    local_state.players[0].z += (cosf(rad) * fwd - sinf(rad) * str) * speed;
+                    if (k[SDL_SCANCODE_SPACE]) local_state.players[0].y += speed;
+                    if (k[SDL_SCANCODE_LCTRL]) local_state.players[0].y -= speed;
+                    local_state.players[0].vx = local_state.players[0].vy = local_state.players[0].vz = 0.0f;
+                } else {
+                    local_update(fwd, str, cam_yaw, cam_pitch, shoot, wpn_req, jump, crouch, reload, ability, NULL, now_ms);
+                }
             }
             int render_pid = 0;
             if (app_state == STATE_GAME_NET &&

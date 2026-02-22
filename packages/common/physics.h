@@ -94,6 +94,14 @@ static const Box map_geo_garage[] = {
 };
 
 
+static const Box map_geo_city[] = {
+    {50.0f, -2.0f, 50.0f, 140.0f, 4.0f, 140.0f},
+    {50.0f, 8.0f, -20.0f, 140.0f, 20.0f, 4.0f},
+    {50.0f, 8.0f, 120.0f, 140.0f, 20.0f, 4.0f},
+    {-20.0f, 8.0f, 50.0f, 4.0f, 20.0f, 140.0f},
+    {120.0f, 8.0f, 50.0f, 4.0f, 20.0f, 140.0f}
+};
+
 #define CITY_MAX_BOXES 2048
 static Box map_geo_voxworld[CITY_MAX_BOXES];
 static int map_geo_voxworld_count = 0;
@@ -200,6 +208,9 @@ static inline void phys_set_scene(int scene_id) {
         init_voxworld_city_geo();
         map_geo = map_geo_voxworld;
         map_count = map_geo_voxworld_count;
+    } else if (scene_id == SCENE_CITY) {
+        map_geo = map_geo_city;
+        map_count = (int)(sizeof(map_geo_city) / sizeof(Box));
     } else {
         map_geo = map_geo_stadium;
         map_count = (int)(sizeof(map_geo_stadium) / sizeof(Box));
@@ -221,6 +232,12 @@ static inline void scene_spawn_point(int scene_id, int slot, float *out_x, float
         *out_x = offsets[idx];
         *out_y = 6.0f;
         *out_z = 0.0f;
+        return;
+    }
+    if (scene_id == SCENE_CITY) {
+        *out_x = 50.0f;
+        *out_y = 5.0f;
+        *out_z = 58.0f;
         return;
     }
     if (slot % 2 == 0) {
@@ -266,6 +283,11 @@ static inline void scene_safety_check(PlayerState *p) {
         if (p->y < VOXWORLD_KILL_Y ||
             p->x < -VOXWORLD_BOUNDS_X || p->x > VOXWORLD_BOUNDS_X ||
             p->z < -VOXWORLD_BOUNDS_Z || p->z > VOXWORLD_BOUNDS_Z) {
+            scene_force_spawn(p);
+        }
+    }
+    if (p->scene_id == SCENE_CITY) {
+        if (p->y < -30.0f || p->x < -30.0f || p->x > 130.0f || p->z < -30.0f || p->z > 130.0f) {
             scene_force_spawn(p);
         }
     }
@@ -567,7 +589,7 @@ void phys_respawn(PlayerState *p, unsigned int now) {
     p->active = 1; p->state = STATE_ALIVE;
     p->health = 100; p->shield = 100; p->respawn_time = 0; p->in_vehicle = 0;
     p->use_was_down = 0;
-    if (p->scene_id != SCENE_GARAGE_OSAKA && p->scene_id != SCENE_STADIUM && p->scene_id != SCENE_VOXWORLD) {
+    if (p->scene_id != SCENE_GARAGE_OSAKA && p->scene_id != SCENE_STADIUM && p->scene_id != SCENE_VOXWORLD && p->scene_id != SCENE_CITY) {
         p->scene_id = SCENE_GARAGE_OSAKA;
     }
     scene_spawn_point(p->scene_id, p->id, &p->x, &p->y, &p->z);
