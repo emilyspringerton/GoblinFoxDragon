@@ -11,6 +11,7 @@
 #define SCENE_VOXWORLD 2
 #define SCENE_CITY 3
 #define SCENE_MINES 4
+#define SCENE_WAREHOUSE 5
 #define SCENE_NEW_HANCLINGTON SCENE_CITY
 
 static inline const char *scene_id_name(int scene_id) {
@@ -20,6 +21,7 @@ static inline const char *scene_id_name(int scene_id) {
         case SCENE_VOXWORLD: return "SCENE_VOXWORLD";
         case SCENE_CITY: return "SCENE_NEW_HANCLINGTON";
         case SCENE_MINES: return "SCENE_MINES";
+        case SCENE_WAREHOUSE: return "WAREHOUSE";
         default: return "SCENE_UNKNOWN";
     }
 }

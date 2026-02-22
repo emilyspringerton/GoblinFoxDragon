@@ -149,6 +149,63 @@ static const Box map_geo_mines[] = {
     {104.0f, 2.0f, 146.0f, 4.5f, 4.0f, 4.5f},
     {-2.0f, 2.0f, 168.0f, 4.5f, 4.0f, 4.5f}
 };
+
+static const Box map_geo_warehouse[] = {
+    // Base floor: interior + loading yard apron
+    {0.0f, -2.0f, 20.0f, 360.0f, 4.0f, 420.0f},
+    {0.0f, -6.0f, 20.0f, 372.0f, 2.0f, 432.0f},
+
+    // Interior hall shell
+    {0.0f, 35.0f, -92.0f, 340.0f, 70.0f, 8.0f},
+    {-170.0f, 35.0f, -10.0f, 8.0f, 70.0f, 188.0f},
+    {170.0f, 35.0f, -10.0f, 8.0f, 70.0f, 188.0f},
+    {0.0f, 66.0f, -10.0f, 340.0f, 4.0f, 188.0f},
+
+    // Loading-door wall: segmented so bays remain open
+    {-138.0f, 32.0f, 84.0f, 64.0f, 64.0f, 6.0f},
+    {-46.0f, 32.0f, 84.0f, 64.0f, 64.0f, 6.0f},
+    {46.0f, 32.0f, 84.0f, 64.0f, 64.0f, 6.0f},
+    {138.0f, 32.0f, 84.0f, 64.0f, 64.0f, 6.0f},
+    {-172.0f, 32.0f, 84.0f, 4.0f, 64.0f, 6.0f},
+    {172.0f, 32.0f, 84.0f, 4.0f, 64.0f, 6.0f},
+
+    // Yard perimeter and far wall
+    {0.0f, 18.0f, 224.0f, 360.0f, 36.0f, 8.0f},
+    {-172.0f, 18.0f, 172.0f, 8.0f, 36.0f, 104.0f},
+    {172.0f, 18.0f, 172.0f, 8.0f, 36.0f, 104.0f},
+
+    // Support columns
+    {-120.0f, 18.0f, -52.0f, 10.0f, 36.0f, 10.0f},
+    {-60.0f, 18.0f, -52.0f, 10.0f, 36.0f, 10.0f},
+    {0.0f, 18.0f, -52.0f, 10.0f, 36.0f, 10.0f},
+    {60.0f, 18.0f, -52.0f, 10.0f, 36.0f, 10.0f},
+    {120.0f, 18.0f, -52.0f, 10.0f, 36.0f, 10.0f},
+    {-120.0f, 18.0f, 0.0f, 10.0f, 36.0f, 10.0f},
+    {-60.0f, 18.0f, 0.0f, 10.0f, 36.0f, 10.0f},
+    {0.0f, 18.0f, 0.0f, 10.0f, 36.0f, 10.0f},
+    {60.0f, 18.0f, 0.0f, 10.0f, 36.0f, 10.0f},
+    {120.0f, 18.0f, 0.0f, 10.0f, 36.0f, 10.0f},
+    {-120.0f, 18.0f, 52.0f, 10.0f, 36.0f, 10.0f},
+    {-60.0f, 18.0f, 52.0f, 10.0f, 36.0f, 10.0f},
+    {0.0f, 18.0f, 52.0f, 10.0f, 36.0f, 10.0f},
+    {60.0f, 18.0f, 52.0f, 10.0f, 36.0f, 10.0f},
+    {120.0f, 18.0f, 52.0f, 10.0f, 36.0f, 10.0f},
+
+    // Overhead beam/light strips
+    {-85.0f, 58.0f, -10.0f, 4.0f, 4.0f, 164.0f},
+    {0.0f, 58.0f, -10.0f, 4.0f, 4.0f, 164.0f},
+    {85.0f, 58.0f, -10.0f, 4.0f, 4.0f, 164.0f},
+
+    // Cover props / crates / low barriers
+    {-108.0f, 3.0f, 118.0f, 34.0f, 6.0f, 18.0f},
+    {106.0f, 3.0f, 136.0f, 28.0f, 6.0f, 18.0f},
+    {0.0f, 4.0f, 162.0f, 42.0f, 8.0f, 16.0f},
+    {-38.0f, 4.5f, -24.0f, 22.0f, 9.0f, 18.0f},
+    {36.0f, 4.5f, 24.0f, 22.0f, 9.0f, 18.0f},
+
+    // Back-wall catwalk illusion ledge
+    {0.0f, 24.0f, -82.0f, 144.0f, 2.0f, 12.0f}
+};
 #define CITY_MAX_BOXES 2048
 static Box map_geo_voxworld[CITY_MAX_BOXES];
 static int map_geo_voxworld_count = 0;
@@ -171,6 +228,9 @@ static int map_count = 0;
 #define MINES_KILL_Y -80.0f
 #define MINES_BOUNDS_X 180.0f
 #define MINES_BOUNDS_Z 220.0f
+#define WAREHOUSE_KILL_Y -70.0f
+#define WAREHOUSE_BOUNDS_X 184.0f
+#define WAREHOUSE_BOUNDS_Z 236.0f
 #define VOXWORLD_SEED 1337
 
 #define GARAGE_PORTAL_X 0.0f
@@ -264,6 +324,9 @@ static inline void phys_set_scene(int scene_id) {
     } else if (scene_id == SCENE_MINES) {
         map_geo = map_geo_mines;
         map_count = (int)(sizeof(map_geo_mines) / sizeof(Box));
+    } else if (scene_id == SCENE_WAREHOUSE) {
+        map_geo = map_geo_warehouse;
+        map_count = (int)(sizeof(map_geo_warehouse) / sizeof(Box));
     } else {
         map_geo = map_geo_stadium;
         map_count = (int)(sizeof(map_geo_stadium) / sizeof(Box));
@@ -297,6 +360,14 @@ static inline void scene_spawn_point(int scene_id, int slot, float *out_x, float
         *out_x = -4.0f + ((float)(slot % 5) * 2.0f);
         *out_y = 0.0f;
         *out_z = -92.0f;
+        return;
+    }
+    if (scene_id == SCENE_WAREHOUSE) {
+        float offsets[] = {-16.0f, -8.0f, 0.0f, 8.0f, 16.0f};
+        int idx = slot % 5;
+        *out_x = offsets[idx];
+        *out_y = 0.0f;
+        *out_z = -62.0f;
         return;
     }
     if (slot % 2 == 0) {
@@ -355,6 +426,14 @@ static inline void scene_safety_check(PlayerState *p) {
         if (p->y < MINES_KILL_Y ||
             p->x < -MINES_BOUNDS_X || p->x > MINES_BOUNDS_X ||
             p->z < -MINES_BOUNDS_Z || p->z > MINES_BOUNDS_Z) {
+            scene_force_spawn(p);
+        }
+        return;
+    }
+    if (p->scene_id == SCENE_WAREHOUSE) {
+        if (p->y < WAREHOUSE_KILL_Y ||
+            p->x < -WAREHOUSE_BOUNDS_X || p->x > WAREHOUSE_BOUNDS_X ||
+            p->z < -WAREHOUSE_BOUNDS_Z || p->z > WAREHOUSE_BOUNDS_Z) {
             scene_force_spawn(p);
         }
     }
@@ -656,7 +735,7 @@ void phys_respawn(PlayerState *p, unsigned int now) {
     p->active = 1; p->state = STATE_ALIVE;
     p->health = 100; p->shield = 100; p->respawn_time = 0; p->in_vehicle = 0;
     p->use_was_down = 0;
-    if (p->scene_id != SCENE_GARAGE_OSAKA && p->scene_id != SCENE_STADIUM && p->scene_id != SCENE_VOXWORLD && p->scene_id != SCENE_CITY && p->scene_id != SCENE_MINES) {
+    if (p->scene_id != SCENE_GARAGE_OSAKA && p->scene_id != SCENE_STADIUM && p->scene_id != SCENE_VOXWORLD && p->scene_id != SCENE_CITY && p->scene_id != SCENE_MINES && p->scene_id != SCENE_WAREHOUSE) {
         p->scene_id = SCENE_GARAGE_OSAKA;
     }
     scene_spawn_point(p->scene_id, p->id, &p->x, &p->y, &p->z);

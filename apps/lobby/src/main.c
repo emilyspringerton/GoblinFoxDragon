@@ -583,6 +583,7 @@ static const LobbySceneOption LOBBY_SCENE_OPTIONS[] = {
     {"Garage", "GARAGE_OSAKA", SCENE_GARAGE_OSAKA},
     {"Stadium", "STADIUM", SCENE_STADIUM},
     {"New Hanclington", "NEW_HANCLINGTON_MOCKUP", SCENE_NEW_HANCLINGTON},
+    {"Warehouse", "WAREHOUSE", SCENE_WAREHOUSE},
     {"Mines", "MINES", SCENE_MINES}
 };
 
@@ -664,6 +665,8 @@ static int lobby_resolve_scene_id(const char *scene_id) {
     if (strcmp(scene_id, "NEW_HANCLINGTON_MOCKUP") == 0) return SCENE_NEW_HANCLINGTON;
     if (strcmp(scene_id, "NEW_HANCLINGTON") == 0) return SCENE_NEW_HANCLINGTON;
     if (strcmp(scene_id, "SCENE_CITY") == 0) return SCENE_NEW_HANCLINGTON;
+    if (strcmp(scene_id, "WAREHOUSE") == 0) return SCENE_WAREHOUSE;
+    if (strcmp(scene_id, "SCENE_WAREHOUSE") == 0) return SCENE_WAREHOUSE;
     if (strcmp(scene_id, "MINES") == 0) return SCENE_MINES;
     if (strcmp(scene_id, "SCENE_MINES") == 0) return SCENE_MINES;
     return -1;
@@ -1067,6 +1070,17 @@ void draw_map() {
         if(nr > 0.8f) nr = 1.0f;
         if(ng > 0.8f) ng = 1.0f;
         if(nb > 0.8f) nb = 1.0f;
+
+        if (local_state.scene_id == SCENE_WAREHOUSE) {
+            nr = 0.18f + 0.10f * sinf(b.x * 0.010f);
+            ng = 0.40f + 0.18f * sinf((b.x + b.z) * 0.008f + 1.4f);
+            nb = 0.46f + 0.18f * sinf(b.z * 0.010f + 2.5f);
+            if (b.z > 70.0f && b.h > 40.0f && b.d < 8.5f) {
+                nr = 0.26f;
+                ng = 0.65f;
+                nb = 0.52f;
+            }
+        }
 
         glPushMatrix(); 
         glTranslatef(b.x, b.y, b.z); 
@@ -1723,6 +1737,8 @@ void draw_scene(PlayerState *render_p) {
         town_debug_ui_draw(&crisis_mock_state, route_line);
     } else if (render_p->scene_id == SCENE_MINES) {
         mines_draw_route_labels_2d(render_p);
+    } else if (render_p->scene_id == SCENE_WAREHOUSE) {
+        draw_string("WAREHOUSE FLOOR / LOADING YARD", 42.0f, 92.0f, 4);
     }
     draw_travel_overlay();
 }
