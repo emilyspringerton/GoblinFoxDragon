@@ -75,13 +75,20 @@ jobs:
           set -euo pipefail
           test -f apps/lobby/src/main.c
 
-          x86_64-w64-mingw32-gcc apps/lobby/src/main.c \
+          x86_64-w64-mingw32-gcc \
+            apps/lobby/src/main.c \
+            packages/world/town_map.c \
+            packages/world/town_render.c \
+            packages/world/crisis_mock_state.c \
+            packages/world/town_debug_ui.c \
             -o GoblinFoxDragon.exe \
             -O2 -static-libgcc \
             -I./sdl2_mingw/include \
             -I. \
             -Ipackages/common \
             -Ipackages/simulation \
+            -Ipackages/world \
+            -Ipackages/ui \
             -L./sdl2_mingw/lib \
             -lmingw32 -lSDL2main -lSDL2 \
             -lopengl32 -lglu32 -lws2_32 -lwinmm -lgdi32 -lm
