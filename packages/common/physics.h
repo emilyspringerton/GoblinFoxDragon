@@ -102,6 +102,20 @@ static const Box map_geo_city[] = {
     {360.0f, 24.0f, 150.0f, 12.0f, 60.0f, 420.0f}
 };
 
+static const Box map_geo_mines[] = {
+    {0.0f, -2.0f, 0.0f, 260.0f, 4.0f, 260.0f},
+    {0.0f, 22.0f, 0.0f, 260.0f, 4.0f, 260.0f},
+    {132.0f, 10.0f, 0.0f, 8.0f, 30.0f, 260.0f},
+    {-132.0f, 10.0f, 0.0f, 8.0f, 30.0f, 260.0f},
+    {0.0f, 10.0f, 132.0f, 260.0f, 30.0f, 8.0f},
+    {0.0f, 10.0f, -132.0f, 260.0f, 30.0f, 8.0f},
+    {-34.0f, 5.0f, -24.0f, 18.0f, 10.0f, 18.0f},
+    {38.0f, 6.0f, -16.0f, 16.0f, 12.0f, 16.0f},
+    {-12.0f, 7.0f, 36.0f, 24.0f, 14.0f, 18.0f},
+    {46.0f, 8.0f, 46.0f, 20.0f, 16.0f, 20.0f},
+    {-58.0f, 6.0f, 52.0f, 18.0f, 12.0f, 16.0f}
+};
+
 #define CITY_MAX_BOXES 2048
 static Box map_geo_voxworld[CITY_MAX_BOXES];
 static int map_geo_voxworld_count = 0;
@@ -121,6 +135,9 @@ static int map_count = 0;
 #define VOXWORLD_KILL_Y -120.0f
 #define VOXWORLD_BOUNDS_X 1180.0f
 #define VOXWORLD_BOUNDS_Z 1180.0f
+#define MINES_KILL_Y -80.0f
+#define MINES_BOUNDS_X 150.0f
+#define MINES_BOUNDS_Z 150.0f
 #define VOXWORLD_SEED 1337
 
 #define GARAGE_PORTAL_X 0.0f
@@ -211,6 +228,9 @@ static inline void phys_set_scene(int scene_id) {
     } else if (scene_id == SCENE_CITY) {
         map_geo = map_geo_city;
         map_count = (int)(sizeof(map_geo_city) / sizeof(Box));
+    } else if (scene_id == SCENE_MINES) {
+        map_geo = map_geo_mines;
+        map_count = (int)(sizeof(map_geo_mines) / sizeof(Box));
     } else {
         map_geo = map_geo_stadium;
         map_count = (int)(sizeof(map_geo_stadium) / sizeof(Box));
@@ -238,6 +258,12 @@ static inline void scene_spawn_point(int scene_id, int slot, float *out_x, float
         *out_x = 150.0f;
         *out_y = 15.0f;
         *out_z = 174.0f;
+        return;
+    }
+    if (scene_id == SCENE_MINES) {
+        *out_x = -90.0f + ((float)(slot % 5) * 12.0f);
+        *out_y = 2.0f;
+        *out_z = -88.0f;
         return;
     }
     if (slot % 2 == 0) {
@@ -288,6 +314,14 @@ static inline void scene_safety_check(PlayerState *p) {
     }
     if (p->scene_id == SCENE_CITY) {
         if (p->y < -90.0f || p->x < -90.0f || p->x > 390.0f || p->z < -90.0f || p->z > 390.0f) {
+            scene_force_spawn(p);
+        }
+        return;
+    }
+    if (p->scene_id == SCENE_MINES) {
+        if (p->y < MINES_KILL_Y ||
+            p->x < -MINES_BOUNDS_X || p->x > MINES_BOUNDS_X ||
+            p->z < -MINES_BOUNDS_Z || p->z > MINES_BOUNDS_Z) {
             scene_force_spawn(p);
         }
     }
@@ -589,7 +623,7 @@ void phys_respawn(PlayerState *p, unsigned int now) {
     p->active = 1; p->state = STATE_ALIVE;
     p->health = 100; p->shield = 100; p->respawn_time = 0; p->in_vehicle = 0;
     p->use_was_down = 0;
-    if (p->scene_id != SCENE_GARAGE_OSAKA && p->scene_id != SCENE_STADIUM && p->scene_id != SCENE_VOXWORLD && p->scene_id != SCENE_CITY) {
+    if (p->scene_id != SCENE_GARAGE_OSAKA && p->scene_id != SCENE_STADIUM && p->scene_id != SCENE_VOXWORLD && p->scene_id != SCENE_CITY && p->scene_id != SCENE_MINES) {
         p->scene_id = SCENE_GARAGE_OSAKA;
     }
     scene_spawn_point(p->scene_id, p->id, &p->x, &p->y, &p->z);
