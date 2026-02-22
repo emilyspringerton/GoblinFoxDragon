@@ -127,7 +127,7 @@ static const TelecrystalDef TELECRYSTAL_DEFS[] = {
         600,
         1,
         SCENE_MINES,
-        -92.0f, 2.0f, -88.0f,
+        0.0f, 0.0f, 0.0f,
         0.0f,
         0.0f,
         "MINES"
@@ -667,10 +667,11 @@ static const TelecrystalDef *telecrystal_find_near_player(PlayerState *p) {
 
 static void telecrystal_spawn_mines_mobs(void) {
     const float low_spawns[][3] = {
-        {-54.0f, 2.0f, -18.0f}, {-36.0f, 2.0f, 8.0f}, {-18.0f, 2.0f, 20.0f}
+        {-15.0f, 0.0f, 19.0f}, {-17.0f, 0.0f, 24.0f}, {-10.0f, 0.0f, 27.0f},
+        {-4.0f, 0.0f, 15.5f}
     };
     const float high_spawns[][3] = {
-        {60.0f, 2.0f, 60.0f}, {74.0f, 2.0f, -44.0f}, {-68.0f, 2.0f, 74.0f}
+        {11.0f, 0.0f, 19.0f}, {16.0f, 0.0f, 24.5f}, {19.0f, 0.0f, 30.0f}
     };
 
     int slot = 1;
@@ -685,8 +686,8 @@ static void telecrystal_spawn_mines_mobs(void) {
         mob->scene_id = SCENE_MINES;
         mob->state = STATE_ALIVE;
         mob->x = low_spawns[i][0]; mob->y = low_spawns[i][1]; mob->z = low_spawns[i][2];
-        mob->health = 80; mob->shield = 25;
-        mob->level = 3 + (int)i;
+        mob->health = 95; mob->shield = 35;
+        mob->level = 6 + (int)i;
         mob->current_weapon = WPN_AR;
         for (int w = 0; w < MAX_WEAPONS; w++) mob->ammo[w] = WPN_STATS[w].ammo_max;
         init_genome(&mob->brain);
@@ -701,8 +702,8 @@ static void telecrystal_spawn_mines_mobs(void) {
         mob->scene_id = SCENE_MINES;
         mob->state = STATE_ALIVE;
         mob->x = high_spawns[i][0]; mob->y = high_spawns[i][1]; mob->z = high_spawns[i][2];
-        mob->health = 140; mob->shield = 110;
-        mob->level = 18 + (int)i;
+        mob->health = 180; mob->shield = 130;
+        mob->level = 10 + (int)i;
         mob->current_weapon = WPN_SNIPER;
         for (int w = 0; w < MAX_WEAPONS; w++) mob->ammo[w] = WPN_STATS[w].ammo_max;
         init_genome(&mob->brain);
@@ -1365,6 +1366,7 @@ static void draw_garage_vehicle_pads() {
         glVertex3f(-3.0f, 0.0f, 3.0f);
         glEnd();
         glPopMatrix();
+
     }
 }
 
@@ -1463,7 +1465,9 @@ static void draw_telecrystal_overlay(void) {
         float t = telecast_state.total_ms > 0 ? (float)elapsed / (float)telecast_state.total_ms : 1.0f;
         if (t > 1.0f) t = 1.0f;
         glColor3f(0.95f, 0.9f, 0.25f);
-        draw_string("CASTING TELEPORT: MINES...", 430, 120, 6);
+        char cast_line[96];
+        snprintf(cast_line, sizeof(cast_line), "CASTING TELEPORT: %s...", def ? def->target_name : "TARGET");
+        draw_string(cast_line, 430, 120, 6);
 
         float x = 420.0f;
         float y = 90.0f;
@@ -1493,6 +1497,8 @@ static void draw_telecrystal_overlay(void) {
         if (def) {
             glColor3f(1.0f, 0.95f, 0.2f);
             draw_string(def->prompt_text, 510, 110, 7);
+            glColor3f(1.0f, 0.6f, 0.2f);
+            draw_string("WARNING: WORM TUNNELS", 472, 84, 4);
         }
     }
 
