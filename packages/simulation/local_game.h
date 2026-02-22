@@ -4,6 +4,7 @@
 #include "../common/protocol.h"
 #include "../common/physics.h"
 #include "../common/shared_movement.h"
+#include <stdio.h>
 #include <string.h>
 
 ServerState local_state;
@@ -48,6 +49,7 @@ PlayerState* get_best_bot() {
 }
 
 static inline void scene_load(int scene_id) {
+    printf("[SCENE] load resolved=%s (%d)\n", scene_id_name(scene_id), scene_id);
     local_state.scene_id = scene_id;
     phys_set_scene(scene_id);
     for (int i = 0; i < MAX_CLIENTS; i++) {
