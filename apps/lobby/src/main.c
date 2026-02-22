@@ -348,6 +348,52 @@ void draw_string(const char* str, float x, float y, float size) {
     turtle_draw_text(&pen, str);
 }
 
+static int project_world_to_screen(float wx, float wy, float wz,
+                                  const GLdouble *model, const GLdouble *proj, const GLint *view,
+                                  float *sx, float *sy) {
+    GLdouble ox = 0.0, oy = 0.0, oz = 0.0;
+    if (gluProject((GLdouble)wx, (GLdouble)wy, (GLdouble)wz, model, proj, view, &ox, &oy, &oz) == GL_TRUE && oz >= 0.0 && oz <= 1.0) {
+        if (sx) *sx = (float)ox;
+        if (sy) *sy = (float)oy;
+        return 1;
+    }
+    return 0;
+}
+
+static void town_draw_metadata_labels_2d(PlayerState *render_p, float cam_x, float cam_y, float cam_z) {
+    (void)render_p;
+    if (!crisis_mock_state.labels_on) return;
+
+    TownMetaLabel labels[TOWN_LABEL_MAX];
+    int count = town_render_collect_labels(&crisis_mock_state, cam_x, cam_y, cam_z, labels, TOWN_LABEL_MAX);
+    if (count <= 0) return;
+
+    GLdouble model[16], proj[16];
+    GLint view[4];
+    glGetDoublev(GL_MODELVIEW_MATRIX, model);
+    glGetDoublev(GL_PROJECTION_MATRIX, proj);
+    glGetIntegerv(GL_VIEWPORT, view);
+
+    glDisable(GL_DEPTH_TEST);
+    glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); glOrtho(0, 1280, 0, 720, -1, 1);
+    glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
+
+    for (int i = 0; i < count; i++) {
+        float sx = 0.0f, sy = 0.0f;
+        if (!project_world_to_screen(labels[i].x, labels[i].y, labels[i].z, model, proj, view, &sx, &sy)) continue;
+        if (sx < -20.0f || sx > 1300.0f || sy < -20.0f || sy > 740.0f) continue;
+
+        if (labels[i].mode == TOWN_LABEL_LANDMARK) glColor3f(0.92f, 0.88f, 0.28f);
+        else if (labels[i].mode == TOWN_LABEL_ROUTE) glColor3f(0.35f, 0.95f, 0.98f);
+        else glColor3f(0.95f, 0.58f, 0.25f);
+        draw_string(labels[i].text, sx - 24.0f, sy - 6.0f, 2);
+    }
+
+    glMatrixMode(GL_PROJECTION); glPopMatrix();
+    glMatrixMode(GL_MODELVIEW); glPopMatrix();
+    glEnable(GL_DEPTH_TEST);
+}
+
 typedef enum {
     LOBBY_DEMO = 0,
     LOBBY_BATTLE,
@@ -1186,6 +1232,11 @@ void draw_scene(PlayerState *render_p) {
     }
     draw_weapon_p(render_p); draw_hud(render_p); draw_garage_overlay(render_p);
     if (render_p->scene_id == SCENE_CITY) {
+        float cam_world_x = (render_p->x + reconcile_x) - cx;
+        float cam_world_y = (render_p->y + reconcile_y) + cam_y;
+        float cam_world_z = (render_p->z + reconcile_z) - cz;
+        town_draw_metadata_labels_2d(render_p, cam_world_x, cam_world_y, cam_world_z);
+
         char route_line[256] = {0};
         town_render_route_distances(render_p->x, render_p->z, route_line, sizeof(route_line));
         town_debug_ui_draw(&crisis_mock_state, route_line);
