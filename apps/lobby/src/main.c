@@ -125,6 +125,11 @@ static int last_applied_scene_id = -999;
 #define NET_JITTER_DIAG 0
 #endif
 
+#ifndef DEBUG_BOOT_NEW_HANCLINGTON
+#define DEBUG_BOOT_NEW_HANCLINGTON 0
+#endif
+
+
 #if NET_JITTER_DIAG
 typedef struct {
     unsigned int window_start_ms;
@@ -355,6 +360,20 @@ typedef enum {
 
 char lobby_labels_mutable[LOBBY_COUNT][64];
 
+typedef struct {
+    const char *label;
+    const char *scene_request;
+    int scene_id;
+} LobbySceneOption;
+
+static const LobbySceneOption LOBBY_SCENE_OPTIONS[] = {
+    {"Garage", "GARAGE_OSAKA", SCENE_GARAGE_OSAKA},
+    {"Stadium", "STADIUM", SCENE_STADIUM},
+    {"New Hanclington", "NEW_HANCLINGTON_MOCKUP", SCENE_NEW_HANCLINGTON}
+};
+
+static int lobby_scene_selection = 0;
+
 static const char *LOBBY_LABELS[LOBBY_COUNT] = {
     "DEMO (SOLO)",
     "BATTLE (BOTS)",
@@ -420,15 +439,28 @@ static void lobby_end_edit(int commit) {
     SDL_StopTextInput();
 }
 
+static int lobby_scene_option_count() {
+    return (int)(sizeof(LOBBY_SCENE_OPTIONS) / sizeof(LOBBY_SCENE_OPTIONS[0]));
+}
+
+static int lobby_resolve_scene_id(const char *scene_id) {
+    if (!scene_id || !scene_id[0]) return -1;
+    if (strcmp(scene_id, "GARAGE_OSAKA") == 0) return SCENE_GARAGE_OSAKA;
+    if (strcmp(scene_id, "STADIUM") == 0) return SCENE_STADIUM;
+    if (strcmp(scene_id, "NEW_HANCLINGTON_MOCKUP") == 0) return SCENE_NEW_HANCLINGTON;
+    if (strcmp(scene_id, "NEW_HANCLINGTON") == 0) return SCENE_NEW_HANCLINGTON;
+    if (strcmp(scene_id, "SCENE_CITY") == 0) return SCENE_NEW_HANCLINGTON;
+    return -1;
+}
+
 static void lobby_apply_scene_id(const char *scene_id) {
-    if (!scene_id || !scene_id[0]) return;
-    if (strcmp(scene_id, "GARAGE_OSAKA") == 0) {
-        scene_load(SCENE_GARAGE_OSAKA);
-    } else if (strcmp(scene_id, "STADIUM") == 0) {
-        scene_load(SCENE_STADIUM);
-    } else if (strcmp(scene_id, "NEW_HANCLINGTON_MOCKUP") == 0) {
-        scene_load(SCENE_CITY);
-    }
+    int resolved = lobby_resolve_scene_id(scene_id);
+    printf("[SCENE] request=%s resolved=%s (%d)\n",
+           scene_id ? scene_id : "<null>",
+           scene_id_name(resolved),
+           resolved);
+    if (resolved < 0) return;
+    scene_load(resolved);
 }
 
 static void lobby_apply_ui_state() {
@@ -514,6 +546,13 @@ static void lobby_start_action(int action) {
                 break;
             default:
                 break;
+        }
+    }
+
+    if (!ui_use_server && app_state == STATE_GAME_LOCAL) {
+        int scene_count = lobby_scene_option_count();
+        if (lobby_scene_selection >= 0 && lobby_scene_selection < scene_count) {
+            lobby_apply_scene_id(LOBBY_SCENE_OPTIONS[lobby_scene_selection].scene_request);
         }
     }
 
@@ -1204,6 +1243,40 @@ static int lobby_hit_test(float mx, float my, int menu_count, float base_x, floa
     return -1;
 }
 
+
+static void draw_lobby_scene_buttons(float base_x, float base_y, float gap, float size) {
+    int count = lobby_scene_option_count();
+    for (int i = 0; i < count; i++) {
+        float y = base_y - (gap * i);
+        if (i == lobby_scene_selection) glColor3f(0.95f, 0.55f, 0.15f);
+        else glColor3f(0.2f, 0.35f, 0.55f);
+        glRectf(base_x, y, base_x + size, y + size);
+
+        glColor3f(0.08f, 0.08f, 0.08f);
+        glLineWidth(2.0f);
+        glBegin(GL_LINE_LOOP);
+        glVertex2f(base_x, y);
+        glVertex2f(base_x + size, y);
+        glVertex2f(base_x + size, y + size);
+        glVertex2f(base_x, y + size);
+        glEnd();
+
+        glColor3f(0.05f, 0.05f, 0.05f);
+        draw_string(LOBBY_SCENE_OPTIONS[i].label, base_x + 10.0f, y + size * 0.55f, 4);
+    }
+}
+
+static int lobby_scene_hit_test(float mx, float my, float base_x, float base_y, float gap, float size) {
+    int count = lobby_scene_option_count();
+    for (int i = 0; i < count; i++) {
+        float y = base_y - (gap * i);
+        if (mx >= base_x && mx <= base_x + size && my >= y && my <= y + size) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 void net_init() {
     #ifdef _WIN32
     WSADATA wsa; WSAStartup(MAKEWORD(2,2), &wsa);
@@ -1741,10 +1814,24 @@ int main(int argc, char* argv[]) {
     
     local_init_match(1, 0);
     lobby_init_labels();
+    printf("[SCENE] startup request=GARAGE_OSAKA resolved=%s (%d)\n", scene_id_name(SCENE_GARAGE_OSAKA), SCENE_GARAGE_OSAKA);
+#if DEBUG_BOOT_NEW_HANCLINGTON
+    app_state = STATE_GAME_LOCAL;
+    scene_load(SCENE_NEW_HANCLINGTON);
+    printf("[SCENE] startup request=DEBUG_BOOT_NEW_HANCLINGTON resolved=%s (%d)\n",
+           scene_id_name(SCENE_NEW_HANCLINGTON), SCENE_NEW_HANCLINGTON);
+#endif
     ui_bridge_init("127.0.0.1", 17777);
     if (ui_bridge_fetch_state(&ui_state)) {
         ui_use_server = 1;
         ui_last_poll = SDL_GetTicks();
+        int resolved = lobby_resolve_scene_id(ui_state.active_scene_id);
+        for (int i = 0; i < lobby_scene_option_count(); i++) {
+            if (LOBBY_SCENE_OPTIONS[i].scene_id == resolved) {
+                lobby_scene_selection = i;
+                break;
+            }
+        }
     }
     
     int running = 1;
@@ -1800,6 +1887,13 @@ int main(int argc, char* argv[]) {
                     float gap = 85.0f;
                     float mx = (float)e.button.x;
                     float my = 720.0f - (float)e.button.y;
+                    int scene_hit = lobby_scene_hit_test(mx, my, 760.0f, 520.0f, 85.0f, 210.0f);
+                    if (scene_hit >= 0) {
+                        lobby_scene_selection = scene_hit;
+                        ui_last_click_ms = 0;
+                        ui_last_click_index = -1;
+                    }
+
                     int hit = lobby_hit_test(mx, my, menu_count, base_x, base_y, gap, size);
                     if (hit >= 0) {
                         unsigned int now = SDL_GetTicks();
@@ -1833,6 +1927,13 @@ int main(int argc, char* argv[]) {
                     float gap = 85.0f;
                     float mx = (float)e.button.x;
                     float my = 720.0f - (float)e.button.y;
+                    int scene_hit = lobby_scene_hit_test(mx, my, 760.0f, 520.0f, 85.0f, 210.0f);
+                    if (scene_hit >= 0) {
+                        lobby_scene_selection = scene_hit;
+                        ui_last_click_ms = 0;
+                        ui_last_click_index = -1;
+                    }
+
                     int hit = lobby_hit_test(mx, my, menu_count, base_x, base_y, gap, size);
                     if (hit >= 0) {
                         unsigned int now = SDL_GetTicks();
@@ -1862,7 +1963,7 @@ int main(int argc, char* argv[]) {
                 if (e.type == SDL_KEYDOWN) {
                     crisis_mock_state_handle_key(&crisis_mock_state, e.key.keysym.sym);
                     if (e.key.keysym.sym == SDLK_F9) {
-                        scene_load(SCENE_CITY);
+                        scene_load(SCENE_NEW_HANCLINGTON);
                     }
                 }
                 if(e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) {
@@ -1905,6 +2006,10 @@ int main(int argc, char* argv[]) {
              float gap = 85.0f;
              int menu_count = lobby_menu_count();
              draw_lobby_buttons(menu_count, base_x, base_y, gap, size);
+
+             glColor3f(0.5f, 0.8f, 0.9f);
+             draw_string("SELECT SCENE", 830, 520, 6);
+             draw_lobby_scene_buttons(760.0f, 430.0f, 85.0f, 210.0f);
 
              glColor3f(0.4f, 0.6f, 0.7f);
              draw_string("DOUBLE-CLICK: FAST=OPEN / SLOW=RENAME", 320, 140, 5);

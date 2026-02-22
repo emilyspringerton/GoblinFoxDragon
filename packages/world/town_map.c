@@ -1,5 +1,7 @@
 #include "town_map.h"
 
+#define TOWN_WORLD_SCALE 3.0f
+
 static const TownBuilding g_buildings[] = {
     {BLD_AUCTION_HOUSE, "Auction House", 50, 52, 34, 8, 8, 0},
     {BLD_TOWN_HALL, "Town Hall", 66, 61, 10, 8, 10, 0},
@@ -38,6 +40,52 @@ static const TownRoutePoint g_routes[] = {
     {"Town Hall", 66, 61}
 };
 
-const TownBuilding *town_map_buildings(size_t *count) { if (count) *count = sizeof(g_buildings) / sizeof(g_buildings[0]); return g_buildings; }
-const CrisisSocket *town_map_sockets(size_t *count) { if (count) *count = sizeof(g_sockets) / sizeof(g_sockets[0]); return g_sockets; }
-const TownRoutePoint *town_map_route_points(size_t *count) { if (count) *count = sizeof(g_routes) / sizeof(g_routes[0]); return g_routes; }
+static TownBuilding g_buildings_scaled[sizeof(g_buildings) / sizeof(g_buildings[0])];
+static CrisisSocket g_sockets_scaled[sizeof(g_sockets) / sizeof(g_sockets[0])];
+static TownRoutePoint g_routes_scaled[sizeof(g_routes) / sizeof(g_routes[0])];
+static int g_scaled_init = 0;
+
+static void town_map_init_scaled() {
+    if (g_scaled_init) return;
+    g_scaled_init = 1;
+
+    for (size_t i = 0; i < sizeof(g_buildings_scaled) / sizeof(g_buildings_scaled[0]); i++) {
+        g_buildings_scaled[i] = g_buildings[i];
+        g_buildings_scaled[i].x *= TOWN_WORLD_SCALE;
+        g_buildings_scaled[i].z *= TOWN_WORLD_SCALE;
+        g_buildings_scaled[i].w *= TOWN_WORLD_SCALE;
+        g_buildings_scaled[i].d *= TOWN_WORLD_SCALE;
+        g_buildings_scaled[i].h *= TOWN_WORLD_SCALE;
+    }
+
+    for (size_t i = 0; i < sizeof(g_sockets_scaled) / sizeof(g_sockets_scaled[0]); i++) {
+        g_sockets_scaled[i] = g_sockets[i];
+        g_sockets_scaled[i].x *= TOWN_WORLD_SCALE;
+        g_sockets_scaled[i].z *= TOWN_WORLD_SCALE;
+        g_sockets_scaled[i].radius *= TOWN_WORLD_SCALE;
+    }
+
+    for (size_t i = 0; i < sizeof(g_routes_scaled) / sizeof(g_routes_scaled[0]); i++) {
+        g_routes_scaled[i] = g_routes[i];
+        g_routes_scaled[i].x *= TOWN_WORLD_SCALE;
+        g_routes_scaled[i].z *= TOWN_WORLD_SCALE;
+    }
+}
+
+const TownBuilding *town_map_buildings(size_t *count) {
+    town_map_init_scaled();
+    if (count) *count = sizeof(g_buildings_scaled) / sizeof(g_buildings_scaled[0]);
+    return g_buildings_scaled;
+}
+
+const CrisisSocket *town_map_sockets(size_t *count) {
+    town_map_init_scaled();
+    if (count) *count = sizeof(g_sockets_scaled) / sizeof(g_sockets_scaled[0]);
+    return g_sockets_scaled;
+}
+
+const TownRoutePoint *town_map_route_points(size_t *count) {
+    town_map_init_scaled();
+    if (count) *count = sizeof(g_routes_scaled) / sizeof(g_routes_scaled[0]);
+    return g_routes_scaled;
+}

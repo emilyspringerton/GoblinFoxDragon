@@ -95,11 +95,11 @@ static const Box map_geo_garage[] = {
 
 
 static const Box map_geo_city[] = {
-    {50.0f, -2.0f, 50.0f, 140.0f, 4.0f, 140.0f},
-    {50.0f, 8.0f, -20.0f, 140.0f, 20.0f, 4.0f},
-    {50.0f, 8.0f, 120.0f, 140.0f, 20.0f, 4.0f},
-    {-20.0f, 8.0f, 50.0f, 4.0f, 20.0f, 140.0f},
-    {120.0f, 8.0f, 50.0f, 4.0f, 20.0f, 140.0f}
+    {150.0f, -6.0f, 150.0f, 420.0f, 12.0f, 420.0f},
+    {150.0f, 24.0f, -60.0f, 420.0f, 60.0f, 12.0f},
+    {150.0f, 24.0f, 360.0f, 420.0f, 60.0f, 12.0f},
+    {-60.0f, 24.0f, 150.0f, 12.0f, 60.0f, 420.0f},
+    {360.0f, 24.0f, 150.0f, 12.0f, 60.0f, 420.0f}
 };
 
 #define CITY_MAX_BOXES 2048
@@ -235,9 +235,9 @@ static inline void scene_spawn_point(int scene_id, int slot, float *out_x, float
         return;
     }
     if (scene_id == SCENE_CITY) {
-        *out_x = 50.0f;
-        *out_y = 5.0f;
-        *out_z = 58.0f;
+        *out_x = 150.0f;
+        *out_y = 15.0f;
+        *out_z = 174.0f;
         return;
     }
     if (slot % 2 == 0) {
@@ -287,7 +287,7 @@ static inline void scene_safety_check(PlayerState *p) {
         }
     }
     if (p->scene_id == SCENE_CITY) {
-        if (p->y < -30.0f || p->x < -30.0f || p->x > 130.0f || p->z < -30.0f || p->z > 130.0f) {
+        if (p->y < -90.0f || p->x < -90.0f || p->x > 390.0f || p->z < -90.0f || p->z > 390.0f) {
             scene_force_spawn(p);
         }
     }

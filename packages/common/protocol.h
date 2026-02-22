@@ -10,6 +10,17 @@
 #define SCENE_STADIUM 1
 #define SCENE_VOXWORLD 2
 #define SCENE_CITY 3
+#define SCENE_NEW_HANCLINGTON SCENE_CITY
+
+static inline const char *scene_id_name(int scene_id) {
+    switch (scene_id) {
+        case SCENE_GARAGE_OSAKA: return "SCENE_GARAGE_OSAKA";
+        case SCENE_STADIUM: return "SCENE_STADIUM";
+        case SCENE_VOXWORLD: return "SCENE_VOXWORLD";
+        case SCENE_CITY: return "SCENE_NEW_HANCLINGTON";
+        default: return "SCENE_UNKNOWN";
+    }
+}
 
 #define PACKET_CONNECT 0
 #define PACKET_USERCMD 1
