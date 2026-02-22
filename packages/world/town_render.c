@@ -31,11 +31,11 @@ static void draw_ring(float x, float z, float y, float radius, float r, float g,
 }
 
 void town_render_world(const CrisisMockState *state) {
-    draw_box(50.0f, -1.5f, 50.0f, 120.0f, 3.0f, 120.0f, 0.04f, 0.04f, 0.05f);
-    draw_box(50.0f, 2.0f, 50.0f, 100.0f, 4.0f, 2.0f, 0.12f, 0.12f, 0.14f);
-    draw_box(50.0f, 2.0f, 50.0f, 2.0f, 4.0f, 100.0f, 0.12f, 0.12f, 0.14f);
-    draw_box(50.0f, 2.0f, 100.0f, 100.0f, 4.0f, 2.0f, 0.20f, 0.20f, 0.22f);
-    draw_box(50.0f, 2.0f, 0.0f, 100.0f, 4.0f, 2.0f, 0.20f, 0.20f, 0.22f);
+    draw_box(150.0f, -4.5f, 150.0f, 360.0f, 9.0f, 360.0f, 0.04f, 0.04f, 0.05f);
+    draw_box(150.0f, 6.0f, 150.0f, 300.0f, 12.0f, 6.0f, 0.12f, 0.12f, 0.14f);
+    draw_box(150.0f, 6.0f, 150.0f, 6.0f, 12.0f, 300.0f, 0.12f, 0.12f, 0.14f);
+    draw_box(150.0f, 6.0f, 300.0f, 300.0f, 12.0f, 6.0f, 0.20f, 0.20f, 0.22f);
+    draw_box(150.0f, 6.0f, 0.0f, 300.0f, 12.0f, 6.0f, 0.20f, 0.20f, 0.22f);
 
     size_t bcount = 0;
     const TownBuilding *b = town_map_buildings(&bcount);
@@ -51,10 +51,10 @@ void town_render_world(const CrisisMockState *state) {
         if (s[i].id == SOCK_ANCHOR_AUCTION) { r = 0.1f; g = 1.0f; bcol = 1.0f; }
         else if (s[i].id == SOCK_RITUAL_TOWN_HALL) { r = 0.7f; g = 0.2f; bcol = 1.0f; }
         else if (s[i].id == SOCK_HEAD_A_DOCKS || s[i].id == SOCK_HEAD_B_MINES) { r = 1.0f; g = 0.1f; bcol = 0.1f; }
-        draw_box(s[i].x, 4.0f, s[i].z, 1.2f, 8.0f, 1.2f, r, g, bcol);
+        draw_box(s[i].x, 12.0f, s[i].z, 3.6f, 24.0f, 3.6f, r, g, bcol);
         draw_ring(s[i].x, s[i].z, 0.2f, s[i].radius, r, g, bcol);
         if (state && state->pressure_idx > 0 && (int)(i % 3) == (state->pressure_idx - 1)) {
-            draw_ring(s[i].x, s[i].z, 0.4f, s[i].radius + 1.3f, 1.0f, 1.0f, 1.0f);
+            draw_ring(s[i].x, s[i].z, 1.2f, s[i].radius + 3.9f, 1.0f, 1.0f, 1.0f);
         }
     }
 }
