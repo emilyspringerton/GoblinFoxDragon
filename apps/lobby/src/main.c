@@ -69,6 +69,7 @@ CrisisMockState crisis_mock_state;
 
 typedef struct {
     int id;
+    int source_scene_id;
     float x;
     float y;
     float z;
@@ -115,10 +116,14 @@ static int telecrystal_g_prev_down = 0;
 static unsigned int telecrystal_last_commit_ms = 0;
 static char travel_overlay_text[64] = "TRAVELING...";
 
-#define TELECRYSTAL_ID_MINES 1
+#define TELECRYSTAL_ID_TOWN_TO_MINES 1
+#define TELECRYSTAL_ID_MINES_RETURN_TOWN 2
+#define TELECRYSTAL_ID_MINES_STUB_CRYSTAL 3
+#define TELECRYSTAL_ID_MINES_SPLIT_CRYSTAL 4
 static const TelecrystalDef TELECRYSTAL_DEFS[] = {
     {
-        TELECRYSTAL_ID_MINES,
+        TELECRYSTAL_ID_TOWN_TO_MINES,
+        SCENE_CITY,
         270.0f, 0.0f, 60.0f,
         14.0f,
         "G: TELEPORT MINES",
@@ -127,10 +132,58 @@ static const TelecrystalDef TELECRYSTAL_DEFS[] = {
         600,
         1,
         SCENE_MINES,
-        0.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, -92.0f,
         0.0f,
         0.0f,
         "MINES"
+    },
+    {
+        TELECRYSTAL_ID_MINES_RETURN_TOWN,
+        SCENE_MINES,
+        0.0f, 0.0f, -92.0f,
+        10.0f,
+        "G: RETURN TOWN",
+        SDL_SCANCODE_G,
+        900,
+        500,
+        1,
+        SCENE_CITY,
+        270.0f, 0.0f, 60.0f,
+        180.0f,
+        0.0f,
+        "TOWN"
+    },
+    {
+        TELECRYSTAL_ID_MINES_STUB_CRYSTAL,
+        SCENE_MINES,
+        0.0f, 0.0f, 178.0f,
+        10.0f,
+        "G: CRYSTAL SHUNT",
+        SDL_SCANCODE_G,
+        900,
+        500,
+        1,
+        SCENE_MINES,
+        0.0f, 0.0f, 44.0f,
+        180.0f,
+        0.0f,
+        "MINE SPLIT"
+    },
+    {
+        TELECRYSTAL_ID_MINES_SPLIT_CRYSTAL,
+        SCENE_MINES,
+        0.0f, 0.0f, 44.0f,
+        8.0f,
+        "G: RETURN ENTRY",
+        SDL_SCANCODE_G,
+        900,
+        500,
+        1,
+        SCENE_MINES,
+        0.0f, 0.0f, -92.0f,
+        180.0f,
+        0.0f,
+        "MINE ENTRY"
     }
 };
 
@@ -469,6 +522,45 @@ static void town_draw_metadata_labels_2d(PlayerState *render_p, float cam_x, flo
     glEnable(GL_DEPTH_TEST);
 }
 
+static void mines_draw_route_labels_2d(PlayerState *render_p) {
+    if (!crisis_mock_state.labels_on) return;
+    if (render_p->scene_id != SCENE_MINES) return;
+
+    static const struct {
+        const char *text;
+        float x, y, z;
+        float r, g, b;
+    } labels[] = {
+        {"LOW ROUTE", -46.0f, 8.0f, 56.0f, 0.42f, 0.95f, 0.42f},
+        {"HIGH ROUTE", 52.0f, 10.0f, 58.0f, 1.00f, 0.35f, 0.35f},
+        {"CRYSTAL ROUTE", 0.0f, 9.0f, 100.0f, 0.40f, 0.88f, 1.00f},
+        {"DEEP CRYSTAL", 0.0f, 8.0f, 178.0f, 1.00f, 0.90f, 0.35f},
+        {"RETURN CRYSTAL", 0.0f, 8.0f, -92.0f, 1.00f, 0.70f, 0.25f}
+    };
+
+    GLdouble model[16], proj[16];
+    GLint view[4];
+    glGetDoublev(GL_MODELVIEW_MATRIX, model);
+    glGetDoublev(GL_PROJECTION_MATRIX, proj);
+    glGetIntegerv(GL_VIEWPORT, view);
+
+    glDisable(GL_DEPTH_TEST);
+    glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); glOrtho(0, 1280, 0, 720, -1, 1);
+    glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
+
+    for (size_t i = 0; i < sizeof(labels) / sizeof(labels[0]); i++) {
+        float sx = 0.0f, sy = 0.0f;
+        if (!project_world_to_screen(labels[i].x, labels[i].y, labels[i].z, model, proj, view, &sx, &sy)) continue;
+        if (sx < -20.0f || sx > 1300.0f || sy < -20.0f || sy > 740.0f) continue;
+        glColor3f(labels[i].r, labels[i].g, labels[i].b);
+        draw_string(labels[i].text, sx - 26.0f, sy - 8.0f, 2);
+    }
+
+    glMatrixMode(GL_PROJECTION); glPopMatrix();
+    glMatrixMode(GL_MODELVIEW); glPopMatrix();
+    glEnable(GL_DEPTH_TEST);
+}
+
 typedef enum {
     LOBBY_DEMO = 0,
     LOBBY_BATTLE,
@@ -654,7 +746,7 @@ static const TelecrystalDef *telecrystal_find_near_player(PlayerState *p) {
     float best_dist_sq = 0.0f;
     for (size_t i = 0; i < sizeof(TELECRYSTAL_DEFS) / sizeof(TELECRYSTAL_DEFS[0]); i++) {
         const TelecrystalDef *def = &TELECRYSTAL_DEFS[i];
-        if (p->scene_id != SCENE_CITY) continue;
+        if (p->scene_id != def->source_scene_id) continue;
         float dx = p->x - def->x;
         float dz = p->z - def->z;
         float dist_sq = dx * dx + dz * dz;
@@ -669,11 +761,12 @@ static const TelecrystalDef *telecrystal_find_near_player(PlayerState *p) {
 
 static void telecrystal_spawn_mines_mobs(void) {
     const float low_spawns[][3] = {
-        {-15.0f, 0.0f, 19.0f}, {-17.0f, 0.0f, 24.0f}, {-10.0f, 0.0f, 27.0f},
-        {-4.0f, 0.0f, 15.5f}
+        {-35.0f, 0.0f, 58.0f}, {-48.0f, 0.0f, 70.0f}, {-64.0f, 0.0f, 86.0f},
+        {-82.0f, 0.0f, 98.0f}, {-108.0f, 0.0f, 122.0f}, {-126.0f, 0.0f, 146.0f}
     };
     const float high_spawns[][3] = {
-        {11.0f, 0.0f, 19.0f}, {16.0f, 0.0f, 24.5f}, {19.0f, 0.0f, 30.0f}
+        {34.0f, 0.0f, 58.0f}, {48.0f, 0.0f, 76.0f}, {66.0f, 0.0f, 98.0f},
+        {86.0f, 0.0f, 126.0f}, {108.0f, 0.0f, 148.0f}
     };
 
     int slot = 1;
@@ -688,8 +781,8 @@ static void telecrystal_spawn_mines_mobs(void) {
         mob->scene_id = SCENE_MINES;
         mob->state = STATE_ALIVE;
         mob->x = low_spawns[i][0]; mob->y = low_spawns[i][1]; mob->z = low_spawns[i][2];
-        mob->health = 95; mob->shield = 35;
-        mob->level = 6 + (int)i;
+        mob->health = 90 + (int)i * 8; mob->shield = 28 + (int)i * 6;
+        mob->level = 5 + (int)i;
         mob->current_weapon = WPN_AR;
         for (int w = 0; w < MAX_WEAPONS; w++) mob->ammo[w] = WPN_STATS[w].ammo_max;
         init_genome(&mob->brain);
@@ -704,8 +797,8 @@ static void telecrystal_spawn_mines_mobs(void) {
         mob->scene_id = SCENE_MINES;
         mob->state = STATE_ALIVE;
         mob->x = high_spawns[i][0]; mob->y = high_spawns[i][1]; mob->z = high_spawns[i][2];
-        mob->health = 180; mob->shield = 130;
-        mob->level = 10 + (int)i;
+        mob->health = 175 + (int)i * 20; mob->shield = 120 + (int)i * 14;
+        mob->level = 11 + (int)i;
         mob->current_weapon = WPN_SNIPER;
         for (int w = 0; w < MAX_WEAPONS; w++) mob->ammo[w] = WPN_STATS[w].ammo_max;
         init_genome(&mob->brain);
@@ -742,7 +835,7 @@ static void world_teleport_player_to_scene(PlayerState *p, int scene_id,
     cam_pitch = spawn_pitch;
     telecast_state.type = TELECAST_NONE;
     telecast_state.committed = 1;
-    telecast_feedback_text = "TRAVELING: MINES";
+    telecast_feedback_text = source_def ? source_def->prompt_text : "TRAVELING";
     telecast_feedback_until_ms = now_ms + 900;
     travel_overlay_until_ms = now_ms + 900;
     snprintf(travel_overlay_text, sizeof(travel_overlay_text), "TRAVELING: %s", source_def ? source_def->target_name : "UNKNOWN");
@@ -751,8 +844,10 @@ static void world_teleport_player_to_scene(PlayerState *p, int scene_id,
         telecrystal_spawn_mines_mobs();
     }
 #if TELECRYSTAL_DEBUG
-    printf("[TELECRYSTAL] commit src=%d target=%s spawn=(%.1f,%.1f,%.1f) now=%u\n",
-           source_def ? source_def->id : -1, scene_id_name(scene_id), spawn_x, spawn_y, spawn_z, now_ms);
+    printf("[TELECRYSTAL] commit id=%d src_scene=%s dst_scene=%s spawn=(%.1f,%.1f,%.1f) now=%u\n",
+           source_def ? source_def->id : -1,
+           source_def ? scene_id_name(source_def->source_scene_id) : "UNKNOWN",
+           scene_id_name(scene_id), spawn_x, spawn_y, spawn_z, now_ms);
 #endif
 }
 
@@ -1430,15 +1525,29 @@ static void draw_garage_overlay(PlayerState *p) {
     glMatrixMode(GL_MODELVIEW); glPopMatrix();
 }
 
+static void telecrystal_ring_color(const TelecrystalDef *def, int in_range, float pulse) {
+    if (in_range) {
+        glColor3f(0.95f, 0.95f, 0.95f);
+        return;
+    }
+    if (def->target_scene_id == SCENE_MINES) {
+        glColor3f(0.38f, 0.72f + pulse * 0.3f, 1.0f);
+    } else if (def->target_scene_id == SCENE_CITY) {
+        glColor3f(1.0f, 0.58f + pulse * 0.25f, 0.25f);
+    } else {
+        glColor3f(0.55f + pulse * 0.35f, 1.0f, 0.85f);
+    }
+}
+
 static void draw_world_telecrystals(PlayerState *p) {
-    if (p->scene_id != SCENE_CITY) return;
     for (size_t i = 0; i < sizeof(TELECRYSTAL_DEFS) / sizeof(TELECRYSTAL_DEFS[0]); i++) {
         const TelecrystalDef *def = &TELECRYSTAL_DEFS[i];
+        if (def->source_scene_id != p->scene_id) continue;
         float pulse = 0.35f + 0.25f * sinf((float)SDL_GetTicks() * 0.009f);
         int in_range = (telecrystal_runtime.active_telecrystal_id == def->id && telecrystal_runtime.near_telecrystal);
         glPushMatrix();
         glTranslatef(def->x, 0.35f, def->z);
-        glColor3f(in_range ? 0.9f : 0.35f, in_range ? 0.95f : (0.55f + pulse), 1.0f);
+        telecrystal_ring_color(def, in_range, pulse);
         glBegin(GL_LINE_LOOP);
         for (int seg = 0; seg < 40; seg++) {
             float a = ((float)seg / 40.0f) * 6.2831853f;
@@ -1586,6 +1695,7 @@ void draw_scene(PlayerState *render_p) {
         town_render_world(&crisis_mock_state);
         draw_world_telecrystals(render_p);
     } else {
+        if (render_p->scene_id == SCENE_MINES) draw_world_telecrystals(render_p);
         draw_grid(); 
         update_and_draw_trails();
         draw_map();
@@ -1611,6 +1721,8 @@ void draw_scene(PlayerState *render_p) {
         char route_line[256] = {0};
         town_render_route_distances(render_p->x, render_p->z, route_line, sizeof(route_line));
         town_debug_ui_draw(&crisis_mock_state, route_line);
+    } else if (render_p->scene_id == SCENE_MINES) {
+        mines_draw_route_labels_2d(render_p);
     }
     draw_travel_overlay();
 }
