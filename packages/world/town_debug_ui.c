@@ -6,7 +6,9 @@
 
 static void draw_string2(const char *str, float x, float y, float size) {
     TurtlePen pen = turtle_pen_create(x, y, size);
-    turtle_draw_text(&pen, str);
+    TurtleTextLayout layout = turtle_text_layout_default();
+    layout.line_gap = 0.75f;
+    turtle_draw_text_ex(&pen, str, &layout);
 }
 
 void town_debug_ui_draw(const CrisisMockState *s, const char *routes_line) {
