@@ -67,6 +67,73 @@ float cam_pitch = 0.0f;
 float current_fov = 75.0f;
 CrisisMockState crisis_mock_state;
 
+typedef struct {
+    int id;
+    float x;
+    float y;
+    float z;
+    float ring_radius;
+    const char *prompt_text;
+    SDL_Scancode required_key;
+    unsigned int cast_total_ms;
+    unsigned int cast_commit_ms;
+    int cast_cancel_on_leave_ring;
+    int target_scene_id;
+    float spawn_x;
+    float spawn_y;
+    float spawn_z;
+    float spawn_yaw;
+    float spawn_pitch;
+    const char *target_name;
+} TelecrystalDef;
+
+typedef enum {
+    TELECAST_NONE = 0,
+    TELECAST_TELEPORT_ACTIVE
+} TelecastType;
+
+typedef struct {
+    TelecastType type;
+    unsigned int started_ms;
+    unsigned int commit_ms;
+    unsigned int total_ms;
+    int committed;
+    int source_interaction_id;
+} TelecastState;
+
+typedef struct {
+    int near_telecrystal;
+    int active_telecrystal_id;
+    int stable_inside;
+} TelecrystalRuntime;
+
+static TelecastState telecast_state = {0};
+static TelecrystalRuntime telecrystal_runtime = {0, -1, 0};
+static unsigned int telecast_feedback_until_ms = 0;
+static const char *telecast_feedback_text = NULL;
+static int telecrystal_g_prev_down = 0;
+static unsigned int telecrystal_last_commit_ms = 0;
+static char travel_overlay_text[64] = "TRAVELING...";
+
+#define TELECRYSTAL_ID_MINES 1
+static const TelecrystalDef TELECRYSTAL_DEFS[] = {
+    {
+        TELECRYSTAL_ID_MINES,
+        270.0f, 0.0f, 60.0f,
+        14.0f,
+        "G: TELEPORT MINES",
+        SDL_SCANCODE_G,
+        1000,
+        600,
+        1,
+        SCENE_MINES,
+        0.0f, 0.0f, 0.0f,
+        0.0f,
+        0.0f,
+        "MINES"
+    }
+};
+
 #define Z_FAR 8000.0f
 
 int sock = -1;
@@ -117,6 +184,8 @@ static unsigned char net_last_scene_id = 255;
 static unsigned char net_prev_is_shooting[MAX_CLIENTS];
 static int last_applied_scene_id = -999;
 
+static void telecrystal_reset_runtime(void);
+
 #ifndef NET_PARITY_DEBUG
 #define NET_PARITY_DEBUG 0
 #endif
@@ -127,6 +196,10 @@ static int last_applied_scene_id = -999;
 
 #ifndef DEBUG_BOOT_NEW_HANCLINGTON
 #define DEBUG_BOOT_NEW_HANCLINGTON 0
+#endif
+
+#ifndef TELECRYSTAL_DEBUG
+#define TELECRYSTAL_DEBUG 1
 #endif
 
 
@@ -415,7 +488,8 @@ typedef struct {
 static const LobbySceneOption LOBBY_SCENE_OPTIONS[] = {
     {"Garage", "GARAGE_OSAKA", SCENE_GARAGE_OSAKA},
     {"Stadium", "STADIUM", SCENE_STADIUM},
-    {"New Hanclington", "NEW_HANCLINGTON_MOCKUP", SCENE_NEW_HANCLINGTON}
+    {"New Hanclington", "NEW_HANCLINGTON_MOCKUP", SCENE_NEW_HANCLINGTON},
+    {"Mines", "MINES", SCENE_MINES}
 };
 
 static int lobby_scene_selection = 0;
@@ -496,6 +570,8 @@ static int lobby_resolve_scene_id(const char *scene_id) {
     if (strcmp(scene_id, "NEW_HANCLINGTON_MOCKUP") == 0) return SCENE_NEW_HANCLINGTON;
     if (strcmp(scene_id, "NEW_HANCLINGTON") == 0) return SCENE_NEW_HANCLINGTON;
     if (strcmp(scene_id, "SCENE_CITY") == 0) return SCENE_NEW_HANCLINGTON;
+    if (strcmp(scene_id, "MINES") == 0) return SCENE_MINES;
+    if (strcmp(scene_id, "SCENE_MINES") == 0) return SCENE_MINES;
     return -1;
 }
 
@@ -521,32 +597,237 @@ static void lobby_apply_ui_state() {
     if (strcmp(ui_state.active_mode_id, "mode.demo") == 0) {
         app_state = STATE_GAME_LOCAL;
         local_init_match(1, MODE_DEATHMATCH);
+        telecrystal_reset_runtime();
     } else if (strcmp(ui_state.active_mode_id, "mode.battle") == 0) {
         app_state = STATE_GAME_LOCAL;
         local_init_match(12, MODE_DEATHMATCH);
+        telecrystal_reset_runtime();
     } else if (strcmp(ui_state.active_mode_id, "mode.tdm") == 0) {
         app_state = STATE_GAME_LOCAL;
         local_init_match(12, MODE_TDM);
+        telecrystal_reset_runtime();
     } else if (strcmp(ui_state.active_mode_id, "mode.ctf") == 0) {
         app_state = STATE_GAME_LOCAL;
         local_init_match(8, MODE_CTF);
+        telecrystal_reset_runtime();
     } else if (strcmp(ui_state.active_mode_id, "mode.evolution") == 0) {
         app_state = STATE_GAME_LOCAL;
         local_init_match(8, MODE_EVOLUTION);
+        telecrystal_reset_runtime();
     } else if (strcmp(ui_state.active_mode_id, "mode.training") == 0) {
         app_state = STATE_GAME_LOCAL;
         local_init_match(1, MODE_DEATHMATCH);
+        telecrystal_reset_runtime();
     } else if (strcmp(ui_state.active_mode_id, "mode.recorder") == 0) {
         app_state = STATE_GAME_LOCAL;
         local_init_match(1, MODE_DEATHMATCH);
+        telecrystal_reset_runtime();
     } else if (strcmp(ui_state.active_mode_id, "mode.garage") == 0) {
         app_state = STATE_GAME_LOCAL;
         local_init_match(1, MODE_DEATHMATCH);
+        telecrystal_reset_runtime();
     } else {
         return;
     }
 
     lobby_apply_scene_id(ui_state.active_scene_id);
+}
+
+static const TelecrystalDef *telecrystal_find_by_id(int id) {
+    for (size_t i = 0; i < sizeof(TELECRYSTAL_DEFS) / sizeof(TELECRYSTAL_DEFS[0]); i++) {
+        if (TELECRYSTAL_DEFS[i].id == id) return &TELECRYSTAL_DEFS[i];
+    }
+    return NULL;
+}
+
+static int telecrystal_inside_ring(const TelecrystalDef *def, const PlayerState *p, float radius_pad) {
+    float radius = def->ring_radius + radius_pad;
+    float dx = p->x - def->x;
+    float dz = p->z - def->z;
+    return (dx * dx + dz * dz) <= (radius * radius);
+}
+
+static const TelecrystalDef *telecrystal_find_near_player(PlayerState *p) {
+    const TelecrystalDef *best = NULL;
+    float best_dist_sq = 0.0f;
+    for (size_t i = 0; i < sizeof(TELECRYSTAL_DEFS) / sizeof(TELECRYSTAL_DEFS[0]); i++) {
+        const TelecrystalDef *def = &TELECRYSTAL_DEFS[i];
+        if (p->scene_id != SCENE_CITY) continue;
+        float dx = p->x - def->x;
+        float dz = p->z - def->z;
+        float dist_sq = dx * dx + dz * dz;
+        if (dist_sq > (def->ring_radius * def->ring_radius)) continue;
+        if (!best || dist_sq < best_dist_sq) {
+            best = def;
+            best_dist_sq = dist_sq;
+        }
+    }
+    return best;
+}
+
+static void telecrystal_spawn_mines_mobs(void) {
+    const float low_spawns[][3] = {
+        {-15.0f, 0.0f, 19.0f}, {-17.0f, 0.0f, 24.0f}, {-10.0f, 0.0f, 27.0f},
+        {-4.0f, 0.0f, 15.5f}
+    };
+    const float high_spawns[][3] = {
+        {11.0f, 0.0f, 19.0f}, {16.0f, 0.0f, 24.5f}, {19.0f, 0.0f, 30.0f}
+    };
+
+    int slot = 1;
+    int low_count = 0;
+    int high_count = 0;
+    for (size_t i = 0; i < sizeof(low_spawns) / sizeof(low_spawns[0]); i++, slot++) {
+        PlayerState *mob = &local_state.players[slot];
+        memset(mob, 0, sizeof(*mob));
+        mob->id = slot;
+        mob->active = 1;
+        mob->is_bot = 1;
+        mob->scene_id = SCENE_MINES;
+        mob->state = STATE_ALIVE;
+        mob->x = low_spawns[i][0]; mob->y = low_spawns[i][1]; mob->z = low_spawns[i][2];
+        mob->health = 95; mob->shield = 35;
+        mob->level = 6 + (int)i;
+        mob->current_weapon = WPN_AR;
+        for (int w = 0; w < MAX_WEAPONS; w++) mob->ammo[w] = WPN_STATS[w].ammo_max;
+        init_genome(&mob->brain);
+        low_count++;
+    }
+    for (size_t i = 0; i < sizeof(high_spawns) / sizeof(high_spawns[0]); i++, slot++) {
+        PlayerState *mob = &local_state.players[slot];
+        memset(mob, 0, sizeof(*mob));
+        mob->id = slot;
+        mob->active = 1;
+        mob->is_bot = 1;
+        mob->scene_id = SCENE_MINES;
+        mob->state = STATE_ALIVE;
+        mob->x = high_spawns[i][0]; mob->y = high_spawns[i][1]; mob->z = high_spawns[i][2];
+        mob->health = 180; mob->shield = 130;
+        mob->level = 10 + (int)i;
+        mob->current_weapon = WPN_SNIPER;
+        for (int w = 0; w < MAX_WEAPONS; w++) mob->ammo[w] = WPN_STATS[w].ammo_max;
+        init_genome(&mob->brain);
+        high_count++;
+    }
+    for (int i = slot; i < MAX_CLIENTS; i++) {
+        if (i == 0) continue;
+        if (local_state.players[i].scene_id == SCENE_MINES) {
+            local_state.players[i].active = 0;
+        }
+    }
+#if TELECRYSTAL_DEBUG
+    printf("[TELECRYSTAL] mines mob init low=%d high=%d\n", low_count, high_count);
+#endif
+}
+
+static void world_teleport_player_to_scene(PlayerState *p, int scene_id,
+                                           float spawn_x, float spawn_y, float spawn_z,
+                                           float spawn_yaw, float spawn_pitch,
+                                           const TelecrystalDef *source_def,
+                                           unsigned int now_ms) {
+    p->scene_id = scene_id;
+    local_state.scene_id = scene_id;
+    phys_set_scene(scene_id);
+    p->x = spawn_x; p->y = spawn_y; p->z = spawn_z;
+    p->yaw = spawn_yaw; p->pitch = spawn_pitch;
+    p->vx = p->vy = p->vz = 0.0f;
+    p->in_use = 0;
+    p->in_jump = 0;
+    p->in_shoot = 0;
+    p->in_reload = 0;
+    p->crouching = 0;
+    cam_yaw = spawn_yaw;
+    cam_pitch = spawn_pitch;
+    telecast_state.type = TELECAST_NONE;
+    telecast_state.committed = 1;
+    telecast_feedback_text = "TRAVELING: MINES";
+    telecast_feedback_until_ms = now_ms + 900;
+    travel_overlay_until_ms = now_ms + 900;
+    snprintf(travel_overlay_text, sizeof(travel_overlay_text), "TRAVELING: %s", source_def ? source_def->target_name : "UNKNOWN");
+    for (int i = 0; i < MAX_PROJECTILES; i++) local_state.projectiles[i].active = 0;
+    if (scene_id == SCENE_MINES) {
+        telecrystal_spawn_mines_mobs();
+    }
+#if TELECRYSTAL_DEBUG
+    printf("[TELECRYSTAL] commit src=%d target=%s spawn=(%.1f,%.1f,%.1f) now=%u\n",
+           source_def ? source_def->id : -1, scene_id_name(scene_id), spawn_x, spawn_y, spawn_z, now_ms);
+#endif
+}
+
+static void telecrystal_update_proximity(PlayerState *p) {
+    int prev_near = telecrystal_runtime.near_telecrystal;
+    int prev_id = telecrystal_runtime.active_telecrystal_id;
+
+    const TelecrystalDef *def = telecrystal_find_by_id(telecrystal_runtime.active_telecrystal_id);
+    int still_inside = 0;
+    if (def) still_inside = telecrystal_inside_ring(def, p, 1.5f);
+    if (!still_inside) {
+        def = telecrystal_find_near_player(p);
+        telecrystal_runtime.stable_inside = def ? 1 : 0;
+    }
+    telecrystal_runtime.near_telecrystal = def ? 1 : 0;
+    telecrystal_runtime.active_telecrystal_id = def ? def->id : -1;
+
+#if TELECRYSTAL_DEBUG
+    if (!prev_near && telecrystal_runtime.near_telecrystal) {
+        printf("[TELECRYSTAL] entered id=%d\n", telecrystal_runtime.active_telecrystal_id);
+    } else if (prev_near && !telecrystal_runtime.near_telecrystal) {
+        printf("[TELECRYSTAL] left id=%d\n", prev_id);
+    }
+#endif
+}
+
+static void telecrystal_tick(PlayerState *p, int g_pressed_edge, unsigned int now_ms) {
+    telecrystal_update_proximity(p);
+    const TelecrystalDef *active_def = telecrystal_find_by_id(telecrystal_runtime.active_telecrystal_id);
+
+    if (telecast_state.type != TELECAST_NONE) {
+        const TelecrystalDef *cast_def = telecrystal_find_by_id(telecast_state.source_interaction_id);
+        unsigned int elapsed = now_ms - telecast_state.started_ms;
+        if (cast_def && cast_def->cast_cancel_on_leave_ring && !telecrystal_inside_ring(cast_def, p, 1.5f) && !telecast_state.committed) {
+            telecast_feedback_text = "TELEPORT INTERRUPTED";
+            telecast_feedback_until_ms = now_ms + 700;
+            telecast_state.type = TELECAST_NONE;
+#if TELECRYSTAL_DEBUG
+            printf("[TELECRYSTAL] cast cancel leave_ring id=%d\n", cast_def->id);
+#endif
+            return;
+        }
+        if (!telecast_state.committed && elapsed >= telecast_state.commit_ms && cast_def) {
+            telecast_state.committed = 1;
+            telecrystal_last_commit_ms = now_ms;
+            world_teleport_player_to_scene(p, cast_def->target_scene_id, cast_def->spawn_x, cast_def->spawn_y, cast_def->spawn_z,
+                                           cast_def->spawn_yaw, cast_def->spawn_pitch, cast_def, now_ms);
+            return;
+        }
+        if (elapsed >= telecast_state.total_ms) {
+            telecast_state.type = TELECAST_NONE;
+        }
+    }
+
+    if (g_pressed_edge && telecast_state.type == TELECAST_NONE && active_def) {
+        if (now_ms - telecrystal_last_commit_ms < 250) return;
+        telecast_state.type = TELECAST_TELEPORT_ACTIVE;
+        telecast_state.started_ms = now_ms;
+        telecast_state.commit_ms = active_def->cast_commit_ms;
+        telecast_state.total_ms = active_def->cast_total_ms;
+        telecast_state.committed = 0;
+        telecast_state.source_interaction_id = active_def->id;
+#if TELECRYSTAL_DEBUG
+        printf("[TELECRYSTAL] cast start id=%d commit=%ums total=%ums\n",
+               active_def->id, active_def->cast_commit_ms, active_def->cast_total_ms);
+#endif
+    }
+}
+
+static void telecrystal_reset_runtime(void) {
+    memset(&telecast_state, 0, sizeof(telecast_state));
+    telecrystal_runtime.near_telecrystal = 0;
+    telecrystal_runtime.active_telecrystal_id = -1;
+    telecrystal_runtime.stable_inside = 0;
+    telecrystal_g_prev_down = 0;
+    telecast_feedback_text = NULL;
+    telecast_feedback_until_ms = 0;
 }
 
 static void setup_lobby_2d() {
@@ -577,18 +858,23 @@ static void lobby_start_action(int action) {
         switch (action) {
             case LOBBY_DEMO:
                 local_init_match(1, MODE_DEATHMATCH);
+        telecrystal_reset_runtime();
                 break;
             case LOBBY_BATTLE:
                 local_init_match(12, MODE_DEATHMATCH);
+        telecrystal_reset_runtime();
                 break;
             case LOBBY_TDM:
                 local_init_match(12, MODE_TDM);
+        telecrystal_reset_runtime();
                 break;
             case LOBBY_CTF:
                 local_init_match(8, MODE_CTF);
+        telecrystal_reset_runtime();
                 break;
             case LOBBY_EVOLUTION:
                 local_init_match(8, MODE_EVOLUTION);
+        telecrystal_reset_runtime();
                 break;
             default:
                 break;
@@ -1080,6 +1366,7 @@ static void draw_garage_vehicle_pads() {
         glVertex3f(-3.0f, 0.0f, 3.0f);
         glEnd();
         glPopMatrix();
+
     }
 }
 
@@ -1141,6 +1428,85 @@ static void draw_garage_overlay(PlayerState *p) {
     glMatrixMode(GL_MODELVIEW); glPopMatrix();
 }
 
+static void draw_world_telecrystals(PlayerState *p) {
+    if (p->scene_id != SCENE_CITY) return;
+    for (size_t i = 0; i < sizeof(TELECRYSTAL_DEFS) / sizeof(TELECRYSTAL_DEFS[0]); i++) {
+        const TelecrystalDef *def = &TELECRYSTAL_DEFS[i];
+        float pulse = 0.35f + 0.25f * sinf((float)SDL_GetTicks() * 0.009f);
+        int in_range = (telecrystal_runtime.active_telecrystal_id == def->id && telecrystal_runtime.near_telecrystal);
+        glPushMatrix();
+        glTranslatef(def->x, 0.35f, def->z);
+        glColor3f(in_range ? 0.9f : 0.35f, in_range ? 0.95f : (0.55f + pulse), 1.0f);
+        glBegin(GL_LINE_LOOP);
+        for (int seg = 0; seg < 40; seg++) {
+            float a = ((float)seg / 40.0f) * 6.2831853f;
+            glVertex3f(cosf(a) * def->ring_radius, 0.0f, sinf(a) * def->ring_radius);
+        }
+        glEnd();
+        glPopMatrix();
+    }
+}
+
+static void draw_telecrystal_overlay(void) {
+    unsigned int now_ms = SDL_GetTicks();
+    glDisable(GL_DEPTH_TEST);
+    glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity();
+    glOrtho(0, 1280, 0, 720, -1, 1);
+    glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
+
+    if (telecast_feedback_text && now_ms < telecast_feedback_until_ms) {
+        glColor3f(1.0f, 0.3f, 0.2f);
+        draw_string(telecast_feedback_text, 500, 300, 6);
+    }
+
+    if (telecast_state.type != TELECAST_NONE) {
+        const TelecrystalDef *def = telecrystal_find_by_id(telecast_state.source_interaction_id);
+        unsigned int elapsed = now_ms - telecast_state.started_ms;
+        float t = telecast_state.total_ms > 0 ? (float)elapsed / (float)telecast_state.total_ms : 1.0f;
+        if (t > 1.0f) t = 1.0f;
+        glColor3f(0.95f, 0.9f, 0.25f);
+        char cast_line[96];
+        snprintf(cast_line, sizeof(cast_line), "CASTING TELEPORT: %s...", def ? def->target_name : "TARGET");
+        draw_string(cast_line, 430, 120, 6);
+
+        float x = 420.0f;
+        float y = 90.0f;
+        float w = 460.0f;
+        float h = 18.0f;
+        glColor3f(0.1f, 0.1f, 0.12f);
+        glRectf(x, y, x + w, y + h);
+        glColor3f(0.95f, 0.85f, 0.2f);
+        glRectf(x + 2.0f, y + 2.0f, x + 2.0f + (w - 4.0f) * t, y + h - 2.0f);
+
+        float commit_t = telecast_state.total_ms > 0 ? (float)telecast_state.commit_ms / (float)telecast_state.total_ms : 1.0f;
+        float marker_x = x + w * commit_t;
+        glColor3f(1.0f, 0.25f, 0.25f);
+        glBegin(GL_LINES);
+        glVertex2f(marker_x, y - 6.0f);
+        glVertex2f(marker_x, y + h + 6.0f);
+        glEnd();
+
+        if (def) {
+            char line[96];
+            snprintf(line, sizeof(line), "COMMIT %ums / TOTAL %ums", def->cast_commit_ms, def->cast_total_ms);
+            glColor3f(0.8f, 0.85f, 1.0f);
+            draw_string(line, 500, 65, 4);
+        }
+    } else if (telecrystal_runtime.near_telecrystal) {
+        const TelecrystalDef *def = telecrystal_find_by_id(telecrystal_runtime.active_telecrystal_id);
+        if (def) {
+            glColor3f(1.0f, 0.95f, 0.2f);
+            draw_string(def->prompt_text, 510, 110, 7);
+            glColor3f(1.0f, 0.6f, 0.2f);
+            draw_string("WARNING: WORM TUNNELS", 472, 84, 4);
+        }
+    }
+
+    glMatrixMode(GL_PROJECTION); glPopMatrix();
+    glMatrixMode(GL_MODELVIEW); glPopMatrix();
+    glEnable(GL_DEPTH_TEST);
+}
+
 void draw_projectiles() {
     glDisable(GL_TEXTURE_2D);
     glPointSize(6.0f);
@@ -1162,6 +1528,7 @@ static void client_apply_scene_id(int scene_id, unsigned int now_ms) {
         local_state.scene_id = scene_id;
         phys_set_scene(scene_id);
         travel_overlay_until_ms = now_ms + 500;
+        snprintf(travel_overlay_text, sizeof(travel_overlay_text), "TRAVELING...");
         for (int i = 0; i < MAX_PROJECTILES; i++) {
             local_state.projectiles[i].active = 0;
         }
@@ -1177,7 +1544,7 @@ static void draw_travel_overlay() {
     glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
 
     glColor3f(0.9f, 0.9f, 0.2f);
-    draw_string("TRAVELING...", 520, 360, 8);
+    draw_string(travel_overlay_text, 480, 360, 7);
 
     glMatrixMode(GL_PROJECTION); glPopMatrix();
     glMatrixMode(GL_MODELVIEW); glPopMatrix();
@@ -1215,6 +1582,7 @@ void draw_scene(PlayerState *render_p) {
     
     if (render_p->scene_id == SCENE_CITY) {
         town_render_world(&crisis_mock_state);
+        draw_world_telecrystals(render_p);
     } else {
         draw_grid(); 
         update_and_draw_trails();
@@ -1231,6 +1599,7 @@ void draw_scene(PlayerState *render_p) {
         draw_player_3rd(p);
     }
     draw_weapon_p(render_p); draw_hud(render_p); draw_garage_overlay(render_p);
+    draw_telecrystal_overlay();
     if (render_p->scene_id == SCENE_CITY) {
         float cam_world_x = (render_p->x + reconcile_x) - cx;
         float cam_world_y = (render_p->y + reconcile_y) + cam_y;
@@ -1864,6 +2233,7 @@ int main(int argc, char* argv[]) {
     net_init();
     
     local_init_match(1, 0);
+    telecrystal_reset_runtime();
     lobby_init_labels();
     printf("[SCENE] startup request=GARAGE_OSAKA resolved=%s (%d)\n", scene_id_name(SCENE_GARAGE_OSAKA), SCENE_GARAGE_OSAKA);
 #if DEBUG_BOOT_NEW_HANCLINGTON
@@ -2080,6 +2450,9 @@ int main(int argc, char* argv[]) {
             int shoot = (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT));
             int reload = k[SDL_SCANCODE_R];
             int use = k[SDL_SCANCODE_F];
+            int g_down = k[SDL_SCANCODE_G];
+            int g_pressed_edge = g_down && !telecrystal_g_prev_down;
+            telecrystal_g_prev_down = g_down;
             int ability = k[SDL_SCANCODE_E];
             if(k[SDL_SCANCODE_1]) wpn_req=0; if(k[SDL_SCANCODE_2]) wpn_req=1;
             if(k[SDL_SCANCODE_3]) wpn_req=2; if(k[SDL_SCANCODE_4]) wpn_req=3; if(k[SDL_SCANCODE_5]) wpn_req=4;
@@ -2107,8 +2480,10 @@ int main(int argc, char* argv[]) {
                 client_decay_pending_correction(SDL_GetTicks());
                 net_apply_remote_interpolation(SDL_GetTicks());
             } else {
+                unsigned int now_ms = SDL_GetTicks();
+                telecrystal_tick(&local_state.players[0], g_pressed_edge, now_ms);
                 local_state.players[0].in_use = use;
-                if (use && local_state.players[0].vehicle_cooldown == 0 && local_state.transition_timer == 0) {
+                if (use && local_state.players[0].vehicle_cooldown == 0 && local_state.transition_timer == 0 && telecast_state.type == TELECAST_NONE) {
                     PlayerState *p0 = &local_state.players[0];
                     int in_garage = local_state.scene_id == SCENE_GARAGE_OSAKA;
                     int portal_id = -1;
@@ -2130,7 +2505,6 @@ int main(int argc, char* argv[]) {
                     }
                 }
                 if(local_state.players[0].vehicle_cooldown > 0) local_state.players[0].vehicle_cooldown--;
-                unsigned int now_ms = SDL_GetTicks();
                 if (local_state.players[0].scene_id == SCENE_CITY && crisis_mock_state.noclip_on) {
                     float rad = cam_yaw * 0.01745f;
                     float speed = 0.9f;
