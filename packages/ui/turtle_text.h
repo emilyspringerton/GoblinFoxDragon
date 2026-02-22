@@ -13,6 +13,17 @@ typedef struct {
     int pen_down;
 } TurtlePen;
 
+typedef struct {
+    /* Additional spacing between lines, expressed in glyph-cell units. */
+    float line_gap;
+} TurtleTextLayout;
+
+static inline TurtleTextLayout turtle_text_layout_default(void) {
+    TurtleTextLayout layout;
+    layout.line_gap = 0.0f;
+    return layout;
+}
+
 static inline TurtlePen turtle_pen_create(float x, float y, float scale) {
     TurtlePen pen;
     pen.x = x;
@@ -189,10 +200,50 @@ static inline void turtle_draw_glyph(TurtlePen *pen, char c) {
     pen->x += cell * 6.0f;
 }
 
-static inline void turtle_draw_text(TurtlePen *pen, const char *text) {
-    for (size_t i = 0; i < strlen(text); i++) {
+static inline void turtle_draw_text_ex(TurtlePen *pen, const char *text, const TurtleTextLayout *layout) {
+    const float start_x = pen->x;
+    const float line_step = (pen->scale * 8.0f) + (pen->scale * (layout ? layout->line_gap : 0.0f));
+    for (size_t i = 0; text[i] != '\0'; i++) {
+        if (text[i] == '\n') {
+            pen->x = start_x;
+            pen->y -= line_step;
+            continue;
+        }
         turtle_draw_glyph(pen, text[i]);
     }
+}
+
+static inline void turtle_draw_text(TurtlePen *pen, const char *text) {
+    TurtleTextLayout layout = turtle_text_layout_default();
+    turtle_draw_text_ex(pen, text, &layout);
+}
+
+static inline void turtle_measure_text_ex(const TurtlePen *pen, const char *text, const TurtleTextLayout *layout, float *out_w, float *out_h) {
+    float max_w = 0.0f;
+    float line_w = 0.0f;
+    float line_count = 1.0f;
+    float glyph_w = pen->scale * 6.0f;
+    float line_h = pen->scale * 8.0f;
+    float line_gap = pen->scale * (layout ? layout->line_gap : 0.0f);
+
+    for (size_t i = 0; text[i] != '\0'; i++) {
+        if (text[i] == '\n') {
+            if (line_w > max_w) max_w = line_w;
+            line_w = 0.0f;
+            line_count += 1.0f;
+            continue;
+        }
+        line_w += glyph_w;
+    }
+    if (line_w > max_w) max_w = line_w;
+
+    if (out_w) *out_w = max_w;
+    if (out_h) *out_h = (line_count * line_h) + ((line_count - 1.0f) * line_gap);
+}
+
+static inline void turtle_measure_text(const TurtlePen *pen, const char *text, float *out_w, float *out_h) {
+    TurtleTextLayout layout = turtle_text_layout_default();
+    turtle_measure_text_ex(pen, text, &layout, out_w, out_h);
 }
 
 #endif
