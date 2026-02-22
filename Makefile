@@ -6,13 +6,13 @@ BIN_DIR  := bin
 
 # ---- Flags ----
 CFLAGS   := -O2 -Wall -D_REENTRANT
-INCLUDES := -Ipackages/common -Ipackages/simulation
+INCLUDES := -Ipackages/common -Ipackages/simulation -Ipackages/world -Ipackages/ui
 
 LIBS_GL  := -lSDL2 -lGL -lGLU -lm
 LIBS_M   := -lm
 
 # ---- Sources ----
-LOBBY_SRC    := apps/lobby/src/main.c
+LOBBY_SRC    := apps/lobby/src/main.c packages/world/town_map.c packages/world/town_render.c packages/world/crisis_mock_state.c packages/world/town_debug_ui.c
 SERVER_SRC   := apps/server/src/main.c
 SERVERCTL_SRC:= apps/server/serverctl.c
 
@@ -37,7 +37,7 @@ lobby: $(LOBBY_BIN)
 
 $(LOBBY_BIN): $(LOBBY_SRC) | $(BIN_DIR)
 	@echo "🔨 Building Lobby Client..."
-	$(CC) $(CFLAGS) $(INCLUDES) $< -o $@ $(LIBS_GL)
+	$(CC) $(CFLAGS) $(INCLUDES) $(LOBBY_SRC) -o $@ $(LIBS_GL)
 
 # ---- GAME SERVER ----
 server: $(SERVER_BIN)
