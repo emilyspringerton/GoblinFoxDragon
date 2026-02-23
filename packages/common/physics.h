@@ -206,6 +206,52 @@ static const Box map_geo_warehouse[] = {
     // Back-wall catwalk illusion ledge
     {0.0f, 24.0f, -82.0f, 144.0f, 2.0f, 12.0f}
 };
+
+static const Box map_geo_docks[] = {
+    {0.0f, -2.0f, 32.0f, 520.0f, 4.0f, 560.0f},
+    {0.0f, 30.0f, -248.0f, 520.0f, 60.0f, 10.0f},
+    {0.0f, 30.0f, 312.0f, 520.0f, 60.0f, 10.0f},
+    {-258.0f, 30.0f, 32.0f, 10.0f, 60.0f, 560.0f},
+    {258.0f, 30.0f, 32.0f, 10.0f, 60.0f, 560.0f},
+
+    {-178.0f, 1.0f, -168.0f, 74.0f, 2.0f, 74.0f},
+    {-178.0f, 5.0f, -130.0f, 74.0f, 10.0f, 4.0f},
+
+    {-86.0f, 0.5f, 22.0f, 8.0f, 1.0f, 468.0f},
+    {-66.0f, 0.5f, 22.0f, 8.0f, 1.0f, 468.0f},
+    {-46.0f, 0.5f, 22.0f, 8.0f, 1.0f, 468.0f},
+    {-76.0f, 4.0f, -34.0f, 20.0f, 8.0f, 48.0f},
+    {-76.0f, 4.0f, 54.0f, 20.0f, 8.0f, 48.0f},
+    {-76.0f, 4.0f, 138.0f, 20.0f, 8.0f, 44.0f},
+
+    {126.0f, 26.0f, -88.0f, 148.0f, 52.0f, 92.0f},
+    {126.0f, 26.0f, 26.0f, 148.0f, 52.0f, 92.0f},
+    {126.0f, 26.0f, 140.0f, 148.0f, 52.0f, 92.0f},
+    {56.0f, 7.0f, -30.0f, 8.0f, 14.0f, 260.0f},
+
+    {-2.0f, 4.0f, -18.0f, 42.0f, 8.0f, 16.0f},
+    {22.0f, 8.0f, -18.0f, 20.0f, 16.0f, 16.0f},
+    {-24.0f, 4.0f, 22.0f, 42.0f, 8.0f, 16.0f},
+    {6.0f, 8.0f, 22.0f, 20.0f, 16.0f, 16.0f},
+    {-4.0f, 4.0f, 62.0f, 42.0f, 8.0f, 16.0f},
+    {20.0f, 8.0f, 62.0f, 20.0f, 16.0f, 16.0f},
+    {-28.0f, 4.0f, 104.0f, 42.0f, 8.0f, 16.0f},
+
+    {-12.0f, 1.0f, 232.0f, 470.0f, 2.0f, 44.0f},
+    {-12.0f, 6.0f, 252.0f, 470.0f, 10.0f, 6.0f},
+    {-162.0f, 20.0f, 286.0f, 132.0f, 40.0f, 34.0f},
+    {92.0f, 22.0f, 286.0f, 168.0f, 44.0f, 38.0f},
+    {-198.0f, 28.0f, 256.0f, 8.0f, 56.0f, 8.0f},
+    {-150.0f, 28.0f, 256.0f, 8.0f, 56.0f, 8.0f},
+    {44.0f, 30.0f, 256.0f, 8.0f, 60.0f, 8.0f},
+    {96.0f, 30.0f, 256.0f, 8.0f, 60.0f, 8.0f},
+
+    {-206.0f, 10.0f, 126.0f, 22.0f, 20.0f, 22.0f},
+    {-178.0f, 8.0f, 86.0f, 18.0f, 16.0f, 18.0f},
+    {-202.0f, 8.0f, 54.0f, 20.0f, 16.0f, 16.0f},
+    {216.0f, 6.0f, 236.0f, 48.0f, 12.0f, 24.0f},
+    {238.0f, 14.0f, 254.0f, 6.0f, 28.0f, 6.0f}
+};
 #define CITY_MAX_BOXES 2048
 static Box map_geo_voxworld[CITY_MAX_BOXES];
 static int map_geo_voxworld_count = 0;
@@ -231,6 +277,9 @@ static int map_count = 0;
 #define WAREHOUSE_KILL_Y -70.0f
 #define WAREHOUSE_BOUNDS_X 184.0f
 #define WAREHOUSE_BOUNDS_Z 236.0f
+#define DOCKS_KILL_Y -80.0f
+#define DOCKS_BOUNDS_X 260.0f
+#define DOCKS_BOUNDS_Z 300.0f
 #define VOXWORLD_SEED 1337
 
 #define GARAGE_PORTAL_X 0.0f
@@ -327,6 +376,9 @@ static inline void phys_set_scene(int scene_id) {
     } else if (scene_id == SCENE_WAREHOUSE) {
         map_geo = map_geo_warehouse;
         map_count = (int)(sizeof(map_geo_warehouse) / sizeof(Box));
+    } else if (scene_id == SCENE_DOCKS) {
+        map_geo = map_geo_docks;
+        map_count = (int)(sizeof(map_geo_docks) / sizeof(Box));
     } else {
         map_geo = map_geo_stadium;
         map_count = (int)(sizeof(map_geo_stadium) / sizeof(Box));
@@ -368,6 +420,14 @@ static inline void scene_spawn_point(int scene_id, int slot, float *out_x, float
         *out_x = offsets[idx];
         *out_y = 0.0f;
         *out_z = -62.0f;
+        return;
+    }
+    if (scene_id == SCENE_DOCKS) {
+        float offsets[] = {-190.0f, -182.0f, -174.0f, -166.0f, -158.0f};
+        int idx = slot % 5;
+        *out_x = offsets[idx];
+        *out_y = 0.0f;
+        *out_z = -168.0f;
         return;
     }
     if (slot % 2 == 0) {
@@ -434,6 +494,14 @@ static inline void scene_safety_check(PlayerState *p) {
         if (p->y < WAREHOUSE_KILL_Y ||
             p->x < -WAREHOUSE_BOUNDS_X || p->x > WAREHOUSE_BOUNDS_X ||
             p->z < -WAREHOUSE_BOUNDS_Z || p->z > WAREHOUSE_BOUNDS_Z) {
+            scene_force_spawn(p);
+        }
+        return;
+    }
+    if (p->scene_id == SCENE_DOCKS) {
+        if (p->y < DOCKS_KILL_Y ||
+            p->x < -DOCKS_BOUNDS_X || p->x > DOCKS_BOUNDS_X ||
+            p->z < -DOCKS_BOUNDS_Z || p->z > DOCKS_BOUNDS_Z) {
             scene_force_spawn(p);
         }
     }
