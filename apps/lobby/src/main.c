@@ -120,6 +120,8 @@ static char travel_overlay_text[64] = "TRAVELING...";
 #define TELECRYSTAL_ID_MINES_RETURN_TOWN 2
 #define TELECRYSTAL_ID_MINES_STUB_CRYSTAL 3
 #define TELECRYSTAL_ID_MINES_SPLIT_CRYSTAL 4
+#define TELECRYSTAL_ID_TOWN_TO_DOCKS 5
+#define TELECRYSTAL_ID_DOCKS_RETURN_TOWN 6
 static const TelecrystalDef TELECRYSTAL_DEFS[] = {
     {
         TELECRYSTAL_ID_TOWN_TO_MINES,
@@ -184,6 +186,38 @@ static const TelecrystalDef TELECRYSTAL_DEFS[] = {
         180.0f,
         0.0f,
         "MINE ENTRY"
+    },
+    {
+        TELECRYSTAL_ID_TOWN_TO_DOCKS,
+        SCENE_CITY,
+        308.0f, 0.0f, 246.0f,
+        14.0f,
+        "G: TELEPORT DOCKS",
+        SDL_SCANCODE_G,
+        1000,
+        600,
+        1,
+        SCENE_DOCKS,
+        -178.0f, 0.0f, -168.0f,
+        95.0f,
+        0.0f,
+        "DOCKS"
+    },
+    {
+        TELECRYSTAL_ID_DOCKS_RETURN_TOWN,
+        SCENE_DOCKS,
+        -178.0f, 0.0f, -168.0f,
+        11.0f,
+        "G: RETURN TOWN",
+        SDL_SCANCODE_G,
+        900,
+        500,
+        1,
+        SCENE_CITY,
+        300.0f, 0.0f, 238.0f,
+        210.0f,
+        0.0f,
+        "TOWN"
     }
 };
 
@@ -561,6 +595,48 @@ static void mines_draw_route_labels_2d(PlayerState *render_p) {
     glEnable(GL_DEPTH_TEST);
 }
 
+
+static void docks_draw_route_labels_2d(PlayerState *render_p) {
+    if (!crisis_mock_state.labels_on) return;
+    if (render_p->scene_id != SCENE_DOCKS) return;
+
+    static const struct {
+        const char *text;
+        float x, y, z;
+        float r, g, b;
+    } labels[] = {
+        {"CRYSTAL YARD", -178.0f, 8.0f, -168.0f, 1.00f, 0.82f, 0.32f},
+        {"FREIGHT SPINE", -72.0f, 7.0f, 40.0f, 0.42f, 0.95f, 0.42f},
+        {"CONTAINER MAZE", -8.0f, 8.0f, 62.0f, 0.40f, 0.88f, 1.00f},
+        {"WAREHOUSE APRON", 126.0f, 24.0f, 22.0f, 1.00f, 0.35f, 0.35f},
+        {"QUAYSIDE", -16.0f, 9.0f, 234.0f, 0.98f, 0.70f, 0.28f},
+        {"FERRY STUB", 216.0f, 10.0f, 236.0f, 0.76f, 0.76f, 1.00f},
+        {"RETURN CRYSTAL", -178.0f, 8.0f, -168.0f, 1.00f, 0.70f, 0.25f}
+    };
+
+    GLdouble model[16], proj[16];
+    GLint view[4];
+    glGetDoublev(GL_MODELVIEW_MATRIX, model);
+    glGetDoublev(GL_PROJECTION_MATRIX, proj);
+    glGetIntegerv(GL_VIEWPORT, view);
+
+    glDisable(GL_DEPTH_TEST);
+    glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); glOrtho(0, 1280, 0, 720, -1, 1);
+    glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
+
+    for (size_t i = 0; i < sizeof(labels) / sizeof(labels[0]); i++) {
+        float sx = 0.0f, sy = 0.0f;
+        if (!project_world_to_screen(labels[i].x, labels[i].y, labels[i].z, model, proj, view, &sx, &sy)) continue;
+        if (sx < -20.0f || sx > 1300.0f || sy < -20.0f || sy > 740.0f) continue;
+        glColor3f(labels[i].r, labels[i].g, labels[i].b);
+        draw_string(labels[i].text, sx - 24.0f, sy - 8.0f, 2);
+    }
+
+    glMatrixMode(GL_PROJECTION); glPopMatrix();
+    glMatrixMode(GL_MODELVIEW); glPopMatrix();
+    glEnable(GL_DEPTH_TEST);
+}
+
 typedef enum {
     LOBBY_DEMO = 0,
     LOBBY_BATTLE,
@@ -584,7 +660,8 @@ static const LobbySceneOption LOBBY_SCENE_OPTIONS[] = {
     {"Stadium", "STADIUM", SCENE_STADIUM},
     {"New Hanclington", "NEW_HANCLINGTON_MOCKUP", SCENE_NEW_HANCLINGTON},
     {"Warehouse", "WAREHOUSE", SCENE_WAREHOUSE},
-    {"Mines", "MINES", SCENE_MINES}
+    {"Mines", "MINES", SCENE_MINES},
+    {"Docks", "DOCKS", SCENE_DOCKS}
 };
 
 static int lobby_scene_selection = 0;
@@ -669,6 +746,8 @@ static int lobby_resolve_scene_id(const char *scene_id) {
     if (strcmp(scene_id, "SCENE_WAREHOUSE") == 0) return SCENE_WAREHOUSE;
     if (strcmp(scene_id, "MINES") == 0) return SCENE_MINES;
     if (strcmp(scene_id, "SCENE_MINES") == 0) return SCENE_MINES;
+    if (strcmp(scene_id, "DOCKS") == 0) return SCENE_DOCKS;
+    if (strcmp(scene_id, "SCENE_DOCKS") == 0) return SCENE_DOCKS;
     return -1;
 }
 
@@ -818,6 +897,14 @@ static void telecrystal_spawn_mines_mobs(void) {
 #endif
 }
 
+static void telecrystal_spawn_docks_mobs(void) {
+    for (int i = 1; i < MAX_CLIENTS; i++) {
+        if (local_state.players[i].scene_id == SCENE_DOCKS) {
+            local_state.players[i].active = 0;
+        }
+    }
+}
+
 static void world_teleport_player_to_scene(PlayerState *p, int scene_id,
                                            float spawn_x, float spawn_y, float spawn_z,
                                            float spawn_yaw, float spawn_pitch,
@@ -845,6 +932,8 @@ static void world_teleport_player_to_scene(PlayerState *p, int scene_id,
     for (int i = 0; i < MAX_PROJECTILES; i++) local_state.projectiles[i].active = 0;
     if (scene_id == SCENE_MINES) {
         telecrystal_spawn_mines_mobs();
+    } else if (scene_id == SCENE_DOCKS) {
+        telecrystal_spawn_docks_mobs();
     }
 #if TELECRYSTAL_DEBUG
     printf("[TELECRYSTAL] commit id=%d src_scene=%s dst_scene=%s spawn=(%.1f,%.1f,%.1f) now=%u\n",
@@ -1546,6 +1635,8 @@ static void telecrystal_ring_color(const TelecrystalDef *def, int in_range, floa
     }
     if (def->target_scene_id == SCENE_MINES) {
         glColor3f(0.38f, 0.72f + pulse * 0.3f, 1.0f);
+    } else if (def->target_scene_id == SCENE_DOCKS) {
+        glColor3f(0.18f, 0.80f + pulse * 0.18f, 0.95f);
     } else if (def->target_scene_id == SCENE_CITY) {
         glColor3f(1.0f, 0.58f + pulse * 0.25f, 0.25f);
     } else {
@@ -1709,7 +1800,7 @@ void draw_scene(PlayerState *render_p) {
         town_render_world(&crisis_mock_state);
         draw_world_telecrystals(render_p);
     } else {
-        if (render_p->scene_id == SCENE_MINES) draw_world_telecrystals(render_p);
+        if (render_p->scene_id == SCENE_MINES || render_p->scene_id == SCENE_DOCKS) draw_world_telecrystals(render_p);
         draw_grid(); 
         update_and_draw_trails();
         draw_map();
@@ -1737,6 +1828,9 @@ void draw_scene(PlayerState *render_p) {
         town_debug_ui_draw(&crisis_mock_state, route_line);
     } else if (render_p->scene_id == SCENE_MINES) {
         mines_draw_route_labels_2d(render_p);
+    } else if (render_p->scene_id == SCENE_DOCKS) {
+        docks_draw_route_labels_2d(render_p);
+        draw_string("DOCKS DISTRICT / FREIGHT QUAY", 42.0f, 92.0f, 4);
     } else if (render_p->scene_id == SCENE_WAREHOUSE) {
         draw_string("WAREHOUSE FLOOR / LOADING YARD", 42.0f, 92.0f, 4);
     }
