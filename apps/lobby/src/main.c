@@ -26,6 +26,8 @@
 
 #include "player_model.h"
 #include "../../../packages/ui/turtle_text.h"
+#include "../../../packages/iduna_client/iduna_auth.h"
+#include "../../../packages/iduna_client/iduna_storage.h"
 #define UI_BRIDGE_DECL static
 #include "../../../packages/ui/ui_bridge.h"
 #include "../../../packages/ui/ui_bridge.c"
@@ -61,6 +63,9 @@ unsigned int ui_last_click_ms = 0;
 int ui_last_click_index = -1;
 char ui_edit_buffer[64];
 unsigned int travel_overlay_until_ms = 0;
+static IdunaAuth g_iduna_auth;
+static int g_enter_world_queued = 0;
+static const char *IDUNA_API_BASE = "https://iduna.yourdomain.com";
 
 float cam_yaw = 0.0f;
 float cam_pitch = 0.0f;
@@ -1026,6 +1031,73 @@ static void setup_lobby_2d() {
     gluOrtho2D(0, 1280, 0, 720);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
+}
+
+static void draw_iduna_overlay(const IdunaAuth *auth) {
+    if (!auth || !auth->overlay_open) return;
+
+    setup_lobby_2d();
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    float x0 = 250.0f;
+    float y0 = 180.0f;
+    float w = 780.0f;
+    float h = 360.0f;
+
+    glColor4f(0.02f, 0.02f, 0.02f, 0.92f);
+    glBegin(GL_QUADS);
+    glVertex2f(x0, y0);
+    glVertex2f(x0 + w, y0);
+    glVertex2f(x0 + w, y0 + h);
+    glVertex2f(x0, y0 + h);
+    glEnd();
+
+    glLineWidth(2.5f);
+    glColor3f(0.0f, 1.0f, 1.0f);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(x0, y0);
+    glVertex2f(x0 + w, y0);
+    glVertex2f(x0 + w, y0 + h);
+    glVertex2f(x0, y0 + h);
+    glEnd();
+
+    glColor3f(0.0f, 1.0f, 1.0f);
+    draw_string("IDUNA DEVICE LOGIN", x0 + 35.0f, y0 + h - 55.0f, 6);
+    glColor3f(0.7f, 0.9f, 1.0f);
+    draw_string("URL", x0 + 35.0f, y0 + h - 105.0f, 4);
+    draw_string(auth->verification_url[0] ? auth->verification_url : "WAITING...", x0 + 35.0f, y0 + h - 130.0f, 3);
+
+    glColor3f(0.0f, 1.0f, 1.0f);
+    draw_string("CODE", x0 + 35.0f, y0 + h - 190.0f, 4);
+    draw_string(auth->user_code[0] ? auth->user_code : "----", x0 + 35.0f, y0 + h - 230.0f, 8);
+
+    glColor3f(0.6f, 0.95f, 1.0f);
+    draw_string("O: OPEN BROWSER", x0 + 35.0f, y0 + 70.0f, 4);
+    draw_string("R: RESTART AUTH", x0 + 35.0f, y0 + 45.0f, 4);
+    draw_string("ESC: CANCEL", x0 + 35.0f, y0 + 20.0f, 4);
+
+    glColor3f(0.7f, 1.0f, 1.0f);
+    draw_string(auth->status_msg, x0 + 320.0f, y0 + 20.0f, 3);
+
+    glDisable(GL_BLEND);
+}
+
+static void iduna_maybe_enter_world(void) {
+    if (!g_enter_world_queued) return;
+    g_enter_world_queued = 0;
+    g_iduna_auth.overlay_open = 0;
+    iduna_storage_save_jwt(g_iduna_auth.api_base, g_iduna_auth.access_token);
+    app_state = STATE_GAME_LOCAL;
+    local_init_match(1, MODE_DEATHMATCH);
+    telecrystal_reset_runtime();
+    lobby_apply_scene_id("SCENE_CITY");
+    SDL_SetRelativeMouseMode(SDL_TRUE);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluPerspective(75.0, 1280.0/720.0, 0.1, Z_FAR);
+    glMatrixMode(GL_MODELVIEW);
+    glEnable(GL_DEPTH_TEST);
 }
 
 static void lobby_start_action(int action) {
@@ -2467,6 +2539,12 @@ int main(int argc, char* argv[]) {
            scene_id_name(SCENE_NEW_HANCLINGTON), SCENE_NEW_HANCLINGTON);
 #endif
     ui_bridge_init("127.0.0.1", 17777);
+    iduna_auth_init(&g_iduna_auth);
+    g_iduna_auth.overlay_open = 1;
+    iduna_auth_try_resume_saved(&g_iduna_auth, IDUNA_API_BASE);
+    if (g_iduna_auth.state == IDUNA_READY) {
+        g_enter_world_queued = 1;
+    }
     if (ui_bridge_fetch_state(&ui_state)) {
         ui_use_server = 1;
         ui_last_poll = SDL_GetTicks();
@@ -2484,6 +2562,24 @@ int main(int argc, char* argv[]) {
         SDL_Event e;
         while(SDL_PollEvent(&e)) {
             if(e.type == SDL_QUIT) running = 0;
+            if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_l) {
+                g_iduna_auth.overlay_open = 1;
+                if (g_iduna_auth.state == IDUNA_IDLE || g_iduna_auth.state == IDUNA_ERROR || g_iduna_auth.state == IDUNA_EXPIRED) {
+                    iduna_auth_begin(&g_iduna_auth, IDUNA_API_BASE, SDL_GetTicks() / 1000.0);
+                }
+            }
+            if (g_iduna_auth.overlay_open && e.type == SDL_KEYDOWN) {
+                if (e.key.keysym.sym == SDLK_o) {
+                    iduna_auth_open_browser(&g_iduna_auth, SDL_GetTicks() / 1000.0);
+                    continue;
+                } else if (e.key.keysym.sym == SDLK_r) {
+                    iduna_auth_begin(&g_iduna_auth, IDUNA_API_BASE, SDL_GetTicks() / 1000.0);
+                    continue;
+                } else if (e.key.keysym.sym == SDLK_ESCAPE) {
+                    g_iduna_auth.overlay_open = 0;
+                    continue;
+                }
+            }
             if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_FOCUS_GAINED && app_state != STATE_LOBBY) SDL_SetRelativeMouseMode(SDL_TRUE);
             if (e.type == SDL_MOUSEBUTTONDOWN && app_state != STATE_LOBBY) SDL_SetRelativeMouseMode(SDL_TRUE);
             
@@ -2627,6 +2723,11 @@ int main(int argc, char* argv[]) {
                 }
             }
         }
+        iduna_auth_update(&g_iduna_auth, SDL_GetTicks() / 1000.0);
+        if (g_iduna_auth.state == IDUNA_READY && g_iduna_auth.access_token[0] && !g_enter_world_queued) {
+            g_enter_world_queued = 1;
+        }
+        iduna_maybe_enter_world();
         if (app_state != STATE_LOBBY) SDL_SetRelativeMouseMode(SDL_TRUE);
         if (app_state == STATE_LOBBY) {
              unsigned int now = SDL_GetTicks();
@@ -2658,6 +2759,7 @@ int main(int argc, char* argv[]) {
 
              glColor3f(0.4f, 0.6f, 0.7f);
              draw_string("DOUBLE-CLICK: FAST=OPEN / SLOW=RENAME", 320, 140, 5);
+             draw_iduna_overlay(&g_iduna_auth);
              SDL_GL_SwapWindow(win);
         } 
         else {
@@ -2769,6 +2871,7 @@ int main(int argc, char* argv[]) {
                 render_p = &local_state.players[render_pid];
             }
             draw_scene(render_p);
+            draw_iduna_overlay(&g_iduna_auth);
             SDL_GL_SwapWindow(win);
         }
         SDL_Delay(16);
