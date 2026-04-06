@@ -252,6 +252,104 @@ static const Box map_geo_docks[] = {
     {216.0f, 6.0f, 236.0f, 48.0f, 12.0f, 24.0f},
     {238.0f, 14.0f, 254.0f, 6.0f, 28.0f, 6.0f}
 };
+
+static const Box map_geo_giza[] = {
+    // FAR DESERT BASE + SUBTLE UNDULATION
+    {0.0f, -2.0f, 0.0f, 5200.0f, 4.0f, 5200.0f},
+    {420.0f, -0.6f, 820.0f, 1200.0f, 2.0f, 720.0f},
+    {-760.0f, -0.4f, 540.0f, 980.0f, 2.0f, 640.0f},
+    {860.0f, -0.5f, -220.0f, 920.0f, 2.0f, 720.0f},
+    {-980.0f, -0.7f, -520.0f, 1000.0f, 2.0f, 840.0f},
+    {40.0f, -0.3f, -1300.0f, 1800.0f, 2.0f, 760.0f},
+
+    // SOUTH APRON / SPAWN FIELD
+    {120.0f, 0.6f, 1180.0f, 980.0f, 1.2f, 680.0f},
+    {-540.0f, 0.4f, 1220.0f, 760.0f, 0.8f, 420.0f},
+    {730.0f, 0.4f, 1240.0f, 760.0f, 0.8f, 420.0f},
+
+    // ESCARPMENT EDGE / WORLD FRAME
+    {0.0f, 70.0f, -2500.0f, 5200.0f, 140.0f, 26.0f},
+    {0.0f, 70.0f, 2500.0f, 5200.0f, 140.0f, 26.0f},
+    {-2500.0f, 70.0f, 0.0f, 26.0f, 140.0f, 5200.0f},
+    {2500.0f, 70.0f, 0.0f, 26.0f, 140.0f, 5200.0f},
+    {-1620.0f, 24.0f, -1380.0f, 780.0f, 48.0f, 180.0f},
+    {1480.0f, 22.0f, -1460.0f, 820.0f, 44.0f, 180.0f},
+    {-1810.0f, 18.0f, 0.0f, 260.0f, 36.0f, 1420.0f},
+    {1760.0f, 20.0f, 220.0f, 300.0f, 40.0f, 1500.0f},
+
+    // PLATEAU SHELVES / RIDGES
+    {200.0f, 5.0f, -440.0f, 2200.0f, 10.0f, 980.0f},
+    {-420.0f, 8.0f, -760.0f, 1480.0f, 16.0f, 840.0f},
+    {-950.0f, 10.0f, -1120.0f, 820.0f, 20.0f, 620.0f},
+    {420.0f, 3.5f, -900.0f, 1360.0f, 7.0f, 320.0f},
+    {-260.0f, 2.5f, -1200.0f, 740.0f, 5.0f, 220.0f},
+    {980.0f, 3.0f, -640.0f, 640.0f, 6.0f, 220.0f},
+
+    // KHUFU MASS (DOMINANT)
+    {520.0f, 45.0f, -460.0f, 600.0f, 90.0f, 600.0f},
+    {520.0f, 92.0f, -460.0f, 470.0f, 78.0f, 470.0f},
+    {520.0f, 132.0f, -460.0f, 360.0f, 62.0f, 360.0f},
+    {520.0f, 163.0f, -460.0f, 260.0f, 48.0f, 260.0f},
+    {520.0f, 186.0f, -460.0f, 168.0f, 34.0f, 168.0f},
+    {520.0f, 204.0f, -460.0f, 90.0f, 20.0f, 90.0f},
+
+    // KHAFRE MASS (HIGHER GROUND, SLIGHTLY SMALLER)
+    {-180.0f, 15.0f, -700.0f, 760.0f, 30.0f, 760.0f},
+    {-180.0f, 53.0f, -700.0f, 500.0f, 76.0f, 500.0f},
+    {-180.0f, 92.0f, -700.0f, 390.0f, 62.0f, 390.0f},
+    {-180.0f, 123.0f, -700.0f, 300.0f, 46.0f, 300.0f},
+    {-180.0f, 145.0f, -700.0f, 210.0f, 34.0f, 210.0f},
+    {-180.0f, 160.0f, -700.0f, 120.0f, 20.0f, 120.0f},
+
+    // MENKAURE MASS (SMALLER, FAR SOUTHWEST)
+    {-900.0f, 14.0f, -1080.0f, 560.0f, 28.0f, 560.0f},
+    {-900.0f, 40.0f, -1080.0f, 320.0f, 52.0f, 320.0f},
+    {-900.0f, 68.0f, -1080.0f, 240.0f, 40.0f, 240.0f},
+    {-900.0f, 88.0f, -1080.0f, 170.0f, 30.0f, 170.0f},
+    {-900.0f, 100.0f, -1080.0f, 90.0f, 18.0f, 90.0f},
+
+    // SPHINX / VALLEY BAND (EAST-SOUTHEAST OF KHAFRE)
+    {220.0f, 5.0f, -980.0f, 420.0f, 10.0f, 220.0f},
+    {300.0f, 12.0f, -930.0f, 170.0f, 24.0f, 60.0f},
+    {250.0f, 16.0f, -950.0f, 60.0f, 10.0f, 90.0f},
+    {338.0f, 17.0f, -930.0f, 38.0f, 6.0f, 40.0f},
+    {362.0f, 20.0f, -930.0f, 22.0f, 4.0f, 16.0f},
+    {160.0f, 8.0f, -1035.0f, 180.0f, 16.0f, 64.0f},
+    {70.0f, 6.0f, -1080.0f, 150.0f, 12.0f, 120.0f},
+
+    // CAUSEWAY LOGIC (KHAFRE -> SPHINX AXIS)
+    {-20.0f, 6.2f, -800.0f, 420.0f, 1.6f, 26.0f},
+    {110.0f, 6.4f, -858.0f, 320.0f, 1.8f, 24.0f},
+    {205.0f, 6.6f, -914.0f, 240.0f, 2.0f, 22.0f},
+    {-20.0f, 5.2f, -824.0f, 420.0f, 0.8f, 16.0f},
+    {110.0f, 5.2f, -880.0f, 320.0f, 0.8f, 14.0f},
+    {205.0f, 5.2f, -935.0f, 240.0f, 0.8f, 14.0f},
+
+    // MASTABA / RUIN FIELDS (SPARSE)
+    {760.0f, 3.0f, -690.0f, 70.0f, 6.0f, 38.0f},
+    {680.0f, 3.0f, -730.0f, 62.0f, 6.0f, 34.0f},
+    {600.0f, 2.5f, -760.0f, 56.0f, 5.0f, 30.0f},
+    {530.0f, 2.2f, -780.0f, 44.0f, 4.4f, 28.0f},
+    {430.0f, 2.8f, -760.0f, 64.0f, 5.6f, 30.0f},
+    {340.0f, 3.0f, -740.0f, 74.0f, 6.0f, 34.0f},
+    {-520.0f, 2.6f, -860.0f, 58.0f, 5.2f, 30.0f},
+    {-620.0f, 2.6f, -920.0f, 62.0f, 5.2f, 32.0f},
+    {-710.0f, 2.8f, -980.0f, 70.0f, 5.6f, 36.0f},
+    {-260.0f, 2.4f, -1020.0f, 56.0f, 4.8f, 28.0f},
+    {-140.0f, 2.4f, -1040.0f, 52.0f, 4.8f, 26.0f},
+    {-20.0f, 2.4f, -1060.0f, 56.0f, 4.8f, 30.0f},
+    {-1020.0f, 2.6f, -860.0f, 60.0f, 5.2f, 34.0f},
+    {-1140.0f, 2.8f, -930.0f, 72.0f, 5.6f, 38.0f},
+    {-1220.0f, 2.6f, -1010.0f, 60.0f, 5.2f, 34.0f},
+    {-1080.0f, 2.2f, -1160.0f, 48.0f, 4.4f, 28.0f},
+    {-960.0f, 2.0f, -1220.0f, 42.0f, 4.0f, 24.0f},
+    {-820.0f, 2.2f, -1260.0f, 50.0f, 4.4f, 28.0f},
+
+    // LANDING TERRACES / OVERLOOK TOUCHES
+    {560.0f, 4.0f, 220.0f, 260.0f, 8.0f, 110.0f},
+    {-340.0f, 6.0f, 120.0f, 300.0f, 12.0f, 130.0f},
+    {1120.0f, 22.0f, -260.0f, 240.0f, 44.0f, 140.0f}
+};
 #define CITY_MAX_BOXES 2048
 static Box map_geo_voxworld[CITY_MAX_BOXES];
 static int map_geo_voxworld_count = 0;
@@ -280,6 +378,9 @@ static int map_count = 0;
 #define DOCKS_KILL_Y -80.0f
 #define DOCKS_BOUNDS_X 260.0f
 #define DOCKS_BOUNDS_Z 300.0f
+#define GIZA_KILL_Y -140.0f
+#define GIZA_BOUNDS_X 2480.0f
+#define GIZA_BOUNDS_Z 2480.0f
 #define VOXWORLD_SEED 1337
 
 #define GARAGE_PORTAL_X 0.0f
@@ -379,6 +480,9 @@ static inline void phys_set_scene(int scene_id) {
     } else if (scene_id == SCENE_DOCKS) {
         map_geo = map_geo_docks;
         map_count = (int)(sizeof(map_geo_docks) / sizeof(Box));
+    } else if (scene_id == SCENE_GIZA_PLATEAU) {
+        map_geo = map_geo_giza;
+        map_count = (int)(sizeof(map_geo_giza) / sizeof(Box));
     } else {
         map_geo = map_geo_stadium;
         map_count = (int)(sizeof(map_geo_stadium) / sizeof(Box));
@@ -428,6 +532,14 @@ static inline void scene_spawn_point(int scene_id, int slot, float *out_x, float
         *out_x = offsets[idx];
         *out_y = 0.0f;
         *out_z = -168.0f;
+        return;
+    }
+    if (scene_id == SCENE_GIZA_PLATEAU) {
+        float offsets[] = {84.0f, 108.0f, 132.0f, 156.0f, 180.0f};
+        int idx = slot % 5;
+        *out_x = offsets[idx];
+        *out_y = 0.0f;
+        *out_z = 1180.0f;
         return;
     }
     if (slot % 2 == 0) {
@@ -502,6 +614,14 @@ static inline void scene_safety_check(PlayerState *p) {
         if (p->y < DOCKS_KILL_Y ||
             p->x < -DOCKS_BOUNDS_X || p->x > DOCKS_BOUNDS_X ||
             p->z < -DOCKS_BOUNDS_Z || p->z > DOCKS_BOUNDS_Z) {
+            scene_force_spawn(p);
+        }
+        return;
+    }
+    if (p->scene_id == SCENE_GIZA_PLATEAU) {
+        if (p->y < GIZA_KILL_Y ||
+            p->x < -GIZA_BOUNDS_X || p->x > GIZA_BOUNDS_X ||
+            p->z < -GIZA_BOUNDS_Z || p->z > GIZA_BOUNDS_Z) {
             scene_force_spawn(p);
         }
     }
@@ -803,7 +923,7 @@ void phys_respawn(PlayerState *p, unsigned int now) {
     p->active = 1; p->state = STATE_ALIVE;
     p->health = 100; p->shield = 100; p->respawn_time = 0; p->in_vehicle = 0;
     p->use_was_down = 0;
-    if (p->scene_id != SCENE_GARAGE_OSAKA && p->scene_id != SCENE_STADIUM && p->scene_id != SCENE_VOXWORLD && p->scene_id != SCENE_CITY && p->scene_id != SCENE_MINES && p->scene_id != SCENE_WAREHOUSE) {
+    if (p->scene_id != SCENE_GARAGE_OSAKA && p->scene_id != SCENE_STADIUM && p->scene_id != SCENE_VOXWORLD && p->scene_id != SCENE_CITY && p->scene_id != SCENE_MINES && p->scene_id != SCENE_WAREHOUSE && p->scene_id != SCENE_DOCKS && p->scene_id != SCENE_GIZA_PLATEAU) {
         p->scene_id = SCENE_GARAGE_OSAKA;
     }
     scene_spawn_point(p->scene_id, p->id, &p->x, &p->y, &p->z);
