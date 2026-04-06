@@ -1361,6 +1361,57 @@ void draw_buggy_model() {
     }
 }
 
+static void draw_box(float w, float h, float d);
+
+static int client_find_player_heli(const PlayerState *p) {
+    for (int i = 0; i < MAX_HELICOPTERS; i++) {
+        if (!local_state.helicopters[i].active) continue;
+        if (local_state.helicopters[i].occupant_player_id == p->id) return i;
+    }
+    return -1;
+}
+
+static int client_find_nearby_heli(const PlayerState *p, float radius) {
+    float r2 = radius * radius;
+    for (int i = 0; i < MAX_HELICOPTERS; i++) {
+        HelicopterState *h = &local_state.helicopters[i];
+        if (!h->active) continue;
+        if (h->scene_id != p->scene_id) continue;
+        if (h->occupant_player_id >= 0) continue;
+        float dx = p->x - h->x;
+        float dz = p->z - h->z;
+        if ((dx * dx + dz * dz) <= r2) return i;
+    }
+    return -1;
+}
+
+static void draw_helicopter_model(const HelicopterState *h) {
+    if (!h || !h->active) return;
+    glPushMatrix();
+    glTranslatef(h->x, h->y, h->z);
+    glRotatef(180.0f - h->yaw, 0, 1, 0);
+    glRotatef(h->roll_visual, 0, 0, 1);
+    glRotatef(h->pitch_visual, 1, 0, 0);
+
+    glColor3f(0.18f, 0.22f, 0.24f);
+    glPushMatrix(); glScalef(3.0f, 1.2f, 6.0f); draw_box(1.0f, 1.0f, 1.0f); glPopMatrix();
+    glColor3f(0.12f, 0.15f, 0.16f);
+    glPushMatrix(); glTranslatef(0.0f, 1.0f, 0.8f); glScalef(2.0f, 1.0f, 2.2f); draw_box(1.0f, 1.0f, 1.0f); glPopMatrix();
+
+    glColor3f(0.16f, 0.16f, 0.18f);
+    glPushMatrix(); glTranslatef(0.0f, 0.4f, -5.8f); glScalef(0.45f, 0.45f, 5.0f); draw_box(1.0f, 1.0f, 1.0f); glPopMatrix();
+
+    glColor3f(0.08f, 0.08f, 0.08f);
+    glPushMatrix(); glTranslatef(0.0f, 1.8f, 0.0f); glRotatef(h->rotor_angle, 0, 1, 0); glScalef(11.0f, 0.12f, 0.45f); draw_box(1.0f, 1.0f, 1.0f); glPopMatrix();
+    glPushMatrix(); glTranslatef(0.0f, 1.8f, 0.0f); glRotatef(h->rotor_angle + 90.0f, 0, 1, 0); glScalef(11.0f, 0.12f, 0.45f); draw_box(1.0f, 1.0f, 1.0f); glPopMatrix();
+    glPushMatrix(); glTranslatef(0.0f, 0.8f, -8.0f); glRotatef(h->rotor_angle * 2.0f, 1, 0, 0); glScalef(0.15f, 1.6f, 0.35f); draw_box(1.0f, 1.0f, 1.0f); glPopMatrix();
+
+    glColor3f(0.20f, 0.20f, 0.22f);
+    glPushMatrix(); glTranslatef(-1.7f, -1.0f, 0.0f); glScalef(0.2f, 0.2f, 6.6f); draw_box(1.0f, 1.0f, 1.0f); glPopMatrix();
+    glPushMatrix(); glTranslatef(1.7f, -1.0f, 0.0f); glScalef(0.2f, 0.2f, 6.6f); draw_box(1.0f, 1.0f, 1.0f); glPopMatrix();
+    glPopMatrix();
+}
+
 void draw_gun_model(int weapon_id) {
     switch(weapon_id) {
         case WPN_KNIFE:   glColor3f(0.8f, 0.8f, 0.9f); glScalef(0.05f, 0.05f, 0.8f); break;
@@ -1521,7 +1572,7 @@ void draw_player_3rd(PlayerState *p) {
     glTranslatef(p->x, p->y + 0.2f, p->z);
     // Simulation yaw assumes forward is -Z, but this model is authored facing +Z.
     glRotatef(180.0f - draw_yaw, 0, 1, 0);
-    if (p->in_vehicle) {
+    if (p->in_vehicle && p->vehicle_type != VEH_HELICOPTER) {
         draw_buggy_model();
     } else {
         draw_ronin_shell();
@@ -1580,7 +1631,11 @@ void draw_hud(PlayerState *p) {
     
     if (p->in_vehicle) {
         glColor3f(0.0f, 1.0f, 0.0f);
-        draw_string("BUGGY ONLINE", 50, 120, 12);
+        if (p->vehicle_type == VEH_HELICOPTER) {
+            draw_string("HELI ONLINE", 50, 120, 12);
+        } else {
+            draw_string("BUGGY ONLINE", 50, 120, 12);
+        }
     }
 
     if (p->storm_charges > 0) {
@@ -1591,6 +1646,16 @@ void draw_hud(PlayerState *p) {
     } else if (p->ability_cooldown == 0) {
         glColor3f(0.0f, 0.8f, 1.0f);
         draw_string("E: STORM ARROWS READY", 50, 140, 8);
+    }
+    if (!p->in_vehicle) {
+        int heli_idx = client_find_nearby_heli(p, g_heli_tuning.enter_radius);
+        if (heli_idx >= 0) {
+            glColor3f(0.95f, 0.9f, 0.25f);
+            draw_string("PRESS F TO ENTER HELICOPTER", 500, 320, 7);
+        }
+    } else if (p->vehicle_type == VEH_HELICOPTER) {
+        glColor3f(0.8f, 0.95f, 1.0f);
+        draw_string("F: EXIT HELICOPTER", 540, 320, 7);
     }
     
     float raw_speed = sqrtf(p->vx*p->vx + p->vz*p->vz);
@@ -1862,8 +1927,14 @@ void draw_scene(PlayerState *render_p) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); glLoadIdentity();
     local_state.scene_id = render_p->scene_id;
     phys_set_scene(render_p->scene_id);
+    int heli_idx = (render_p->in_vehicle && render_p->vehicle_type == VEH_HELICOPTER)
+        ? client_find_player_heli(render_p) : -1;
     float cam_y = render_p->in_vehicle ? 8.0f : (render_p->crouching ? 2.5f : EYE_HEIGHT);
     float cam_z_off = render_p->in_vehicle ? 10.0f : 0.0f;
+    if (heli_idx >= 0) {
+        cam_y = g_heli_tuning.camera_height;
+        cam_z_off = g_heli_tuning.camera_back;
+    }
     
     float rad = -cam_yaw * 0.01745f;
     float cx = sinf(rad) * cam_z_off;
@@ -1878,7 +1949,7 @@ void draw_scene(PlayerState *render_p) {
         reconcile_z = reconcile_corr_z;
     }
 
-    if (render_p->scene_id == SCENE_CITY && crisis_mock_state.topdown_on) {
+    if (render_p->scene_id == SCENE_CITY && crisis_mock_state.topdown_on && heli_idx < 0) {
         glRotatef(-90.0f, 1, 0, 0);
         glTranslatef(-50.0f, -140.0f, -50.0f);
     } else {
@@ -1900,11 +1971,17 @@ void draw_scene(PlayerState *render_p) {
         draw_garage_portal_frame();
     }
     draw_projectiles();
-    if (render_p->in_vehicle) draw_player_3rd(render_p);
+    for (int i = 0; i < MAX_HELICOPTERS; i++) {
+        HelicopterState *h = &local_state.helicopters[i];
+        if (!h->active || h->scene_id != render_p->scene_id) continue;
+        draw_helicopter_model(h);
+    }
+    if (render_p->in_vehicle && render_p->vehicle_type != VEH_HELICOPTER) draw_player_3rd(render_p);
     for(int i=0; i<MAX_CLIENTS; i++) {
         PlayerState *p = &local_state.players[i];
         if (!p->active || p->scene_id != render_p->scene_id) continue;
         if (p == render_p) continue;
+        if (p->in_vehicle && p->vehicle_type == VEH_HELICOPTER) continue;
         draw_player_3rd(p);
     }
     draw_weapon_p(render_p); draw_hud(render_p); draw_garage_overlay(render_p);
@@ -2348,8 +2425,10 @@ void net_process_snapshot(char *buffer, int len) {
 
     int cursor = (int)sizeof(NetHeader);
     unsigned char count = *(unsigned char*)(buffer + cursor); cursor++;
+    if (cursor >= len) return;
+    unsigned char heli_count = *(unsigned char*)(buffer + cursor); cursor++;
 
-    int needed = (int)sizeof(NetHeader) + 1 + (int)count * (int)sizeof(NetPlayer);
+    int needed = (int)sizeof(NetHeader) + 2 + (int)count * (int)sizeof(NetPlayer) + (int)heli_count * (int)sizeof(NetHelicopter);
     if (len < needed) return;
 
     int local_seen = 0;
@@ -2396,6 +2475,7 @@ void net_process_snapshot(char *buffer, int len) {
 
         p->is_shooting = now_shooting;
         p->in_vehicle = np->in_vehicle;
+        if (!p->in_vehicle) p->vehicle_type = VEH_NONE;
         p->storm_charges = np->storm_charges;
         p->hit_feedback = np->hit_feedback;
         p->ammo[p->current_weapon] = np->ammo;
@@ -2461,6 +2541,39 @@ void net_process_snapshot(char *buffer, int len) {
             net_prev_is_shooting[id] = 0;
             rinterp[id].has_a = 0;
             rinterp[id].has_b = 0;
+        }
+    }
+    for (int i = 0; i < MAX_HELICOPTERS; i++) {
+        local_state.helicopters[i].active = 0;
+    }
+    for (int i = 0; i < heli_count; i++) {
+        if (cursor + (int)sizeof(NetHelicopter) > len) break;
+        NetHelicopter *nh = (NetHelicopter*)(buffer + cursor);
+        cursor += (int)sizeof(NetHelicopter);
+        if (nh->id >= MAX_HELICOPTERS) continue;
+        HelicopterState *h = &local_state.helicopters[nh->id];
+        h->id = nh->id;
+        h->scene_id = nh->scene_id;
+        h->active = nh->active;
+        h->grounded = nh->grounded;
+        h->x = nh->x; h->y = nh->y; h->z = nh->z;
+        h->vx = nh->vx; h->vy = nh->vy; h->vz = nh->vz;
+        h->yaw = nh->yaw;
+        h->pitch_visual = nh->pitch_visual;
+        h->roll_visual = nh->roll_visual;
+        h->rotor_angle = nh->rotor_angle;
+        h->rotor_speed = nh->rotor_speed;
+        h->throttle = nh->throttle;
+        h->health = nh->health;
+        h->occupant_player_id = nh->occupant_player_id;
+        if (h->occupant_player_id > 0 && h->occupant_player_id < MAX_CLIENTS) {
+            PlayerState *occ = &local_state.players[h->occupant_player_id];
+            occ->in_vehicle = 1;
+            occ->vehicle_type = VEH_HELICOPTER;
+            occ->x = h->x;
+            occ->y = h->y - 1.4f;
+            occ->z = h->z;
+            occ->yaw = h->yaw;
         }
     }
 
@@ -2535,6 +2648,7 @@ void net_tick() {
             printf("✅ JOINED SERVER AS CLIENT ID: %d\n", my_client_id);
         }
     }
+
 }
 
 
@@ -2804,7 +2918,6 @@ int main(int argc, char* argv[]) {
                 local_state.players[0].in_use = use;
                 if (use && local_state.players[0].vehicle_cooldown == 0 && local_state.transition_timer == 0 && telecast_state.type == TELECAST_NONE) {
                     PlayerState *p0 = &local_state.players[0];
-                    int in_garage = local_state.scene_id == SCENE_GARAGE_OSAKA;
                     int portal_id = -1;
                     if (scene_portal_triggered(p0, &portal_id)) {
                         int dest_scene = -1;
@@ -2813,17 +2926,12 @@ int main(int argc, char* argv[]) {
                             p0->scene_id = dest_scene;
                             p0->x = sx; p0->y = sy; p0->z = sz;
                             p0->vx = 0.0f; p0->vy = 0.0f; p0->vz = 0.0f;
+                            p0->in_vehicle = 0;
+                            p0->vehicle_type = VEH_NONE;
                             scene_request_transition(dest_scene);
                         }
-                    } else if (in_garage && scene_near_vehicle_pad(local_state.scene_id, p0->x, p0->z, 6.0f, NULL)) {
-                        p0->in_vehicle = !p0->in_vehicle;
-                        p0->vehicle_cooldown = 30;
-                    } else if (!in_garage) {
-                        p0->in_vehicle = !p0->in_vehicle;
-                        p0->vehicle_cooldown = 30;
                     }
                 }
-                if(local_state.players[0].vehicle_cooldown > 0) local_state.players[0].vehicle_cooldown--;
                 if (local_state.players[0].scene_id == SCENE_CITY && crisis_mock_state.noclip_on) {
                     float rad = cam_yaw * 0.01745f;
                     float speed = 0.9f;

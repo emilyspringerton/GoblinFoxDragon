@@ -4,6 +4,7 @@
 #define MAX_CLIENTS 70
 #define MAX_WEAPONS 5
 #define MAX_PROJECTILES 1024
+#define MAX_HELICOPTERS 8
 #define LAG_HISTORY 64
 
 #define SCENE_GARAGE_OSAKA 0
@@ -85,6 +86,81 @@ typedef struct {
 #define VEH_NONE  0
 #define VEH_BUGGY 1
 #define VEH_BIKE  2
+#define VEH_HELICOPTER 3
+
+typedef struct {
+    float hover_lift;
+    float ascend_accel;
+    float descend_accel;
+    float forward_accel;
+    float strafe_accel;
+    float drag;
+    float vertical_damping;
+    float hover_assist;
+    float max_hspeed;
+    float max_vspeed_up;
+    float max_vspeed_down;
+    float yaw_rate_deg;
+    float pitch_visual_max;
+    float roll_visual_max;
+    float enter_radius;
+    float exit_offset;
+    float camera_back;
+    float camera_height;
+    float collider_radius;
+    float collider_height;
+    float rotor_spin_idle;
+    float rotor_spin_max;
+} HelicopterTuning;
+
+static const HelicopterTuning g_heli_tuning = {
+    0.18f, 0.18f, 0.28f, 0.11f, 0.09f,
+    0.025f, 0.050f, 0.035f,
+    3.4f, 0.95f, 1.10f, 2.8f,
+    12.0f, 14.0f,
+    9.0f, 5.0f,
+    16.0f, 6.0f,
+    2.4f, 2.4f,
+    8.0f, 28.0f
+};
+
+typedef struct {
+    unsigned char id;
+    unsigned char scene_id;
+    unsigned char active;
+    unsigned char grounded;
+    float x, y, z;
+    float vx, vy, vz;
+    float yaw;
+    float pitch_visual;
+    float roll_visual;
+    float rotor_angle;
+    float rotor_speed;
+    float throttle;
+    int health;
+    int occupant_player_id;
+} NetHelicopter;
+
+typedef struct {
+    int id;
+    int scene_id;
+    int active;
+    int grounded;
+    float x, y, z;
+    float vx, vy, vz;
+    float yaw;
+    float pitch_visual;
+    float roll_visual;
+    float rotor_angle;
+    float rotor_speed;
+    float throttle;
+    int health;
+    int occupant_player_id;
+    float input_forward;
+    float input_strafe;
+    float input_yaw;
+    float input_collective;
+} HelicopterState;
 
 typedef struct {
     int id;
@@ -186,6 +262,7 @@ typedef struct {
     int transition_timer;
     struct sockaddr_in clients[MAX_CLIENTS];
     ClientMeta client_meta[MAX_CLIENTS];
+    HelicopterState helicopters[MAX_HELICOPTERS];
 } ServerState;
 
 #endif

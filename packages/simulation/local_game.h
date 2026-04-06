@@ -4,6 +4,7 @@
 #include "../common/protocol.h"
 #include "../common/physics.h"
 #include "../common/shared_movement.h"
+#include "../common/net_sim.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -16,6 +17,109 @@ void local_init_match(int num_players, int mode);
 
 float rand_weight() { return ((float)(rand()%2000)/1000.0f) - 1.0f; } 
 float rand_pos() { return ((float)(rand()%1000)/1000.0f); } 
+
+static inline float heli_scene_ground_height(int scene_id, float x, float z) {
+    float highest = 0.0f;
+    if (scene_id == SCENE_GIZA_PLATEAU) {
+        const int count = (int)(sizeof(map_geo_giza) / sizeof(Box));
+        for (int i = 0; i < count; i++) {
+            Box b = map_geo_giza[i];
+            if (x >= b.x - b.w * 0.5f && x <= b.x + b.w * 0.5f &&
+                z >= b.z - b.d * 0.5f && z <= b.z + b.d * 0.5f) {
+                float top = b.y + b.h * 0.5f;
+                if (top > highest) highest = top;
+            }
+        }
+    } else {
+        int old_scene = phys_scene_id;
+        phys_set_scene(scene_id);
+        for (int i = 0; i < map_count; i++) {
+            Box b = map_geo[i];
+            if (x >= b.x - b.w * 0.5f && x <= b.x + b.w * 0.5f &&
+                z >= b.z - b.d * 0.5f && z <= b.z + b.d * 0.5f) {
+                float top = b.y + b.h * 0.5f;
+                if (top > highest) highest = top;
+            }
+        }
+        phys_set_scene(old_scene);
+    }
+    return highest;
+}
+
+static inline void helicopter_reset(HelicopterState *h, int id) {
+    memset(h, 0, sizeof(*h));
+    h->id = id;
+    h->health = 350;
+    h->occupant_player_id = -1;
+    h->rotor_speed = g_heli_tuning.rotor_spin_idle;
+}
+
+static inline void world_spawn_scene_vehicles(int scene_id) {
+    for (int i = 0; i < MAX_HELICOPTERS; i++) {
+        helicopter_reset(&local_state.helicopters[i], i);
+    }
+
+    if (scene_id == SCENE_GIZA_PLATEAU) {
+        HelicopterState *h = &local_state.helicopters[0];
+        float summit_x = 520.0f;
+        float summit_z = 540.0f;
+        float summit_y = heli_scene_ground_height(SCENE_GIZA_PLATEAU, summit_x, summit_z);
+        h->active = 1;
+        h->scene_id = SCENE_GIZA_PLATEAU;
+        h->x = summit_x;
+        h->z = summit_z;
+        h->y = summit_y + 2.2f;
+        h->yaw = 36.0f;
+        h->grounded = 1;
+        h->rotor_angle = 0.0f;
+        h->rotor_speed = g_heli_tuning.rotor_spin_idle;
+        h->throttle = 0.0f;
+        h->occupant_player_id = -1;
+    }
+}
+
+static inline int heli_find_nearby(const PlayerState *p, float radius) {
+    float r2 = radius * radius;
+    for (int i = 0; i < MAX_HELICOPTERS; i++) {
+        const HelicopterState *h = &local_state.helicopters[i];
+        if (!h->active) continue;
+        if (h->scene_id != p->scene_id) continue;
+        if (h->occupant_player_id >= 0) continue;
+        float dx = p->x - h->x;
+        float dz = p->z - h->z;
+        if ((dx * dx + dz * dz) <= r2) return i;
+    }
+    return -1;
+}
+
+static inline void heli_place_player_for_exit(PlayerState *p, HelicopterState *h) {
+    float yaw_r = -h->yaw * (3.14159265358979323846f / 180.0f);
+    float right_x = cosf(yaw_r);
+    float right_z = sinf(yaw_r);
+    float back_x = -sinf(yaw_r);
+    float back_z = cosf(yaw_r);
+    float offsets[3][2] = {
+        { right_x * g_heli_tuning.exit_offset, right_z * g_heli_tuning.exit_offset },
+        {-right_x * g_heli_tuning.exit_offset,-right_z * g_heli_tuning.exit_offset },
+        { back_x  * g_heli_tuning.exit_offset, back_z  * g_heli_tuning.exit_offset }
+    };
+    for (int i = 0; i < 3; i++) {
+        float ex = h->x + offsets[i][0];
+        float ez = h->z + offsets[i][1];
+        float ey = heli_scene_ground_height(h->scene_id, ex, ez) + 0.1f;
+        float hx, hy, hz, nx, ny, nz;
+        if (!trace_map(ex, ey + 0.5f, ez, ex, ey + 1.8f, ez, &hx, &hy, &hz, &nx, &ny, &nz)) {
+            p->x = ex; p->y = ey; p->z = ez;
+            p->vx = 0.0f; p->vy = 0.0f; p->vz = 0.0f;
+            p->on_ground = 1;
+            return;
+        }
+    }
+    p->x = h->x;
+    p->y = heli_scene_ground_height(h->scene_id, h->x, h->z) + 0.1f;
+    p->z = h->z - g_heli_tuning.exit_offset;
+    p->vx = p->vy = p->vz = 0.0f;
+}
 
 void init_genome(BotGenome *g) {
     g->version = 1;
@@ -52,6 +156,7 @@ static inline void scene_load(int scene_id) {
     printf("[SCENE] load resolved=%s (%d)\n", scene_id_name(scene_id), scene_id);
     local_state.scene_id = scene_id;
     phys_set_scene(scene_id);
+    world_spawn_scene_vehicles(SCENE_GIZA_PLATEAU);
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (!local_state.players[i].active) continue;
         local_state.players[i].scene_id = scene_id;
@@ -245,6 +350,37 @@ void local_update(float fwd, float str, float yaw, float pitch, int shoot, int w
         ability = 0;
     }
     p0->yaw = yaw; p0->pitch = pitch;
+    int use_pressed = p0->in_use && !p0->use_was_down;
+    if (use_pressed && p0->vehicle_cooldown == 0) {
+        if (p0->in_vehicle && p0->vehicle_type == VEH_HELICOPTER) {
+            int hidx = -1;
+            for (int i = 0; i < MAX_HELICOPTERS; i++) {
+                if (local_state.helicopters[i].active && local_state.helicopters[i].occupant_player_id == p0->id) {
+                    hidx = i;
+                    break;
+                }
+            }
+            if (hidx >= 0) {
+                HelicopterState *h = &local_state.helicopters[hidx];
+                h->occupant_player_id = -1;
+                p0->in_vehicle = 0;
+                p0->vehicle_type = VEH_NONE;
+                heli_place_player_for_exit(p0, h);
+                p0->vehicle_cooldown = 24;
+            }
+        } else {
+            int near_idx = heli_find_nearby(p0, g_heli_tuning.enter_radius);
+            if (near_idx >= 0) {
+                HelicopterState *h = &local_state.helicopters[near_idx];
+                h->occupant_player_id = p0->id;
+                p0->in_vehicle = 1;
+                p0->vehicle_type = VEH_HELICOPTER;
+                p0->vehicle_cooldown = 24;
+            }
+        }
+    }
+    p0->use_was_down = p0->in_use;
+    if (p0->vehicle_cooldown > 0) p0->vehicle_cooldown--;
     if (weapon_req >= 0 && weapon_req < MAX_WEAPONS) p0->current_weapon = weapon_req;
     MoveIntent move_intent = {
         .forward = fwd,
@@ -297,6 +433,13 @@ void local_update(float fwd, float str, float yaw, float pitch, int shoot, int w
         phys_set_scene(p->scene_id);
         update_entity(p, 0.016f, server_context, cmd_time);
     }
+    for (int i = 0; i < MAX_HELICOPTERS; i++) {
+        HelicopterState *h = &local_state.helicopters[i];
+        if (!h->active) continue;
+        if (h->occupant_player_id < 0) {
+            shankpit_helicopter_simulate(h, NULL, SHANKPIT_NET_FIXED_DT);
+        }
+    }
     update_projectiles(cmd_time);
 }
 
@@ -307,6 +450,7 @@ void local_init_match(int num_players, int mode) {
     local_state.pending_scene = -1;
     local_state.transition_timer = 0;
     phys_set_scene(local_state.scene_id);
+    world_spawn_scene_vehicles(SCENE_GIZA_PLATEAU);
     local_state.players[0].active = 1;
     local_state.players[0].scene_id = local_state.scene_id;
     phys_respawn(&local_state.players[0], 0);

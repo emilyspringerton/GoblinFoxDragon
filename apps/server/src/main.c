@@ -118,6 +118,11 @@ static int alloc_slot(const struct sockaddr_in *addr) {
 
 static void free_slot(int slot) {
     if (slot <= 0 || slot >= MAX_CLIENTS) return;
+    for (int i = 0; i < MAX_HELICOPTERS; i++) {
+        if (local_state.helicopters[i].active && local_state.helicopters[i].occupant_player_id == slot) {
+            local_state.helicopters[i].occupant_player_id = -1;
+        }
+    }
     slots[slot].active = 0;
     slots[slot].welcomed = 0;
     slots[slot].cmd_seen = 0;
@@ -125,6 +130,47 @@ static void free_slot(int slot) {
     slots[slot].last_heard = 0.0;
     slots[slot].player_id = -1;
     server_disconnect(slot, client_last_seq);
+}
+
+static int server_find_nearby_heli(const PlayerState *p, float radius) {
+    float r2 = radius * radius;
+    for (int i = 0; i < MAX_HELICOPTERS; i++) {
+        HelicopterState *h = &local_state.helicopters[i];
+        if (!h->active) continue;
+        if (h->scene_id != p->scene_id) continue;
+        if (h->occupant_player_id >= 0) continue;
+        float dx = p->x - h->x;
+        float dz = p->z - h->z;
+        if ((dx * dx + dz * dz) <= r2) return i;
+    }
+    return -1;
+}
+
+static void server_exit_helicopter(PlayerState *p) {
+    int heli_idx = shankpit_find_player_helicopter(p->id);
+    if (heli_idx < 0) {
+        p->in_vehicle = 0;
+        p->vehicle_type = VEH_NONE;
+        return;
+    }
+    HelicopterState *h = &local_state.helicopters[heli_idx];
+    h->occupant_player_id = -1;
+    p->in_vehicle = 0;
+    p->vehicle_type = VEH_NONE;
+    heli_place_player_for_exit(p, h);
+}
+
+static void server_try_enter_helicopter(PlayerState *p) {
+    int idx = server_find_nearby_heli(p, g_heli_tuning.enter_radius);
+    if (idx < 0) return;
+    HelicopterState *h = &local_state.helicopters[idx];
+    if (!h->active || h->occupant_player_id >= 0) return;
+    h->occupant_player_id = p->id;
+    p->in_vehicle = 1;
+    p->vehicle_type = VEH_HELICOPTER;
+    p->x = h->x;
+    p->y = h->y - 1.4f;
+    p->z = h->z;
 }
 
 static void send_welcome(const struct sockaddr_in *addr, int client_id) {
@@ -330,6 +376,7 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
         p->use_was_down = 0;
         p->portal_cooldown_until_ms = 0;
         p->vehicle_cooldown = 0;
+        p->vehicle_type = VEH_NONE;
         send_welcome(sender, client_id);
     }
 
@@ -363,7 +410,7 @@ void server_handle_packet(struct sockaddr_in *sender, char *buffer, int size) {
 }
 
 void server_broadcast() {
-    char buffer[4096];
+    char buffer[8192];
     int cursor = 0;
     NetHeader head;
     head.type = PACKET_SNAPSHOT;
@@ -373,11 +420,14 @@ void server_broadcast() {
     head.scene_id = 0;
 
     unsigned char count = 0;
+    unsigned char heli_count = 0;
     for(int i=1; i<MAX_CLIENTS; i++) if (slots[i].active && slots[i].welcomed && slots[i].cmd_seen && local_state.players[i].active) count++;
+    for (int i = 0; i < MAX_HELICOPTERS; i++) if (local_state.helicopters[i].active) heli_count++;
     head.entity_count = count;
 
     memcpy(buffer + cursor, &head, sizeof(NetHeader)); cursor += (int)sizeof(NetHeader);
     memcpy(buffer + cursor, &count, 1); cursor += 1;
+    memcpy(buffer + cursor, &heli_count, 1); cursor += 1;
 
     for(int i=1; i<MAX_CLIENTS; i++) {
         PlayerState *p = &local_state.players[i];
@@ -403,6 +453,26 @@ void server_broadcast() {
             p->accumulated_reward = 0;
             memcpy(buffer + cursor, &np, sizeof(NetPlayer)); cursor += (int)sizeof(NetPlayer);
         }
+    }
+    for (int i = 0; i < MAX_HELICOPTERS; i++) {
+        HelicopterState *h = &local_state.helicopters[i];
+        if (!h->active) continue;
+        NetHelicopter nh;
+        nh.id = (unsigned char)i;
+        nh.scene_id = (unsigned char)h->scene_id;
+        nh.active = (unsigned char)h->active;
+        nh.grounded = (unsigned char)h->grounded;
+        nh.x = h->x; nh.y = h->y; nh.z = h->z;
+        nh.vx = h->vx; nh.vy = h->vy; nh.vz = h->vz;
+        nh.yaw = h->yaw;
+        nh.pitch_visual = h->pitch_visual;
+        nh.roll_visual = h->roll_visual;
+        nh.rotor_angle = h->rotor_angle;
+        nh.rotor_speed = h->rotor_speed;
+        nh.throttle = h->throttle;
+        nh.health = h->health;
+        nh.occupant_player_id = h->occupant_player_id;
+        memcpy(buffer + cursor, &nh, sizeof(NetHelicopter)); cursor += (int)sizeof(NetHelicopter);
     }
 
     for(int i=1; i<MAX_CLIENTS; i++) {
@@ -491,20 +561,20 @@ int main(int argc, char *argv[]) {
                         p->x = sx; p->y = sy; p->z = sz;
                         p->vx = 0.0f; p->vy = 0.0f; p->vz = 0.0f;
                         p->in_vehicle = 0;
+                        p->vehicle_type = VEH_NONE;
                         p->portal_cooldown_until_ms = now + 1000;
                         p->in_use = 0;
                         printf("PORTAL_TRAVEL client=%d from=%d to=%d\n", i, from_scene, dest_scene);
                     }
                 } else if (use_pressed && p->vehicle_cooldown == 0) {
-                    int in_garage = p->scene_id == SCENE_GARAGE_OSAKA;
-                    if (in_garage && scene_near_vehicle_pad(p->scene_id, p->x, p->z, 6.0f, NULL)) {
-                        p->in_vehicle = !p->in_vehicle;
-                        p->vehicle_cooldown = 30;
-                        printf("Client %d Toggle Vehicle: %d\n", i, p->in_vehicle);
-                    } else if (!in_garage) {
-                        p->in_vehicle = !p->in_vehicle;
-                        p->vehicle_cooldown = 30;
-                        printf("Client %d Toggle Vehicle: %d\n", i, p->in_vehicle);
+                    if (p->in_vehicle && p->vehicle_type == VEH_HELICOPTER) {
+                        server_exit_helicopter(p);
+                        p->vehicle_cooldown = 24;
+                    } else {
+                        server_try_enter_helicopter(p);
+                        if (p->in_vehicle && p->vehicle_type == VEH_HELICOPTER) {
+                            p->vehicle_cooldown = 24;
+                        }
                     }
                 }
                 p->use_was_down = p->in_use;
@@ -513,6 +583,13 @@ int main(int argc, char *argv[]) {
                 shankpit_simulate_movement_tick(p, now);
             } else {
                 update_entity(p, SHANKPIT_NET_FIXED_DT, NULL, now);
+            }
+        }
+        for (int i = 0; i < MAX_HELICOPTERS; i++) {
+            HelicopterState *h = &local_state.helicopters[i];
+            if (!h->active) continue;
+            if (h->occupant_player_id < 0) {
+                shankpit_helicopter_simulate(h, NULL, SHANKPIT_NET_FIXED_DT);
             }
         }
 
