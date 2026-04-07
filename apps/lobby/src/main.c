@@ -128,7 +128,7 @@ static const TelecrystalDef TELECRYSTAL_DEFS[] = {
     {
         TELECRYSTAL_ID_TOWN_TO_MINES,
         SCENE_CITY,
-        270.0f, 0.0f, 60.0f,
+        -88.0f, 0.0f, 168.0f,
         14.0f,
         "G: TELEPORT MINES",
         SDL_SCANCODE_G,
@@ -152,8 +152,8 @@ static const TelecrystalDef TELECRYSTAL_DEFS[] = {
         500,
         1,
         SCENE_CITY,
-        270.0f, 0.0f, 60.0f,
-        180.0f,
+        -88.0f, 0.0f, 168.0f,
+        90.0f,
         0.0f,
         "TOWN"
     },
@@ -192,7 +192,7 @@ static const TelecrystalDef TELECRYSTAL_DEFS[] = {
     {
         TELECRYSTAL_ID_TOWN_TO_DOCKS,
         SCENE_CITY,
-        308.0f, 0.0f, 246.0f,
+        304.0f, 0.0f, 244.0f,
         14.0f,
         "G: TELEPORT DOCKS",
         SDL_SCANCODE_G,
@@ -216,7 +216,7 @@ static const TelecrystalDef TELECRYSTAL_DEFS[] = {
         500,
         1,
         SCENE_CITY,
-        300.0f, 0.0f, 238.0f,
+        304.0f, 0.0f, 244.0f,
         210.0f,
         0.0f,
         "TOWN"
@@ -224,7 +224,7 @@ static const TelecrystalDef TELECRYSTAL_DEFS[] = {
     {
         TELECRYSTAL_ID_TOWN_TO_GIZA,
         SCENE_CITY,
-        98.0f, 0.0f, 318.0f,
+        430.0f, 0.0f, 42.0f,
         16.0f,
         "G: TELEPORT GIZA PLATEAU",
         SDL_SCANCODE_G,
@@ -248,8 +248,8 @@ static const TelecrystalDef TELECRYSTAL_DEFS[] = {
         500,
         1,
         SCENE_CITY,
-        98.0f, 0.0f, 318.0f,
-        188.0f,
+        430.0f, 0.0f, 42.0f,
+        220.0f,
         0.0f,
         "TOWN"
     }
@@ -732,7 +732,7 @@ typedef struct {
 static const LobbySceneOption LOBBY_SCENE_OPTIONS[] = {
     {"Garage", "GARAGE_OSAKA", SCENE_GARAGE_OSAKA},
     {"Stadium", "STADIUM", SCENE_STADIUM},
-    {"New Hanclington", "NEW_HANCLINGTON_MOCKUP", SCENE_NEW_HANCLINGTON},
+    {"Detroit Core", "DETROIT_CORE", SCENE_NEW_HANCLINGTON},
     {"Warehouse", "WAREHOUSE", SCENE_WAREHOUSE},
     {"Mines", "MINES", SCENE_MINES},
     {"Docks", "DOCKS", SCENE_DOCKS},
@@ -816,6 +816,8 @@ static int lobby_resolve_scene_id(const char *scene_id) {
     if (strcmp(scene_id, "STADIUM") == 0) return SCENE_STADIUM;
     if (strcmp(scene_id, "NEW_HANCLINGTON_MOCKUP") == 0) return SCENE_NEW_HANCLINGTON;
     if (strcmp(scene_id, "NEW_HANCLINGTON") == 0) return SCENE_NEW_HANCLINGTON;
+    if (strcmp(scene_id, "DETROIT_CORE") == 0) return SCENE_NEW_HANCLINGTON;
+    if (strcmp(scene_id, "SCENE_DETROIT_CORE") == 0) return SCENE_NEW_HANCLINGTON;
     if (strcmp(scene_id, "SCENE_CITY") == 0) return SCENE_NEW_HANCLINGTON;
     if (strcmp(scene_id, "WAREHOUSE") == 0) return SCENE_WAREHOUSE;
     if (strcmp(scene_id, "SCENE_WAREHOUSE") == 0) return SCENE_WAREHOUSE;

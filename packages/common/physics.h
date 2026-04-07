@@ -95,11 +95,98 @@ static const Box map_geo_garage[] = {
 
 
 static const Box map_geo_city[] = {
-    {150.0f, -6.0f, 150.0f, 420.0f, 12.0f, 420.0f},
-    {150.0f, 24.0f, -60.0f, 420.0f, 60.0f, 12.0f},
-    {150.0f, 24.0f, 360.0f, 420.0f, 60.0f, 12.0f},
-    {-60.0f, 24.0f, 150.0f, 12.0f, 60.0f, 420.0f},
-    {360.0f, 24.0f, 150.0f, 12.0f, 60.0f, 420.0f}
+    // District floorplate + retaining shell
+    {180.0f, -6.0f, 180.0f, 880.0f, 12.0f, 880.0f},
+    {180.0f, 30.0f, -260.0f, 880.0f, 60.0f, 12.0f},
+    {180.0f, 30.0f, 620.0f, 880.0f, 60.0f, 12.0f},
+    {-260.0f, 30.0f, 180.0f, 12.0f, 60.0f, 880.0f},
+    {620.0f, 30.0f, 180.0f, 12.0f, 60.0f, 880.0f},
+
+    // Grand Avenue spine (north-south boulevard edges)
+    {180.0f, 4.0f, 180.0f, 32.0f, 8.0f, 760.0f},
+    {122.0f, 6.0f, 180.0f, 6.0f, 12.0f, 760.0f},
+    {238.0f, 6.0f, 180.0f, 6.0f, 12.0f, 760.0f},
+
+    // Civic core / campus plaza podium + monument
+    {180.0f, 1.8f, 176.0f, 132.0f, 3.6f, 120.0f},
+    {180.0f, 0.5f, 176.0f, 46.0f, 1.0f, 46.0f},
+    {180.0f, 9.0f, 176.0f, 10.0f, 18.0f, 10.0f},
+    {180.0f, 14.0f, 176.0f, 18.0f, 4.0f, 18.0f},
+    {132.0f, 8.0f, 132.0f, 40.0f, 16.0f, 40.0f},
+    {228.0f, 8.0f, 132.0f, 40.0f, 16.0f, 40.0f},
+    {132.0f, 8.0f, 220.0f, 40.0f, 16.0f, 40.0f},
+    {228.0f, 8.0f, 220.0f, 40.0f, 16.0f, 40.0f},
+
+    // Financial / riverward edge towers + canyon
+    {320.0f, 38.0f, -22.0f, 70.0f, 76.0f, 56.0f},
+    {414.0f, 44.0f, 12.0f, 64.0f, 88.0f, 64.0f},
+    {344.0f, 16.0f, 54.0f, 112.0f, 32.0f, 54.0f},
+    {430.0f, 22.0f, 98.0f, 90.0f, 44.0f, 58.0f},
+    {300.0f, 18.0f, 116.0f, 78.0f, 36.0f, 62.0f},
+
+    // Stadium / entertainment district (north + northeast)
+    {248.0f, 10.0f, 390.0f, 220.0f, 20.0f, 170.0f},
+    {248.0f, 22.0f, 390.0f, 170.0f, 24.0f, 120.0f},
+    {248.0f, 32.0f, 390.0f, 124.0f, 20.0f, 78.0f},
+    {98.0f, 7.0f, 352.0f, 86.0f, 14.0f, 66.0f},
+    {88.0f, 4.0f, 438.0f, 140.0f, 8.0f, 70.0f},
+
+    // Brush blocks / neighborhood grid (northwest + north)
+    {2.0f, 8.0f, 294.0f, 50.0f, 16.0f, 44.0f},
+    {62.0f, 7.0f, 286.0f, 46.0f, 14.0f, 38.0f},
+    {14.0f, 6.0f, 354.0f, 56.0f, 12.0f, 44.0f},
+    {74.0f, 9.0f, 362.0f, 48.0f, 18.0f, 46.0f},
+    {2.0f, 7.0f, 422.0f, 52.0f, 14.0f, 40.0f},
+    {64.0f, 8.0f, 430.0f, 52.0f, 16.0f, 42.0f},
+    {24.0f, 12.0f, 500.0f, 74.0f, 24.0f, 54.0f},
+
+    // Warehouse / utility edge (west + southwest)
+    {-118.0f, 12.0f, 156.0f, 118.0f, 24.0f, 74.0f},
+    {-118.0f, 24.0f, 156.0f, 88.0f, 4.0f, 54.0f},
+    {-130.0f, 8.0f, 72.0f, 96.0f, 16.0f, 54.0f},
+    {-122.0f, 8.0f, 242.0f, 102.0f, 16.0f, 62.0f},
+    {-54.0f, 5.0f, 234.0f, 48.0f, 10.0f, 38.0f},
+
+    // Primary parking deck landmark (multi-level, enterable)
+    {292.0f, 2.0f, 276.0f, 84.0f, 4.0f, 84.0f},
+    {292.0f, 8.0f, 276.0f, 84.0f, 4.0f, 84.0f},
+    {292.0f, 14.0f, 276.0f, 84.0f, 4.0f, 84.0f},
+    {332.0f, 11.0f, 276.0f, 4.0f, 22.0f, 84.0f},
+    {252.0f, 11.0f, 276.0f, 4.0f, 22.0f, 84.0f},
+    {292.0f, 11.0f, 332.0f, 84.0f, 22.0f, 4.0f},
+    {292.0f, 11.0f, 236.0f, 84.0f, 22.0f, 4.0f},
+    {304.0f, 6.0f, 236.0f, 20.0f, 2.0f, 20.0f},
+    {316.0f, 10.0f, 248.0f, 20.0f, 2.0f, 20.0f},
+    {328.0f, 14.0f, 260.0f, 20.0f, 2.0f, 20.0f},
+
+    // Rooftop route links + maintenance catwalks
+    {184.0f, 18.0f, 302.0f, 120.0f, 2.0f, 8.0f},
+    {236.0f, 20.0f, 250.0f, 8.0f, 2.0f, 108.0f},
+    {124.0f, 16.0f, 258.0f, 8.0f, 2.0f, 76.0f},
+    {88.0f, 14.0f, 288.0f, 64.0f, 2.0f, 8.0f},
+    {40.0f, 14.0f, 324.0f, 8.0f, 2.0f, 72.0f},
+
+    // Transit guideway (elevated people-mover vibe)
+    {206.0f, 24.0f, 176.0f, 12.0f, 4.0f, 620.0f},
+    {206.0f, 28.0f, 176.0f, 24.0f, 2.0f, 620.0f},
+    {206.0f, 16.0f, -98.0f, 6.0f, 32.0f, 6.0f},
+    {206.0f, 16.0f, 82.0f, 6.0f, 32.0f, 6.0f},
+    {206.0f, 16.0f, 262.0f, 6.0f, 32.0f, 6.0f},
+    {206.0f, 16.0f, 442.0f, 6.0f, 32.0f, 6.0f},
+
+    // Highway scars / edge barriers + ramps
+    {420.0f, 14.0f, 360.0f, 170.0f, 28.0f, 18.0f},
+    {482.0f, 18.0f, 258.0f, 18.0f, 36.0f, 202.0f},
+    {396.0f, 12.0f, 470.0f, 126.0f, 24.0f, 18.0f},
+    {452.0f, 10.0f, 420.0f, 70.0f, 20.0f, 16.0f},
+    {470.0f, 6.0f, 448.0f, 34.0f, 12.0f, 14.0f},
+
+    // Alley/service blockers for navigation rhythm
+    {60.0f, 3.0f, 180.0f, 6.0f, 6.0f, 240.0f},
+    {-18.0f, 3.0f, 250.0f, 84.0f, 6.0f, 6.0f},
+    {42.0f, 3.0f, 102.0f, 90.0f, 6.0f, 6.0f},
+    {108.0f, 3.0f, 88.0f, 6.0f, 6.0f, 86.0f},
+    {352.0f, 3.0f, 188.0f, 6.0f, 6.0f, 130.0f}
 };
 
 static const Box map_geo_mines[] = {
@@ -507,9 +594,17 @@ static inline void scene_spawn_point(int scene_id, int slot, float *out_x, float
         return;
     }
     if (scene_id == SCENE_CITY) {
-        *out_x = 150.0f;
-        *out_y = 15.0f;
-        *out_z = 174.0f;
+        static const float city_spawns[][3] = {
+            {180.0f, 8.0f, 176.0f},  // Campus Plaza
+            {36.0f, 8.0f, 338.0f},   // Brush Blocks edge
+            {244.0f, 10.0f, 470.0f}, // Stadium approach
+            {-86.0f, 8.0f, 158.0f},  // Warehouse edge
+            {332.0f, 8.0f, 74.0f}    // Financial edge
+        };
+        int idx = slot % 5;
+        *out_x = city_spawns[idx][0];
+        *out_y = city_spawns[idx][1];
+        *out_z = city_spawns[idx][2];
         return;
     }
     if (scene_id == SCENE_MINES) {
@@ -589,7 +684,7 @@ static inline void scene_safety_check(PlayerState *p) {
         }
     }
     if (p->scene_id == SCENE_CITY) {
-        if (p->y < -90.0f || p->x < -90.0f || p->x > 390.0f || p->z < -90.0f || p->z > 390.0f) {
+        if (p->y < -90.0f || p->x < -280.0f || p->x > 640.0f || p->z < -280.0f || p->z > 640.0f) {
             scene_force_spawn(p);
         }
         return;

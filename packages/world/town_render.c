@@ -75,11 +75,11 @@ static void draw_ring(float x, float z, float y, float radius, float r, float g,
 }
 
 static void draw_mock_door(const TownBuilding *b) {
-    float dx = (b->x >= 150.0f) ? 1.0f : -1.0f;
+    float dx = (b->x >= 180.0f) ? 1.0f : -1.0f;
     float dz = 0.0f;
-    if (fabsf(b->x - 150.0f) < 50.0f) {
+    if (fabsf(b->x - 180.0f) < 50.0f) {
         dx = 0.0f;
-        dz = (b->z >= 150.0f) ? -1.0f : 1.0f;
+        dz = (b->z >= 180.0f) ? -1.0f : 1.0f;
     }
 
     float half_w = b->w * 0.5f;
@@ -153,12 +153,12 @@ int town_render_collect_labels(const CrisisMockState *state,
     }
 
     const float gates[][2] = {
-        {270.0f, 258.0f}, // docks
-        {36.0f, 60.0f},   // secret gate
-        {270.0f, 54.0f},  // mines
-        {24.0f, 174.0f}   // residences / west edge
+        {304.0f, 244.0f},
+        {-58.0f, 168.0f},
+        {462.0f, 356.0f},
+        {34.0f, 462.0f}
     };
-    const char *gate_names[] = {"Gate Docks", "Gate Secret", "Gate Mines", "Gate Residences"};
+    const char *gate_names[] = {"Gate Garage", "Gate Warehouse", "Gate Freeway", "Gate Brush"};
     for (int i = 0; i < 4 && out_count < max_labels; i++) {
         TownMetaLabel *lbl = &out_labels[out_count++];
         snprintf(lbl->text, sizeof(lbl->text), "%s", gate_names[i]);
@@ -167,6 +167,28 @@ int town_render_collect_labels(const CrisisMockState *state,
         float near_roof = town_label_roof_height(lbl->x, lbl->z);
         lbl->y = clampf(near_roof + town_label_gate_clearance, 2.0f, town_label_height_max - 4.0f);
         lbl->mode = TOWN_LABEL_GATE;
+    }
+
+    const struct {
+        const char *text;
+        float x, y, z;
+        TownLabelMode mode;
+    } district_labels[] = {
+        {"CAMPUS PLAZA", 180.0f, 22.0f, 176.0f, TOWN_LABEL_LANDMARK},
+        {"GRAND AVENUE", 180.0f, 20.0f, 320.0f, TOWN_LABEL_ROUTE},
+        {"STADIUM DISTRICT", 248.0f, 30.0f, 420.0f, TOWN_LABEL_LANDMARK},
+        {"BRUSH BLOCKS", 38.0f, 24.0f, 420.0f, TOWN_LABEL_ROUTE},
+        {"WAREHOUSE EDGE", -104.0f, 20.0f, 168.0f, TOWN_LABEL_ROUTE},
+        {"FINANCIAL EDGE", 360.0f, 30.0f, 48.0f, TOWN_LABEL_LANDMARK},
+        {"CIVIC CORE", 180.0f, 18.0f, 124.0f, TOWN_LABEL_GATE}
+    };
+    for (size_t i = 0; i < sizeof(district_labels) / sizeof(district_labels[0]) && out_count < max_labels; i++) {
+        TownMetaLabel *lbl = &out_labels[out_count++];
+        snprintf(lbl->text, sizeof(lbl->text), "%s", district_labels[i].text);
+        lbl->x = district_labels[i].x;
+        lbl->y = district_labels[i].y;
+        lbl->z = district_labels[i].z;
+        lbl->mode = district_labels[i].mode;
     }
 
     for (int i = 0; i < out_count; i++) {
@@ -192,15 +214,18 @@ void town_render_world(const CrisisMockState *state) {
         printf("[TOWN] outline pass=on\n");
     }
 
-    draw_box(150.0f, -4.5f, 150.0f, 360.0f, 9.0f, 360.0f, 0.04f, 0.04f, 0.05f);
-    draw_box(150.0f, 6.0f, 150.0f, 300.0f, 12.0f, 6.0f, 0.12f, 0.12f, 0.14f);
-    draw_box(150.0f, 6.0f, 150.0f, 6.0f, 12.0f, 300.0f, 0.12f, 0.12f, 0.14f);
-    draw_box(150.0f, 6.0f, 300.0f, 300.0f, 12.0f, 6.0f, 0.20f, 0.20f, 0.22f);
-    draw_box(150.0f, 6.0f, 0.0f, 300.0f, 12.0f, 6.0f, 0.20f, 0.20f, 0.22f);
+    draw_box(180.0f, -4.5f, 180.0f, 860.0f, 9.0f, 860.0f, 0.03f, 0.03f, 0.04f);
+    draw_box(180.0f, 6.0f, 180.0f, 120.0f, 12.0f, 760.0f, 0.11f, 0.12f, 0.14f); // grand avenue
+    draw_box(180.0f, 1.2f, 176.0f, 132.0f, 2.4f, 120.0f, 0.16f, 0.16f, 0.18f); // civic plaza
+    draw_box(248.0f, 2.0f, 390.0f, 248.0f, 4.0f, 196.0f, 0.14f, 0.14f, 0.15f); // stadium/event apron
+    draw_box(300.0f, 4.0f, 68.0f, 196.0f, 8.0f, 150.0f, 0.10f, 0.11f, 0.14f);  // financial podium
+    draw_box(-96.0f, 2.0f, 168.0f, 164.0f, 4.0f, 198.0f, 0.11f, 0.10f, 0.10f);  // warehouse apron
 
-    draw_box_outline(150.0f, -4.5f, 150.0f, 360.0f, 9.0f, 360.0f, 0.18f, 0.90f, 0.92f, 1.5f);
-    draw_box_outline(150.0f, 6.0f, 150.0f, 300.0f, 12.0f, 6.0f, 0.98f, 0.78f, 0.25f, 1.4f);
-    draw_box_outline(150.0f, 6.0f, 150.0f, 6.0f, 12.0f, 300.0f, 0.98f, 0.78f, 0.25f, 1.4f);
+    draw_box_outline(180.0f, -4.5f, 180.0f, 860.0f, 9.0f, 860.0f, 0.18f, 0.90f, 0.92f, 1.4f);
+    draw_box_outline(180.0f, 6.0f, 180.0f, 120.0f, 12.0f, 760.0f, 0.98f, 0.78f, 0.25f, 1.4f);
+    draw_box_outline(180.0f, 1.2f, 176.0f, 132.0f, 2.4f, 120.0f, 0.30f, 0.94f, 0.94f, 1.8f);
+    draw_box_outline(248.0f, 2.0f, 390.0f, 248.0f, 4.0f, 196.0f, 0.95f, 0.55f, 0.20f, 1.6f);
+    draw_box_outline(-96.0f, 2.0f, 168.0f, 164.0f, 4.0f, 198.0f, 0.35f, 0.88f, 0.95f, 1.6f);
 
     size_t bcount = 0;
     const TownBuilding *b = town_map_buildings(&bcount);
@@ -208,8 +233,8 @@ void town_render_world(const CrisisMockState *state) {
     for (size_t i = 0; i < bcount; i++) {
         float base = (b[i].id == BLD_AUCTION_HOUSE) ? 0.09f : 0.06f;
         float j = (hash01((unsigned int)b[i].id + 17U) - 0.5f) * 0.045f;
-        float district_x = (b[i].x < 150.0f) ? 0.012f : -0.006f;
-        float district_z = (b[i].z > 150.0f) ? 0.010f : -0.004f;
+        float district_x = (b[i].x < 180.0f) ? 0.012f : -0.006f;
+        float district_z = (b[i].z > 180.0f) ? 0.010f : -0.004f;
         float r = clampf(base + j + district_x, 0.04f, 0.17f);
         float g = clampf(base + j * 0.7f + district_z, 0.04f, 0.17f);
         float bl = clampf(base + 0.02f + j * 0.6f + district_x * 0.5f, 0.05f, 0.20f);
@@ -224,7 +249,11 @@ void town_render_world(const CrisisMockState *state) {
         door_count++;
     }
 
-    draw_box_outline(150.0f, 12.0f, 156.0f, 108.0f, 2.0f, 7.0f, 1.0f, 0.95f, 0.35f, 2.1f);
+    // District landmarks
+    draw_box_outline(180.0f, 9.0f, 176.0f, 10.0f, 18.0f, 10.0f, 1.0f, 0.95f, 0.35f, 2.2f);   // monument
+    draw_box_outline(248.0f, 22.0f, 390.0f, 170.0f, 24.0f, 120.0f, 1.0f, 0.55f, 0.2f, 2.1f); // stadium bowl
+    draw_box_outline(292.0f, 14.0f, 276.0f, 84.0f, 28.0f, 84.0f, 0.95f, 0.92f, 0.35f, 1.8f); // garage landmark
+    draw_box_outline(414.0f, 44.0f, 12.0f, 64.0f, 88.0f, 64.0f, 0.88f, 0.95f, 1.0f, 1.6f);   // financial tower
 
     size_t scount = 0;
     const CrisisSocket *s = town_map_sockets(&scount);
@@ -241,10 +270,10 @@ void town_render_world(const CrisisMockState *state) {
         }
     }
 
-    draw_mock_gate(270.0f, 258.0f, 20.0f, 18.0f, 0.95f, 0.72f, 0.25f); // Docks route
-    draw_mock_gate(36.0f, 60.0f, 16.0f, 16.0f, 0.25f, 0.95f, 0.95f);   // Secret gate
-    draw_mock_gate(270.0f, 54.0f, 18.0f, 18.0f, 0.98f, 0.55f, 0.20f);   // Mines exit
-    draw_mock_gate(24.0f, 174.0f, 16.0f, 16.0f, 0.35f, 0.88f, 0.95f);   // Residences route
+    draw_mock_gate(304.0f, 244.0f, 24.0f, 18.0f, 0.95f, 0.72f, 0.25f); // garage / stadium seam
+    draw_mock_gate(-58.0f, 168.0f, 16.0f, 16.0f, 0.25f, 0.95f, 0.95f); // warehouse edge gate
+    draw_mock_gate(462.0f, 356.0f, 18.0f, 18.0f, 0.98f, 0.55f, 0.20f); // freeway barrier break
+    draw_mock_gate(34.0f, 462.0f, 16.0f, 16.0f, 0.35f, 0.88f, 0.95f);  // brush blocks gate
 
     if (log_once == 1) {
         log_once = 2;

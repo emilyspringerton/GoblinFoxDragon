@@ -3,41 +3,42 @@
 #define TOWN_WORLD_SCALE 3.0f
 
 static const TownBuilding g_buildings[] = {
-    {BLD_AUCTION_HOUSE, "Auction House", 50, 52, 34, 8, 8, 0},
-    {BLD_TOWN_HALL, "Town Hall", 66, 61, 10, 8, 10, 0},
-    {BLD_GUILD_HOUSE, "Guild House", 36, 58, 10, 8, 8, 0},
-    {BLD_GOLD_GUILD, "Gold Guild", 28, 56, 10, 8, 8, 0},
-    {BLD_POST_OFFICE, "Post Office", 22, 44, 12, 8, 7, 0},
-    {BLD_BLACKSMITH, "Blacksmith", 28, 68, 8, 8, 8, 0},
-    {BLD_WEAPONS_GUILD, "Weapons Guild", 33, 82, 14, 10, 8, 0},
-    {BLD_POTIONS, "Potions", 58, 66, 8, 8, 7, 0},
-    {BLD_ALCHEMY_SHOP, "Alchemy Shop", 72, 66, 10, 8, 7, 0},
-    {BLD_SHADY_DEALER, "Shady Dealer", 82, 60, 10, 8, 8, 0},
-    {BLD_FISH_SHOP, "Fish Shop", 52, 86, 10, 8, 7, 0},
-    {BLD_ARMOR_SHOP, "Armor Shop", 72, 74, 10, 8, 8, 0},
-    {BLD_MINECO_OPS, "Mineco Ops", 45, 26, 12, 8, 8, 0},
-    {BLD_MINING_SUPPLIES, "Mining Supplies", 60, 26, 12, 8, 8, 0},
-    {BLD_ARCHERY_GUILD, "Archery Guild", 84, 40, 12, 10, 8, 0},
-    {BLD_POLICE, "Police", 66, 34, 8, 6, 7, 0},
-    {BLD_GLOVE_SHOP, "Glove Shop", 80, 22, 8, 8, 7, 0},
+    {BLD_AUCTION_HOUSE, "Campus Tower", 60, 52, 20, 16, 24, 0},
+    {BLD_TOWN_HALL, "Civic Hall", 60, 60, 12, 10, 16, 0},
+    {BLD_GUILD_HOUSE, "Grand Ave South Lobby", 46, 46, 18, 12, 12, 0},
+    {BLD_GOLD_GUILD, "Grand Ave North Lobby", 62, 82, 16, 12, 12, 0},
+    {BLD_POST_OFFICE, "Brush Row North", 14, 96, 16, 14, 10, 0},
+    {BLD_BLACKSMITH, "Brush Row Court", 24, 112, 16, 12, 10, 0},
+    {BLD_WEAPONS_GUILD, "Brush Hall", 16, 136, 24, 16, 14, 0},
+    {BLD_POTIONS, "Stadium Concourse", 82, 132, 26, 18, 16, 0},
+    {BLD_ALCHEMY_SHOP, "Event Plaza Hall", 96, 124, 18, 14, 12, 0},
+    {BLD_SHADY_DEALER, "Arena Garage", 98, 92, 24, 24, 16, 0},
+    {BLD_FISH_SHOP, "Warehouse Bay A", 8, 54, 28, 16, 12, 0},
+    {BLD_ARMOR_SHOP, "Warehouse Bay B", 8, 74, 26, 16, 12, 0},
+    {BLD_MINECO_OPS, "Utility Annex", 22, 78, 14, 10, 8, 0},
+    {BLD_MINING_SUPPLIES, "Utility Garage", 22, 50, 14, 10, 8, 0},
+    {BLD_ARCHERY_GUILD, "Financial Podium", 118, 42, 22, 16, 18, 0},
+    {BLD_POLICE, "Riverward Core", 134, 34, 20, 18, 20, 0},
+    {BLD_GLOVE_SHOP, "Congress Exchange", 110, 22, 18, 14, 14, 0},
 };
 
 static const CrisisSocket g_sockets[] = {
-    {SOCK_ANCHOR_AUCTION, "Anchor: Auction", 52, 58, 3.5f, SOCK_ROLE_BUILDER, 1},
-    {SOCK_RITUAL_TOWN_HALL, "Ritual: Town Hall", 66, 61, 3.5f, SOCK_ROLE_RITUALIST, 1},
-    {SOCK_INTERCEPT_DOCK_ROUTE, "Intercept: Docks", 84, 86, 4.0f, SOCK_ROLE_STRIKE | SOCK_ROLE_SCOUT, 1},
-    {SOCK_INTERCEPT_MINES_ROUTE, "Intercept: Mines", 88, 20, 4.0f, SOCK_ROLE_STRIKE | SOCK_ROLE_SCOUT, 1},
-    {SOCK_HEAD_A_DOCKS, "Head A: Docks Edge", 90, 82, 4.5f, SOCK_ROLE_STRIKE, 0},
-    {SOCK_HEAD_B_MINES, "Head B: Mines Edge", 92, 18, 4.5f, SOCK_ROLE_STRIKE, 0},
-    {SOCK_SECRET_GATE_PRESSURE, "Secret Gate Pressure", 12, 20, 3.0f, SOCK_ROLE_SCOUT, 1}
+    {SOCK_ANCHOR_AUCTION, "Anchor: CAMPUS PLAZA", 60, 58, 3.5f, SOCK_ROLE_BUILDER, 1},
+    {SOCK_RITUAL_TOWN_HALL, "Anchor: GRAND AVENUE", 60, 86, 3.5f, SOCK_ROLE_RITUALIST, 1},
+    {SOCK_INTERCEPT_DOCK_ROUTE, "Anchor: STADIUM DISTRICT", 96, 132, 4.0f, SOCK_ROLE_STRIKE | SOCK_ROLE_SCOUT, 1},
+    {SOCK_INTERCEPT_MINES_ROUTE, "Anchor: FINANCIAL EDGE", 120, 24, 4.0f, SOCK_ROLE_STRIKE | SOCK_ROLE_SCOUT, 1},
+    {SOCK_HEAD_A_DOCKS, "Anchor: WAREHOUSE EDGE", 8, 62, 4.5f, SOCK_ROLE_STRIKE, 0},
+    {SOCK_HEAD_B_MINES, "Anchor: BRUSH BLOCKS", 16, 112, 4.5f, SOCK_ROLE_STRIKE, 0},
+    {SOCK_SECRET_GATE_PRESSURE, "Anchor: RIVER GATE", 142, 18, 3.0f, SOCK_ROLE_SCOUT, 1}
 };
 
 static const TownRoutePoint g_routes[] = {
-    {"Auction", 50, 52},
-    {"Docks", 90, 86},
-    {"Mines", 90, 20},
-    {"Secret Gate", 12, 20},
-    {"Town Hall", 66, 61}
+    {"Campus Plaza", 60, 58},
+    {"Grand Avenue", 60, 86},
+    {"Stadium District", 96, 132},
+    {"Brush Blocks", 20, 114},
+    {"Warehouse Edge", 8, 62},
+    {"Financial Edge", 120, 24}
 };
 
 static TownBuilding g_buildings_scaled[sizeof(g_buildings) / sizeof(g_buildings[0])];
