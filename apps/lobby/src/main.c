@@ -315,8 +315,8 @@ static void telecrystal_reset_runtime(void);
 #define NET_JITTER_DIAG 0
 #endif
 
-#ifndef DEBUG_BOOT_NEW_HANCLINGTON
-#define DEBUG_BOOT_NEW_HANCLINGTON 0
+#ifndef DEBUG_BOOT_TOWN
+#define DEBUG_BOOT_TOWN 0
 #endif
 
 #ifndef TELECRYSTAL_DEBUG
@@ -732,7 +732,7 @@ typedef struct {
 static const LobbySceneOption LOBBY_SCENE_OPTIONS[] = {
     {"Garage", "GARAGE_OSAKA", SCENE_GARAGE_OSAKA},
     {"Stadium", "STADIUM", SCENE_STADIUM},
-    {"Town", "TOWN", SCENE_NEW_HANCLINGTON},
+    {"Town", "TOWN", SCENE_CITY},
     {"Warehouse", "WAREHOUSE", SCENE_WAREHOUSE},
     {"Mines", "MINES", SCENE_MINES},
     {"Docks", "DOCKS", SCENE_DOCKS},
@@ -814,13 +814,8 @@ static int lobby_resolve_scene_id(const char *scene_id) {
     if (!scene_id || !scene_id[0]) return -1;
     if (strcmp(scene_id, "GARAGE_OSAKA") == 0) return SCENE_GARAGE_OSAKA;
     if (strcmp(scene_id, "STADIUM") == 0) return SCENE_STADIUM;
-    if (strcmp(scene_id, "NEW_HANCLINGTON_MOCKUP") == 0) return SCENE_NEW_HANCLINGTON;
-    if (strcmp(scene_id, "NEW_HANCLINGTON") == 0) return SCENE_NEW_HANCLINGTON;
-    if (strcmp(scene_id, "DETROIT_CORE") == 0) return SCENE_NEW_HANCLINGTON;
-    if (strcmp(scene_id, "SCENE_DETROIT_CORE") == 0) return SCENE_NEW_HANCLINGTON;
-    if (strcmp(scene_id, "SCENE_CITY") == 0) return SCENE_NEW_HANCLINGTON;
-    if (strcmp(scene_id, "TOWN") == 0) return SCENE_NEW_HANCLINGTON;
-    if (strcmp(scene_id, "SCENE_TOWN") == 0) return SCENE_NEW_HANCLINGTON;
+    if (strcmp(scene_id, "TOWN") == 0) return SCENE_CITY;
+    if (strcmp(scene_id, "SCENE_CITY") == 0) return SCENE_CITY;
     if (strcmp(scene_id, "WAREHOUSE") == 0) return SCENE_WAREHOUSE;
     if (strcmp(scene_id, "SCENE_WAREHOUSE") == 0) return SCENE_WAREHOUSE;
     if (strcmp(scene_id, "MINES") == 0) return SCENE_MINES;
@@ -2673,11 +2668,11 @@ int main(int argc, char* argv[]) {
     telecrystal_reset_runtime();
     lobby_init_labels();
     printf("[SCENE] startup request=GARAGE_OSAKA resolved=%s (%d)\n", scene_id_name(SCENE_GARAGE_OSAKA), SCENE_GARAGE_OSAKA);
-#if DEBUG_BOOT_NEW_HANCLINGTON
+#if DEBUG_BOOT_TOWN
     app_state = STATE_GAME_LOCAL;
-    scene_load(SCENE_NEW_HANCLINGTON);
-    printf("[SCENE] startup request=DEBUG_BOOT_NEW_HANCLINGTON resolved=%s (%d)\n",
-           scene_id_name(SCENE_NEW_HANCLINGTON), SCENE_NEW_HANCLINGTON);
+    scene_load(SCENE_CITY);
+    printf("[SCENE] startup request=DEBUG_BOOT_TOWN resolved=%s (%d)\n",
+           scene_id_name(SCENE_CITY), SCENE_CITY);
 #endif
     ui_bridge_init("127.0.0.1", 17777);
     if (ui_bridge_fetch_state(&ui_state)) {
@@ -2821,7 +2816,7 @@ int main(int argc, char* argv[]) {
                 if (e.type == SDL_KEYDOWN) {
                     crisis_mock_state_handle_key(&crisis_mock_state, e.key.keysym.sym);
                     if (e.key.keysym.sym == SDLK_F9) {
-                        scene_load(SCENE_NEW_HANCLINGTON);
+                        scene_load(SCENE_CITY);
                     }
                 }
                 if(e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) {

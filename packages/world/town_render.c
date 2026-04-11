@@ -174,12 +174,12 @@ int town_render_collect_labels(const CrisisMockState *state,
         float x, y, z;
         TownLabelMode mode;
     } district_labels[] = {
-        {"CAMPUS PLAZA", 180.0f, 22.0f, 176.0f, TOWN_LABEL_LANDMARK},
-        {"GRAND AVENUE", 180.0f, 20.0f, 320.0f, TOWN_LABEL_ROUTE},
+        {"AUCTION SQUARE", 180.0f, 22.0f, 176.0f, TOWN_LABEL_LANDMARK},
+        {"TOWN HALL WAY", 180.0f, 20.0f, 320.0f, TOWN_LABEL_ROUTE},
         {"STADIUM DISTRICT", 248.0f, 30.0f, 420.0f, TOWN_LABEL_LANDMARK},
         {"BRUSH BLOCKS", 38.0f, 24.0f, 420.0f, TOWN_LABEL_ROUTE},
-        {"WAREHOUSE EDGE", -104.0f, 20.0f, 168.0f, TOWN_LABEL_ROUTE},
-        {"FINANCIAL EDGE", 360.0f, 30.0f, 48.0f, TOWN_LABEL_LANDMARK},
+        {"WATERFRONT GATE", -104.0f, 20.0f, 168.0f, TOWN_LABEL_ROUTE},
+        {"MARKET WAY", 360.0f, 30.0f, 48.0f, TOWN_LABEL_LANDMARK},
         {"CIVIC CORE", 180.0f, 18.0f, 124.0f, TOWN_LABEL_GATE}
     };
     for (size_t i = 0; i < sizeof(district_labels) / sizeof(district_labels[0]) && out_count < max_labels; i++) {

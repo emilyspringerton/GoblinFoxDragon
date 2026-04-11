@@ -15,6 +15,7 @@
 #define SCENE_WAREHOUSE 5
 #define SCENE_DOCKS 6
 #define SCENE_GIZA_PLATEAU 7
+/* Legacy aliases kept for build compatibility only. */
 #define SCENE_NEW_HANCLINGTON SCENE_CITY
 #define SCENE_DETROIT_CORE SCENE_CITY
 
