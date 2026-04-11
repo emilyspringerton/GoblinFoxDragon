@@ -103,14 +103,14 @@ static const Box map_geo_city[] = {
     {650.0f, 30.0f, 180.0f, 14.0f, 60.0f, 940.0f},
 
     // Primary streets and plazas (single coherent traversal grid)
-    {180.0f, 0.6f, 180.0f, 120.0f, 1.2f, 820.0f}, // Grand Avenue spine
-    {180.0f, 0.6f, 176.0f, 340.0f, 1.2f, 120.0f}, // Civic plaza east-west
-    {180.0f, 0.6f, 300.0f, 760.0f, 1.2f, 96.0f},  // Midtown connector
-    {180.0f, 0.6f, 424.0f, 760.0f, 1.2f, 96.0f},  // North connector
-    {60.0f, 0.6f, 180.0f, 96.0f, 1.2f, 560.0f},   // West arterial
-    {300.0f, 0.6f, 180.0f, 96.0f, 1.2f, 560.0f},  // East arterial
-    {-70.0f, 0.6f, 176.0f, 200.0f, 1.2f, 420.0f}, // Warehouse edge routes
-    {430.0f, 0.6f, 82.0f, 220.0f, 1.2f, 240.0f},  // Financial edge routes
+    {180.0f, -0.6f, 180.0f, 120.0f, 1.2f, 820.0f}, // Grand Avenue spine
+    {180.0f, -0.6f, 176.0f, 340.0f, 1.2f, 120.0f}, // Civic plaza east-west
+    {180.0f, -0.6f, 300.0f, 760.0f, 1.2f, 96.0f},  // Midtown connector
+    {180.0f, -0.6f, 424.0f, 760.0f, 1.2f, 96.0f},  // North connector
+    {60.0f, -0.6f, 180.0f, 96.0f, 1.2f, 560.0f},   // West arterial
+    {300.0f, -0.6f, 180.0f, 96.0f, 1.2f, 560.0f},  // East arterial
+    {-70.0f, -0.6f, 176.0f, 200.0f, 1.2f, 420.0f}, // Warehouse edge routes
+    {430.0f, -0.6f, 82.0f, 220.0f, 1.2f, 240.0f},  // Financial edge routes
 
     // Civic core district
     {180.0f, 8.0f, 176.0f, 40.0f, 16.0f, 40.0f},
@@ -150,13 +150,13 @@ static const Box map_geo_city[] = {
     {398.0f, 12.0f, 118.0f, 110.0f, 24.0f, 56.0f},
 
     // Town expansion districts (south and far north), connected by streets
-    {180.0f, 0.6f, 28.0f, 520.0f, 1.2f, 96.0f},
+    {180.0f, -0.6f, 28.0f, 520.0f, 1.2f, 96.0f},
     {48.0f, 8.0f, 20.0f, 56.0f, 16.0f, 40.0f},
     {120.0f, 9.0f, 24.0f, 60.0f, 18.0f, 44.0f},
     {240.0f, 9.0f, 24.0f, 60.0f, 18.0f, 44.0f},
     {320.0f, 8.0f, 20.0f, 56.0f, 16.0f, 40.0f},
 
-    {180.0f, 0.6f, 548.0f, 560.0f, 1.2f, 96.0f},
+    {180.0f, -0.6f, 548.0f, 560.0f, 1.2f, 96.0f},
     {72.0f, 8.0f, 548.0f, 56.0f, 16.0f, 44.0f},
     {148.0f, 9.0f, 548.0f, 60.0f, 18.0f, 46.0f},
     {228.0f, 9.0f, 548.0f, 60.0f, 18.0f, 46.0f},
