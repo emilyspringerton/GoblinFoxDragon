@@ -732,7 +732,7 @@ typedef struct {
 static const LobbySceneOption LOBBY_SCENE_OPTIONS[] = {
     {"Garage", "GARAGE_OSAKA", SCENE_GARAGE_OSAKA},
     {"Stadium", "STADIUM", SCENE_STADIUM},
-    {"Detroit Core", "DETROIT_CORE", SCENE_NEW_HANCLINGTON},
+    {"Town", "TOWN", SCENE_NEW_HANCLINGTON},
     {"Warehouse", "WAREHOUSE", SCENE_WAREHOUSE},
     {"Mines", "MINES", SCENE_MINES},
     {"Docks", "DOCKS", SCENE_DOCKS},
@@ -819,6 +819,8 @@ static int lobby_resolve_scene_id(const char *scene_id) {
     if (strcmp(scene_id, "DETROIT_CORE") == 0) return SCENE_NEW_HANCLINGTON;
     if (strcmp(scene_id, "SCENE_DETROIT_CORE") == 0) return SCENE_NEW_HANCLINGTON;
     if (strcmp(scene_id, "SCENE_CITY") == 0) return SCENE_NEW_HANCLINGTON;
+    if (strcmp(scene_id, "TOWN") == 0) return SCENE_NEW_HANCLINGTON;
+    if (strcmp(scene_id, "SCENE_TOWN") == 0) return SCENE_NEW_HANCLINGTON;
     if (strcmp(scene_id, "WAREHOUSE") == 0) return SCENE_WAREHOUSE;
     if (strcmp(scene_id, "SCENE_WAREHOUSE") == 0) return SCENE_WAREHOUSE;
     if (strcmp(scene_id, "MINES") == 0) return SCENE_MINES;

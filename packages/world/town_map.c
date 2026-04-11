@@ -3,23 +3,23 @@
 #define TOWN_WORLD_SCALE 3.0f
 
 static const TownBuilding g_buildings[] = {
-    {BLD_AUCTION_HOUSE, "Campus Tower", 60, 52, 20, 16, 24, 0},
+    {BLD_AUCTION_HOUSE, "Town Exchange", 60, 52, 20, 16, 24, 0},
     {BLD_TOWN_HALL, "Civic Hall", 60, 60, 12, 10, 16, 0},
-    {BLD_GUILD_HOUSE, "Grand Ave South Lobby", 46, 46, 18, 12, 12, 0},
-    {BLD_GOLD_GUILD, "Grand Ave North Lobby", 62, 82, 16, 12, 12, 0},
+    {BLD_GUILD_HOUSE, "South Grand Arcade", 46, 46, 18, 12, 12, 0},
+    {BLD_GOLD_GUILD, "North Grand Arcade", 62, 82, 16, 12, 12, 0},
     {BLD_POST_OFFICE, "Brush Row North", 14, 96, 16, 14, 10, 0},
     {BLD_BLACKSMITH, "Brush Row Court", 24, 112, 16, 12, 10, 0},
     {BLD_WEAPONS_GUILD, "Brush Hall", 16, 136, 24, 16, 14, 0},
-    {BLD_POTIONS, "Stadium Concourse", 82, 132, 26, 18, 16, 0},
-    {BLD_ALCHEMY_SHOP, "Event Plaza Hall", 96, 124, 18, 14, 12, 0},
-    {BLD_SHADY_DEALER, "Arena Garage", 98, 92, 24, 24, 16, 0},
-    {BLD_FISH_SHOP, "Warehouse Bay A", 8, 54, 28, 16, 12, 0},
-    {BLD_ARMOR_SHOP, "Warehouse Bay B", 8, 74, 26, 16, 12, 0},
-    {BLD_MINECO_OPS, "Utility Annex", 22, 78, 14, 10, 8, 0},
-    {BLD_MINING_SUPPLIES, "Utility Garage", 22, 50, 14, 10, 8, 0},
-    {BLD_ARCHERY_GUILD, "Financial Podium", 118, 42, 22, 16, 18, 0},
-    {BLD_POLICE, "Riverward Core", 134, 34, 20, 18, 20, 0},
-    {BLD_GLOVE_SHOP, "Congress Exchange", 110, 22, 18, 14, 14, 0},
+    {BLD_POTIONS, "Market Concourse", 82, 132, 26, 18, 16, 0},
+    {BLD_ALCHEMY_SHOP, "Festival Hall", 96, 124, 18, 14, 12, 0},
+    {BLD_SHADY_DEALER, "Cedar Court", 98, 92, 24, 24, 16, 0},
+    {BLD_FISH_SHOP, "Harbor Row West", 8, 54, 28, 16, 12, 0},
+    {BLD_ARMOR_SHOP, "Harbor Row East", 8, 74, 26, 16, 12, 0},
+    {BLD_MINECO_OPS, "Old Foundry Annex", 22, 78, 14, 10, 8, 0},
+    {BLD_MINING_SUPPLIES, "Old Foundry Hall", 22, 50, 14, 10, 8, 0},
+    {BLD_ARCHERY_GUILD, "Riverward Spire", 118, 42, 22, 16, 18, 0},
+    {BLD_POLICE, "Riverward Watch", 134, 34, 20, 18, 20, 0},
+    {BLD_GLOVE_SHOP, "Congress Walk", 110, 22, 18, 14, 14, 0},
 };
 
 static const CrisisSocket g_sockets[] = {

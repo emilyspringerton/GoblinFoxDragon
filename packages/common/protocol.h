@@ -23,7 +23,7 @@ static inline const char *scene_id_name(int scene_id) {
         case SCENE_GARAGE_OSAKA: return "SCENE_GARAGE_OSAKA";
         case SCENE_STADIUM: return "SCENE_STADIUM";
         case SCENE_VOXWORLD: return "SCENE_VOXWORLD";
-        case SCENE_CITY: return "SCENE_DETROIT_CORE";
+        case SCENE_CITY: return "SCENE_CITY";
         case SCENE_MINES: return "SCENE_MINES";
         case SCENE_WAREHOUSE: return "WAREHOUSE";
         case SCENE_DOCKS: return "DOCKS";
