@@ -215,17 +215,17 @@ void town_render_world(const CrisisMockState *state) {
     }
 
     draw_box(180.0f, -4.5f, 180.0f, 860.0f, 9.0f, 860.0f, 0.03f, 0.03f, 0.04f);
-    draw_box(180.0f, 6.0f, 180.0f, 120.0f, 12.0f, 760.0f, 0.11f, 0.12f, 0.14f); // grand avenue
-    draw_box(180.0f, 1.2f, 176.0f, 132.0f, 2.4f, 120.0f, 0.16f, 0.16f, 0.18f); // civic plaza
-    draw_box(248.0f, 2.0f, 390.0f, 248.0f, 4.0f, 196.0f, 0.14f, 0.14f, 0.15f); // stadium/event apron
-    draw_box(300.0f, 4.0f, 68.0f, 196.0f, 8.0f, 150.0f, 0.10f, 0.11f, 0.14f);  // financial podium
-    draw_box(-96.0f, 2.0f, 168.0f, 164.0f, 4.0f, 198.0f, 0.11f, 0.10f, 0.10f);  // warehouse apron
+    draw_box(180.0f, -0.6f, 180.0f, 120.0f, 1.2f, 760.0f, 0.11f, 0.12f, 0.14f); // grand avenue (ground-level)
+    draw_box(180.0f, -0.6f, 176.0f, 132.0f, 1.2f, 120.0f, 0.16f, 0.16f, 0.18f); // civic plaza (ground-level)
+    draw_box(248.0f, -0.6f, 390.0f, 248.0f, 1.2f, 196.0f, 0.14f, 0.14f, 0.15f); // stadium/event apron (ground-level)
+    draw_box(300.0f, -0.6f, 68.0f, 196.0f, 1.2f, 150.0f, 0.10f, 0.11f, 0.14f);  // financial podium (ground-level)
+    draw_box(-96.0f, -0.6f, 168.0f, 164.0f, 1.2f, 198.0f, 0.11f, 0.10f, 0.10f);  // warehouse apron (ground-level)
 
     draw_box_outline(180.0f, -4.5f, 180.0f, 860.0f, 9.0f, 860.0f, 0.18f, 0.90f, 0.92f, 1.4f);
-    draw_box_outline(180.0f, 6.0f, 180.0f, 120.0f, 12.0f, 760.0f, 0.98f, 0.78f, 0.25f, 1.4f);
-    draw_box_outline(180.0f, 1.2f, 176.0f, 132.0f, 2.4f, 120.0f, 0.30f, 0.94f, 0.94f, 1.8f);
-    draw_box_outline(248.0f, 2.0f, 390.0f, 248.0f, 4.0f, 196.0f, 0.95f, 0.55f, 0.20f, 1.6f);
-    draw_box_outline(-96.0f, 2.0f, 168.0f, 164.0f, 4.0f, 198.0f, 0.35f, 0.88f, 0.95f, 1.6f);
+    draw_box_outline(180.0f, -0.6f, 180.0f, 120.0f, 1.2f, 760.0f, 0.98f, 0.78f, 0.25f, 1.4f);
+    draw_box_outline(180.0f, -0.6f, 176.0f, 132.0f, 1.2f, 120.0f, 0.30f, 0.94f, 0.94f, 1.8f);
+    draw_box_outline(248.0f, -0.6f, 390.0f, 248.0f, 1.2f, 196.0f, 0.95f, 0.55f, 0.20f, 1.6f);
+    draw_box_outline(-96.0f, -0.6f, 168.0f, 164.0f, 1.2f, 198.0f, 0.35f, 0.88f, 0.95f, 1.6f);
 
     size_t bcount = 0;
     const TownBuilding *b = town_map_buildings(&bcount);
