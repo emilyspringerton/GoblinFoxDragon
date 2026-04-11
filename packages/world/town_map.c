@@ -2,7 +2,16 @@
 
 #define TOWN_WORLD_SCALE 3.0f
 
-static const TownBuilding g_buildings[] = {
+typedef struct {
+    TownBuildingId id;
+    const char *label;
+    float x, z;
+    float w, d;
+    float h;
+    unsigned int tags;
+} TownBuildingSeed;
+
+static const TownBuildingSeed g_core_buildings[] = {
     {BLD_AUCTION_HOUSE, "Auction House", 60, 58, 20, 16, 24, 0},
     {BLD_TOWN_HALL, "Town Hall", 60, 70, 14, 12, 18, 0},
     {BLD_GUILD_HOUSE, "Guild House", 44, 50, 18, 12, 12, 0},
@@ -21,6 +30,8 @@ static const TownBuilding g_buildings[] = {
     {BLD_POLICE, "Town Watch", 148, 30, 20, 18, 20, 0},
     {BLD_GLOVE_SHOP, "Market Exchange", 120, 18, 18, 14, 14, 0},
 };
+
+#include "generated/town_expansion_blocks.inl"
 
 static const CrisisSocket g_sockets[] = {
     {SOCK_ANCHOR_AUCTION, "Anchor: AUCTION SQUARE", 60, 58, 3.5f, SOCK_ROLE_BUILDER, 1},
@@ -41,22 +52,35 @@ static const TownRoutePoint g_routes[] = {
     {"Market Way", 120, 24}
 };
 
-static TownBuilding g_buildings_scaled[sizeof(g_buildings) / sizeof(g_buildings[0])];
+#define CORE_BUILDING_COUNT (sizeof(g_core_buildings) / sizeof(g_core_buildings[0]))
+#define EXPANSION_BUILDING_COUNT (sizeof(g_expansion_seed_buildings) / sizeof(g_expansion_seed_buildings[0]))
+#define TOTAL_BUILDING_COUNT (CORE_BUILDING_COUNT + EXPANSION_BUILDING_COUNT)
+
+static TownBuilding g_buildings_scaled[TOTAL_BUILDING_COUNT];
 static CrisisSocket g_sockets_scaled[sizeof(g_sockets) / sizeof(g_sockets[0])];
 static TownRoutePoint g_routes_scaled[sizeof(g_routes) / sizeof(g_routes[0])];
 static int g_scaled_init = 0;
+
+static void town_map_scale_seed(size_t out_idx, const TownBuildingSeed *seed) {
+    g_buildings_scaled[out_idx].id = seed->id;
+    g_buildings_scaled[out_idx].label = seed->label;
+    g_buildings_scaled[out_idx].x = seed->x * TOWN_WORLD_SCALE;
+    g_buildings_scaled[out_idx].z = seed->z * TOWN_WORLD_SCALE;
+    g_buildings_scaled[out_idx].w = seed->w * TOWN_WORLD_SCALE;
+    g_buildings_scaled[out_idx].d = seed->d * TOWN_WORLD_SCALE;
+    g_buildings_scaled[out_idx].h = seed->h * TOWN_WORLD_SCALE;
+    g_buildings_scaled[out_idx].tags = seed->tags;
+}
 
 static void town_map_init_scaled() {
     if (g_scaled_init) return;
     g_scaled_init = 1;
 
-    for (size_t i = 0; i < sizeof(g_buildings_scaled) / sizeof(g_buildings_scaled[0]); i++) {
-        g_buildings_scaled[i] = g_buildings[i];
-        g_buildings_scaled[i].x *= TOWN_WORLD_SCALE;
-        g_buildings_scaled[i].z *= TOWN_WORLD_SCALE;
-        g_buildings_scaled[i].w *= TOWN_WORLD_SCALE;
-        g_buildings_scaled[i].d *= TOWN_WORLD_SCALE;
-        g_buildings_scaled[i].h *= TOWN_WORLD_SCALE;
+    for (size_t i = 0; i < CORE_BUILDING_COUNT; i++) {
+        town_map_scale_seed(i, &g_core_buildings[i]);
+    }
+    for (size_t i = 0; i < EXPANSION_BUILDING_COUNT; i++) {
+        town_map_scale_seed(CORE_BUILDING_COUNT + i, &g_expansion_seed_buildings[i]);
     }
 
     for (size_t i = 0; i < sizeof(g_sockets_scaled) / sizeof(g_sockets_scaled[0]); i++) {
@@ -75,7 +99,7 @@ static void town_map_init_scaled() {
 
 const TownBuilding *town_map_buildings(size_t *count) {
     town_map_init_scaled();
-    if (count) *count = sizeof(g_buildings_scaled) / sizeof(g_buildings_scaled[0]);
+    if (count) *count = TOTAL_BUILDING_COUNT;
     return g_buildings_scaled;
 }
 
