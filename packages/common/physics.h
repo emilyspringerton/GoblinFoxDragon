@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "protocol.h"
-#include "../world/town_map.h"
 
 // --- TUNING ---
 #define GRAVITY_FLOAT 0.025f 
@@ -426,10 +425,6 @@ static Box map_geo_voxworld[CITY_MAX_BOXES];
 static int map_geo_voxworld_count = 0;
 static int map_geo_voxworld_init = 0;
 
-static Box map_geo_city_runtime[4096];
-static int map_geo_city_runtime_count = 0;
-static int map_geo_city_runtime_init = 0;
-
 static const Box *map_geo = map_geo_stadium;
 static int map_count = 0;
 
@@ -532,31 +527,6 @@ static inline void init_voxworld_city_geo() {
     }
 }
 
-static inline void init_city_runtime_geo() {
-    if (map_geo_city_runtime_init) return;
-    map_geo_city_runtime_init = 1;
-    map_geo_city_runtime_count = 0;
-
-    int base_count = (int)(sizeof(map_geo_city_base) / sizeof(Box));
-    for (int i = 0; i < base_count && map_geo_city_runtime_count < (int)(sizeof(map_geo_city_runtime) / sizeof(Box)); i++) {
-        map_geo_city_runtime[map_geo_city_runtime_count++] = map_geo_city_base[i];
-    }
-
-    size_t building_count = 0;
-    const TownBuilding *buildings = town_map_buildings(&building_count);
-    for (size_t i = 0; i < building_count && map_geo_city_runtime_count < (int)(sizeof(map_geo_city_runtime) / sizeof(Box)); i++) {
-        if (buildings[i].tags & TOWN_BLD_TAG_ENTERABLE) continue;
-        map_geo_city_runtime[map_geo_city_runtime_count++] = (Box){
-            buildings[i].x,
-            buildings[i].h * 0.5f,
-            buildings[i].z,
-            buildings[i].w,
-            buildings[i].h,
-            buildings[i].d
-        };
-    }
-}
-
 static int phys_scene_id = SCENE_STADIUM;
 
 static inline void phys_set_scene(int scene_id) {
@@ -569,9 +539,8 @@ static inline void phys_set_scene(int scene_id) {
         map_geo = map_geo_voxworld;
         map_count = map_geo_voxworld_count;
     } else if (scene_id == SCENE_CITY) {
-        init_city_runtime_geo();
-        map_geo = map_geo_city_runtime;
-        map_count = map_geo_city_runtime_count;
+        map_geo = map_geo_city_base;
+        map_count = (int)(sizeof(map_geo_city_base) / sizeof(Box));
     } else if (scene_id == SCENE_MINES) {
         map_geo = map_geo_mines;
         map_count = (int)(sizeof(map_geo_mines) / sizeof(Box));
