@@ -38,6 +38,13 @@
 #include "../../../packages/world/town_render.h"
 #include "../../../packages/world/town_debug_ui.h"
 #include "../../../packages/world/crisis_mock_state.h"
+#include "../../../packages/education/edu_script.h"
+#include "../../../packages/education/edu_bytecode.c"
+#include "../../../packages/education/edu_lexer.c"
+#include "../../../packages/education/edu_bindings.c"
+#include "../../../packages/education/edu_vm.c"
+#include "../../../packages/education/edu_parser.c"
+#include "../../../packages/education/edu_script.c"
 
 #define STATE_LOBBY 0
 #define STATE_GAME_NET 1
@@ -66,6 +73,7 @@ float cam_yaw = 0.0f;
 float cam_pitch = 0.0f;
 float current_fov = 75.0f;
 CrisisMockState crisis_mock_state;
+EduScriptSystem edu_script_system;
 
 typedef struct {
     int id;
@@ -1780,6 +1788,64 @@ static void draw_garage_overlay(PlayerState *p) {
     glMatrixMode(GL_MODELVIEW); glPopMatrix();
 }
 
+static void draw_edu_world_entities(void) {
+    if (local_state.scene_id != SCENE_GARAGE_OSAKA) return;
+    glPushMatrix();
+    glTranslatef(35.0f + (float)edu_script_system.world.crate_x, 1.0f, 25.0f);
+    glColor3f(0.95f, 0.75f, 0.15f);
+    glBegin(GL_QUADS);
+    glVertex3f(-2.0f, 0.0f, -2.0f); glVertex3f(2.0f, 0.0f, -2.0f); glVertex3f(2.0f, 4.0f, -2.0f); glVertex3f(-2.0f, 4.0f, -2.0f);
+    glVertex3f(-2.0f, 0.0f, 2.0f); glVertex3f(2.0f, 0.0f, 2.0f); glVertex3f(2.0f, 4.0f, 2.0f); glVertex3f(-2.0f, 4.0f, 2.0f);
+    glEnd();
+    glPopMatrix();
+
+    glPushMatrix();
+    glTranslatef(80.0f, 0.5f, 30.0f);
+    glColor3f(edu_script_system.world.gate_open ? 0.2f : 0.95f, edu_script_system.world.gate_open ? 0.9f : 0.3f, 0.2f);
+    glBegin(GL_QUADS);
+    float gate_h = edu_script_system.world.gate_open ? 1.0f : 8.0f;
+    glVertex3f(-8.0f, 0.0f, 0.0f); glVertex3f(8.0f, 0.0f, 0.0f); glVertex3f(8.0f, gate_h, 0.0f); glVertex3f(-8.0f, gate_h, 0.0f);
+    glEnd();
+    glPopMatrix();
+}
+
+static void draw_edu_terminal_overlay(void) {
+    if (!edu_script_system.terminal_open) return;
+    EduScriptSlot *slot = &edu_script_system.slots[edu_script_system.active_slot];
+
+    glDisable(GL_DEPTH_TEST);
+    glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity();
+    glOrtho(0, 1280, 0, 720, -1, 1);
+    glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
+
+    glColor4f(0.05f, 0.08f, 0.12f, 0.95f);
+    glRectf(120.0f, 80.0f, 1160.0f, 660.0f);
+    glColor3f(0.2f, 1.0f, 0.9f);
+    draw_string("EDU SHRINE TERMINAL [F6 toggle | F7 compile | F8 run | F9 reset | TAB slot]", 140, 630, 4);
+    glColor3f(0.9f, 0.95f, 1.0f);
+    draw_string(slot->name, 140, 605, 5);
+    draw_string(slot->source, 140, 560, 4);
+
+    glColor3f(0.4f, 0.9f, 0.5f);
+    draw_string(edu_script_system.compile_status, 140, 150, 4);
+    glColor3f(0.9f, 0.9f, 0.4f);
+    draw_string(edu_script_system.run_status, 140, 130, 4);
+    glColor3f(0.8f, 0.8f, 1.0f);
+    draw_string(edu_script_system.last_output, 140, 110, 4);
+
+    char world_line[196];
+    snprintf(world_line, sizeof(world_line), "crate_x=%d speed=%d gate=%d switch=%d quest(move/fall/gate)=%d/%d/%d instr=%d",
+             edu_script_system.world.crate_x, edu_script_system.world.crate_speed, edu_script_system.world.gate_open,
+             edu_script_system.world.switch_on, edu_script_system.world.quest_make_it_move, edu_script_system.world.quest_stop_the_fall,
+             edu_script_system.world.quest_open_the_gate, edu_script_system.last_instruction_count);
+    glColor3f(0.65f, 0.95f, 0.95f);
+    draw_string(world_line, 140, 90, 4);
+
+    glMatrixMode(GL_PROJECTION); glPopMatrix();
+    glMatrixMode(GL_MODELVIEW); glPopMatrix();
+    glEnable(GL_DEPTH_TEST);
+}
+
 static void telecrystal_ring_color(const TelecrystalDef *def, int in_range, float pulse) {
     if (in_range) {
         glColor3f(0.95f, 0.95f, 0.95f);
@@ -1966,6 +2032,7 @@ void draw_scene(PlayerState *render_p) {
         draw_grid(); 
         update_and_draw_trails();
         draw_map();
+        draw_edu_world_entities();
         draw_garage_vehicle_pads();
         draw_garage_portal_frame();
     }
@@ -1985,6 +2052,7 @@ void draw_scene(PlayerState *render_p) {
     }
     draw_weapon_p(render_p); draw_hud(render_p); draw_garage_overlay(render_p);
     draw_telecrystal_overlay();
+    draw_edu_terminal_overlay();
     if (render_p->scene_id == SCENE_CITY) {
         float cam_world_x = (render_p->x + reconcile_x) - cx;
         float cam_world_y = (render_p->y + reconcile_y) + cam_y;
@@ -2662,6 +2730,7 @@ int main(int argc, char* argv[]) {
     SDL_Window *win = SDL_CreateWindow("SHANKPIT [BUILD 181 - CTF RELOADED]", 100, 100, 1280, 720, SDL_WINDOW_OPENGL);
     SDL_GL_CreateContext(win);
     crisis_mock_state_init(&crisis_mock_state);
+    edu_script_init(&edu_script_system);
     net_init();
     
     local_init_match(1, 0);
@@ -2813,7 +2882,26 @@ int main(int argc, char* argv[]) {
                     }
                 }
             } else {
+                if (e.type == SDL_TEXTINPUT && edu_script_system.terminal_open) {
+                    edu_script_insert_text(&edu_script_system, e.text.text);
+                    continue;
+                }
                 if (e.type == SDL_KEYDOWN) {
+                    if (e.key.keysym.sym == SDLK_F6) {
+                        edu_script_toggle_terminal(&edu_script_system);
+                        if (edu_script_system.terminal_open) SDL_StartTextInput();
+                        else SDL_StopTextInput();
+                        continue;
+                    }
+                    if (edu_script_system.terminal_open) {
+                        if (e.key.keysym.sym == SDLK_F7) edu_script_compile_active(&edu_script_system);
+                        else if (e.key.keysym.sym == SDLK_F8) edu_script_run_active(&edu_script_system);
+                        else if (e.key.keysym.sym == SDLK_F9) edu_script_reset_active(&edu_script_system);
+                        else if (e.key.keysym.sym == SDLK_TAB) edu_script_system.active_slot = (edu_script_system.active_slot + 1) % EDU_MAX_SCRIPTS;
+                        else if (e.key.keysym.sym == SDLK_BACKSPACE) edu_script_backspace(&edu_script_system);
+                        else if (e.key.keysym.sym == SDLK_RETURN || e.key.keysym.sym == SDLK_KP_ENTER) edu_script_newline(&edu_script_system);
+                        continue;
+                    }
                     crisis_mock_state_handle_key(&crisis_mock_state, e.key.keysym.sym);
                     if (e.key.keysym.sym == SDLK_F9) {
                         scene_load(SCENE_CITY);
@@ -2886,6 +2974,16 @@ int main(int argc, char* argv[]) {
             int g_pressed_edge = g_down && !telecrystal_g_prev_down;
             telecrystal_g_prev_down = g_down;
             int ability = k[SDL_SCANCODE_E];
+            if (edu_script_system.terminal_open) {
+                fwd = 0.0f;
+                str = 0.0f;
+                jump = 0;
+                crouch = 0;
+                shoot = 0;
+                reload = 0;
+                use = 0;
+                ability = 0;
+            }
             if(k[SDL_SCANCODE_1]) wpn_req=0; if(k[SDL_SCANCODE_2]) wpn_req=1;
             if(k[SDL_SCANCODE_3]) wpn_req=2; if(k[SDL_SCANCODE_4]) wpn_req=3; if(k[SDL_SCANCODE_5]) wpn_req=4;
 

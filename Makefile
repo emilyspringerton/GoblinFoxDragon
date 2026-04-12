@@ -6,7 +6,7 @@ BIN_DIR  := bin
 
 # ---- Flags ----
 CFLAGS   := -O2 -Wall -D_REENTRANT
-INCLUDES := -Ipackages/common -Ipackages/simulation -Ipackages/world -Ipackages/ui
+INCLUDES := -Ipackages/common -Ipackages/simulation -Ipackages/world -Ipackages/ui -Ipackages/education
 
 LIBS_GL  := -lSDL2 -lGL -lGLU -lm
 LIBS_M   := -lm
