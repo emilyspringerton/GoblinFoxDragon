@@ -13,7 +13,7 @@ LIBS_M   := -lm
 
 # ---- Sources ----
 LOBBY_SRC    := apps/lobby/src/main.c packages/world/town_map.c packages/world/town_render.c packages/world/crisis_mock_state.c packages/world/town_debug_ui.c
-SERVER_SRC   := apps/server/src/main.c
+SERVER_SRC   := apps/server/src/main.c packages/world/town_map.c
 SERVERCTL_SRC:= apps/server/serverctl.c
 
 # ---- Outputs ----
@@ -44,7 +44,7 @@ server: $(SERVER_BIN)
 
 $(SERVER_BIN): $(SERVER_SRC) | $(BIN_DIR)
 	@echo "🔨 Building Game Server..."
-	$(CC) $(CFLAGS) $(INCLUDES) $< -o $@ $(LIBS_M)
+	$(CC) $(CFLAGS) $(INCLUDES) $(SERVER_SRC) -o $@ $(LIBS_M)
 
 # ---- SERVER CONTROL (OPTIONAL, LOCAL ONLY) ----
 serverctl: $(SERVERCTL_BIN)
