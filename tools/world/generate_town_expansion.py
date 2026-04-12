@@ -35,6 +35,16 @@ def emit_layout(path: Path, *, blocks_x: int, blocks_z: int, spacing: float, mar
             if (bx % 5 == 0) or (bz % 4 == 0):
                 continue
 
+            district_tag = "TOWN_BLD_TAG_DISTRICT_MARKET"
+            if bz >= blocks_z * 0.62:
+                district_tag = "TOWN_BLD_TAG_DISTRICT_STADIUM"
+            elif bx <= blocks_x * 0.22:
+                district_tag = "TOWN_BLD_TAG_DISTRICT_WAREHOUSE"
+            elif bx >= blocks_x * 0.74 and bz <= blocks_z * 0.42:
+                district_tag = "TOWN_BLD_TAG_DISTRICT_FINANCIAL"
+            elif bz >= blocks_z * 0.42:
+                district_tag = "TOWN_BLD_TAG_DISTRICT_BRUSH"
+
             pattern = hash32((bx + 11) * 31337 + (bz + 7) * 92821) % 3
             offsets = [(-0.26, -0.24), (0.24, -0.22), (-0.20, 0.24), (0.20, 0.20)]
             if pattern == 1:
@@ -45,20 +55,28 @@ def emit_layout(path: Path, *, blocks_x: int, blocks_z: int, spacing: float, mar
             block_count = 0
             for ox, oz in offsets:
                 seed = (bx + 1) * 1000003 + (bz + 1) * 9176 + block_count * 193
-                w = pick(seed + 1, 10.0, 18.0)
-                d = pick(seed + 2, 10.0, 18.0)
-                h = pick(seed + 3, 14.0, 36.0)
+                w = pick(seed + 1, 14.0, 24.0)
+                d = pick(seed + 2, 14.0, 24.0)
+                h = pick(seed + 3, 18.0, 44.0)
                 px = cx + ox * spacing
                 pz = cz + oz * spacing
+
+                # keep a generous central plaza/park clear so spawn has breathing room.
+                if abs(px - 120.0) < 34.0 and abs(pz - 102.0) < 26.0:
+                    continue
 
                 if abs(ox) > 0.24 and pattern != 1:
                     w = min(w, spacing * (0.24 - margin))
                 if abs(oz) > 0.24 and pattern != 1:
                     d = min(d, spacing * (0.24 - margin))
 
+                tags = district_tag
+                if hash32(seed + 11) % 13 == 0:
+                    tags = f"TOWN_BLD_TAG_ENTERABLE | {district_tag}"
+
                 out.append(
-                    '    {BLD_MISC_COUNT, "Block %03d", %.2ff, %.2ff, %.2ff, %.2ff, %.2ff, 0},'
-                    % (idx + 1, px, pz, w, d, h)
+                    '    {BLD_MISC_COUNT, "Block %03d", %.2ff, %.2ff, %.2ff, %.2ff, %.2ff, %s},'
+                    % (idx + 1, px, pz, w, d, h, tags)
                 )
                 idx += 1
                 block_count += 1
@@ -75,7 +93,7 @@ def main() -> None:
     parser.add_argument("--out", type=Path, default=Path("packages/world/generated/town_expansion_blocks.inl"))
     parser.add_argument("--blocks-x", type=int, default=20)
     parser.add_argument("--blocks-z", type=int, default=18)
-    parser.add_argument("--spacing", type=float, default=34.0)
+    parser.add_argument("--spacing", type=float, default=42.0)
     parser.add_argument("--margin", type=float, default=0.04)
     parser.add_argument("--origin-x", type=float, default=-170.0)
     parser.add_argument("--origin-z", type=float, default=-130.0)

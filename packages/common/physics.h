@@ -94,13 +94,13 @@ static const Box map_geo_garage[] = {
 };
 
 
-static const Box map_geo_city[] = {
+static const Box map_geo_city_base[] = {
     // Town foundation + district shell (authoritative town world bounds)
-    {180.0f, -6.0f, 180.0f, 940.0f, 12.0f, 940.0f},
-    {180.0f, 30.0f, -290.0f, 940.0f, 60.0f, 14.0f},
-    {180.0f, 30.0f, 650.0f, 940.0f, 60.0f, 14.0f},
-    {-290.0f, 30.0f, 180.0f, 14.0f, 60.0f, 940.0f},
-    {650.0f, 30.0f, 180.0f, 14.0f, 60.0f, 940.0f},
+    {640.0f, -6.0f, 640.0f, 2520.0f, 12.0f, 2520.0f},
+    {640.0f, 30.0f, -620.0f, 2520.0f, 60.0f, 14.0f},
+    {640.0f, 30.0f, 1900.0f, 2520.0f, 60.0f, 14.0f},
+    {-620.0f, 30.0f, 640.0f, 14.0f, 60.0f, 2520.0f},
+    {1900.0f, 30.0f, 640.0f, 14.0f, 60.0f, 2520.0f},
 
     // Primary streets and plazas (single coherent traversal grid)
     {180.0f, -0.6f, 180.0f, 120.0f, 1.2f, 820.0f}, // Grand Avenue spine
@@ -539,8 +539,8 @@ static inline void phys_set_scene(int scene_id) {
         map_geo = map_geo_voxworld;
         map_count = map_geo_voxworld_count;
     } else if (scene_id == SCENE_CITY) {
-        map_geo = map_geo_city;
-        map_count = (int)(sizeof(map_geo_city) / sizeof(Box));
+        map_geo = map_geo_city_base;
+        map_count = (int)(sizeof(map_geo_city_base) / sizeof(Box));
     } else if (scene_id == SCENE_MINES) {
         map_geo = map_geo_mines;
         map_count = (int)(sizeof(map_geo_mines) / sizeof(Box));
@@ -578,11 +578,11 @@ static inline void scene_spawn_point(int scene_id, int slot, float *out_x, float
     }
     if (scene_id == SCENE_CITY) {
         static const float city_spawns[][3] = {
-            {180.0f, 8.0f, 176.0f},  // Campus Plaza
-            {36.0f, 8.0f, 338.0f},   // Brush Blocks edge
-            {244.0f, 10.0f, 470.0f}, // Stadium approach
-            {-86.0f, 8.0f, 158.0f},  // Warehouse edge
-            {332.0f, 8.0f, 74.0f}    // Financial edge
+            {180.0f, 8.0f, 176.0f},  // Central plaza fountain
+            {160.0f, 8.0f, 176.0f},  // Central plaza west walkout
+            {200.0f, 8.0f, 176.0f},  // Central plaza east walkout
+            {180.0f, 8.0f, 150.0f},  // Central plaza south gate
+            {180.0f, 8.0f, 202.0f}   // Central plaza north gate
         };
         int idx = slot % 5;
         *out_x = city_spawns[idx][0];
@@ -667,7 +667,7 @@ static inline void scene_safety_check(PlayerState *p) {
         }
     }
     if (p->scene_id == SCENE_CITY) {
-        if (p->y < -90.0f || p->x < -280.0f || p->x > 640.0f || p->z < -280.0f || p->z > 640.0f) {
+        if (p->y < -90.0f || p->x < -620.0f || p->x > 1900.0f || p->z < -620.0f || p->z > 1900.0f) {
             scene_force_spawn(p);
         }
         return;

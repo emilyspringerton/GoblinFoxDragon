@@ -26,6 +26,16 @@ static float hash01(unsigned int x) {
     return (float)(x & 1023U) / 1023.0f;
 }
 
+static void district_palette(unsigned int tags, float *r, float *g, float *b) {
+    if (tags & TOWN_BLD_TAG_DISTRICT_CIVIC) { *r = 0.27f; *g = 0.30f; *b = 0.38f; return; }
+    if (tags & TOWN_BLD_TAG_DISTRICT_MARKET) { *r = 0.44f; *g = 0.30f; *b = 0.22f; return; }
+    if (tags & TOWN_BLD_TAG_DISTRICT_BRUSH) { *r = 0.26f; *g = 0.38f; *b = 0.26f; return; }
+    if (tags & TOWN_BLD_TAG_DISTRICT_STADIUM) { *r = 0.24f; *g = 0.34f; *b = 0.44f; return; }
+    if (tags & TOWN_BLD_TAG_DISTRICT_WAREHOUSE) { *r = 0.30f; *g = 0.30f; *b = 0.28f; return; }
+    if (tags & TOWN_BLD_TAG_DISTRICT_FINANCIAL) { *r = 0.34f; *g = 0.30f; *b = 0.44f; return; }
+    *r = 0.32f; *g = 0.32f; *b = 0.34f;
+}
+
 static void draw_box(float x, float y, float z, float w, float h, float d, float r, float g, float b) {
     glPushMatrix();
     glTranslatef(x, y, z);
@@ -92,6 +102,23 @@ static void draw_mock_door(const TownBuilding *b) {
     draw_box(px - dx * 0.2f, door_h * 0.5f, pz - dz * 0.2f, (dx != 0.0f ? 0.5f : door_w), door_h, (dz != 0.0f ? 0.5f : door_w), 0.03f, 0.03f, 0.04f);
     draw_box_outline(px, door_h * 0.5f, pz, (dx != 0.0f ? 0.9f : door_w + 0.9f), door_h + 0.6f, (dz != 0.0f ? 0.9f : door_w + 0.9f), 0.98f, 0.72f, 0.20f, 1.6f);
     draw_box(px + dx * 0.35f, 0.18f, pz + dz * 0.35f, (dx != 0.0f ? 1.0f : door_w + 1.2f), 0.25f, (dz != 0.0f ? 1.0f : door_w + 1.2f), 0.20f, 0.95f, 0.95f);
+}
+
+static void draw_building_features(const TownBuilding *b, unsigned int seed, float br, float bg, float bb) {
+    float roof_h = fmaxf(1.6f, b->h * (0.10f + hash01(seed + 3U) * 0.08f));
+    draw_box(b->x, b->h + roof_h * 0.5f, b->z, b->w * 0.86f, roof_h, b->d * 0.86f, br * 0.8f, bg * 0.8f, bb * 0.8f);
+
+    if ((seed % 3U) != 0U) {
+        float aw = fmaxf(4.0f, b->w * (0.28f + hash01(seed + 7U) * 0.16f));
+        float ad = fmaxf(4.0f, b->d * (0.28f + hash01(seed + 9U) * 0.16f));
+        float ah = fmaxf(3.0f, b->h * (0.32f + hash01(seed + 11U) * 0.22f));
+        float ax = b->x + ((seed & 1U) ? (b->w * 0.26f) : (-b->w * 0.26f));
+        float az = b->z + ((seed & 2U) ? (b->d * 0.26f) : (-b->d * 0.26f));
+        draw_box(ax, ah * 0.5f, az, aw, ah, ad, br * 0.92f, bg * 0.92f, bb * 0.92f);
+    }
+
+    float stripe_y = b->h * (0.52f + hash01(seed + 21U) * 0.22f);
+    draw_box(b->x, stripe_y, b->z, b->w * 0.98f, fmaxf(1.2f, b->h * 0.06f), b->d * 0.98f, br * 1.2f, bg * 1.2f, bb * 1.2f);
 }
 
 static void draw_mock_gate(float x, float z, float opening_w, float post_h, float r, float g, float b) {
@@ -217,6 +244,7 @@ void town_render_world(const CrisisMockState *state) {
     draw_box(180.0f, -4.5f, 220.0f, 3200.0f, 9.0f, 3200.0f, 0.03f, 0.03f, 0.04f);
     draw_box(180.0f, -0.6f, 180.0f, 120.0f, 1.2f, 760.0f, 0.11f, 0.12f, 0.14f); // grand avenue (ground-level)
     draw_box(180.0f, -0.6f, 176.0f, 132.0f, 1.2f, 120.0f, 0.16f, 0.16f, 0.18f); // civic plaza (ground-level)
+    draw_box(180.0f, -0.4f, 176.0f, 76.0f, 0.8f, 68.0f, 0.09f, 0.22f, 0.11f);   // central plaza park carpet
     draw_box(248.0f, -0.6f, 390.0f, 248.0f, 1.2f, 196.0f, 0.14f, 0.14f, 0.15f); // stadium/event apron (ground-level)
     draw_box(300.0f, -0.6f, 68.0f, 196.0f, 1.2f, 150.0f, 0.10f, 0.11f, 0.14f);  // financial podium (ground-level)
     draw_box(-96.0f, -0.6f, 168.0f, 164.0f, 1.2f, 198.0f, 0.11f, 0.10f, 0.10f);  // warehouse apron (ground-level)
@@ -224,6 +252,7 @@ void town_render_world(const CrisisMockState *state) {
     draw_box_outline(180.0f, -4.5f, 220.0f, 3200.0f, 9.0f, 3200.0f, 0.18f, 0.90f, 0.92f, 1.4f);
     draw_box_outline(180.0f, -0.6f, 180.0f, 120.0f, 1.2f, 760.0f, 0.98f, 0.78f, 0.25f, 1.4f);
     draw_box_outline(180.0f, -0.6f, 176.0f, 132.0f, 1.2f, 120.0f, 0.30f, 0.94f, 0.94f, 1.8f);
+    draw_box_outline(180.0f, -0.4f, 176.0f, 76.0f, 0.8f, 68.0f, 0.45f, 0.95f, 0.45f, 1.5f);
     draw_box_outline(248.0f, -0.6f, 390.0f, 248.0f, 1.2f, 196.0f, 0.95f, 0.55f, 0.20f, 1.6f);
     draw_box_outline(-96.0f, -0.6f, 168.0f, 164.0f, 1.2f, 198.0f, 0.35f, 0.88f, 0.95f, 1.6f);
 
@@ -231,22 +260,24 @@ void town_render_world(const CrisisMockState *state) {
     const TownBuilding *b = town_map_buildings(&bcount);
     int door_count = 0;
     for (size_t i = 0; i < bcount; i++) {
-        float base = (b[i].id == BLD_AUCTION_HOUSE) ? 0.09f : 0.06f;
-        float j = (hash01((unsigned int)b[i].id + 17U) - 0.5f) * 0.045f;
-        float district_x = (b[i].x < 180.0f) ? 0.012f : -0.006f;
-        float district_z = (b[i].z > 180.0f) ? 0.010f : -0.004f;
-        float r = clampf(base + j + district_x, 0.04f, 0.17f);
-        float g = clampf(base + j * 0.7f + district_z, 0.04f, 0.17f);
-        float bl = clampf(base + 0.02f + j * 0.6f + district_x * 0.5f, 0.05f, 0.20f);
+        unsigned int seed = (unsigned int)b[i].id + (unsigned int)(i * 131U + 17U);
+        float base_r = 0.2f, base_g = 0.2f, base_b = 0.2f;
+        district_palette(b[i].tags, &base_r, &base_g, &base_b);
+        float j = (hash01(seed) - 0.5f) * 0.20f;
+        float r = clampf(base_r + j, 0.10f, 0.86f);
+        float g = clampf(base_g + j * 0.8f, 0.10f, 0.86f);
+        float bl = clampf(base_b + j * 0.75f, 0.10f, 0.90f);
         draw_box(b[i].x, b[i].h * 0.5f, b[i].z, b[i].w, b[i].h, b[i].d, r, g, bl);
+        draw_building_features(&b[i], seed, r, g, bl);
 
-        float or = (b[i].id == BLD_AUCTION_HOUSE || b[i].id == BLD_TOWN_HALL) ? 1.0f : 0.85f;
-        float og = (b[i].id == BLD_AUCTION_HOUSE || b[i].id == BLD_TOWN_HALL) ? 0.85f : 0.94f;
-        float ob = (b[i].id == BLD_AUCTION_HOUSE || b[i].id == BLD_TOWN_HALL) ? 0.28f : 0.38f;
+        float or = (b[i].tags & TOWN_BLD_TAG_ENTERABLE) ? 1.0f : 0.85f;
+        float og = (b[i].tags & TOWN_BLD_TAG_ENTERABLE) ? 0.87f : 0.94f;
+        float ob = (b[i].tags & TOWN_BLD_TAG_ENTERABLE) ? 0.30f : 0.40f;
         draw_box_outline(b[i].x, b[i].h * 0.5f, b[i].z, b[i].w, b[i].h, b[i].d, or, og, ob, 1.6f);
-
-        draw_mock_door(&b[i]);
-        door_count++;
+        if (b[i].tags & TOWN_BLD_TAG_ENTERABLE) {
+            draw_mock_door(&b[i]);
+            door_count++;
+        }
     }
 
     // District landmarks
