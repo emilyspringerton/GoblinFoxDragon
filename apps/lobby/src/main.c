@@ -39,6 +39,12 @@
 #include "../../../packages/world/town_debug_ui.h"
 #include "../../../packages/world/crisis_mock_state.h"
 #include "../../../packages/education/edu_script.h"
+#include "../../../packages/education/edu_bytecode.c"
+#include "../../../packages/education/edu_lexer.c"
+#include "../../../packages/education/edu_bindings.c"
+#include "../../../packages/education/edu_vm.c"
+#include "../../../packages/education/edu_parser.c"
+#include "../../../packages/education/edu_script.c"
 
 #define STATE_LOBBY 0
 #define STATE_GAME_NET 1

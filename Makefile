@@ -12,7 +12,7 @@ LIBS_GL  := -lSDL2 -lGL -lGLU -lm
 LIBS_M   := -lm
 
 # ---- Sources ----
-LOBBY_SRC    := apps/lobby/src/main.c packages/world/town_map.c packages/world/town_render.c packages/world/crisis_mock_state.c packages/world/town_debug_ui.c packages/education/edu_bytecode.c packages/education/edu_lexer.c packages/education/edu_parser.c packages/education/edu_vm.c packages/education/edu_bindings.c packages/education/edu_script.c
+LOBBY_SRC    := apps/lobby/src/main.c packages/world/town_map.c packages/world/town_render.c packages/world/crisis_mock_state.c packages/world/town_debug_ui.c
 SERVER_SRC   := apps/server/src/main.c
 SERVERCTL_SRC:= apps/server/serverctl.c
 
