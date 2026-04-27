@@ -153,7 +153,11 @@ int edu_vm_exec(EduVm *vm, const unsigned char *code, int code_len,
 
     limits->error_code = vm->last_error;
     if (vm->last_error) {
-        snprintf(out_msg, (size_t)out_msg_cap, "vm error=%d instr=%d", vm->last_error, vm->instruction_count);
+        if (vm->last_error == EDU_VM_ERR_BUILTIN && vm->debug_line[0]) {
+            snprintf(out_msg, (size_t)out_msg_cap, "vm builtin error: %s instr=%d", vm->debug_line, vm->instruction_count);
+        } else {
+            snprintf(out_msg, (size_t)out_msg_cap, "vm error=%d instr=%d", vm->last_error, vm->instruction_count);
+        }
         return 0;
     }
     snprintf(out_msg, (size_t)out_msg_cap, "vm halt instructions=%d ret=%d", vm->instruction_count, ret);
