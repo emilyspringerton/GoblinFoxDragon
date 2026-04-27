@@ -74,6 +74,14 @@ float cam_pitch = 0.0f;
 float current_fov = 75.0f;
 CrisisMockState crisis_mock_state;
 EduScriptSystem edu_script_system;
+typedef struct {
+    float hound_x;
+    float hound_z;
+    float hound_patrol_phase;
+    unsigned int hound_slow_until_ms;
+    unsigned int hound_defeat_logged;
+} ArchitectTrialRuntime;
+static ArchitectTrialRuntime architect_trial = {56.0f, 48.0f, 0.0f, 0, 0};
 
 typedef struct {
     int id;
@@ -1790,6 +1798,40 @@ static void draw_garage_overlay(PlayerState *p) {
 
 static void draw_edu_world_entities(void) {
     if (local_state.scene_id != SCENE_GARAGE_OSAKA) return;
+    unsigned int now_ms = SDL_GetTicks();
+    edu_script_system.world.puppet_anim_t += 0.016f;
+    edu_script_system.world.enemy_count = edu_script_system.world.rift_hound_active ? 1 : 0;
+    if (edu_script_system.world.enemy_slowed[0] && now_ms > architect_trial.hound_slow_until_ms) {
+        architect_trial.hound_slow_until_ms = now_ms + 4000;
+    }
+    float to_player_x = local_state.players[0].x - architect_trial.hound_x;
+    float to_player_z = local_state.players[0].z - architect_trial.hound_z;
+    float dist = sqrtf(to_player_x * to_player_x + to_player_z * to_player_z);
+    if (edu_script_system.world.rift_hound_active && dist > 0.01f) {
+        float speed = (now_ms < architect_trial.hound_slow_until_ms) ? 0.03f : 0.08f;
+        architect_trial.hound_x += (to_player_x / dist) * speed;
+        architect_trial.hound_z += (to_player_z / dist) * speed;
+    }
+    if (edu_script_system.world.rift_hound_active &&
+        edu_script_system.world.enemy_marked[0] &&
+        edu_script_system.world.enemy_slowed[0] &&
+        edu_script_system.world.portal_open) {
+        edu_script_system.world.rift_hound_active = 0;
+        edu_script_system.world.enemy_count = 0;
+        if (!architect_trial.hound_defeat_logged) {
+            architect_trial.hound_defeat_logged = 1;
+            printf("[RIFT] hound defeated\n");
+        }
+    }
+
+    glPushMatrix();
+    glTranslatef(58.0f, 0.01f, 42.0f);
+    glColor3f(0.93f, 0.93f, 0.95f);
+    glBegin(GL_QUADS);
+    glVertex3f(-36.0f, 0.0f, -24.0f); glVertex3f(36.0f, 0.0f, -24.0f); glVertex3f(36.0f, 0.0f, 24.0f); glVertex3f(-36.0f, 0.0f, 24.0f);
+    glEnd();
+    glPopMatrix();
+
     glPushMatrix();
     glTranslatef(35.0f + (float)edu_script_system.world.crate_x, 1.0f, 25.0f);
     glColor3f(0.95f, 0.75f, 0.15f);
@@ -1801,12 +1843,64 @@ static void draw_edu_world_entities(void) {
 
     glPushMatrix();
     glTranslatef(80.0f, 0.5f, 30.0f);
-    glColor3f(edu_script_system.world.gate_open ? 0.2f : 0.95f, edu_script_system.world.gate_open ? 0.9f : 0.3f, 0.2f);
+    glColor3f(edu_script_system.world.gate_open ? 0.70f : 0.95f, edu_script_system.world.gate_open ? 0.78f : 0.38f, 0.88f);
     glBegin(GL_QUADS);
     float gate_h = edu_script_system.world.gate_open ? 1.0f : 8.0f;
     glVertex3f(-8.0f, 0.0f, 0.0f); glVertex3f(8.0f, 0.0f, 0.0f); glVertex3f(8.0f, gate_h, 0.0f); glVertex3f(-8.0f, gate_h, 0.0f);
     glEnd();
     glPopMatrix();
+
+    glPushMatrix();
+    glTranslatef(67.0f, 0.3f, 35.0f);
+    glRotatef((float)edu_script_system.world.bridge_angle, 0.0f, 0.0f, 1.0f);
+    glColor3f(0.86f, 0.84f, 0.95f);
+    glBegin(GL_QUADS);
+    glVertex3f(-10.0f, 0.0f, -2.0f); glVertex3f(10.0f, 0.0f, -2.0f); glVertex3f(10.0f, 0.0f, 2.0f); glVertex3f(-10.0f, 0.0f, 2.0f);
+    glEnd();
+    glPopMatrix();
+
+    glPushMatrix();
+    glTranslatef(92.0f, 0.0f, 46.0f);
+    glColor3f(0.76f, 0.73f, 0.86f);
+    glBegin(GL_LINE_LOOP);
+    for (int seg = 0; seg < 36; seg++) {
+        float a = ((float)seg / 36.0f) * 6.2831853f;
+        glVertex3f(cosf(a) * 6.0f, 5.0f + sinf(a * 2.0f) * 0.1f, sinf(a) * 1.1f);
+    }
+    glEnd();
+    if (edu_script_system.world.portal_open) {
+        float pulse = 0.6f + 0.4f * sinf((float)now_ms * 0.01f);
+        glColor3f(0.92f, 0.85f + pulse * 0.1f, 1.0f);
+        glBegin(GL_QUADS);
+        glVertex3f(-4.0f, 1.0f, 0.0f); glVertex3f(4.0f, 1.0f, 0.0f); glVertex3f(4.0f, 9.0f, 0.0f); glVertex3f(-4.0f, 9.0f, 0.0f);
+        glEnd();
+    }
+    glPopMatrix();
+
+    if (edu_script_system.world.puppet_active) {
+        float y = 1.2f + sinf(edu_script_system.world.puppet_anim_t * 1.6f) * 0.25f;
+        glPushMatrix();
+        glTranslatef(edu_script_system.world.puppet_x, y, edu_script_system.world.puppet_z);
+        glColor3f(0.95f, 0.92f, 1.0f);
+        glBegin(GL_QUADS);
+        glVertex3f(-0.8f, 0.0f, -0.8f); glVertex3f(0.8f, 0.0f, -0.8f); glVertex3f(0.8f, 2.5f, -0.8f); glVertex3f(-0.8f, 2.5f, -0.8f);
+        glEnd();
+        glPopMatrix();
+    }
+
+    if (edu_script_system.world.rift_hound_active) {
+        glPushMatrix();
+        glTranslatef(architect_trial.hound_x, 0.2f, architect_trial.hound_z);
+        glColor3f(0.08f, 0.08f, 0.1f);
+        glBegin(GL_QUADS);
+        glVertex3f(-1.8f, 0.0f, -3.0f); glVertex3f(1.8f, 0.0f, -3.0f); glVertex3f(2.2f, 1.1f, 2.8f); glVertex3f(-2.2f, 1.1f, 2.8f);
+        glEnd();
+        glColor3f(edu_script_system.world.enemy_marked[0] ? 1.0f : 0.95f, 0.18f, 0.6f);
+        glBegin(GL_QUADS);
+        glVertex3f(-0.4f, 0.5f, 2.8f); glVertex3f(0.4f, 0.5f, 2.8f); glVertex3f(0.4f, 1.0f, 2.8f); glVertex3f(-0.4f, 1.0f, 2.8f);
+        glEnd();
+        glPopMatrix();
+    }
 }
 
 static void draw_edu_terminal_overlay(void) {
@@ -1818,11 +1912,11 @@ static void draw_edu_terminal_overlay(void) {
     glOrtho(0, 1280, 0, 720, -1, 1);
     glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
 
-    glColor4f(0.05f, 0.08f, 0.12f, 0.95f);
+    glColor4f(0.95f, 0.94f, 0.99f, 0.96f);
     glRectf(120.0f, 80.0f, 1160.0f, 660.0f);
-    glColor3f(0.2f, 1.0f, 0.9f);
-    draw_string("EDU SHRINE TERMINAL [F6 toggle | F7 compile | F8 run | F9 reset | TAB slot]", 140, 630, 4);
-    glColor3f(0.9f, 0.95f, 1.0f);
+    glColor3f(0.52f, 0.41f, 0.72f);
+    draw_string("ARCHITECT'S ORB [F6 toggle | F7 compile | F8 run | F9 reset | TAB slot]", 140, 630, 4);
+    glColor3f(0.42f, 0.38f, 0.50f);
     draw_string(slot->name, 140, 605, 5);
     draw_string(slot->source, 140, 560, 4);
 
@@ -1833,11 +1927,12 @@ static void draw_edu_terminal_overlay(void) {
     glColor3f(0.8f, 0.8f, 1.0f);
     draw_string(edu_script_system.last_output, 140, 110, 4);
 
-    char world_line[196];
-    snprintf(world_line, sizeof(world_line), "crate_x=%d speed=%d gate=%d switch=%d quest(move/fall/gate)=%d/%d/%d instr=%d",
-             edu_script_system.world.crate_x, edu_script_system.world.crate_speed, edu_script_system.world.gate_open,
-             edu_script_system.world.switch_on, edu_script_system.world.quest_make_it_move, edu_script_system.world.quest_stop_the_fall,
-             edu_script_system.world.quest_open_the_gate, edu_script_system.last_instruction_count);
+    char world_line[256];
+    snprintf(world_line, sizeof(world_line),
+             "gate=%d bridge=%d portal=%d stable=%d enemies=%d trial=%d instr=%d",
+             edu_script_system.world.gate_open, edu_script_system.world.bridge_raised, edu_script_system.world.portal_open,
+             edu_script_system.world.portal_stability, edu_script_system.world.enemy_count, edu_script_system.world.trial_complete,
+             edu_script_system.last_instruction_count);
     glColor3f(0.65f, 0.95f, 0.95f);
     draw_string(world_line, 140, 90, 4);
 
