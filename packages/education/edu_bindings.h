@@ -1,6 +1,8 @@
 #ifndef EDU_BINDINGS_H
 #define EDU_BINDINGS_H
 
+#include "edu_entities.h"
+
 typedef struct {
     int crate_speed;
     int crate_x;
@@ -33,6 +35,9 @@ typedef struct {
     float puppet_anim_t;
     int last_print;
     char last_message[96];
+    Entity entities[MAX_EDU_ENTITIES];
+    int entity_count;
+    unsigned int entity_tick_last_ms;
 } EduWorldState;
 
 typedef enum {
@@ -56,6 +61,9 @@ typedef enum {
     EDU_BUILTIN_OPEN_PORTAL,
     EDU_BUILTIN_MARK_ENEMY,
     EDU_BUILTIN_SLOW_ENEMY,
+    EDU_BUILTIN_SPAWN_PROP,
+    EDU_BUILTIN_SET_ENTITY_POS,
+    EDU_BUILTIN_SET_ENTITY_VEL,
     EDU_BUILTIN_COUNT
 } EduBuiltinId;
 
@@ -63,5 +71,6 @@ int edu_binding_lookup(const char *name, int name_len, int *out_id, int *out_arg
 int edu_binding_call(EduWorldState *world, int builtin_id, const int *args, int argc,
                      const char *const *strings, int string_count, int *out_ret,
                      char *debug_out, int debug_cap);
+void world_objects_tick(EduWorldState *w, unsigned int now_ms);
 
 #endif

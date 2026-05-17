@@ -122,12 +122,16 @@ int edu_script_run_active(EduScriptSystem *sys) {
     meta.strings = s->strings;
     meta.string_count = s->string_count;
     int ok = edu_vm_exec(&vm, s->bytecode, s->bytecode_len, &meta, &sys->world, &lim, sys->run_status, (int)sizeof(sys->run_status));
+    world_objects_tick(&sys->world, 0);
     if (ok) {
         snprintf(sys->last_output, sizeof(sys->last_output), "%.96s | print=%d", vm.debug_line, sys->world.last_print);
         printf("[EDU_VM] run ok instruction_count=%d\n", vm.instruction_count);
     } else {
         snprintf(sys->last_output, sizeof(sys->last_output), "runtime failure");
         printf("[EDU_VM] run error %s\n", sys->run_status);
+    }
+    if (sys->world.entity_count > 0) {
+        snprintf(sys->last_output, sizeof(sys->last_output), "Crate pos: %.2f", sys->world.entities[0].x);
     }
     sys->last_instruction_count = vm.instruction_count;
     return ok;
