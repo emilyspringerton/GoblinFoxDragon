@@ -1,3 +1,7 @@
+## 2026-06-20
+
+- feat: S42-01 worldapi :7070 live; S42-02 scene-differentiated ProceduralWorldStore (Apple #1449)
+
 ## 2026-06-18
 - feat(worldapi): S41-02 DragonflyChunkGenerator — WorldStore hook + procedural fallback + block name→ID mapping (Apple #1421)
 
