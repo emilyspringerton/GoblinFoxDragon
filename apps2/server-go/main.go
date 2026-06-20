@@ -2,15 +2,18 @@ package main
 
 import (
 	"encoding/binary"
+	"flag"
 	"fmt"
 	"math"
 	"net"
+	"net/http"
 	"time"
 
 	"dragonsnshit/packages2/common"
 	"dragonsnshit/server/player"
 	"dragonsnshit/server/store"
 	"dragonsnshit/server/system"
+	"dragonsnshit/server/worldapi"
 )
 
 type world struct{}
@@ -59,6 +62,22 @@ type clientInfo struct {
 }
 
 func main() {
+	worldapiPort := flag.Int("worldapi-port", 7070, "HTTP port for the worldapi /chunks endpoint (0 = disabled)")
+	flag.Parse()
+
+	// Start the worldapi HTTP server — SHANKPIT connects here with --dragonfly-url http://localhost:7070
+	if *worldapiPort > 0 {
+		gen := worldapi.NewDragonflyChunkGenerator(worldapi.ProceduralWorldStore)
+		srv := worldapi.New(gen)
+		go func() {
+			addr := fmt.Sprintf(":%d", *worldapiPort)
+			fmt.Printf("worldapi listening on %s (scene 0=meadow, 1=hills, 2=caves)\n", addr)
+			if err := http.ListenAndServe(addr, srv); err != nil {
+				fmt.Printf("worldapi: %v\n", err)
+			}
+		}()
+	}
+
 	addr, err := net.ResolveUDPAddr("udp", ":6969")
 	if err != nil {
 		panic(err)
