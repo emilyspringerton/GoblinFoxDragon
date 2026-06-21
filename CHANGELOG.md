@@ -1,4 +1,5 @@
 ## 2026-06-21
+- feat: S81-04 status effects system (Poison/Paralyze/Slow/Silence/Bind/Haste/Regen/Refresh/Protect/Shell); 43 tests
 - feat: S81-03 TP weapon skill points system; 34 tests (Apple #2530)
 - feat: S81-01+02 skillchain+magic burst system; 14 resonances 3 tiers 31 tests (Apple #2521)
 - feat: S80-01 auto-attack + mob tagging; AI state machine; 26 tests (Apple #2518)
