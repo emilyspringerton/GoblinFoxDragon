@@ -1,3 +1,7 @@
+## 2026-06-21
+
+- docs: S77-01 DragonsNShit MMO_NORTHSTAR — 7 systems, IDUNA schema, 8-milestone product roadmap (Apple #2470)
+
 ## 2026-06-20
 
 - feat: S42-01 worldapi :7070 live; S42-02 scene-differentiated ProceduralWorldStore (Apple #1449)
