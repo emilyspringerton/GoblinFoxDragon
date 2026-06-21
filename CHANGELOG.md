@@ -1,4 +1,5 @@
 ## 2026-06-21
+- feat: S81-01+02 skillchain+magic burst system; 14 resonances 3 tiers 31 tests (Apple #2521)
 - feat: S80-01 auto-attack + mob tagging; AI state machine; 26 tests (Apple #2518)
 - feat: S79-01 linkshell guild system; Feather/Feather Sack; 22 tests (Apple #2515)
 - feat: S78-01 chat system say/tell/yell/guild (PacketChat=6); 19 tests (Apple #2472)
