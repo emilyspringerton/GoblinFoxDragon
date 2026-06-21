@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"dragonsnshit/packages2/common"
+	"dragonsnshit/server/chat"
 	"dragonsnshit/server/player"
 	"dragonsnshit/server/store"
 	"dragonsnshit/server/system"
@@ -94,6 +95,8 @@ func main() {
 	clientStore := store.NewMemoryClientStore()
 	clients := make(map[string]clientInfo)
 	nextClientID := uint8(0)
+	chatRouter := chat.New()
+	clientAddrs := make(map[string]*net.UDPAddr) // slot → addr for chat delivery
 
 	for {
 		conn.SetReadDeadline(time.Now().Add(250 * time.Millisecond))
@@ -112,13 +115,21 @@ func main() {
 		const userCmdSize = 36
 		switch buf[0] {
 		case common.PacketConnect:
-			info, ok := clients[remote.String()]
+			slot := remote.String()
+			info, ok := clients[slot]
 			if !ok {
 				info = clientInfo{id: nextClientID}
 				if nextClientID < 255 {
 					nextClientID++
 				}
-				clients[remote.String()] = info
+				clients[slot] = info
+				clientAddrs[slot] = remote
+				chatRouter.Register(slot, chat.Session{
+					Name:    fmt.Sprintf("Player%d", info.id),
+					SceneID: 1,
+					GuildID: "",
+					Pos:     chat.Pos{},
+				})
 			}
 			sendWelcome(conn, remote, info.id)
 			sendVoxelPacket(conn, remote, info)
@@ -126,7 +137,8 @@ func main() {
 			if n < netHeaderSize+1+userCmdSize {
 				continue
 			}
-			info, ok := clients[remote.String()]
+			slot := remote.String()
+			info, ok := clients[slot]
 			if !ok {
 				info = clientInfo{id: nextClientID}
 				if nextClientID < 255 {
@@ -134,20 +146,36 @@ func main() {
 				}
 			}
 			info = sendVoxelPacket(conn, remote, info)
-			clients[remote.String()] = info
+			clients[slot] = info
 			count := int(buf[netHeaderSize])
 			if count < 1 {
 				continue
 			}
 			cmd := parseUserCmd(buf, netHeaderSize+1)
-			clientStore.Upsert(remote.String(), cmd)
+			clientStore.Upsert(slot, cmd)
 			if cmd.Buttons&common.BtnAttack != 0 {
 				hit, pos, hitEntity := player.HandleShankFire(p, float64(cmd.Yaw), float64(cmd.Pitch), int(cmd.WeaponIdx))
 				if hit {
 					sendImpact(conn, remote, pos, hitEntity, 0)
 				}
 			}
-			_ = remote
+
+		case common.PacketChat:
+			if n < 4 {
+				continue
+			}
+			slot := remote.String()
+			channel, target, msg, ok := chat.ParseChatPacket(buf[:n])
+			if !ok {
+				continue
+			}
+			deliveries := chatRouter.Deliver(slot, channel, target, msg, common.SayRadius)
+			for _, d := range deliveries {
+				if addr, ok := clientAddrs[d.To]; ok {
+					_, _ = conn.WriteToUDP(d.Packet, addr)
+				}
+			}
+			fmt.Printf("[chat/%s] %s: %s\n", channelName(channel), slot, msg)
 		}
 	}
 }
@@ -327,4 +355,19 @@ func setBlock(blocks []uint16, x, y, z int, blockID uint16) {
 
 func chunkIndex(x, y, z int) int {
 	return (y*chunkSize+z)*chunkSize + x
+}
+
+func channelName(ch int) string {
+	switch ch {
+	case common.ChatSay:
+		return "say"
+	case common.ChatTell:
+		return "tell"
+	case common.ChatYell:
+		return "yell"
+	case common.ChatGuild:
+		return "guild"
+	default:
+		return "unknown"
+	}
 }

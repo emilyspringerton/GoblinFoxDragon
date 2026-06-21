@@ -14,6 +14,21 @@ const (
 	PacketWelcome   = 3
 	PacketVoxelData = 4
 	PacketImpact    = 5
+	PacketChat      = 6
+)
+
+// Chat channel IDs (byte 1 of PacketChat).
+const (
+	ChatSay   = 0 // local area — same scene, within SayRadius units
+	ChatTell  = 1 // private — direct to named recipient, any scene
+	ChatYell  = 2 // zone-wide — same scene, all players
+	ChatGuild = 3 // guild — same guild, any scene
+)
+
+const (
+	SayRadius  = 50.0  // units
+	MaxChatMsg = 200   // bytes
+	MaxName    = 32    // bytes
 )
 
 const (
