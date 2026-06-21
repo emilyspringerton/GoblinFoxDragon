@@ -1,4 +1,5 @@
 ## 2026-06-21
+- feat: S78-01 chat system say/tell/yell/guild (PacketChat=6); 19 tests (Apple #2472)
 
 - docs: S77-01 DragonsNShit MMO_NORTHSTAR — 7 systems, IDUNA schema, 8-milestone product roadmap (Apple #2470)
 
