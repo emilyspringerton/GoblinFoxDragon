@@ -39,6 +39,7 @@ import (
 	"dragonsnshit/server/mob"
 	"dragonsnshit/server/nm"
 	"dragonsnshit/server/party"
+	"dragonsnshit/server/cartography"
 	"dragonsnshit/server/pet"
 	"dragonsnshit/server/quest"
 	"dragonsnshit/server/skillchain"
@@ -232,6 +233,21 @@ func npcByID(id string) *npcDef {
 // questBank is the global quest registry.
 var questBank = quest.NewBank(quest.StarterQuests)
 
+// zoneNamesMap returns zone ID → display name for the cartography package.
+func zoneNamesMap() map[int]string {
+	m := make(map[int]string, len(zoneDesc))
+	for id, desc := range zoneDesc {
+		// Use the first sentence or first 20 chars as the zone name.
+		name := zoneName(id)
+		if name != "" {
+			m[id] = name
+		} else {
+			_ = desc
+		}
+	}
+	return m
+}
+
 // ── world state ───────────────────────────────────────────────────────────────
 
 type deadMob struct {
@@ -320,7 +336,8 @@ type player struct {
 	recastTracker *job.RecastTracker
 	petSlot      *pet.Slot       // BST pet companion (non-nil always; pet.IsAlive() = has pet)
 	petHeel      bool            // true = pet does not attack (heel mode)
-	questJournal *quest.Journal  // NPC quest progress
+	questJournal *quest.Journal        // NPC quest progress
+	atlas        *cartography.Atlas   // explored zone map
 	conn        net.Conn
 	w           *bufio.Writer
 	inbox       chan string
@@ -1468,6 +1485,9 @@ func handle(p *player, line string) {
 		p.prompt()
 	case "pet-heal", "cure-pet":
 		cmdPetHeal(p)
+	case "explore", "atlas":
+		p.send(p.atlas.ExitMap(exits, zoneNamesMap(), p.zoneID))
+		p.prompt()
 	case "npcs":
 		cmdNPCs(p)
 	case "talk":
@@ -1765,6 +1785,7 @@ func cmdGo(p *player, dir string) {
 	p.combat.TargetMobID = ""
 	_ = gw.zoneMgr.Transfer(p.slot, dest)
 	p.zoneID = dest
+	p.atlas.Visit(dest) // cartography: mark zone discovered
 
 	destZone, _ := gw.zoneMgr.Get(dest)
 	p.pos = mob.Pos{X: destZone.SpawnX, Y: destZone.SpawnY, Z: destZone.SpawnZ}
@@ -2368,7 +2389,8 @@ func cmdGear(p *player) {
 }
 
 func cmdMap(p *player) {
-	p.sendf("\r\n=== World Map ===")
+	p.sendf("\r\n=== World Map  (explored: %d/%d zones) ===",
+		p.atlas.Count(), len(gw.zoneMgr.ZoneIDs()))
 	zones := gw.zoneMgr.ZoneIDs()
 	for _, id := range zones {
 		z, _ := gw.zoneMgr.Get(id)
@@ -2378,11 +2400,15 @@ func cmdMap(p *player) {
 		if id == p.zoneID {
 			marker = "->"
 		}
+		explored := " "
+		if p.atlas.Has(id) {
+			explored = "✓"
+		}
 		manualStr := ""
 		if m, ok := gw.fieldManuals[id]; ok && m != nil && m.Active(time.Now()) {
 			manualStr = fmt.Sprintf(" [+%d%%XP]", m.BonusPct)
 		}
-		p.sendf("%s [%d] %-12s  %d mob(s)  %d player(s)%s", marker, id, z.Name, mobCount, count, manualStr)
+		p.sendf("%s %s [%d] %-12s  %d mob(s)  %d player(s)%s", marker, explored, id, z.Name, mobCount, count, manualStr)
 		if ex, ok := exits[id]; ok {
 			for dir, dest := range ex {
 				dz, _ := gw.zoneMgr.Get(dest)
@@ -2390,6 +2416,7 @@ func cmdMap(p *player) {
 			}
 		}
 	}
+	p.sendf("\r\n  Type 'explore' for your personal discovery map.")
 	p.prompt()
 }
 
@@ -3968,6 +3995,7 @@ func handleConn(conn net.Conn) {
 		recastTracker: job.NewRecastTracker(job.WarriorAbilities()),
 		petSlot:       pet.NewSlot(),
 		questJournal:  quest.NewJournal(),
+		atlas:         cartography.NewAtlas(),
 		inventory:  make(map[string]int),
 		craftSkill: craft.NewCraftSkill(),
 		gil:        500, // starting gil
@@ -4002,6 +4030,7 @@ func handleConn(conn net.Conn) {
 
 	gw.mu.Lock()
 	gw.players[slot] = p
+	p.atlas.Visit(0) // starting zone is always known
 	_ = gw.zoneMgr.Enter(slot, name, 0)
 	gw.chatRouter.Register(slot, chat.Session{Name: name, SceneID: 0, Pos: chat.Pos{X: 0, Y: 2, Z: 0}})
 	broadcastZoneNoLock(0, fmt.Sprintf("%s has entered the world.", name), slot)
