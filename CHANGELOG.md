@@ -1,4 +1,5 @@
 ## 2026-06-23
+- S114-01: BRD songs (march/paeon/ballad/minne/carol/mambo); zone-AoE status buffs; BRD job gate; 3-minute duration; party broadcast
 - S113-01: BLM black magic nukes (6 elements × 3 tiers); INT scaling; BLM/RDM job gate; target-mob required
 - S112-01: Party-targeted spell casting; cast <spell> <player> resolves zone-local target; Cure/Protect/Shell/Haste/Regen/Refresh notify both caster and target
 - S111-01: WHM buff spells (Protect/Shell/Haste/Regen/Refresh via status.Stack); Dia DoT on combat target; RDM allowed Refresh
