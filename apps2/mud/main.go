@@ -23,7 +23,9 @@ import (
 	"dragonsnshit/server/gather"
 	"dragonsnshit/server/homepoint"
 	"dragonsnshit/server/job"
+	"dragonsnshit/server/loot"
 	"dragonsnshit/server/mob"
+	"dragonsnshit/server/nm"
 	"dragonsnshit/server/party"
 	"dragonsnshit/server/skillchain"
 	"dragonsnshit/server/status"
@@ -87,6 +89,13 @@ type mobChainState struct {
 	Slot   string // who threw the WS
 }
 
+// activeLootPool is a pending treasure pool after a mob kill.
+type activeLootPool struct {
+	pool   *loot.Pool
+	poolID string
+	zoneID int
+}
+
 type world struct {
 	mu             sync.Mutex
 	zoneMgr        *zone.Manager
@@ -101,6 +110,8 @@ type world struct {
 	xpChains       map[string]*party.XPChain // partyID → chain
 	pendingInvites map[string]string // invitee slot → inviter slot
 	mobChains      map[string]*mobChainState // mobID → last WS chain state
+	lootPools      map[string]*activeLootPool // poolID → pool
+	nmSpawns       map[int][]*nm.NMSpawn // zoneID → NM spawn definitions
 }
 
 var gw *world
@@ -165,6 +176,11 @@ func initWorld() *world {
 		xpChains:       make(map[string]*party.XPChain),
 		pendingInvites: make(map[string]string),
 		mobChains:      make(map[string]*mobChainState),
+		lootPools:      make(map[string]*activeLootPool),
+		nmSpawns: map[int][]*nm.NMSpawn{
+			0: nm.MeadowNMs(),
+			3: nm.SwampNMs(),
+		},
 	}
 
 	w.zoneMgr = zone.New(zone.DefaultZones())
@@ -275,6 +291,18 @@ func resolveKill(p *player, killedMob *mob.Mob, reg *mob.Registry, now time.Time
 		respawnAt: now.Add(respawnDelay),
 		zoneID:    p.zoneID,
 	})
+
+	// Loot pool.
+	openLootPool(p, killedMob, now)
+
+	// NM placeholder check.
+	for _, spawn := range gw.nmSpawns[p.zoneID] {
+		if spawn.PlaceholderID == killedMob.ID {
+			spawn.OnPlaceholderKilled(now)
+			broadcastZoneNoLock(p.zoneID,
+				fmt.Sprintf("[!!!] The slaying of %s has disturbed something nearby...", killedMob.Kind), "")
+		}
+	}
 }
 
 // applyJobStats recomputes maxHP/maxMP for p based on their current job + level
@@ -295,6 +323,143 @@ func applyJobStats(p *player) {
 			p.mp = p.maxMP
 		}
 	}
+}
+
+// dropsForMob returns the loot items a mob of the given kind drops on death.
+func dropsForMob(kind string) []loot.Item {
+	switch strings.ToLower(kind) {
+	case "worm":
+		return []loot.Item{
+			{ID: "worm-sinew", Name: "Worm Sinew"},
+			{ID: "earth-crystal", Name: "Earth Crystal"},
+		}
+	case "leech":
+		return []loot.Item{
+			{ID: "leech-blood", Name: "Leech Blood"},
+			{ID: "water-crystal", Name: "Water Crystal"},
+		}
+	case "slime":
+		return []loot.Item{{ID: "slime-oil", Name: "Slime Oil"}}
+	case "lizard":
+		return []loot.Item{
+			{ID: "lizard-tail", Name: "Lizard Tail"},
+			{ID: "fire-crystal", Name: "Fire Crystal"},
+		}
+	case "king worm":
+		return []loot.Item{
+			{ID: "king-sinew", Name: "King Worm Sinew"},
+			{ID: "nm-worm-shell", Name: "Royal Worm Shell"},
+			{ID: "earth-crystal-hq", Name: "Earth Crystal (HQ)"},
+		}
+	case "marsh leech":
+		return []loot.Item{
+			{ID: "marsh-blood", Name: "Marsh Leech Blood"},
+			{ID: "nm-leech-fang", Name: "Marsh Leech Fang"},
+			{ID: "water-crystal-hq", Name: "Water Crystal (HQ)"},
+		}
+	default:
+		return []loot.Item{{ID: "gil-drop", Name: "100 Gil"}}
+	}
+}
+
+// nmMobFor returns a Mob template for the given NM ID.
+func nmMobFor(nmID string) mob.Mob {
+	switch nmID {
+	case "nm-king-worm":
+		return mob.Mob{
+			ID: nmID, Kind: "King Worm",
+			HP: 800, MaxHP: 800,
+			AggroRange: 15, LeashRange: 40, MeleeRange: 3,
+			MoveSpeed: 4, MeleeDamage: 60, SwingDelay: 2 * time.Second,
+		}
+	case "nm-marsh-leech":
+		return mob.Mob{
+			ID: nmID, Kind: "Marsh Leech",
+			HP: 600, MaxHP: 600,
+			AggroRange: 12, LeashRange: 35, MeleeRange: 3,
+			MoveSpeed: 5, MeleeDamage: 50, SwingDelay: 2 * time.Second,
+		}
+	default:
+		return mob.Mob{
+			ID: nmID, Kind: nmID,
+			HP: 500, MaxHP: 500,
+			AggroRange: 10, LeashRange: 30, MeleeRange: 3,
+			MoveSpeed: 4, MeleeDamage: 40,
+		}
+	}
+}
+
+// openLootPool creates a loot pool after a mob kill. For solo kills, drops are auto-awarded.
+// Must be called with gw.mu held.
+func openLootPool(killer *player, m *mob.Mob, now time.Time) {
+	drops := dropsForMob(m.Kind)
+	if len(drops) == 0 {
+		return
+	}
+
+	// Determine eligible players (party members in same zone, or solo).
+	var eligible []string
+	if partyID, inParty := gw.playerParty[killer.slot]; inParty {
+		if pt, ok := gw.parties[partyID]; ok {
+			for _, slot := range pt.All() {
+				if op, ok := gw.players[slot]; ok && op.zoneID == killer.zoneID {
+					eligible = append(eligible, slot)
+				}
+			}
+		}
+	}
+
+	if len(eligible) == 0 {
+		// Solo: auto-award all drops to the killer.
+		for _, it := range drops {
+			killer.sendf("  You obtain: %s.", it.Name)
+		}
+		return
+	}
+
+	// Party: open a pool.
+	poolID := fmt.Sprintf("%s-%d", m.ID, now.UnixNano())
+	pool := loot.NewPool(m.ID, eligible, drops, now.UnixNano())
+	gw.lootPools[poolID] = &activeLootPool{pool: pool, poolID: poolID, zoneID: killer.zoneID}
+
+	// Announce to eligible players.
+	for _, slot := range eligible {
+		if op, ok := gw.players[slot]; ok {
+			op.sendf("\r\n[Loot] Treasure pool from %s:", m.Kind)
+			for i, it := range drops {
+				op.sendf("  [%d] %s", i+1, it.Name)
+			}
+			op.send("  Use 'lot N' to roll or 'pass N' (or 'pass all') to decline.")
+		}
+	}
+}
+
+// resolvePool announces awards and removes the pool when all players have acted.
+// Must be called with gw.mu held.
+func resolvePool(alp *activeLootPool) {
+	if !alp.pool.Ready() {
+		return
+	}
+	awards, err := alp.pool.Resolve()
+	if err != nil {
+		return
+	}
+	// Find item names.
+	itemNames := make(map[string]string)
+	for _, it := range alp.pool.Items {
+		itemNames[it.ID] = it.Name
+	}
+	// Announce to zone.
+	for _, award := range awards {
+		name := itemNames[award.ItemID]
+		if award.Slot == "" {
+			broadcastZoneNoLock(alp.zoneID, fmt.Sprintf("[Loot] %s — no one claimed it.", name), "")
+		} else if op, ok := gw.players[award.Slot]; ok {
+			broadcastZoneNoLock(alp.zoneID,
+				fmt.Sprintf("[Loot] %s obtains %s! (lot: %d)", op.name, name, award.Roll), "")
+		}
+	}
+	delete(gw.lootPools, alp.poolID)
 }
 
 // knockOut marks p as KO'd and broadcasts the death message.
@@ -430,6 +595,26 @@ func tickAll() {
 		}
 	}
 	gw.deadQueue = remaining
+
+	// NM spawn checks.
+	for zoneID, spawns := range gw.nmSpawns {
+		for _, spawn := range spawns {
+			if spawn.WindowExpired(now) {
+				spawn.Reset()
+				continue
+			}
+			if spawn.InWindow(now) && spawn.TrySpawn(now, gw.rng) {
+				nmMob := nmMobFor(spawn.ID)
+				_ = gw.mobRegs[zoneID].Spawn(nmMob)
+				for _, p := range gw.players {
+					if p.zoneID == zoneID {
+						p.sendf("\r\n[!!!] %s has appeared in %s!", nmMob.Kind, zoneName(zoneID))
+						p.prompt()
+					}
+				}
+			}
+		}
+	}
 }
 
 func broadcastMobEvent(zoneID int, ev mob.Event) {
@@ -581,6 +766,22 @@ func handle(p *player, line string) {
 		cmdParty(p)
 	case "leave-party", "lp":
 		cmdLeaveParty(p)
+	case "lot":
+		if len(args) == 0 {
+			p.send("Usage: lot <item-number>  (e.g. 'lot 1')")
+			p.prompt()
+			return
+		}
+		cmdLot(p, args[0])
+	case "pass":
+		if len(args) == 0 {
+			p.send("Usage: pass <item-number> | pass all")
+			p.prompt()
+			return
+		}
+		cmdPass(p, args[0])
+	case "pool", "loot":
+		cmdPool(p)
 	case "setjob":
 		if len(args) == 0 {
 			p.sendf("Current job: %s  (use 'jobs' to list all, 'setjob <JOB>' to change)", p.jobID)
@@ -1238,6 +1439,107 @@ func cmdLeaveParty(p *player) {
 	p.prompt()
 }
 
+// findActivePool returns the first active loot pool in p's zone that p is eligible for.
+func findActivePool(p *player) *activeLootPool {
+	for _, alp := range gw.lootPools {
+		if alp.zoneID != p.zoneID {
+			continue
+		}
+		for _, slot := range alp.pool.Eligible {
+			if slot == p.slot {
+				return alp
+			}
+		}
+	}
+	return nil
+}
+
+func cmdPool(p *player) {
+	alp := findActivePool(p)
+	if alp == nil {
+		p.send("No active loot pool in this zone.")
+		p.prompt()
+		return
+	}
+	p.send("\r\n[Loot Pool]")
+	for i, it := range alp.pool.Items {
+		results, _ := alp.pool.LotStatus(it.ID)
+		actStr := ""
+		for _, lr := range results {
+			if lr.Slot == p.slot {
+				if lr.Roll == 0 {
+					actStr = " (you: pass)"
+				} else {
+					actStr = fmt.Sprintf(" (you: %d)", lr.Roll)
+				}
+			}
+		}
+		p.sendf("  [%d] %s%s", i+1, it.Name, actStr)
+	}
+	p.prompt()
+}
+
+func cmdLot(p *player, numStr string) {
+	alp := findActivePool(p)
+	if alp == nil {
+		p.send("No active loot pool to lot in.")
+		p.prompt()
+		return
+	}
+	var idx int
+	if _, err := fmt.Sscanf(numStr, "%d", &idx); err != nil || idx < 1 || idx > len(alp.pool.Items) {
+		p.sendf("Invalid item number. Pool has %d item(s).", len(alp.pool.Items))
+		p.prompt()
+		return
+	}
+	itemID := alp.pool.Items[idx-1].ID
+	roll, err := alp.pool.Lot(p.slot, itemID)
+	if err != nil {
+		p.sendf("Lot failed: %v", err)
+		p.prompt()
+		return
+	}
+	itemName := alp.pool.Items[idx-1].Name
+	broadcastZoneNoLock(alp.zoneID,
+		fmt.Sprintf("[Loot] %s lots %s: %d", p.name, itemName, roll), "")
+	resolvePool(alp)
+	p.prompt()
+}
+
+func cmdPass(p *player, what string) {
+	alp := findActivePool(p)
+	if alp == nil {
+		p.send("No active loot pool to pass on.")
+		p.prompt()
+		return
+	}
+	if strings.EqualFold(what, "all") {
+		for _, it := range alp.pool.Items {
+			_ = alp.pool.Pass(p.slot, it.ID)
+		}
+		broadcastZoneNoLock(alp.zoneID, fmt.Sprintf("[Loot] %s passes on all items.", p.name), "")
+		resolvePool(alp)
+		p.prompt()
+		return
+	}
+	var idx int
+	if _, err := fmt.Sscanf(what, "%d", &idx); err != nil || idx < 1 || idx > len(alp.pool.Items) {
+		p.sendf("Invalid item number. Use 'pool' to see the list, or 'pass all' to decline everything.")
+		p.prompt()
+		return
+	}
+	itemID := alp.pool.Items[idx-1].ID
+	if err := alp.pool.Pass(p.slot, itemID); err != nil {
+		p.sendf("Pass failed: %v", err)
+		p.prompt()
+		return
+	}
+	broadcastZoneNoLock(alp.zoneID,
+		fmt.Sprintf("[Loot] %s passes on %s.", p.name, alp.pool.Items[idx-1].Name), "")
+	resolvePool(alp)
+	p.prompt()
+}
+
 func cmdSetJob(p *player, jobID string) {
 	if p.homePoint.IsKO {
 		p.send("You cannot change jobs while KO'd.")
@@ -1296,6 +1598,9 @@ Commands:
   wslist              — list all weapon skills and their SC resonances
   setjob <JOB>        — change your job (WAR/WHM/BLM/RDM/THF/PLD/DRK/… 22 total)
   jobs                — list all 22 jobs with HP/MP growth and base stats
+  pool / loot         — show active treasure pool in this zone
+  lot <N>             — roll on item N in the loot pool
+  pass <N> / pass all — decline item(s) in the loot pool
   mine                — attempt mining at a nearby point
   mine-points / mp    — list mining points in this zone
   status / st         — show your stats (level, XP, homepoint, party)
