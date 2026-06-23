@@ -229,6 +229,7 @@ type world struct {
 	ah             *market.AuctionHouse
 	playerNation   map[string]conquest.Nation // slot → declared nation
 	lastConquestTick time.Time
+	bazaars        map[string]map[string]int // slot → { itemID: price }
 	mobEnmity      map[string]*enmity.Table // mobID → enmity table
 	chatRouter     *chat.Router
 	guildReg       *guild.Registry
@@ -314,6 +315,7 @@ func initWorld() *world {
 		lootPools:      make(map[string]*activeLootPool),
 		playerNation:   make(map[string]conquest.Nation),
 		lastConquestTick: time.Now(),
+		bazaars:        make(map[string]map[string]int),
 		mobEnmity:      make(map[string]*enmity.Table),
 		chatRouter:     chat.New(),
 		guildReg:       guild.New(),
@@ -1122,6 +1124,12 @@ func handle(p *player, line string) {
 		cmdCast(p, strings.ToLower(args[0]))
 	case "removedebuffs", "erase":
 		cmdRemoveDebuffs(p)
+	case "bazaar":
+		if len(args) == 0 {
+			p.send("Usage: bazaar set <item> <price> | bazaar list | bazaar list <player> | bazaar buy <player> <item>")
+			return
+		}
+		cmdBazaar(p, args)
 	case "ja":
 		if len(args) < 1 {
 			p.send("Usage: ja <ability-id>  (e.g. ja provoke)")
@@ -3098,6 +3106,128 @@ func cmdCast(p *player, spell string) {
 		p.sendf("Cure II: +%d HP. (HP: %d/%d  MP: %d)", healed, p.hp, p.maxHP, p.mp)
 	default:
 		p.sendf("Unknown spell %q. Available: invisible, sneak, cure, cure2", spell)
+	}
+	p.prompt()
+}
+
+func cmdBazaar(p *player, args []string) {
+	switch args[0] {
+	case "set":
+		if len(args) < 3 {
+			p.send("Usage: bazaar set <item-id> <price>")
+			p.prompt()
+			return
+		}
+		itemID := args[1]
+		price := 0
+		fmt.Sscanf(args[2], "%d", &price)
+		if price <= 0 {
+			p.send("Price must be > 0.")
+			p.prompt()
+			return
+		}
+		if p.inventory[itemID] <= 0 {
+			p.sendf("You don't have any %s.", itemName(itemID))
+			p.prompt()
+			return
+		}
+		if gw.bazaars[p.slot] == nil {
+			gw.bazaars[p.slot] = make(map[string]int)
+		}
+		gw.bazaars[p.slot][itemID] = price
+		p.sendf("Bazaar: %s listed at %d gil.", itemName(itemID), price)
+
+	case "list":
+		if len(args) >= 2 {
+			// List another player's bazaar.
+			target := args[1]
+			var targetSlot string
+			for slot, op := range gw.players {
+				if strings.EqualFold(op.name, target) {
+					targetSlot = slot
+					break
+				}
+			}
+			if targetSlot == "" {
+				p.sendf("Player %q not found.", target)
+				p.prompt()
+				return
+			}
+			baz := gw.bazaars[targetSlot]
+			if len(baz) == 0 {
+				p.sendf("%s has no bazaar listings.", target)
+				p.prompt()
+				return
+			}
+			p.sendf("\r\n=== %s's Bazaar ===", gw.players[targetSlot].name)
+			for itemID, price := range baz {
+				p.sendf("  %-20s %d gil", itemName(itemID), price)
+			}
+		} else {
+			// Your own bazaar.
+			baz := gw.bazaars[p.slot]
+			if len(baz) == 0 {
+				p.send("Your bazaar is empty. Use: bazaar set <item> <price>")
+				p.prompt()
+				return
+			}
+			p.send("\r\n=== Your Bazaar ===")
+			for itemID, price := range baz {
+				p.sendf("  %-20s %d gil", itemName(itemID), price)
+			}
+		}
+
+	case "buy":
+		if len(args) < 3 {
+			p.send("Usage: bazaar buy <player> <item-id>")
+			p.prompt()
+			return
+		}
+		sellerName := args[1]
+		itemID := args[2]
+		var seller *player
+		for _, op := range gw.players {
+			if strings.EqualFold(op.name, sellerName) {
+				seller = op
+				break
+			}
+		}
+		if seller == nil {
+			p.sendf("Player %q not found.", sellerName)
+			p.prompt()
+			return
+		}
+		baz := gw.bazaars[seller.slot]
+		price, listed := baz[itemID]
+		if !listed {
+			p.sendf("%s is not selling %s.", seller.name, itemName(itemID))
+			p.prompt()
+			return
+		}
+		if seller.inventory[itemID] <= 0 {
+			p.sendf("%s no longer has %s.", seller.name, itemName(itemID))
+			delete(baz, itemID)
+			p.prompt()
+			return
+		}
+		if p.gil < price {
+			p.sendf("Not enough gil. (need %d, have %d)", price, p.gil)
+			p.prompt()
+			return
+		}
+		p.gil -= price
+		seller.gil += price
+		p.inventory[itemID]++
+		seller.inventory[itemID]--
+		if seller.inventory[itemID] == 0 {
+			delete(baz, itemID)
+		}
+		p.sendf("Bought %s from %s for %d gil. (gil: %d)", itemName(itemID), seller.name, price, p.gil)
+		seller.sendf("\r\n[Bazaar] %s bought your %s for %d gil. (gil: %d)", p.name, itemName(itemID), price, seller.gil)
+		seller.prompt()
+
+	default:
+		p.send("Usage: bazaar set <item> <price> | bazaar list | bazaar list <player> | bazaar buy <player> <item>")
 	}
 	p.prompt()
 }
