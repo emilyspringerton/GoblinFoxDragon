@@ -180,15 +180,15 @@ func TestTurnInSuccess(t *testing.T) {
 	j := NewJournal()
 	q, _ := b.Get("gather-iron-ore")
 	j.Accept(q)
-	gil, item, err := j.TurnIn(b, "gather-iron-ore", map[string]int{"iron-ore": 3})
+	res, err := j.TurnIn(b, "gather-iron-ore", map[string]int{"iron-ore": 3})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if gil != 100 {
-		t.Errorf("expected 100 gil, got %d", gil)
+	if res.Gil != 100 {
+		t.Errorf("expected 100 gil, got %d", res.Gil)
 	}
-	if item != "" {
-		t.Errorf("expected no item reward, got %q", item)
+	if res.Item != "" {
+		t.Errorf("expected no item reward, got %q", res.Item)
 	}
 	if !j.Completed["gather-iron-ore"] {
 		t.Error("quest should be marked complete after turn-in")
@@ -204,19 +204,36 @@ func TestTurnInItemReward(t *testing.T) {
 	q, _ := b.Get("defeat-king-worm")
 	j.Accept(q)
 	j.RecordKill("king-worm")
-	_, item, err := j.TurnIn(b, "defeat-king-worm", map[string]int{})
+	res, err := j.TurnIn(b, "defeat-king-worm", map[string]int{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if item != "iron-sword" {
-		t.Errorf("expected iron-sword item reward, got %q", item)
+	if res.Item != "iron-sword" {
+		t.Errorf("expected iron-sword item reward, got %q", res.Item)
+	}
+}
+
+func TestTurnInFameReward(t *testing.T) {
+	b := starterBank()
+	j := NewJournal()
+	q, _ := b.Get("gather-iron-ore")
+	j.Accept(q)
+	res, err := j.TurnIn(b, "gather-iron-ore", map[string]int{"iron-ore": 3})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.RewardFame != 30 {
+		t.Errorf("expected 30 fame, got %d", res.RewardFame)
+	}
+	if res.FameNation != 1 {
+		t.Errorf("expected FameNation=1 (Sandoria), got %d", res.FameNation)
 	}
 }
 
 func TestTurnInNotActive(t *testing.T) {
 	b := starterBank()
 	j := NewJournal()
-	_, _, err := j.TurnIn(b, "swamp-patrol", map[string]int{})
+	_, err := j.TurnIn(b, "swamp-patrol", map[string]int{})
 	if err != ErrNotActive {
 		t.Errorf("expected ErrNotActive got %v", err)
 	}
@@ -230,7 +247,7 @@ func TestTurnInNotComplete(t *testing.T) {
 	// Only 2 kills, need 5
 	j.RecordKill("leech")
 	j.RecordKill("leech")
-	_, _, err := j.TurnIn(b, "swamp-patrol", map[string]int{})
+	_, err := j.TurnIn(b, "swamp-patrol", map[string]int{})
 	if err != ErrNotComplete {
 		t.Errorf("expected ErrNotComplete got %v", err)
 	}

@@ -16,6 +16,8 @@ type Quest struct {
 	RequireKills map[string]int // mob kind → count
 	RewardGil    int
 	RewardItem   string // "" if no item reward
+	RewardFame   int    // fame points granted on completion (0 = no fame)
+	FameNation   int    // nation receiving fame (matches fame.Nation values; 0 = Neutral/none)
 }
 
 // State is one player's progress through a quest.
@@ -38,6 +40,7 @@ var (
 )
 
 // StarterQuests are the 5 starter quests available from NPCs.
+// FameNation uses fame.Nation values: 1=Sandoria, 2=Bastok, 3=Windurst.
 var StarterQuests = []*Quest{
 	{
 		ID:           "gather-iron-ore",
@@ -48,6 +51,8 @@ var StarterQuests = []*Quest{
 		RequireKills: map[string]int{},
 		RewardGil:    100,
 		RewardItem:   "",
+		RewardFame:   30,
+		FameNation:   1, // Sandoria
 	},
 	{
 		ID:           "defeat-king-worm",
@@ -58,6 +63,8 @@ var StarterQuests = []*Quest{
 		RequireKills: map[string]int{"king-worm": 1},
 		RewardGil:    500,
 		RewardItem:   "iron-sword",
+		RewardFame:   75,
+		FameNation:   1, // Sandoria
 	},
 	{
 		ID:           "merchants-request",
@@ -68,6 +75,8 @@ var StarterQuests = []*Quest{
 		RequireKills: map[string]int{},
 		RewardGil:    200,
 		RewardItem:   "",
+		RewardFame:   40,
+		FameNation:   2, // Bastok
 	},
 	{
 		ID:           "swamp-patrol",
@@ -78,6 +87,8 @@ var StarterQuests = []*Quest{
 		RequireKills: map[string]int{"leech": 5},
 		RewardGil:    300,
 		RewardItem:   "leather-belt",
+		RewardFame:   50,
+		FameNation:   3, // Windurst
 	},
 	{
 		ID:           "crisis-volunteer",
@@ -88,6 +99,8 @@ var StarterQuests = []*Quest{
 		RequireKills: map[string]int{},
 		RewardGil:    400,
 		RewardItem:   "echo-drop",
+		RewardFame:   60,
+		FameNation:   3, // Windurst
 	},
 }
 
@@ -225,31 +238,43 @@ func (j *Journal) IsMet(questID string, inventory map[string]int) (bool, error) 
 	return true, nil
 }
 
+// TurnInResult holds all rewards from a completed quest.
+type TurnInResult struct {
+	Gil        int
+	Item       string
+	RewardFame int
+	FameNation int
+}
+
 // TurnIn completes a quest. Returns ErrNotActive, ErrNotComplete, or nil on success.
 // On success, the quest is moved to Completed and removed from Active.
-// Returns (rewardGil, rewardItem).
-func (j *Journal) TurnIn(b *Bank, questID string, inventory map[string]int) (gil int, item string, err error) {
+func (j *Journal) TurnIn(b *Bank, questID string, inventory map[string]int) (TurnInResult, error) {
 	q, qErr := b.Get(questID)
 	if qErr != nil {
-		return 0, "", qErr
+		return TurnInResult{}, qErr
 	}
 	st, ok := j.Active[questID]
 	if !ok {
-		return 0, "", ErrNotActive
+		return TurnInResult{}, ErrNotActive
 	}
 	// Check kills.
 	for kind, need := range q.RequireKills {
 		if st.KillProgress[kind] < need {
-			return 0, "", ErrNotComplete
+			return TurnInResult{}, ErrNotComplete
 		}
 	}
 	// Check items.
 	for itemID, need := range q.RequireItems {
 		if inventory[itemID] < need {
-			return 0, "", ErrNotComplete
+			return TurnInResult{}, ErrNotComplete
 		}
 	}
 	j.Completed[questID] = true
 	delete(j.Active, questID)
-	return q.RewardGil, q.RewardItem, nil
+	return TurnInResult{
+		Gil:        q.RewardGil,
+		Item:       q.RewardItem,
+		RewardFame: q.RewardFame,
+		FameNation: q.FameNation,
+	}, nil
 }

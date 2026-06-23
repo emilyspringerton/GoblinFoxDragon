@@ -50,6 +50,7 @@ import (
 	"dragonsnshit/server/zone"
 	"dragonsnshit/server/idunaclient"
 	"dragonsnshit/server/food"
+	"dragonsnshit/server/fame"
 	combatTp "dragonsnshit/server/combat"
 )
 
@@ -326,6 +327,7 @@ type player struct {
 	miningSkill  float64
 	fishingSkill float64
 	foodEffect   *food.FoodEffect
+	fameStore    *fame.Store
 	charXP      *xp.CharXP
 	homePoint   *homepoint.State
 	wsSkill     string // current weapon skill name (from CanonicalWeaponSkills)
@@ -1455,6 +1457,8 @@ func handle(p *player, line string) {
 		}
 	case "food":
 		cmdFoodBuff(p)
+	case "fame", "reputation", "rep":
+		cmdFame(p)
 	case "sethome":
 		if p.homePoint.IsKO {
 			p.send("Cannot set home while KO'd.")
@@ -1754,17 +1758,22 @@ func cmdQuestAccept(p *player, questID string) {
 }
 
 func cmdQuestTurnIn(p *player, questID string) {
-	gil, item, err := p.questJournal.TurnIn(questBank, questID, p.inventory)
+	res, err := p.questJournal.TurnIn(questBank, questID, p.inventory)
 	if err != nil {
 		p.sendf("Cannot turn in quest: %v", err)
 		p.prompt()
 		return
 	}
-	p.gil += gil
-	p.sendf("Quest complete! +%d gil.", gil)
-	if item != "" {
-		p.inventory[item]++
-		p.sendf("  You received: %s", item)
+	p.gil += res.Gil
+	p.sendf("Quest complete! +%d gil.", res.Gil)
+	if res.Item != "" {
+		p.inventory[res.Item]++
+		p.sendf("  You received: %s", res.Item)
+	}
+	if res.RewardFame > 0 && res.FameNation != 0 {
+		n := fame.Nation(res.FameNation)
+		p.fameStore.Earn(n, res.RewardFame)
+		p.sendf("  Fame: +%d with %s (rank: %s)", res.RewardFame, fame.NationName(n), p.fameStore.RankLabel(n))
 	}
 	p.prompt()
 }
@@ -2775,6 +2784,19 @@ func formatDuration(d time.Duration) string {
 		return fmt.Sprintf("%dm", m)
 	}
 	return fmt.Sprintf("%ds", s)
+}
+
+func cmdFame(p *player) {
+	p.send("\r\n=== Nation Reputation ===")
+	for _, ns := range p.fameStore.Summary() {
+		next := ""
+		if ns.Next > 0 {
+			need := ns.Next - ns.Points
+			next = fmt.Sprintf("  (%d pts to Rank %d)", need, ns.Rank+1)
+		}
+		p.sendf("  %-12s  Rank %d (%s)  %d pts%s", ns.Name, ns.Rank, ns.RankLabel, ns.Points, next)
+	}
+	p.prompt()
 }
 
 func cmdHome(p *player) {
@@ -4242,6 +4264,7 @@ Commands:
   fish-points / fp    — list fishing spots in this zone
   eat <item-id>       — eat food to gain a stat buff
   food                — show current food buff status
+  fame / rep          — show nation reputation (fame ranks)
   status / st         — show your stats (level, XP, homepoint, party)
   who                 — list online players
   say <text>  / ' msg — speak in zone
@@ -4324,6 +4347,7 @@ func handleConn(conn net.Conn) {
 		petSlot:       pet.NewSlot(),
 		questJournal:  quest.NewJournal(),
 		atlas:         cartography.NewAtlas(),
+		fameStore:     fame.NewStore(),
 		inventory:  make(map[string]int),
 		craftSkill: craft.NewCraftSkill(),
 		gil:        500, // starting gil
