@@ -19,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"dragonsnshit/server/conquest"
 	"dragonsnshit/server/craft"
 	"dragonsnshit/server/field"
 	"dragonsnshit/server/gather"
@@ -153,6 +154,9 @@ type world struct {
 	mobChains      map[string]*mobChainState // mobID → last WS chain state
 	lootPools      map[string]*activeLootPool // poolID → pool
 	nmSpawns       map[int][]*nm.NMSpawn // zoneID → NM spawn definitions
+	conquestMap    *conquest.Map
+	playerNation   map[string]conquest.Nation // slot → declared nation
+	lastConquestTick time.Time
 }
 
 var gw *world
@@ -220,6 +224,8 @@ func initWorld() *world {
 		pendingInvites: make(map[string]string),
 		mobChains:      make(map[string]*mobChainState),
 		lootPools:      make(map[string]*activeLootPool),
+		playerNation:   make(map[string]conquest.Nation),
+		lastConquestTick: time.Now(),
 		nmSpawns: map[int][]*nm.NMSpawn{
 			0: nm.MeadowNMs(),
 			3: nm.SwampNMs(),
@@ -227,6 +233,11 @@ func initWorld() *world {
 	}
 
 	w.zoneMgr = zone.New(zone.DefaultZones())
+
+	w.conquestMap = conquest.NewMap()
+	for _, r := range conquest.DefaultRegions() {
+		w.conquestMap.AddRegion(r)
+	}
 
 	for _, zoneID := range []int{0, 1, 2, 3} {
 		w.mobRegs[zoneID] = mob.New()
@@ -337,6 +348,12 @@ func resolveKill(p *player, killedMob *mob.Mob, reg *mob.Registry, now time.Time
 
 	// Loot pool.
 	openLootPool(p, killedMob, now)
+
+	// Conquest: award kill points to the player's declared nation.
+	if nation := gw.playerNation[p.slot]; nation != conquest.NationNeutral {
+		pts := 1 + killedMob.MaxHP/50
+		_ = gw.conquestMap.AddPoints(p.zoneID, nation, pts)
+	}
 
 	// NM placeholder check.
 	for _, spawn := range gw.nmSpawns[p.zoneID] {
@@ -641,6 +658,21 @@ func tickAll() {
 	}
 	gw.deadQueue = remaining
 
+	// Conquest tick: evaluate weekly control once per minute (MUD-compressed to 1 min).
+	if now.Sub(gw.lastConquestTick) >= time.Minute {
+		gw.lastConquestTick = now
+		results := gw.conquestMap.TickAll()
+		for regionID, newController := range results {
+			if r, ok := gw.conquestMap.Get(regionID); ok {
+				msg := fmt.Sprintf("[Conquest] %s is now controlled by %s.", r.Name, conquest.NationName(newController))
+				for _, cp := range gw.players {
+					cp.sendf("\r\n%s", msg)
+					cp.prompt()
+				}
+			}
+		}
+	}
+
 	// NM spawn checks.
 	for zoneID, spawns := range gw.nmSpawns {
 		for _, spawn := range spawns {
@@ -811,6 +843,15 @@ func handle(p *player, line string) {
 		cmdParty(p)
 	case "leave-party", "lp":
 		cmdLeaveParty(p)
+	case "conquest", "con":
+		cmdConquest(p)
+	case "declare":
+		if len(args) == 0 {
+			p.send("Usage: declare <sandoria|bastok|windurst|neutral>")
+			p.prompt()
+			return
+		}
+		cmdDeclare(p, strings.ToLower(args[0]))
 	case "inv", "inventory", "i":
 		cmdInventory(p)
 	case "craft":
@@ -1597,6 +1638,52 @@ func cmdPass(p *player, what string) {
 	broadcastZoneNoLock(alp.zoneID,
 		fmt.Sprintf("[Loot] %s passes on %s.", p.name, alp.pool.Items[idx-1].Name), "")
 	resolvePool(alp)
+	p.prompt()
+}
+
+func cmdConquest(p *player) {
+	p.send("\r\n=== Conquest — Region Control ===")
+	for _, r := range conquest.DefaultRegions() {
+		live, ok := gw.conquestMap.Get(r.ID)
+		if !ok {
+			continue
+		}
+		ctrl := conquest.NationName(live.Controller)
+		pts := live.Points
+		p.sendf("  %-18s  Controller: %-12s  [S:%d B:%d W:%d]",
+			live.Name, ctrl,
+			pts[conquest.NationSandoria], pts[conquest.NationBastok], pts[conquest.NationWindurst])
+	}
+	p.send("")
+	counts := gw.conquestMap.RegionCount()
+	totals := gw.conquestMap.Scoreboard()
+	p.send("  Nation totals:")
+	for _, n := range conquest.AllNations() {
+		p.sendf("    %-12s  regions: %d  points: %d", conquest.NationName(n), counts[n], totals[n])
+	}
+	myNation := gw.playerNation[p.slot]
+	p.sendf("\r\n  Your allegiance: %s", conquest.NationName(myNation))
+	p.prompt()
+}
+
+func cmdDeclare(p *player, input string) {
+	var n conquest.Nation
+	switch input {
+	case "sandoria", "san":
+		n = conquest.NationSandoria
+	case "bastok", "bas":
+		n = conquest.NationBastok
+	case "windurst", "win":
+		n = conquest.NationWindurst
+	case "neutral", "none":
+		n = conquest.NationNeutral
+	default:
+		p.sendf("Unknown nation %q. Choose: sandoria, bastok, windurst, neutral.", input)
+		p.prompt()
+		return
+	}
+	gw.playerNation[p.slot] = n
+	p.sendf("You have declared allegiance to %s.", conquest.NationName(n))
 	p.prompt()
 }
 
