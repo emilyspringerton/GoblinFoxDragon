@@ -1,4 +1,5 @@
 ## 2026-06-23
+- S117-01: NIN ninjutsu (6 elements × 2 tiers); DEX scaling; NIN job gate; cast <spell> dispatch
 - S116-01: DRK dark magic (Drain HP steal, Aspir MP absorb, Absorb-STR/DEX/VIT/INT/MND); DRK/RDM job gate
 - S115-01: WHM teleport spells (teleport-meadow/hills/caves/swamp + tele- aliases); 100 MP; combat target reset; arrival broadcast
 - S114-01: BRD songs (march/paeon/ballad/minne/carol/mambo); zone-AoE status buffs; BRD job gate; 3-minute duration; party broadcast
