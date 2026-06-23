@@ -7,10 +7,12 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"dragonsnshit/packages2/common"
 	"dragonsnshit/server/chat"
+	"dragonsnshit/server/idunaauth"
 	"dragonsnshit/server/player"
 	"dragonsnshit/server/store"
 	"dragonsnshit/server/system"
@@ -58,6 +60,7 @@ type chunkCoord struct {
 
 type clientInfo struct {
 	id            uint8
+	playerID      string // IDUNA subject ("sub") from JWT — empty until authenticated
 	lastVoxelSent time.Time
 	chunkIndex    int
 }
@@ -90,6 +93,7 @@ func main() {
 	defer conn.Close()
 
 	fmt.Println("Go backend listening on :6969")
+	authVerifier := idunaauth.NewVerifier()
 	buf := make([]byte, 2048)
 	p := &shankPlayer{pos: system.Vec3{}, eyeHeight: 1.62, world: world{}}
 	clientStore := store.NewMemoryClientStore()
@@ -115,10 +119,21 @@ func main() {
 		const userCmdSize = 36
 		switch buf[0] {
 		case common.PacketConnect:
+			// Payload layout: buf[0] = PacketConnect; buf[1:n] = null-terminated JWT string.
+			// Validate JWT against IDUNA before accepting the connection.
 			slot := remote.String()
-			info, ok := clients[slot]
-			if !ok {
-				info = clientInfo{id: nextClientID}
+			if _, already := clients[slot]; !already {
+				jwtStr := ""
+				if n > 1 {
+					jwtStr = strings.TrimRight(string(buf[1:n]), "\x00")
+				}
+				claims, authErr := authVerifier.Verify(jwtStr)
+				if authErr != nil {
+					fmt.Printf("[auth] reject %s: %v\n", slot, authErr)
+					sendAuthReject(conn, remote)
+					continue
+				}
+				info := clientInfo{id: nextClientID, playerID: claims.Subject}
 				if nextClientID < 255 {
 					nextClientID++
 				}
@@ -130,7 +145,9 @@ func main() {
 					GuildID: "",
 					Pos:     chat.Pos{},
 				})
+				fmt.Printf("[auth] accept %s playerID=%s id=%d\n", slot, claims.Subject, info.id)
 			}
+			info := clients[slot]
 			sendWelcome(conn, remote, info.id)
 			sendVoxelPacket(conn, remote, info)
 		case common.PacketUserCmd:
@@ -178,6 +195,10 @@ func main() {
 			fmt.Printf("[chat/%s] %s: %s\n", channelName(channel), slot, msg)
 		}
 	}
+}
+
+func sendAuthReject(conn *net.UDPConn, remote *net.UDPAddr) {
+	_, _ = conn.WriteToUDP([]byte{common.PacketAuthReject}, remote)
 }
 
 func sendWelcome(conn *net.UDPConn, remote *net.UDPAddr, id uint8) {

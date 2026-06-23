@@ -16,6 +16,7 @@ const (
 	PacketImpact      = 5
 	PacketChat        = 6
 	PacketSceneChange = 7 // server→client: zone transfer; payload: zoneID uint8 + spawnXYZ float32×3
+	PacketAuthReject  = 8 // server→client: PACKET_CONNECT rejected (bad/missing JWT); no payload
 )
 
 // Chat channel IDs (byte 1 of PacketChat).
