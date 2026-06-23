@@ -22,6 +22,7 @@ import (
 	"dragonsnshit/server/field"
 	"dragonsnshit/server/gather"
 	"dragonsnshit/server/homepoint"
+	"dragonsnshit/server/job"
 	"dragonsnshit/server/mob"
 	"dragonsnshit/server/party"
 	"dragonsnshit/server/skillchain"
@@ -120,6 +121,7 @@ type player struct {
 	charXP      *xp.CharXP
 	homePoint   *homepoint.State
 	wsSkill     string // current weapon skill name (from CanonicalWeaponSkills)
+	jobID       string // current job (job.JobID, default "WAR")
 	conn        net.Conn
 	w           *bufio.Writer
 	inbox       chan string
@@ -206,7 +208,9 @@ func awardXP(p *player, baseXP int, now time.Time) {
 		p.sendf("  XP: +%d (Lv.%d  %d/%d to next)", total, p.charXP.Level, p.charXP.CurrentXP, needed)
 	}
 	if leveled {
-		p.sendf("  >>> LEVEL UP! You are now level %d! <<<", p.charXP.Level)
+		applyJobStats(p)
+		p.sendf("  >>> LEVEL UP! You are now level %d! (HP: %d/%d  MP: %d/%d) <<<",
+			p.charXP.Level, p.hp, p.maxHP, p.mp, p.maxMP)
 		broadcastZoneNoLock(p.zoneID, fmt.Sprintf(">>> %s reaches level %d! <<<", p.name, p.charXP.Level), p.slot)
 	}
 }
@@ -271,6 +275,26 @@ func resolveKill(p *player, killedMob *mob.Mob, reg *mob.Registry, now time.Time
 		respawnAt: now.Add(respawnDelay),
 		zoneID:    p.zoneID,
 	})
+}
+
+// applyJobStats recomputes maxHP/maxMP for p based on their current job + level
+// and caps current HP/MP to the new max. Must be called with gw.mu held (or at login).
+func applyJobStats(p *player) {
+	if hp, err := job.HPAtLevel(p.jobID, p.charXP.Level); err == nil {
+		p.maxHP = hp
+		if p.hp > p.maxHP {
+			p.hp = p.maxHP
+		}
+	}
+	if mp, err := job.MPAtLevel(p.jobID, p.charXP.Level); err == nil {
+		p.maxMP = mp
+		if mp == 0 {
+			p.maxMP = 0 // melee job — no MP pool
+		}
+		if p.mp > p.maxMP {
+			p.mp = p.maxMP
+		}
+	}
 }
 
 // knockOut marks p as KO'd and broadcasts the death message.
@@ -557,6 +581,15 @@ func handle(p *player, line string) {
 		cmdParty(p)
 	case "leave-party", "lp":
 		cmdLeaveParty(p)
+	case "setjob":
+		if len(args) == 0 {
+			p.sendf("Current job: %s  (use 'jobs' to list all, 'setjob <JOB>' to change)", p.jobID)
+			p.prompt()
+			return
+		}
+		cmdSetJob(p, strings.ToUpper(args[0]))
+	case "jobs":
+		cmdJobs(p)
 	case "help", "?":
 		cmdHelp(p)
 	case "quit", "exit", "q":
@@ -838,7 +871,7 @@ func cmdStatus(p *player) {
 	if p.charXP.Level >= xp.MaxLevel {
 		xpStr = "MAX"
 	}
-	p.sendf("\r\n=== %s ===", p.name)
+	p.sendf("\r\n=== %s [%s] ===", p.name, p.jobID)
 	if koStr != "" {
 		p.send(koStr)
 	}
@@ -1205,6 +1238,51 @@ func cmdLeaveParty(p *player) {
 	p.prompt()
 }
 
+func cmdSetJob(p *player, jobID string) {
+	if p.homePoint.IsKO {
+		p.send("You cannot change jobs while KO'd.")
+		p.prompt()
+		return
+	}
+	s, err := job.StatsFor(jobID)
+	if err != nil {
+		p.sendf("Unknown job %q. Use 'jobs' to list all 22 jobs.", jobID)
+		p.prompt()
+		return
+	}
+	p.jobID = jobID
+	applyJobStats(p)
+	// Restore HP to full on job change (FFXI-style rest at moogle).
+	p.hp = p.maxHP
+	p.mp = p.maxMP
+	mpStr := fmt.Sprintf("MP: %d", p.maxMP)
+	if s.BaseMP == 0 {
+		mpStr = "MP: --  (melee job)"
+	}
+	p.sendf("Job changed to %s. HP: %d  %s", jobID, p.maxHP, mpStr)
+	p.prompt()
+}
+
+func cmdJobs(p *player) {
+	p.send("\r\n=== Jobs (22) — FFXI-parity ===")
+	for _, j := range job.AllJobs {
+		s, _ := job.StatsFor(j)
+		hpStr := fmt.Sprintf("HP+%d/lv", s.HPPerLevel)
+		mpStr := "no MP"
+		if s.BaseMP > 0 {
+			mpStr = fmt.Sprintf("MP+%d/lv", s.MPPerLevel)
+		}
+		cur := ""
+		if j == p.jobID {
+			cur = " <--"
+		}
+		p.sendf("  %-4s  %-12s %-12s  STR:%d DEX:%d VIT:%d AGI:%d INT:%d MND:%d CHR:%d%s",
+			j, hpStr, mpStr, s.STR, s.DEX, s.VIT, s.AGI, s.INT, s.MND, s.CHR, cur)
+	}
+	p.send("Use 'setjob <ABBR>' to change your job (restores HP/MP).")
+	p.prompt()
+}
+
 func cmdHelp(p *player) {
 	p.send(`
 Commands:
@@ -1216,6 +1294,8 @@ Commands:
   ws [skillname]      — unleash weapon skill (requires TP >= 100); chains with others' WS
   setws <name>        — change your weapon skill (see 'wslist')
   wslist              — list all weapon skills and their SC resonances
+  setjob <JOB>        — change your job (WAR/WHM/BLM/RDM/THF/PLD/DRK/… 22 total)
+  jobs                — list all 22 jobs with HP/MP growth and base stats
   mine                — attempt mining at a nearby point
   mine-points / mp    — list mining points in this zone
   status / st         — show your stats (level, XP, homepoint, party)
@@ -1272,15 +1352,20 @@ func handleConn(conn net.Conn) {
 
 	slot := conn.RemoteAddr().String()
 
+	startHP, _ := job.HPAtLevel(job.WAR, 1)
+	startMP, _ := job.MPAtLevel(job.WAR, 1)
+	if startHP == 0 {
+		startHP = defaultHP
+	}
 	p := &player{
 		slot:        slot,
 		name:        name,
 		zoneID:      0,
 		pos:         mob.Pos{X: 0, Y: 2, Z: 0},
-		hp:          defaultHP,
-		maxHP:       defaultMaxHP,
-		mp:          defaultMP,
-		maxMP:       defaultMaxMP,
+		hp:          startHP,
+		maxHP:       startHP,
+		mp:          startMP,
+		maxMP:       startMP,
 		tp:          &combatTp.TPState{},
 		statFX:      status.New(),
 		combat:      &mob.PlayerCombat{BaseDamage: playerDamage, MeleeRange: playerMeleeRng},
@@ -1288,6 +1373,7 @@ func handleConn(conn net.Conn) {
 		charXP:      xp.NewCharXP(),
 		homePoint:   homepoint.NewState(0),
 		wsSkill:     "Fast Blade",
+		jobID:       job.WAR,
 		conn:        conn,
 		w:           w,
 	}
