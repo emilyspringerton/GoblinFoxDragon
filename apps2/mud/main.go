@@ -266,6 +266,7 @@ type player struct {
 	invisExpires time.Time
 	isSneaking   bool
 	sneakExpires time.Time
+	isResting    bool
 	charJob      *job.CharJob // main+sub job pairing (nil until initialized)
 	meritBank    *merit.MeritBank
 	recastTracker *job.RecastTracker
@@ -737,6 +738,36 @@ func tickAll() {
 			p.sendf("\r\n[Sneak fades.]")
 			p.prompt()
 		}
+		// Rest regen: +5% maxHP and +3% maxMP per tick when resting.
+		if p.isResting && !p.homePoint.IsKO {
+			hpGain := p.maxHP * 5 / 100
+			mpGain := p.maxMP * 3 / 100
+			if hpGain < 1 {
+				hpGain = 1
+			}
+			if mpGain < 1 {
+				mpGain = 1
+			}
+			changed := false
+			if p.hp < p.maxHP {
+				p.hp += hpGain
+				if p.hp > p.maxHP {
+					p.hp = p.maxHP
+				}
+				changed = true
+			}
+			if p.mp < p.maxMP {
+				p.mp += mpGain
+				if p.mp > p.maxMP {
+					p.mp = p.maxMP
+				}
+				changed = true
+			}
+			if changed {
+				p.sendf("\r\n[Rest] HP: %d/%d  MP: %d/%d", p.hp, p.maxHP, p.mp, p.maxMP)
+				p.prompt()
+			}
+		}
 		if p.homePoint.IsKO || p.combat.TargetMobID == "" {
 			continue
 		}
@@ -945,7 +976,12 @@ func broadcastMobEvent(zoneID int, ev mob.Event) {
 		switch ev.Kind {
 		case mob.EvtMobAggro:
 			if ev.Slot == p.slot {
-				p.sendf("\r\n[!] %s turns toward you with malicious intent!", ev.MobID)
+				if p.isResting {
+					p.isResting = false
+					p.sendf("\r\n[!] %s interrupts your rest!", ev.MobID)
+				} else {
+					p.sendf("\r\n[!] %s turns toward you with malicious intent!", ev.MobID)
+				}
 				p.prompt()
 			}
 		case mob.EvtMobAttack:
@@ -993,6 +1029,27 @@ func handle(p *player, line string) {
 		cmd = full
 	}
 
+	// Party chat shortcut: /p <msg>
+	if cmd == "/p" || strings.HasPrefix(line, "/p ") {
+		gw.mu.Lock()
+		defer gw.mu.Unlock()
+		msg := strings.TrimSpace(strings.TrimPrefix(line, "/p"))
+		partyID, inParty := gw.playerParty[p.slot]
+		if !inParty {
+			p.send("You are not in a party.")
+			p.prompt()
+			return
+		}
+		pt := gw.parties[partyID]
+		for _, s := range pt.All() {
+			if op, ok := gw.players[s]; ok {
+				op.sendf("[Party] %s: %s", p.name, msg)
+				op.prompt()
+			}
+		}
+		return
+	}
+
 	gw.mu.Lock()
 	defer gw.mu.Unlock()
 
@@ -1007,6 +1064,16 @@ func handle(p *player, line string) {
 			return
 		}
 		cmdGo(p, strings.ToLower(args[0]))
+	case "target":
+		if len(args) == 0 {
+			if p.combat.TargetMobID != "" {
+				p.sendf("Current target: %s", p.combat.TargetMobID)
+			} else {
+				p.send("No target selected.")
+			}
+			return
+		}
+		cmdTarget(p, strings.Join(args, " "))
 	case "attack", "a", "kill", "k":
 		if p.homePoint.IsKO {
 			p.send("You are KO'd. Type 'home' to return to your Home Point.")
@@ -1016,6 +1083,7 @@ func handle(p *player, line string) {
 			p.send("Attack what?")
 			return
 		}
+		p.isResting = false // stand up when engaging
 		cmdAttack(p, strings.Join(args, " "))
 	case "stop":
 		p.combat.TargetMobID = ""
@@ -1124,6 +1192,26 @@ func handle(p *player, line string) {
 		cmdCast(p, strings.ToLower(args[0]))
 	case "removedebuffs", "erase":
 		cmdRemoveDebuffs(p)
+	case "rest", "meditate":
+		if p.homePoint.IsKO {
+			p.send("You can't rest while knocked out.")
+			return
+		}
+		if p.isResting {
+			p.send("You are already resting.")
+			return
+		}
+		p.isResting = true
+		p.send("You sit down to rest. (HP/MP regen active. Type 'stand' to cancel.)")
+		p.prompt()
+	case "stand":
+		if !p.isResting {
+			p.send("You are already standing.")
+			return
+		}
+		p.isResting = false
+		p.send("You stand up.")
+		p.prompt()
 	case "bazaar":
 		if len(args) == 0 {
 			p.send("Usage: bazaar set <item> <price> | bazaar list | bazaar list <player> | bazaar buy <player> <item>")
@@ -3108,6 +3196,44 @@ func cmdCast(p *player, spell string) {
 		p.sendf("Unknown spell %q. Available: invisible, sneak, cure, cure2", spell)
 	}
 	p.prompt()
+}
+
+func cmdTarget(p *player, query string) {
+	reg := gw.mobRegs[p.zoneID]
+	ids := reg.All()
+	query = strings.ToLower(query)
+	var found *mob.Mob
+	for _, id := range ids {
+		m, ok := reg.Get(id)
+		if !ok || m.HP <= 0 {
+			continue
+		}
+		if strings.Contains(strings.ToLower(m.Kind), query) || strings.Contains(strings.ToLower(m.ID), query) {
+			found = m
+			break
+		}
+	}
+	if found == nil {
+		p.sendf("No mob matching %q found in this zone.", query)
+		p.prompt()
+		return
+	}
+	p.combat.TargetMobID = found.ID
+	hpPct := 0
+	if found.MaxHP > 0 {
+		hpPct = found.HP * 100 / found.MaxHP
+	}
+	bar := hpBar(hpPct, 20)
+	p.sendf("Target: %s (HP: %s %d%%)", found.Kind, bar, hpPct)
+	p.prompt()
+}
+
+func hpBar(pct, width int) string {
+	filled := pct * width / 100
+	if filled > width {
+		filled = width
+	}
+	return "[" + strings.Repeat("█", filled) + strings.Repeat("░", width-filled) + "]"
 }
 
 func cmdBazaar(p *player, args []string) {
