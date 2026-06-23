@@ -4415,8 +4415,105 @@ func cmdCast(p *player, spell string, targetName string) {
 			p.combat.TargetMobID = ""
 			resolveKill(p, m, reg, now)
 		}
+	case "fire", "fire2", "fire3",
+		"blizzard", "blizzard2", "blizzard3",
+		"thunder", "thunder2", "thunder3",
+		"stone", "stone2", "stone3",
+		"water", "water2", "water3",
+		"aero", "aero2", "aero3":
+		cmdCastBlackMagic(p, spell)
 	default:
-		p.sendf("Unknown spell %q. Available: invisible, sneak, cure, cure2, protect, shell, haste, regen, refresh, dia", spell)
+		p.sendf("Unknown spell %q. Available: invisible, sneak, cure, cure2, protect, shell, haste, regen, refresh, dia, fire/fire2/fire3, blizzard/blizzard2/blizzard3, thunder/thunder2/thunder3, stone, water, aero", spell)
+	}
+	p.prompt()
+}
+
+// blmSpellDef defines a black magic nuke spell.
+type blmSpellDef struct {
+	MPCost  int
+	BaseDmg int // base damage before INT scaling
+	Element string
+}
+
+var blmSpells = map[string]blmSpellDef{
+	"fire":       {MPCost: 30, BaseDmg: 50, Element: "Fire"},
+	"fire2":      {MPCost: 65, BaseDmg: 130, Element: "Fire"},
+	"fire3":      {MPCost: 120, BaseDmg: 260, Element: "Fire"},
+	"blizzard":   {MPCost: 30, BaseDmg: 45, Element: "Ice"},
+	"blizzard2":  {MPCost: 65, BaseDmg: 115, Element: "Ice"},
+	"blizzard3":  {MPCost: 120, BaseDmg: 230, Element: "Ice"},
+	"thunder":    {MPCost: 35, BaseDmg: 60, Element: "Lightning"},
+	"thunder2":   {MPCost: 75, BaseDmg: 155, Element: "Lightning"},
+	"thunder3":   {MPCost: 140, BaseDmg: 310, Element: "Lightning"},
+	"stone":      {MPCost: 25, BaseDmg: 40, Element: "Earth"},
+	"stone2":     {MPCost: 55, BaseDmg: 100, Element: "Earth"},
+	"stone3":     {MPCost: 100, BaseDmg: 200, Element: "Earth"},
+	"water":      {MPCost: 28, BaseDmg: 42, Element: "Water"},
+	"water2":     {MPCost: 60, BaseDmg: 110, Element: "Water"},
+	"water3":     {MPCost: 110, BaseDmg: 220, Element: "Water"},
+	"aero":       {MPCost: 27, BaseDmg: 38, Element: "Wind"},
+	"aero2":      {MPCost: 58, BaseDmg: 105, Element: "Wind"},
+	"aero3":      {MPCost: 105, BaseDmg: 210, Element: "Wind"},
+}
+
+func cmdCastBlackMagic(p *player, spell string) {
+	def, ok := blmSpells[spell]
+	if !ok {
+		p.sendf("Unknown black magic spell: %q", spell)
+		p.prompt()
+		return
+	}
+	if p.jobID != job.BLM && p.jobID != job.RDM &&
+		(p.charJob == nil || (p.charJob.Sub != job.BLM && p.charJob.Sub != job.RDM)) {
+		p.sendf("%s requires Black Mage or Red Mage job or sub-job.", def.Element)
+		p.prompt()
+		return
+	}
+	if p.statFX.IsSilenced() {
+		p.send("You are silenced and cannot cast spells.")
+		p.prompt()
+		return
+	}
+	if p.combat.TargetMobID == "" {
+		p.send("No target. Use 'target <mob>' first.")
+		p.prompt()
+		return
+	}
+	if p.mp < def.MPCost {
+		p.sendf("Not enough MP. (need %d, have %d)", def.MPCost, p.mp)
+		p.prompt()
+		return
+	}
+	reg := gw.mobRegs[p.zoneID]
+	m, ok2 := reg.Get(p.combat.TargetMobID)
+	if !ok2 || m.HP <= 0 {
+		p.send("Your target is dead or gone.")
+		p.prompt()
+		return
+	}
+	p.mp -= def.MPCost
+	// INT scales damage: +1 damage per INT point above 10.
+	intBonus := 0
+	if p.charJob != nil {
+		if stats, err := p.charJob.CombinedStats(); err == nil {
+			if stats.INT > 10 {
+				intBonus = stats.INT - 10
+			}
+		}
+	}
+	dmg := def.BaseDmg + intBonus
+	if dmg > m.HP {
+		dmg = m.HP
+	}
+	m.HP -= dmg
+	now := time.Now()
+	p.sendf("%s: %d %s damage on %s. (mob HP: %d/%d  MP: %d)",
+		def.Element, dmg, def.Element, m.Kind, m.HP, m.MaxHP, p.mp)
+	if m.HP <= 0 {
+		m.State = mob.StateDead
+		p.send("  The creature falls!")
+		p.combat.TargetMobID = ""
+		resolveKill(p, m, reg, now)
 	}
 	p.prompt()
 }
