@@ -27,6 +27,7 @@ import (
 	"dragonsnshit/server/guild"
 	"dragonsnshit/server/merit"
 	"dragonsnshit/server/telecrystal"
+	"dragonsnshit/server/worldcrisis"
 	"dragonsnshit/server/market"
 	"dragonsnshit/server/field"
 	"dragonsnshit/server/gather"
@@ -86,6 +87,7 @@ var itemDisplayName = map[string]string{
 	"nm-leech-fang":    "Marsh Leech Fang",
 	"water-crystal-hq": "Water Crystal (HQ)",
 	"gil-drop":         "100 Gil",
+	"crisis-shard":     "Crisis Shard",
 	"iron-ingot":       "Iron Ingot",
 	"iron-ingot+1":     "Iron Ingot +1",
 	"iron-ingot+2":     "Iron Ingot +2",
@@ -116,6 +118,7 @@ var itemCategory = map[string]market.Category{
 	"nm-worm-shell": market.CatMaterials,
 	"marsh-blood":   market.CatMaterials,
 	"nm-leech-fang": market.CatMaterials,
+	"crisis-shard":  market.CatMaterials,
 	"iron-ingot":    market.CatCraftItems,
 	"iron-ingot+1":  market.CatCraftItems,
 	"iron-ingot+2":  market.CatCraftItems,
@@ -191,6 +194,7 @@ type world struct {
 	mobEnmity      map[string]*enmity.Table // mobID → enmity table
 	chatRouter     *chat.Router
 	guildReg       *guild.Registry
+	wcrisis        *worldcrisis.Crisis
 }
 
 var gw *world
@@ -268,6 +272,7 @@ func initWorld() *world {
 		mobEnmity:      make(map[string]*enmity.Table),
 		chatRouter:     chat.New(),
 		guildReg:       guild.New(),
+		wcrisis:        worldcrisis.New(),
 		nmSpawns: map[int][]*nm.NMSpawn{
 			0: nm.MeadowNMs(),
 			3: nm.SwampNMs(),
@@ -420,6 +425,20 @@ func resolveKill(p *player, killedMob *mob.Mob, reg *mob.Registry, now time.Time
 			spawn.OnPlaceholderKilled(now)
 			broadcastZoneNoLock(p.zoneID,
 				fmt.Sprintf("[!!!] The slaying of %s has disturbed something nearby...", killedMob.Kind), "")
+		}
+	}
+
+	// World Crisis: NM kills (ID prefix "nm-") contribute to Intercept objective.
+	if strings.HasPrefix(killedMob.ID, "nm-") {
+		_ = gw.wcrisis.CompleteObjective(worldcrisis.ObjectiveIntercept, 10, now)
+		for _, cp := range gw.players {
+			cp.sendf("\r\n[Crisis] %s vanquished! Intercept objective advanced. (LEY +10)", killedMob.Kind)
+			cp.prompt()
+		}
+		// Chaos Elementals drop crisis-shards.
+		if killedMob.Kind == "Chaos Elemental" {
+			p.inventory["crisis-shard"]++
+			p.sendf("[Crisis] You obtain: Crisis Shard.")
 		}
 	}
 }
@@ -760,6 +779,68 @@ func tickAll() {
 		}
 	}
 
+	// World Crisis tick.
+	if gw.wcrisis.Status().Phase == worldcrisis.PhaseIdle && len(gw.players) > 0 {
+		_ = gw.wcrisis.Start(now, "")
+		for _, cp := range gw.players {
+			cp.sendf("\r\n[World Crisis] Ley energies stir... a World Crisis is beginning!")
+			cp.prompt()
+		}
+	}
+	if gw.wcrisis.Status().Phase != worldcrisis.PhaseIdle {
+		phaseChanged, oldPhase, newPhase := gw.wcrisis.Tick(now)
+		if phaseChanged {
+			phaseMsgs := map[worldcrisis.Phase]string{
+				worldcrisis.PhaseOmens:       "[Crisis] Omens spread across the land...",
+				worldcrisis.PhaseBurrow:       "[Crisis] The threat burrows deeper — prepare yourselves!",
+				worldcrisis.PhaseEmergence:    "[Crisis] Combat window open — strike now! Chaos Elementals emerge in the Swamp!",
+				worldcrisis.PhaseSplitWar:     "[Crisis] The enemy splits — two fronts detected!",
+				worldcrisis.PhaseFinalWindow:  "[Crisis] Final Window! Complete objectives NOW!",
+				worldcrisis.PhaseResolution:   "",
+			}
+			_ = oldPhase
+			if msg, ok := phaseMsgs[newPhase]; ok && msg != "" {
+				for _, cp := range gw.players {
+					cp.sendf("\r\n\033[1;31m%s\033[0m", msg)
+					cp.prompt()
+				}
+			}
+			// Spawn crisis NMs in Swamp on Emergence.
+			if newPhase == worldcrisis.PhaseEmergence {
+				reg3 := gw.mobRegs[3]
+				if reg3 != nil {
+					for i := 1; i <= 3; i++ {
+						nmID := fmt.Sprintf("nm-chaos-elemental-%d", i)
+						spawnPos := mob.Pos{X: float64(-15 + i*12), Y: 0, Z: float64(-40 + i*10)}
+					_ = reg3.Spawn(mob.Mob{
+						ID: nmID, Kind: "Chaos Elemental",
+						HP: 1200, MaxHP: 1200,
+						SceneID:     3,
+						AggroRange:  18, LeashRange: 45, MeleeRange: 3,
+						MoveSpeed:   6, MeleeDamage: 80, SwingDelay: 2 * time.Second,
+						Pos:     spawnPos,
+						HomePos: spawnPos,
+					})
+					}
+				}
+			}
+			if newPhase == worldcrisis.PhaseResolution {
+				st := gw.wcrisis.Status()
+				outcome := "FAILURE"
+				if st.Outcome == worldcrisis.OutcomeVictory {
+					outcome = "VICTORY"
+				}
+				for _, cp := range gw.players {
+					cp.sendf("\r\n\033[1;33m[Crisis] World Crisis resolved: %s! LEY integrity: %d/%d\033[0m",
+						outcome, st.LeyIntegrity, worldcrisis.LeyMax)
+					cp.prompt()
+				}
+				// Auto-restart after resolution.
+				gw.wcrisis = worldcrisis.New()
+			}
+		}
+	}
+
 	// NM spawn checks.
 	for zoneID, spawns := range gw.nmSpawns {
 		for _, spawn := range spawns {
@@ -959,6 +1040,18 @@ func handle(p *player, line string) {
 			return
 		}
 		cmdTravel(p, args[0])
+	case "crisis":
+		cmdCrisis(p)
+	case "crisis-ley":
+		if len(args) < 1 {
+			p.send("Usage: crisis-ley <amount>")
+			return
+		}
+		amount := 0
+		_, _ = fmt.Sscan(args[0], &amount)
+		gw.wcrisis.LeyDecay(amount)
+		p.sendf("LEY decayed by %d. New integrity: %d", amount, gw.wcrisis.Status().LeyIntegrity)
+		p.prompt()
 	case "touch":
 		cmdTouchCrystal(p)
 	case "map":
@@ -1324,6 +1417,12 @@ func cmdMine(p *player) {
 		p.miningSkill = gather.SkillCap
 	}
 	p.sendf("  (Mining skill: %.1f)", p.miningSkill)
+	// Crisis: gathering contributes to Ritual objective.
+	if y.ItemID != "" {
+		if err2 := gw.wcrisis.CompleteObjective(worldcrisis.ObjectiveRitual, 5, time.Now()); err2 == nil {
+			p.sendf("[Crisis] Gathering stabilizes the ley lines. (Ritual +5 LEY)")
+		}
+	}
 	p.prompt()
 }
 
@@ -2677,6 +2776,36 @@ func cmdTouchCrystal(p *player) {
 	}
 	p.sendf("You touch the crystal. [%s] (→ %s, cost %d Gil)", touched.ID, touched.TargetName, touched.CastCost)
 	p.sendf("Use 'travel %s' to teleport.", touched.ID)
+	p.prompt()
+}
+
+func cmdCrisis(p *player) {
+	st := gw.wcrisis.Status()
+	if st.Phase == worldcrisis.PhaseIdle {
+		p.send("No active World Crisis.")
+		p.prompt()
+		return
+	}
+	p.sendf("\r\n=== World Crisis ===")
+	p.sendf("  Phase:         %s", st.Phase)
+	p.sendf("  LEY Integrity: %d/%d", st.LeyIntegrity, worldcrisis.LeyMax)
+	if st.Outcome != worldcrisis.OutcomeNone {
+		p.sendf("  Outcome:       %s", st.Outcome)
+	}
+	if !st.PhaseDeadline.IsZero() {
+		remaining := time.Until(st.PhaseDeadline).Round(time.Second)
+		if remaining > 0 {
+			p.sendf("  Phase ends in: %s", remaining)
+		}
+	}
+	p.sendf("  Objectives completed:")
+	for obj, t := range st.Objectives {
+		p.sendf("    %s — %s", obj, t.Format("15:04:05"))
+	}
+	if len(st.Objectives) == 0 {
+		p.send("    (none yet)")
+	}
+	p.sendf("  Objectives needed: intercept + anchor + ritual (concurrent within 5 min)")
 	p.prompt()
 }
 
