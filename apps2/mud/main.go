@@ -3,8 +3,8 @@
 // Connect: nc localhost 2323   (or telnet localhost 2323)
 // Port is configurable via -port flag.
 //
-// Packages wired: mob, combat/tp, status, zone, gather/mining, market,
-// chat, guild, xp, homepoint, field, party (XP chain).
+// Packages wired: mob, combat/tp, status, zone, gather/mining, xp, homepoint,
+// field, party (XP chain), skillchain (weapon skills + SC detection).
 // Game loop ticks at 1 Hz.
 package main
 
@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -23,6 +24,7 @@ import (
 	"dragonsnshit/server/homepoint"
 	"dragonsnshit/server/mob"
 	"dragonsnshit/server/party"
+	"dragonsnshit/server/skillchain"
 	"dragonsnshit/server/status"
 	"dragonsnshit/server/xp"
 	"dragonsnshit/server/zone"
@@ -77,6 +79,13 @@ type deadMob struct {
 	zoneID    int
 }
 
+// mobChainState records the last weapon skill that hit a mob (for skillchain detection).
+type mobChainState struct {
+	Attrs  []skillchain.Resonance
+	At     time.Time
+	Slot   string // who threw the WS
+}
+
 type world struct {
 	mu             sync.Mutex
 	zoneMgr        *zone.Manager
@@ -90,6 +99,7 @@ type world struct {
 	playerParty    map[string]string // slot → partyID
 	xpChains       map[string]*party.XPChain // partyID → chain
 	pendingInvites map[string]string // invitee slot → inviter slot
+	mobChains      map[string]*mobChainState // mobID → last WS chain state
 }
 
 var gw *world
@@ -109,6 +119,7 @@ type player struct {
 	miningSkill float64
 	charXP      *xp.CharXP
 	homePoint   *homepoint.State
+	wsSkill     string // current weapon skill name (from CanonicalWeaponSkills)
 	conn        net.Conn
 	w           *bufio.Writer
 	inbox       chan string
@@ -151,6 +162,7 @@ func initWorld() *world {
 		playerParty:    make(map[string]string),
 		xpChains:       make(map[string]*party.XPChain),
 		pendingInvites: make(map[string]string),
+		mobChains:      make(map[string]*mobChainState),
 	}
 
 	w.zoneMgr = zone.New(zone.DefaultZones())
@@ -330,15 +342,15 @@ func tickAll() {
 			p.sendf("\r\nYou hit for %d damage. (TP: %d [+%d])", res.Dealt, p.tp.Current, gained)
 			if res.Died {
 				p.send("The creature collapses!")
+				deadMobID := p.combat.TargetMobID
 				p.combat.TargetMobID = ""
-				// Retrieve the mob record from the last event before it's removed.
+				delete(gw.mobChains, deadMobID)
 				var killedMob *mob.Mob
 				if len(evts) > 0 {
 					if m, ok := reg.Get(evts[len(evts)-1].MobID); ok {
 						killedMob = m
 					}
 				}
-				// Remove mob from registry so we can queue respawn.
 				if killedMob != nil {
 					resolveKill(p, killedMob, reg, now)
 				}
@@ -483,7 +495,17 @@ func handle(p *player, line string) {
 			p.send("You are KO'd.")
 			return
 		}
-		cmdWS(p)
+		override := strings.Join(args, " ")
+		cmdWS(p, override)
+	case "setws":
+		if len(args) == 0 {
+			p.sendf("Current WS: %q  (use 'wslist' to see options, 'setws <name>' to change)", p.wsSkill)
+			p.prompt()
+			return
+		}
+		cmdSetWS(p, strings.Join(args, " "))
+	case "wslist":
+		cmdWSList(p)
 	case "mine":
 		if p.homePoint.IsKO {
 			p.send("You are KO'd.")
@@ -645,7 +667,7 @@ func cmdAttack(p *player, target string) {
 	p.prompt()
 }
 
-func cmdWS(p *player) {
+func cmdWS(p *player, overrideName string) {
 	if !p.tp.CanWeaponSkill() {
 		p.sendf("Not enough TP (%d/100).", p.tp.Current)
 		p.prompt()
@@ -656,9 +678,36 @@ func cmdWS(p *player) {
 		p.prompt()
 		return
 	}
+
+	wsName := p.wsSkill
+	if overrideName != "" {
+		wsName = overrideName
+	}
+	ws, ok := skillchain.CanonicalWeaponSkills[wsName]
+	if !ok {
+		p.sendf("Unknown weapon skill %q. Use 'wslist' to see available skills.", wsName)
+		p.prompt()
+		return
+	}
+
 	reg := gw.mobRegs[p.zoneID]
-	damage := playerDamage * 3
-	res, evts, err := reg.Hit(p.combat.TargetMobID, p.slot, damage)
+	baseDamage := playerDamage * 3
+	mobID := p.combat.TargetMobID
+
+	// Skillchain detection: check if prior WS on this mob is within the chain window.
+	chainBonus := 0
+	chainName := ""
+	now := time.Now()
+	if prev, exists := gw.mobChains[mobID]; exists && prev.Slot != p.slot {
+		elapsed := now.Sub(prev.At)
+		if result, formed := skillchain.Chain(prev.Attrs, ws.Attrs, elapsed, skillchain.DefaultChainWindow); formed {
+			chainBonus = int(float64(baseDamage) * result.Multiplier)
+			chainName = result.Resonance.String()
+		}
+	}
+
+	totalDamage := baseDamage + chainBonus
+	res, evts, err := reg.Hit(mobID, p.slot, totalDamage)
 	_ = evts
 	if err != nil {
 		p.sendf("WS failed: %v", err)
@@ -666,15 +715,75 @@ func cmdWS(p *player) {
 		return
 	}
 	p.tp.UseWeaponSkill()
-	p.sendf(">>> FAST BLADE <<< You unleash your weapon skill for %d damage!", res.Dealt)
+
+	// Announce WS + chain.
+	if chainName != "" {
+		p.sendf(">>> %s <<< %d damage — SKILLCHAIN: %s! (+%d bonus)", ws.Name, res.Dealt, strings.ToUpper(chainName), chainBonus)
+		broadcastZoneNoLock(p.zoneID,
+			fmt.Sprintf(">>> SKILLCHAIN: %s! <<< %s → %s", strings.ToUpper(chainName), p.name, ws.Name), p.slot)
+	} else {
+		p.sendf(">>> %s <<< You unleash your weapon skill for %d damage!", ws.Name, res.Dealt)
+	}
+
+	// Update mob chain state.
+	gw.mobChains[mobID] = &mobChainState{Attrs: ws.Attrs, At: now, Slot: p.slot}
+
 	if res.Died {
 		p.send("The creature collapses!")
-		wsTarget := p.combat.TargetMobID
+		delete(gw.mobChains, mobID)
+		wsTarget := mobID
 		p.combat.TargetMobID = ""
 		if m, ok := reg.Get(wsTarget); ok {
-			resolveKill(p, m, reg, time.Now())
+			resolveKill(p, m, reg, now)
 		}
 	}
+	p.prompt()
+}
+
+func cmdSetWS(p *player, name string) {
+	if _, ok := skillchain.CanonicalWeaponSkills[name]; !ok {
+		// Try case-insensitive match.
+		for wsName := range skillchain.CanonicalWeaponSkills {
+			if strings.EqualFold(wsName, name) {
+				name = wsName
+				goto found
+			}
+		}
+		p.sendf("Unknown weapon skill %q. Use 'wslist' to see available skills.", name)
+		p.prompt()
+		return
+	}
+found:
+	p.wsSkill = name
+	ws := skillchain.CanonicalWeaponSkills[name]
+	attrs := make([]string, len(ws.Attrs))
+	for i, a := range ws.Attrs {
+		attrs[i] = a.String()
+	}
+	p.sendf("Weapon skill set to %q  [%s]", name, strings.Join(attrs, ", "))
+	p.prompt()
+}
+
+func cmdWSList(p *player) {
+	p.send("\r\n=== Available Weapon Skills ===")
+	names := make([]string, 0, len(skillchain.CanonicalWeaponSkills))
+	for n := range skillchain.CanonicalWeaponSkills {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		ws := skillchain.CanonicalWeaponSkills[n]
+		attrs := make([]string, len(ws.Attrs))
+		for i, a := range ws.Attrs {
+			attrs[i] = a.String()
+		}
+		cur := ""
+		if n == p.wsSkill {
+			cur = " <--"
+		}
+		p.sendf("  %-20s  [%s]%s", n, strings.Join(attrs, ", "), cur)
+	}
+	p.send("Use 'setws <name>' to change your weapon skill.")
 	p.prompt()
 }
 
@@ -737,7 +846,12 @@ func cmdStatus(p *player) {
 	p.sendf("  Zone:         %s", zoneName(p.zoneID))
 	p.sendf("  HP:           %d / %d", p.hp, p.maxHP)
 	p.sendf("  MP:           %d / %d", p.mp, p.maxMP)
-	p.sendf("  TP:           %d / 300  (WS at 100)", p.tp.Current)
+	ws := skillchain.CanonicalWeaponSkills[p.wsSkill]
+	wsAttrs := make([]string, len(ws.Attrs))
+	for i, a := range ws.Attrs {
+		wsAttrs[i] = a.String()
+	}
+	p.sendf("  TP:           %d / 300  (WS at 100 — %s [%s])", p.tp.Current, p.wsSkill, strings.Join(wsAttrs, ", "))
 	p.sendf("  Mining skill: %.1f / %.0f", p.miningSkill, gather.SkillCap)
 	p.sendf("  Haste:        %d%%", p.statFX.NetHastePct())
 	if p.statFX.IsParalyzed() {
@@ -1099,7 +1213,9 @@ Commands:
   go <dir>            — same as direction shortcut
   attack <mob>        — target and auto-attack a mob (id or kind prefix)
   stop                — cease attacking
-  ws / weaponskill    — unleash weapon skill (requires TP >= 100)
+  ws [skillname]      — unleash weapon skill (requires TP >= 100); chains with others' WS
+  setws <name>        — change your weapon skill (see 'wslist')
+  wslist              — list all weapon skills and their SC resonances
   mine                — attempt mining at a nearby point
   mine-points / mp    — list mining points in this zone
   status / st         — show your stats (level, XP, homepoint, party)
@@ -1171,6 +1287,7 @@ func handleConn(conn net.Conn) {
 		miningSkill: 0,
 		charXP:      xp.NewCharXP(),
 		homePoint:   homepoint.NewState(0),
+		wsSkill:     "Fast Blade",
 		conn:        conn,
 		w:           w,
 	}
