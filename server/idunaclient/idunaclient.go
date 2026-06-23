@@ -211,6 +211,30 @@ func (c *Client) DestroyItem(itemID string) error {
 	}
 }
 
+// IncrementSkill adds delta to character's skill_name, capped at 110.0.
+func (c *Client) IncrementSkill(characterID, skillName string, delta float64) error {
+	body, _ := json.Marshal(map[string]interface{}{
+		"skill_name": skillName,
+		"delta":      delta,
+	})
+	req, _ := http.NewRequest(http.MethodPatch,
+		c.baseURL+"/api/v1/characters/"+characterID+"/skills",
+		bytes.NewReader(body))
+	resp, err := c.do(req)
+	if err != nil {
+		return fmt.Errorf("idunaclient: IncrementSkill: %w", err)
+	}
+	defer resp.Body.Close()
+	switch resp.StatusCode {
+	case http.StatusNoContent, http.StatusOK:
+		return nil
+	case http.StatusNotFound:
+		return ErrNotFound
+	default:
+		return fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+}
+
 // PatchWorldEvent patches a world event's phase and ley_integrity in IDUNA.
 func (c *Client) PatchWorldEvent(eventID, phase string, leyIntegrity int) error {
 	body, _ := json.Marshal(map[string]interface{}{

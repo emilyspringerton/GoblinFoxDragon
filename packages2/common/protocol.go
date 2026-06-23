@@ -26,6 +26,8 @@ const (
 	// World Crisis (S76-05)
 	PacketWorldCrisisUpdate = 14 // server→client: JSON {phase,ley_integrity,phase_deadline_unix,outcome}
 	PacketObjectiveComplete = 15 // client→server: JSON {character_id,objective_type,stabilize_amount}
+	// Skill XP (S76-06)
+	PacketSkillXP = 16 // client→server: JSON {character_id,skill_name,delta} — server validates + calls IDUNA
 )
 
 // Chat channel IDs (byte 1 of PacketChat).

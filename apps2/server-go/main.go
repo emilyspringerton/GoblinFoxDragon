@@ -359,6 +359,40 @@ func main() {
 			fmt.Printf("[craft] %s crafted %s (HQ%d) → %s\n",
 				craftReq.CharacterID, result.ItemID, result.HQTier, newItemID)
 
+		case common.PacketSkillXP:
+			// Payload: JSON {"character_id":"...","skill_name":"...","delta":N}
+			// Server validates the claim is plausible (delta > 0, delta <= maxGrant per tick)
+			// then calls IDUNA to increment. Never trust client-reported XP magnitude.
+			slot := remote.String()
+			info, ok := clients[slot]
+			if !ok || info.playerID == "" {
+				continue
+			}
+			if n < 2 {
+				continue
+			}
+			var xpReq struct {
+				CharacterID string  `json:"character_id"`
+				SkillName   string  `json:"skill_name"`
+				Delta       float64 `json:"delta"`
+			}
+			if err := json.Unmarshal(buf[1:n], &xpReq); err != nil {
+				continue
+			}
+			// Cap per-packet XP grant to prevent inflation (max 1.0 per action).
+			const maxXPGrant = 1.0
+			if xpReq.Delta <= 0 || xpReq.SkillName == "" {
+				continue
+			}
+			if xpReq.Delta > maxXPGrant {
+				xpReq.Delta = maxXPGrant
+			}
+			go func(cid, skill string, delta float64) {
+				if err := idunaClient.IncrementSkill(cid, skill, delta); err != nil {
+					fmt.Printf("[skill-xp] IncrementSkill %s/%s: %v\n", cid, skill, err)
+				}
+			}(xpReq.CharacterID, xpReq.SkillName, xpReq.Delta)
+
 		case common.PacketObjectiveComplete:
 			// Payload: JSON {"character_id":"...","objective_type":"anchor|ritual|intercept","stabilize_amount":N}
 			slot := remote.String()
