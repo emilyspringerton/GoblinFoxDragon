@@ -9,6 +9,7 @@ import "math"
 // sceneID=0 → flat meadow (grass surface + oak trees, classic FPS arena feel)
 // sceneID=1 → rolling hills (sinusoidal height variation, open sightlines)
 // sceneID=2 → stone caves (underground corridors carved into solid stone)
+// sceneID=3 → Swampville (clay/mud floor, shallow water pools, dead mangrove trees)
 // all other → flat meadow fallback
 func ProceduralWorldStore(sceneID, chunkX, chunkZ int) []WorldBlock {
 	switch sceneID {
@@ -16,6 +17,8 @@ func ProceduralWorldStore(sceneID, chunkX, chunkZ int) []WorldBlock {
 		return hillsChunk(chunkX, chunkZ)
 	case 2:
 		return cavesChunk(chunkX, chunkZ)
+	case 3:
+		return swampChunk(chunkX, chunkZ)
 	default:
 		return meadowChunk(chunkX, chunkZ)
 	}
@@ -193,5 +196,112 @@ func worldTree(chunkX, chunkZ, lx, lz, baseY int) []WorldBlock {
 		}
 	}
 	out = append(out, WorldBlock{X: wx, Y: leafY + 1, Z: wz, BlockName: "minecraft:oak_leaves"})
+	return out
+}
+
+// ── scene 3: Swampville ───────────────────────────────────────────────────────
+
+// swampChunk generates low-lying swamp terrain:
+//   - y=0 stone base, y=1 clay floor, y=1 water pools (deterministic per-chunk)
+//   - sparse mud patches at surface
+//   - dead mangrove trees (jungle log + sparse leaves, no canopy density)
+//
+// The flat y=1 surface matches the Swampville zone SpawnY=1.
+func swampChunk(chunkX, chunkZ int) []WorldBlock {
+	const chunkSize = 16
+	out := make([]WorldBlock, 0, 512)
+
+	// Per-chunk water-pool mask: some local coords are water at y=1.
+	waterSet := swampWaterCells(chunkX, chunkZ)
+	isWater := func(lx, lz int) bool {
+		return waterSet[lx*chunkSize+lz]
+	}
+
+	for z := 0; z < chunkSize; z++ {
+		for x := 0; x < chunkSize; x++ {
+			wx := chunkX*chunkSize + x
+			wz := chunkZ*chunkSize + z
+
+			// Stone base
+			out = append(out, WorldBlock{X: wx, Y: 0, Z: wz, BlockName: "minecraft:stone"})
+
+			if isWater(x, z) {
+				// Shallow water cell: clay bottom + water surface
+				out = append(out, WorldBlock{X: wx, Y: 1, Z: wz, BlockName: "minecraft:clay"})
+				out = append(out, WorldBlock{X: wx, Y: 2, Z: wz, BlockName: "minecraft:water"})
+			} else {
+				// Dry land: clay with occasional mud patch
+				floor := "minecraft:clay"
+				h := (x*7 + z*13 + chunkX*3 + chunkZ*5) & 0xF
+				if h < 3 {
+					floor = "minecraft:mud"
+				}
+				out = append(out, WorldBlock{X: wx, Y: 1, Z: wz, BlockName: floor})
+			}
+		}
+	}
+
+	// Dead mangrove trees on dry land only.
+	for _, t := range swampTrees(chunkX, chunkZ) {
+		lx, lz := t[0], t[1]
+		if !isWater(lx, lz) {
+			out = append(out, swampTree(chunkX, chunkZ, lx, lz, 2)...)
+		}
+	}
+
+	return out
+}
+
+// swampWaterCells returns a flat [16×16]bool marking water cells for a chunk.
+// Uses a cheap deterministic hash — about 25% of cells are water, forming
+// irregular scattered pools.
+func swampWaterCells(chunkX, chunkZ int) [256]bool {
+	var mask [256]bool
+	seed := chunkX*1031 + chunkZ*7919
+	for z := 0; z < 16; z++ {
+		for x := 0; x < 16; x++ {
+			h := seed ^ (x*431) ^ (z*521)
+			h = (h ^ (h >> 4)) * 0x45d9f3b
+			h = (h ^ (h >> 16))
+			if h&0x3 == 0 { // ~25% water
+				mask[x*16+z] = true
+			}
+		}
+	}
+	return mask
+}
+
+func swampTrees(chunkX, chunkZ int) [][2]int {
+	h := chunkX*53 + chunkZ*37
+	switch h % 6 {
+	case 0:
+		return [][2]int{{3, 3}, {11, 10}}
+	case 1:
+		return [][2]int{{6, 2}, {13, 13}}
+	case 2:
+		return [][2]int{{2, 8}}
+	case 3:
+		return [][2]int{{9, 5}, {4, 12}, {13, 2}}
+	case 4:
+		return [][2]int{{1, 1}, {14, 14}}
+	default:
+		return [][2]int{{7, 9}}
+	}
+}
+
+// swampTree places a dead mangrove tree: bare trunk (3 tall) + sparse leaf crown.
+func swampTree(chunkX, chunkZ, lx, lz, baseY int) []WorldBlock {
+	wx := chunkX*16 + lx
+	wz := chunkZ*16 + lz
+	out := make([]WorldBlock, 0, 8)
+	for dy := 0; dy < 3; dy++ {
+		out = append(out, WorldBlock{X: wx, Y: baseY + dy, Z: wz, BlockName: "minecraft:jungle_log"})
+	}
+	// Sparse leaf crown — four cardinal leaves only (dead tree look)
+	leafY := baseY + 3
+	for _, d := range [][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
+		out = append(out, WorldBlock{X: wx + d[0], Y: leafY, Z: wz + d[1], BlockName: "minecraft:jungle_leaves"})
+	}
+	out = append(out, WorldBlock{X: wx, Y: leafY, Z: wz, BlockName: "minecraft:jungle_leaves"})
 	return out
 }
