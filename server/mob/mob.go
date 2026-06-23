@@ -55,6 +55,7 @@ const (
 	StatePursuing            // moving toward aggro target
 	StateReturning           // leashed; moving back to home position
 	StateDead
+	StateBurrowed // underground; untargetable until burrow expires
 )
 
 func (s MobState) String() string {
@@ -67,6 +68,8 @@ func (s MobState) String() string {
 		return "returning"
 	case StateDead:
 		return "dead"
+	case StateBurrowed:
+		return "burrowed"
 	default:
 		return "unknown"
 	}
@@ -94,9 +97,16 @@ type Mob struct {
 	MeleeDamage int
 	lastSwing   time.Time
 	DiedAt      time.Time
+
+	// Burrow fields — non-zero enables periodic burrowing (e.g. worms).
+	BurrowInterval time.Duration // how often to burrow; 0 = never
+	BurrowDuration time.Duration // how long to stay underground
+	lastBurrow     time.Time     // when the last burrow began (zero = never burrowed)
+	burrowEnd      time.Time     // when the current burrow finishes
 }
 
-func (m *Mob) alive() bool { return m.State != StateDead }
+func (m *Mob) alive() bool     { return m.State != StateDead }
+func (m *Mob) targetable() bool { return m.alive() && m.State != StateBurrowed }
 
 // EventKind classifies a combat event returned by Tick.
 type EventKind int
@@ -106,6 +116,8 @@ const (
 	EvtMobAttack                    // mob swung at player (damage delivered)
 	EvtMobReset                     // mob leashed back to home
 	EvtMobDied                      // mob died; Tagger = who gets credit
+	EvtMobBurrow                    // mob began burrowing (untargetable)
+	EvtMobSurface                   // mob surfaced from burrow
 )
 
 // Event is a single combat occurrence produced by Tick or Hit.
@@ -213,6 +225,9 @@ func (reg *Registry) Hit(mobID, attackerSlot string, damage int) (HitResult, []E
 	if !m.alive() {
 		return HitResult{}, nil, ErrMobDead
 	}
+	if !m.targetable() {
+		return HitResult{}, nil, ErrMobDead // burrowed: same error class, unhittable
+	}
 
 	res := HitResult{}
 
@@ -275,6 +290,33 @@ func (reg *Registry) Tick(now time.Time, dt float64, players []PlayerPositions) 
 
 func tickMob(m *Mob, now time.Time, dt float64, players []PlayerPositions) []Event {
 	var events []Event
+
+	// Handle burrow surface: if currently burrowed and the burrow has ended, surface.
+	if m.State == StateBurrowed {
+		if now.After(m.burrowEnd) {
+			m.State = StateIdle
+			events = append(events, Event{Kind: EvtMobSurface, MobID: m.ID})
+		}
+		return events // burrowed mobs do nothing else this tick
+	}
+
+	// Check whether it's time to burrow (only from Idle).
+	if m.BurrowInterval > 0 && m.State == StateIdle {
+		triggerTime := m.lastBurrow.Add(m.BurrowInterval)
+		if m.lastBurrow.IsZero() {
+			// Delay first burrow by one full interval from spawn.
+			triggerTime = now.Add(m.BurrowInterval)
+			m.lastBurrow = now
+		}
+		if now.After(triggerTime) {
+			m.State = StateBurrowed
+			m.lastBurrow = now
+			m.burrowEnd = now.Add(m.BurrowDuration)
+			m.AggroSlot = "" // drop aggro on burrow
+			events = append(events, Event{Kind: EvtMobBurrow, MobID: m.ID})
+			return events
+		}
+	}
 
 	switch m.State {
 	case StateIdle:
@@ -376,6 +418,9 @@ func (reg *Registry) TickPlayer(
 	if !m.alive() {
 		combat.TargetMobID = ""
 		return HitResult{}, nil, ErrMobDead
+	}
+	if !m.targetable() {
+		return HitResult{}, nil, ErrMobDead // burrowed
 	}
 	if m.SceneID != playerSceneID {
 		return HitResult{}, nil, ErrOutOfRange
