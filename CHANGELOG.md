@@ -1,3 +1,7 @@
+## 2026-06-23
+
+- feat: Swampville secondary starting zone — zone 3, scene 3 swamp terrain (clay/mud/water/mangrove), leech+slime+lizard mobs, 20 tests
+
 ## 2026-06-21
 - feat: S81-04 status effects system (Poison/Paralyze/Slow/Silence/Bind/Haste/Regen/Refresh/Protect/Shell); 43 tests
 - feat: S81-03 TP weapon skill points system; 34 tests (Apple #2530)
