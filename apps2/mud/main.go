@@ -19,8 +19,14 @@ import (
 	"sync"
 	"time"
 
+	"dragonsnshit/server/chat"
 	"dragonsnshit/server/conquest"
 	"dragonsnshit/server/craft"
+	"dragonsnshit/server/enmity"
+	"dragonsnshit/server/gear"
+	"dragonsnshit/server/guild"
+	"dragonsnshit/server/merit"
+	"dragonsnshit/server/telecrystal"
 	"dragonsnshit/server/market"
 	"dragonsnshit/server/field"
 	"dragonsnshit/server/gather"
@@ -182,6 +188,9 @@ type world struct {
 	ah             *market.AuctionHouse
 	playerNation   map[string]conquest.Nation // slot → declared nation
 	lastConquestTick time.Time
+	mobEnmity      map[string]*enmity.Table // mobID → enmity table
+	chatRouter     *chat.Router
+	guildReg       *guild.Registry
 }
 
 var gw *world
@@ -206,6 +215,10 @@ type player struct {
 	inventory   map[string]int // itemID → quantity
 	craftSkill  *craft.CraftSkill
 	gil         int
+	guildID     string // linkshell guild ID ("" = none)
+	equip       *gear.Equipment
+	charJob     *job.CharJob // main+sub job pairing (nil until initialized)
+	meritBank   *merit.MeritBank
 	conn        net.Conn
 	w           *bufio.Writer
 	inbox       chan string
@@ -252,6 +265,9 @@ func initWorld() *world {
 		lootPools:      make(map[string]*activeLootPool),
 		playerNation:   make(map[string]conquest.Nation),
 		lastConquestTick: time.Now(),
+		mobEnmity:      make(map[string]*enmity.Table),
+		chatRouter:     chat.New(),
+		guildReg:       guild.New(),
 		nmSpawns: map[int][]*nm.NMSpawn{
 			0: nm.MeadowNMs(),
 			3: nm.SwampNMs(),
@@ -295,7 +311,16 @@ func awardXP(p *player, baseXP int, now time.Time) {
 	leveled, err := p.charXP.AddXP(total)
 	p.homePoint.CurrentXP = p.charXP.CurrentXP
 	if err == xp.ErrAtCap {
-		p.sendf("  XP: +%d (Level cap reached — 99)", total)
+		// At level cap: XP converts to merit points.
+		gained, merr := p.meritBank.Earn(total)
+		if gained > 0 {
+			p.sendf("  Merit: +%d point(s) (%d/%d banked)",
+				gained, p.meritBank.Points, merit.MeritCap)
+		} else if merr == merit.ErrMeritCapReached {
+			p.sendf("  XP: +%d (Level cap 99 + merit cap reached)", total)
+		} else {
+			p.sendf("  XP: +%d (Level cap 99)", total)
+		}
 		return
 	}
 	needed := p.charXP.XPToNextLevel()
@@ -376,6 +401,12 @@ func resolveKill(p *player, killedMob *mob.Mob, reg *mob.Registry, now time.Time
 
 	// Loot pool.
 	openLootPool(p, killedMob, now)
+
+	// Clear enmity table for this mob.
+	if et := gw.mobEnmity[killedMob.ID]; et != nil {
+		et.Clear()
+	}
+	delete(gw.mobEnmity, killedMob.ID)
 
 	// Conquest: award kill points to the player's declared nation.
 	if nation := gw.playerNation[p.slot]; nation != conquest.NationNeutral {
@@ -628,11 +659,30 @@ func tickAll() {
 		if res.Dealt > 0 {
 			gained := p.tp.AddTP(combatTp.Delay1HSword, float64(p.statFX.NetHastePct()))
 			p.sendf("\r\nYou hit for %d damage. (TP: %d [+%d])", res.Dealt, p.tp.Current, gained)
+			// Enmity: damage generates CE.
+			mobID := p.combat.TargetMobID
+			if mobID != "" {
+				if gw.mobEnmity[mobID] == nil {
+					gw.mobEnmity[mobID] = enmity.NewTable()
+				}
+				gw.mobEnmity[mobID].Add(p.slot, res.Dealt)
+				// Switch mob AggroSlot to highest enmity player.
+				if topSlot, err := gw.mobEnmity[mobID].Top(); err == nil {
+					if m, ok := reg.Get(mobID); ok && m.AggroSlot != topSlot {
+						m.AggroSlot = topSlot
+					}
+				}
+			}
 			if res.Died {
 				p.send("The creature collapses!")
 				deadMobID := p.combat.TargetMobID
 				p.combat.TargetMobID = ""
 				delete(gw.mobChains, deadMobID)
+				// Clear enmity on death.
+				if et := gw.mobEnmity[deadMobID]; et != nil {
+					et.Clear()
+				}
+				delete(gw.mobEnmity, deadMobID)
 				var killedMob *mob.Mob
 				if len(evts) > 0 {
 					if m, ok := reg.Get(evts[len(evts)-1].MobID); ok {
@@ -851,6 +901,66 @@ func handle(p *player, line string) {
 			return
 		}
 		cmdTell(p, args[0], strings.Join(args[1:], " "))
+	case "yell", "y":
+		cmdYell(p, strings.Join(args, " "))
+	case "guild", "g":
+		cmdGuildChat(p, strings.Join(args, " "))
+	case "ls-create":
+		if len(args) < 2 {
+			p.send("Usage: ls-create <name> <tag>")
+			return
+		}
+		cmdLSCreate(p, args[0], args[1])
+	case "ls-invite":
+		if len(args) < 1 {
+			p.send("Usage: ls-invite <player-name>")
+			return
+		}
+		cmdLSInvite(p, args[0])
+	case "ls-leave":
+		cmdLSLeave(p)
+	case "ls-info":
+		cmdLSInfo(p)
+	case "equip":
+		if len(args) < 2 {
+			p.send("Usage: equip <slot> <item-id>")
+			return
+		}
+		cmdEquip(p, args[0], args[1])
+	case "unequip":
+		if len(args) < 1 {
+			p.send("Usage: unequip <slot>")
+			return
+		}
+		cmdUnequip(p, args[0])
+	case "gear":
+		cmdGear(p)
+	case "setsubjob", "ssj":
+		if len(args) < 1 {
+			p.send("Usage: setsubjob <JOB>")
+			return
+		}
+		cmdSetSubJob(p, strings.ToUpper(args[0]))
+	case "subjob", "sj":
+		cmdSubJob(p)
+	case "merits":
+		cmdMerits(p)
+	case "merit-spend", "ms":
+		if len(args) < 1 {
+			p.send("Usage: merit-spend <category>")
+			return
+		}
+		cmdMeritSpend(p, args[0])
+	case "crystals":
+		cmdCrystals(p)
+	case "travel":
+		if len(args) < 1 {
+			p.send("Usage: travel <crystal-id>")
+			return
+		}
+		cmdTravel(p, args[0])
+	case "touch":
+		cmdTouchCrystal(p)
 	case "map":
 		cmdMap(p)
 	case "mobs":
@@ -882,6 +992,8 @@ func handle(p *player, line string) {
 		cmdLeaveParty(p)
 	case "ah":
 		cmdAH(p, args)
+	case "enmity", "en":
+		cmdEnmity(p)
 	case "conquest", "con":
 		cmdConquest(p)
 	case "declare":
@@ -1008,6 +1120,7 @@ func cmdGo(p *player, dir string) {
 
 	destZone, _ := gw.zoneMgr.Get(dest)
 	p.pos = mob.Pos{X: destZone.SpawnX, Y: destZone.SpawnY, Z: destZone.SpawnZ}
+	syncChatSession(p)
 
 	broadcastZoneNoLock(p.zoneID, fmt.Sprintf("%s arrives.", p.name), p.slot)
 	cmdLook(p)
@@ -1081,6 +1194,18 @@ func cmdWS(p *player, overrideName string) {
 	totalDamage := baseDamage + chainBonus
 	res, evts, err := reg.Hit(mobID, p.slot, totalDamage)
 	_ = evts
+	// Enmity: WS damage CE.
+	if err == nil && res.Dealt > 0 {
+		if gw.mobEnmity[mobID] == nil {
+			gw.mobEnmity[mobID] = enmity.NewTable()
+		}
+		gw.mobEnmity[mobID].Add(p.slot, res.Dealt)
+		if topSlot, terr := gw.mobEnmity[mobID].Top(); terr == nil {
+			if m, ok := reg.Get(mobID); ok && m.AggroSlot != topSlot {
+				m.AggroSlot = topSlot
+			}
+		}
+	}
 	if err != nil {
 		p.sendf("WS failed: %v", err)
 		p.prompt()
@@ -1275,31 +1400,316 @@ func cmdWho(p *player) {
 	p.prompt()
 }
 
+// syncChatSession updates the chat router with the player's current position/zone/guild.
+func syncChatSession(p *player) {
+	gw.chatRouter.Register(p.slot, chat.Session{
+		Name:    p.name,
+		SceneID: p.zoneID,
+		GuildID: p.guildID,
+		Pos:     chat.Pos{X: p.pos.X, Y: p.pos.Y, Z: float64(p.zoneID) * 1000},
+	})
+}
+
+// deliverChat routes a chat message and writes to each recipient.
+func deliverChat(fromSlot string, channel int, target, msg string) {
+	deliveries := gw.chatRouter.Deliver(fromSlot, channel, target, msg, 50.0)
+	for _, d := range deliveries {
+		ch, _, body, ok := chat.ParseChatPacket(d.Packet)
+		if !ok {
+			continue
+		}
+		op, found := gw.players[d.To]
+		if !found {
+			continue
+		}
+		prefix := ""
+		switch ch {
+		case chat.ChatSay:
+			prefix = fmt.Sprintf("[Say] %s: ", gw.players[fromSlot].name)
+		case chat.ChatTell:
+			prefix = fmt.Sprintf("[Tell → %s]: ", gw.players[fromSlot].name)
+		case chat.ChatYell:
+			prefix = fmt.Sprintf("[Yell] %s: ", gw.players[fromSlot].name)
+		case chat.ChatGuild:
+			prefix = fmt.Sprintf("[LS] %s: ", gw.players[fromSlot].name)
+		}
+		op.sendf("\r\n%s%s", prefix, body)
+		op.prompt()
+	}
+}
+
 func cmdSay(p *player, msg string) {
 	if msg == "" {
 		p.send("Say what?")
 		p.prompt()
 		return
 	}
-	full := fmt.Sprintf("%s says: %s", p.name, msg)
-	broadcastZone(p.zoneID, full, "")
+	syncChatSession(p)
+	deliverChat(p.slot, chat.ChatSay, "", msg)
+	p.prompt()
 }
 
 func cmdTell(p *player, target, msg string) {
-	var dest *player
-	for _, op := range gw.players {
-		if strings.EqualFold(op.name, target) {
-			dest = op
-			break
-		}
-	}
-	if dest == nil {
-		p.sendf("No player named %q online.", target)
+	syncChatSession(p)
+	deliverChat(p.slot, chat.ChatTell, target, msg)
+	p.prompt()
+}
+
+func cmdYell(p *player, msg string) {
+	if msg == "" {
+		p.send("Yell what?")
 		p.prompt()
 		return
 	}
-	dest.sendf("[Tell from %s]: %s", p.name, msg)
-	p.sendf("[Tell to %s]: %s", dest.name, msg)
+	syncChatSession(p)
+	deliverChat(p.slot, chat.ChatYell, "", msg)
+	p.prompt()
+}
+
+func cmdGuildChat(p *player, msg string) {
+	if msg == "" {
+		p.send("Guild chat what?")
+		p.prompt()
+		return
+	}
+	if p.guildID == "" {
+		p.send("You are not in a linkshell.")
+		p.prompt()
+		return
+	}
+	if !gw.guildReg.CanChat(p.guildID, p.slot) {
+		p.send("Your linkshell feather has been revoked.")
+		p.prompt()
+		return
+	}
+	syncChatSession(p)
+	deliverChat(p.slot, chat.ChatGuild, "", msg)
+	p.prompt()
+}
+
+func cmdLSCreate(p *player, name, tag string) {
+	if p.guildID != "" {
+		p.sendf("You are already in linkshell [%s]. Leave first.", p.guildID)
+		p.prompt()
+		return
+	}
+	guildID := strings.ToLower(strings.ReplaceAll(name, " ", "-")) + "-" + p.slot[:4]
+	_, _, err := gw.guildReg.CreateGuild(guildID, name, tag, p.slot)
+	if err != nil {
+		p.sendf("Failed to create linkshell: %v", err)
+		p.prompt()
+		return
+	}
+	p.guildID = guildID
+	syncChatSession(p)
+	p.sendf("Linkshell [%s] <%s> founded. You hold the Feather Sack.", name, tag)
+	p.prompt()
+}
+
+func cmdLSInvite(p *player, targetName string) {
+	if p.guildID == "" {
+		p.send("You are not in a linkshell.")
+		p.prompt()
+		return
+	}
+	var target *player
+	for _, op := range gw.players {
+		if strings.EqualFold(op.name, targetName) {
+			target = op
+			break
+		}
+	}
+	if target == nil {
+		p.sendf("No player named %q online.", targetName)
+		p.prompt()
+		return
+	}
+	if target.guildID != "" {
+		p.sendf("%s is already in a linkshell.", target.name)
+		p.prompt()
+		return
+	}
+	_, err := gw.guildReg.ForgeFeather(p.guildID, p.slot, target.slot)
+	if err != nil {
+		p.sendf("Cannot invite: %v", err)
+		p.prompt()
+		return
+	}
+	target.guildID = p.guildID
+	syncChatSession(target)
+	target.sendf("[Linkshell] %s has invited you to join. You now hold a Feather.", p.name)
+	p.sendf("[Linkshell] %s has joined.", target.name)
+	p.prompt()
+}
+
+func cmdLSLeave(p *player) {
+	if p.guildID == "" {
+		p.send("You are not in a linkshell.")
+		p.prompt()
+		return
+	}
+	g, err := gw.guildReg.GetGuild(p.guildID)
+	if err != nil {
+		p.send("Linkshell not found.")
+		p.guildID = ""
+		p.prompt()
+		return
+	}
+	// Find and revoke own item via leader/self — simplest: clear membership directly.
+	// The guild Registry does not expose a self-leave API; use RevokeItem as leader, or
+	// just drop the player from the guild's internal map via a dedicated approach.
+	// Since RevokeItem requires an Officer+ issuer who is NOT the target, a player leaving
+	// voluntarily needs a special path. We implement leave by finding an officer/leader to
+	// auto-revoke, falling back to just clearing our local state if we're the last member.
+	members := g.Members()
+	var issuerSlot string
+	for _, m := range members {
+		if m.CharacterID != p.slot && m.Role >= 2 { // RoleOfficer=2, RoleLeader=3
+			issuerSlot = m.CharacterID
+			break
+		}
+	}
+	lsName := g.Name
+	if issuerSlot != "" {
+		// Find our feather item ID
+		for _, m := range members {
+			if m.CharacterID == p.slot {
+				_ = gw.guildReg.RevokeItem(p.guildID, issuerSlot, m.FeatherID)
+				break
+			}
+		}
+	}
+	// Regardless, clear local guildID.
+	p.guildID = ""
+	syncChatSession(p)
+	p.sendf("You have left linkshell [%s].", lsName)
+	p.prompt()
+}
+
+func cmdLSInfo(p *player) {
+	if p.guildID == "" {
+		p.send("You are not in a linkshell.")
+		p.prompt()
+		return
+	}
+	g, err := gw.guildReg.GetGuild(p.guildID)
+	if err != nil {
+		p.send("Linkshell not found.")
+		p.prompt()
+		return
+	}
+	p.sendf("\r\n=== Linkshell [%s] <%s> ===", g.Name, g.Tag)
+	members := g.Members()
+	roleLabel := []string{"", "Member", "Officer", "Leader"}
+	for _, m := range members {
+		online := ""
+		if _, ok := gw.players[m.CharacterID]; ok {
+			online = " (online)"
+		}
+		label := "Member"
+		if int(m.Role) < len(roleLabel) {
+			label = roleLabel[m.Role]
+		}
+		p.sendf("  %s — %s%s", m.CharacterID, label, online)
+	}
+	p.prompt()
+}
+
+// itemIL maps known equippable item IDs to their item level.
+var itemIL = map[string]int{
+	"bronze-sword":    1,
+	"iron-sword":      10,
+	"bronze-shield":   1,
+	"iron-shield":     10,
+	"leather-helm":    5,
+	"leather-body":    5,
+	"leather-legs":    5,
+	"leather-feet":    5,
+	"leather-hands":   5,
+	"bone-earring":    3,
+	"iron-earring":    8,
+	"cotton-cape":     4,
+	"leather-belt":    4,
+	"bronze-ring":     2,
+}
+
+func cmdEquip(p *player, slotName, itemID string) {
+	// Validate slot.
+	validSlot := false
+	for _, s := range gear.AllSlots {
+		if s == slotName {
+			validSlot = true
+			break
+		}
+	}
+	if !validSlot {
+		p.sendf("Unknown slot %q. Valid slots: %s", slotName, strings.Join(gear.AllSlots, ", "))
+		p.prompt()
+		return
+	}
+	// Must have item in inventory.
+	if p.inventory[itemID] <= 0 {
+		p.sendf("You don't have %s in your inventory.", itemDisplayName[itemID])
+		p.prompt()
+		return
+	}
+	il, ok := itemIL[itemID]
+	if !ok {
+		il = 1
+	}
+	// Move old item back to inventory if slot occupied.
+	if old, err := p.equip.Unequip(slotName); err == nil {
+		p.inventory[old.ItemID]++
+	}
+	_ = p.equip.Equip(slotName, gear.ItemEntry{ItemID: itemID, IL: il})
+	p.inventory[itemID]--
+	if p.inventory[itemID] == 0 {
+		delete(p.inventory, itemID)
+	}
+	dispName := itemID
+	if dn, ok := itemDisplayName[itemID]; ok {
+		dispName = dn
+	}
+	p.sendf("Equipped %s in %s slot.", dispName, slotName)
+	if eIL, err := p.equip.EffectiveIL(); err == nil {
+		p.sendf("  Effective IL: %d", eIL)
+	}
+	p.prompt()
+}
+
+func cmdUnequip(p *player, slotName string) {
+	item, err := p.equip.Unequip(slotName)
+	if err != nil {
+		p.sendf("Cannot unequip %s: %v", slotName, err)
+		p.prompt()
+		return
+	}
+	p.inventory[item.ItemID]++
+	dispName := item.ItemID
+	if dn, ok := itemDisplayName[item.ItemID]; ok {
+		dispName = dn
+	}
+	p.sendf("Unequipped %s from %s.", dispName, slotName)
+	p.prompt()
+}
+
+func cmdGear(p *player) {
+	p.sendf("\r\n=== Equipment ===")
+	for _, slotName := range gear.AllSlots {
+		item, err := p.equip.ItemAt(slotName)
+		if err != nil {
+			p.sendf("  %-8s: (empty)", slotName)
+			continue
+		}
+		dispName := item.ItemID
+		if dn, ok := itemDisplayName[item.ItemID]; ok {
+			dispName = dn
+		}
+		p.sendf("  %-8s: %s (IL %d)", slotName, dispName, item.IL)
+	}
+	if eIL, err := p.equip.EffectiveIL(); err == nil {
+		p.sendf("  Effective IL: %d", eIL)
+	}
 	p.prompt()
 }
 
@@ -1677,6 +2087,45 @@ func cmdPass(p *player, what string) {
 	broadcastZoneNoLock(alp.zoneID,
 		fmt.Sprintf("[Loot] %s passes on %s.", p.name, alp.pool.Items[idx-1].Name), "")
 	resolvePool(alp)
+	p.prompt()
+}
+
+func cmdEnmity(p *player) {
+	mobID := p.combat.TargetMobID
+	if mobID == "" {
+		p.send("No target. Attack something first.")
+		p.prompt()
+		return
+	}
+	et := gw.mobEnmity[mobID]
+	if et == nil || et.Len() == 0 {
+		p.send("No enmity data for this mob yet.")
+		p.prompt()
+		return
+	}
+	reg := gw.mobRegs[p.zoneID]
+	m, _ := reg.Get(mobID)
+	mobKind := mobID
+	if m != nil {
+		mobKind = m.Kind
+	}
+	p.sendf("\r\n=== Enmity — %s ===", mobKind)
+	topSlot, _ := et.Top()
+	for _, slot := range et.Slots() {
+		score, _ := et.Score(slot)
+		bar := score * 20 / enmity.EnmityCap
+		marker := ""
+		if slot == topSlot {
+			marker = " ◄ TOP"
+		}
+		pp := gw.players[slot]
+		name := slot
+		if pp != nil {
+			name = pp.name
+		}
+		p.sendf("  %-12s %5d/%-5d [%-20s]%s", name, score, enmity.EnmityCap,
+			strings.Repeat("█", bar)+strings.Repeat("░", 20-bar), marker)
+	}
 	p.prompt()
 }
 
@@ -2059,6 +2508,178 @@ func cmdSetJob(p *player, jobID string) {
 	p.prompt()
 }
 
+func cmdSetSubJob(p *player, subJobID string) {
+	if subJobID == "NONE" || subJobID == "" {
+		if p.charJob != nil {
+			p.charJob.Sub = ""
+			p.charJob.SubLvl = 0
+		}
+		p.send("Sub-job cleared.")
+		p.prompt()
+		return
+	}
+	if _, err := job.StatsFor(subJobID); err != nil {
+		p.sendf("Unknown job %q. Use 'jobs' to list all.", subJobID)
+		p.prompt()
+		return
+	}
+	if subJobID == p.jobID {
+		p.send("Sub-job cannot match main job.")
+		p.prompt()
+		return
+	}
+	subLvl := p.charXP.Level / 2
+	cj, err := job.NewCharJob(p.jobID, subJobID, p.charXP.Level, subLvl)
+	if err != nil {
+		p.sendf("Cannot set sub-job: %v", err)
+		p.prompt()
+		return
+	}
+	p.charJob = cj
+	combined, _ := cj.CombinedStats()
+	p.sendf("Sub-job set to %s (effective level %d). STR: %d VIT: %d INT: %d",
+		subJobID, cj.EffectiveSubLevel(), combined.STR, combined.VIT, combined.INT)
+	p.prompt()
+}
+
+func cmdSubJob(p *player) {
+	if p.charJob == nil || p.charJob.Sub == "" {
+		p.send("No sub-job set. Use 'setsubjob <JOB>' to set one.")
+		p.prompt()
+		return
+	}
+	cj := p.charJob
+	combined, err := cj.CombinedStats()
+	if err != nil {
+		p.sendf("Sub-job info error: %v", err)
+		p.prompt()
+		return
+	}
+	p.sendf("\r\n=== Job ===")
+	p.sendf("  Main: %s Lv%d", cj.Main, cj.MainLvl)
+	p.sendf("  Sub:  %s Lv%d (effective: Lv%d)", cj.Sub, cj.SubLvl, cj.EffectiveSubLevel())
+	p.sendf("  Combined STR:%d DEX:%d VIT:%d AGI:%d INT:%d MND:%d CHR:%d",
+		combined.STR, combined.DEX, combined.VIT, combined.AGI,
+		combined.INT, combined.MND, combined.CHR)
+	p.prompt()
+}
+
+func cmdMerits(p *player) {
+	mb := p.meritBank
+	p.sendf("\r\n=== Merit Points: %d/%d ===", mb.Points, merit.MeritCap)
+	p.sendf("  %-10s  %s  %s", "Category", "Tier", "Next cost")
+	for _, cat := range merit.AllCategories {
+		tier := mb.TierOf(cat)
+		nextCost := "maxed"
+		if tier < merit.MaxTierPerCategory {
+			nextCost = fmt.Sprintf("%d mp", tier+1)
+		}
+		p.sendf("  %-10s  %d/5  %s", cat, tier, nextCost)
+	}
+	p.prompt()
+}
+
+func cmdMeritSpend(p *player, category string) {
+	err := p.meritBank.Spend(category)
+	switch err {
+	case nil:
+		tier := p.meritBank.TierOf(category)
+		p.sendf("Merit spent. %s is now tier %d. (Points remaining: %d)",
+			category, tier, p.meritBank.Points)
+	case merit.ErrInvalidCategory:
+		p.sendf("Unknown category %q. Valid: %s", category, strings.Join(merit.AllCategories, ", "))
+	case merit.ErrTierCapped:
+		p.sendf("%s is already at maximum tier (5).", category)
+	case merit.ErrInsufficientMerits:
+		cost := p.meritBank.TierOf(category) + 1
+		p.sendf("Need %d merit point(s) for %s. You have %d.", cost, category, p.meritBank.Points)
+	default:
+		p.sendf("Merit spend error: %v", err)
+	}
+	p.prompt()
+}
+
+func crystalPos(p *player) telecrystal.Vec3 {
+	return telecrystal.Vec3{X: p.pos.X, Y: p.pos.Y, Z: p.pos.Z}
+}
+
+func cmdCrystals(p *player) {
+	nearby := telecrystal.InScene(p.zoneID)
+	if len(nearby) == 0 {
+		p.send("No telecrystals in this zone.")
+		p.prompt()
+		return
+	}
+	p.sendf("\r\n=== Telecrystals in %s ===", zoneName(p.zoneID))
+	ppos := crystalPos(p)
+	for _, c := range nearby {
+		dist := c.Dist2D(ppos)
+		inRange := ""
+		if c.InRange(ppos) {
+			inRange = " [IN RANGE]"
+		}
+		p.sendf("  %-40s → %-12s  dist: %.0f  cost: %d Gil%s",
+			c.ID, c.TargetName, dist, c.CastCost, inRange)
+	}
+	p.prompt()
+}
+
+func cmdTravel(p *player, crystalID string) {
+	c, err := telecrystal.Validate(crystalID, p.zoneID, crystalPos(p), p.gil)
+	switch err {
+	case telecrystal.ErrUnknownCrystal:
+		p.sendf("Unknown crystal %q.", crystalID)
+		p.prompt()
+		return
+	case telecrystal.ErrWrongScene:
+		p.sendf("Crystal %q is not in this zone.", crystalID)
+		p.prompt()
+		return
+	case telecrystal.ErrInsufficientGold:
+		p.sendf("Need %d Gil to travel. You have %d.", c.CastCost, p.gil)
+		p.prompt()
+		return
+	}
+	if err != nil {
+		p.sendf("Travel failed: %v", err)
+		p.prompt()
+		return
+	}
+	// Deduct cost and teleport.
+	p.gil -= c.CastCost
+	p.sendf("The crystal resonates... you are transported to %s! (-%d Gil)", c.TargetName, c.CastCost)
+	gw.mu.Lock()
+	broadcastZoneNoLock(p.zoneID, fmt.Sprintf("%s vanishes into a telecrystal.", p.name), p.slot)
+	_ = gw.zoneMgr.Transfer(p.slot, c.TargetScene)
+	p.combat.TargetMobID = ""
+	p.zoneID = c.TargetScene
+	p.pos = mob.Pos{X: c.SpawnPos.X, Y: c.SpawnPos.Y, Z: c.SpawnPos.Z}
+	syncChatSession(p)
+	broadcastZoneNoLock(p.zoneID, fmt.Sprintf("%s arrives via telecrystal.", p.name), p.slot)
+	gw.mu.Unlock()
+	cmdLook(p)
+}
+
+func cmdTouchCrystal(p *player) {
+	ppos := crystalPos(p)
+	nearby := telecrystal.InScene(p.zoneID)
+	var touched *telecrystal.Crystal
+	for i := range nearby {
+		if nearby[i].InRange(ppos) {
+			touched = &nearby[i]
+			break
+		}
+	}
+	if touched == nil {
+		p.send("No telecrystal within range. Move closer.")
+		p.prompt()
+		return
+	}
+	p.sendf("You touch the crystal. [%s] (→ %s, cost %d Gil)", touched.ID, touched.TargetName, touched.CastCost)
+	p.sendf("Use 'travel %s' to teleport.", touched.ID)
+	p.prompt()
+}
+
 func cmdJobs(p *player) {
 	p.send("\r\n=== Jobs (22) — FFXI-parity ===")
 	for _, j := range job.AllJobs {
@@ -2173,9 +2794,12 @@ func handleConn(conn net.Conn) {
 		homePoint:   homepoint.NewState(0),
 		wsSkill:    "Fast Blade",
 		jobID:      job.WAR,
+		charJob:    func() *job.CharJob { cj, _ := job.NewCharJob(job.WAR, "", 1, 0); return cj }(),
+		meritBank:  merit.NewMeritBank(),
 		inventory:  make(map[string]int),
 		craftSkill: craft.NewCraftSkill(),
 		gil:        500, // starting gil
+		equip:      gear.NewEquipment(),
 		conn:       conn,
 		w:           w,
 	}
@@ -2183,6 +2807,7 @@ func handleConn(conn net.Conn) {
 	gw.mu.Lock()
 	gw.players[slot] = p
 	_ = gw.zoneMgr.Enter(slot, name, 0)
+	gw.chatRouter.Register(slot, chat.Session{Name: name, SceneID: 0, Pos: chat.Pos{X: 0, Y: 2, Z: 0}})
 	broadcastZoneNoLock(0, fmt.Sprintf("%s has entered the world.", name), slot)
 	gw.mu.Unlock()
 
@@ -2207,6 +2832,7 @@ func handleConn(conn net.Conn) {
 		delete(gw.pendingInvites, slot)
 		delete(gw.players, slot)
 		gw.zoneMgr.Leave(slot)
+		gw.chatRouter.Unregister(slot)
 		broadcastZoneNoLock(p.zoneID, fmt.Sprintf("%s has left the world.", name), slot)
 		gw.mu.Unlock()
 	}()
