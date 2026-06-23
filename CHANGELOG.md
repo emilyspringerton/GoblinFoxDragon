@@ -1,4 +1,5 @@
 ## 2026-06-23
+- S110-01: ls-kick/ls-promote MUD commands (guild Officer+); S110-02: shop/shop buy/shop sell at NPC vendors (guildmaster/merchant/scout)
 - S109-02: Fame MUD wiring; talk <npc> fame gate; NPC [LOCKED] indicator; quest fame reward tags; 2 new gated NPCs
 - S109-01: Add nation fame system (server/fame); Earn/Rank/MeetsRank/Summary; TurnIn now returns RewardFame+FameNation; MUD fame/rep command shows reputation table
 - S108: fishing skill (server/gather/fishing.go) + food buff system (server/food/) + MUD wiring (fish/fish-points/eat/food commands)
