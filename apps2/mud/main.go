@@ -225,8 +225,9 @@ type player struct {
 	invisExpires time.Time
 	isSneaking   bool
 	sneakExpires time.Time
-	charJob     *job.CharJob // main+sub job pairing (nil until initialized)
-	meritBank   *merit.MeritBank
+	charJob      *job.CharJob // main+sub job pairing (nil until initialized)
+	meritBank    *merit.MeritBank
+	recastTracker *job.RecastTracker
 	conn        net.Conn
 	w           *bufio.Writer
 	inbox       chan string
@@ -1073,6 +1074,14 @@ func handle(p *player, line string) {
 			return
 		}
 		cmdCast(p, strings.ToLower(args[0]))
+	case "ja":
+		if len(args) < 1 {
+			p.send("Usage: ja <ability-id>  (e.g. ja provoke)")
+			return
+		}
+		cmdJA(p, strings.ToLower(args[0]))
+	case "recasts", "recast":
+		cmdRecasts(p)
 	case "crisis":
 		cmdCrisis(p)
 	case "crisis-ley":
@@ -2628,6 +2637,7 @@ func cmdSetJob(p *player, jobID string) {
 		return
 	}
 	p.jobID = jobID
+	p.recastTracker = job.NewRecastTracker(abilitiesForJob(jobID))
 	applyJobStats(p)
 	// Restore HP to full on job change (FFXI-style rest at moogle).
 	p.hp = p.maxHP
@@ -2812,6 +2822,91 @@ func cmdTouchCrystal(p *player) {
 	p.prompt()
 }
 
+// abilitiesForJob returns the known abilities for a job ID.
+func abilitiesForJob(jobID string) []job.Ability {
+	switch jobID {
+	case job.WAR:
+		return job.WarriorAbilities()
+	case job.WHM:
+		return job.WhiteMageAbilities()
+	default:
+		return nil
+	}
+}
+
+func cmdJA(p *player, abilityID string) {
+	now := time.Now()
+	err := p.recastTracker.Use(abilityID, now, p.charXP.Level)
+	switch err {
+	case nil:
+		// Apply ability effect.
+		switch abilityID {
+		case "provoke":
+			// Add enmity on current target.
+			mobID := p.combat.TargetMobID
+			if mobID != "" {
+				if gw.mobEnmity[mobID] == nil {
+					gw.mobEnmity[mobID] = enmity.NewTable()
+				}
+				gw.mobEnmity[mobID].Add(p.slot, 2000)
+				reg := gw.mobRegs[p.zoneID]
+				if topSlot, terr := gw.mobEnmity[mobID].Top(); terr == nil {
+					if m, ok := reg.Get(mobID); ok && m.AggroSlot != topSlot {
+						m.AggroSlot = topSlot
+					}
+				}
+				p.sendf("You shout Provoke! (Enmity +2000 on target)")
+			} else {
+				p.send("No target for Provoke.")
+			}
+		case "berserk":
+			p.sendf("You enter Berserk! (Haste +30%% for 3 minutes)")
+		case "warcry":
+			broadcastZone(p.zoneID, fmt.Sprintf("%s lets out a fierce battle cry!", p.name), "")
+		case "benediction":
+			p.hp = p.maxHP
+			p.mp = p.maxMP
+			p.sendf("Benediction! HP and MP fully restored.")
+		default:
+			p.sendf("You use %s.", abilityID)
+		}
+	case job.ErrAbilityOnRecast:
+		remaining, _ := p.recastTracker.RecastRemaining(abilityID, now)
+		p.sendf("%s is on recast. (%s remaining)", abilityID, remaining.Round(time.Second))
+	case job.ErrAbilityLevelGated:
+		p.sendf("You need a higher level to use %s.", abilityID)
+	case job.ErrAbilityUnknown:
+		p.sendf("Unknown ability %q. Use 'recasts' to see your abilities.", abilityID)
+	default:
+		p.sendf("Cannot use %s: %v", abilityID, err)
+	}
+	p.prompt()
+}
+
+func cmdRecasts(p *player) {
+	now := time.Now()
+	abilities := abilitiesForJob(p.jobID)
+	if len(abilities) == 0 {
+		p.sendf("No abilities registered for job %s.", p.jobID)
+		p.prompt()
+		return
+	}
+	p.sendf("\r\n=== Job Abilities [%s] ===", p.jobID)
+	for _, a := range abilities {
+		if p.charXP.Level < a.MinLevel {
+			p.sendf("  %-18s (requires Lv%d)", a.ID, a.MinLevel)
+			continue
+		}
+		remaining, _ := p.recastTracker.RecastRemaining(a.ID, now)
+		status := "ready"
+		if remaining > 0 {
+			status = remaining.Round(time.Second).String()
+		}
+		p.sendf("  %-18s %s", a.ID, status)
+	}
+	p.prompt()
+}
+
 func cmdCast(p *player, spell string) {
 	if p.statFX.IsSilenced() {
 		p.send("You are silenced and cannot cast spells.")
@@ -2993,8 +3088,9 @@ func handleConn(conn net.Conn) {
 		homePoint:   homepoint.NewState(0),
 		wsSkill:    "Fast Blade",
 		jobID:      job.WAR,
-		charJob:    func() *job.CharJob { cj, _ := job.NewCharJob(job.WAR, "", 1, 0); return cj }(),
-		meritBank:  merit.NewMeritBank(),
+		charJob:       func() *job.CharJob { cj, _ := job.NewCharJob(job.WAR, "", 1, 0); return cj }(),
+		meritBank:     merit.NewMeritBank(),
+		recastTracker: job.NewRecastTracker(job.WarriorAbilities()),
 		inventory:  make(map[string]int),
 		craftSkill: craft.NewCraftSkill(),
 		gil:        500, // starting gil
