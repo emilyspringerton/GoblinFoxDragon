@@ -21,6 +21,7 @@ import (
 
 	"dragonsnshit/server/conquest"
 	"dragonsnshit/server/craft"
+	"dragonsnshit/server/market"
 	"dragonsnshit/server/field"
 	"dragonsnshit/server/gather"
 	"dragonsnshit/server/homepoint"
@@ -96,6 +97,29 @@ func itemName(id string) string {
 	return id
 }
 
+// itemCategory maps item IDs to AH categories for listing.
+var itemCategory = map[string]market.Category{
+	"worm-sinew":    market.CatMaterials,
+	"earth-crystal": market.CatCrystals,
+	"leech-blood":   market.CatMaterials,
+	"water-crystal": market.CatCrystals,
+	"slime-oil":     market.CatMaterials,
+	"lizard-tail":   market.CatMaterials,
+	"fire-crystal":  market.CatCrystals,
+	"king-sinew":    market.CatMaterials,
+	"nm-worm-shell": market.CatMaterials,
+	"marsh-blood":   market.CatMaterials,
+	"nm-leech-fang": market.CatMaterials,
+	"iron-ingot":    market.CatCraftItems,
+	"iron-ingot+1":  market.CatCraftItems,
+	"iron-ingot+2":  market.CatCraftItems,
+	"iron-ingot+3":  market.CatCraftItems,
+	"herbal-remedy":   market.CatCraftItems,
+	"herbal-remedy+1": market.CatCraftItems,
+	"herbal-remedy+2": market.CatCraftItems,
+	"herbal-remedy+3": market.CatCraftItems,
+}
+
 // Zone adjacency: zoneID → direction → destination zoneID
 var exits = map[int]map[string]int{
 	0: {"north": 1, "south": 2, "east": 3},
@@ -155,6 +179,7 @@ type world struct {
 	lootPools      map[string]*activeLootPool // poolID → pool
 	nmSpawns       map[int][]*nm.NMSpawn // zoneID → NM spawn definitions
 	conquestMap    *conquest.Map
+	ah             *market.AuctionHouse
 	playerNation   map[string]conquest.Nation // slot → declared nation
 	lastConquestTick time.Time
 }
@@ -180,6 +205,7 @@ type player struct {
 	jobID       string // current job (job.JobID, default "WAR")
 	inventory   map[string]int // itemID → quantity
 	craftSkill  *craft.CraftSkill
+	gil         int
 	conn        net.Conn
 	w           *bufio.Writer
 	inbox       chan string
@@ -238,6 +264,8 @@ func initWorld() *world {
 	for _, r := range conquest.DefaultRegions() {
 		w.conquestMap.AddRegion(r)
 	}
+
+	w.ah = market.New()
 
 	for _, zoneID := range []int{0, 1, 2, 3} {
 		w.mobRegs[zoneID] = mob.New()
@@ -472,8 +500,13 @@ func openLootPool(killer *player, m *mob.Mob, now time.Time) {
 	if len(eligible) == 0 {
 		// Solo: auto-award all drops to the killer.
 		for _, it := range drops {
-			killer.inventory[it.ID]++
-			killer.sendf("  You obtain: %s.", it.Name)
+			if it.ID == "gil-drop" {
+				killer.gil += 100
+				killer.sendf("  You obtain: 100 Gil.")
+			} else {
+				killer.inventory[it.ID]++
+				killer.sendf("  You obtain: %s.", it.Name)
+			}
 		}
 		return
 	}
@@ -516,7 +549,11 @@ func resolvePool(alp *activeLootPool) {
 		if award.Slot == "" {
 			broadcastZoneNoLock(alp.zoneID, fmt.Sprintf("[Loot] %s — no one claimed it.", name), "")
 		} else if op, ok := gw.players[award.Slot]; ok {
-			op.inventory[award.ItemID]++
+			if award.ItemID == "gil-drop" {
+				op.gil += 100
+			} else {
+				op.inventory[award.ItemID]++
+			}
 			broadcastZoneNoLock(alp.zoneID,
 				fmt.Sprintf("[Loot] %s obtains %s! (lot: %d)", op.name, name, award.Roll), "")
 		}
@@ -843,6 +880,8 @@ func handle(p *player, line string) {
 		cmdParty(p)
 	case "leave-party", "lp":
 		cmdLeaveParty(p)
+	case "ah":
+		cmdAH(p, args)
 	case "conquest", "con":
 		cmdConquest(p)
 	case "declare":
@@ -1641,6 +1680,198 @@ func cmdPass(p *player, what string) {
 	p.prompt()
 }
 
+func cmdAH(p *player, args []string) {
+	if len(args) == 0 {
+		p.send("\r\nAuction House — subcommands: browse [category], sell <item-id> <price>, buy <listing-id>, history <item-id>, status, cancel <listing-id>")
+		p.prompt()
+		return
+	}
+	sub := strings.ToLower(args[0])
+	switch sub {
+	case "browse":
+		ahBrowse(p, args[1:])
+	case "sell":
+		if len(args) < 3 {
+			p.send("Usage: ah sell <item-id> <price>")
+			p.prompt()
+			return
+		}
+		price := int64(0)
+		fmt.Sscanf(args[2], "%d", &price)
+		ahSell(p, args[1], price)
+	case "buy":
+		if len(args) < 2 {
+			p.send("Usage: ah buy <listing-id>")
+			p.prompt()
+			return
+		}
+		ahBuy(p, args[1])
+	case "history":
+		if len(args) < 2 {
+			p.send("Usage: ah history <item-id>")
+			p.prompt()
+			return
+		}
+		ahHistory(p, args[1])
+	case "status":
+		ahStatus(p)
+	case "cancel":
+		if len(args) < 2 {
+			p.send("Usage: ah cancel <listing-id>")
+			p.prompt()
+			return
+		}
+		ahCancel(p, args[1])
+	default:
+		p.sendf("Unknown ah subcommand %q. Try: browse, sell, buy, history, status, cancel.", sub)
+		p.prompt()
+	}
+}
+
+func ahBrowse(p *player, args []string) {
+	if len(args) == 0 {
+		p.send("\r\n=== Auction House — Categories ===")
+		for _, cat := range market.AllCategories() {
+			items := gw.ah.BrowseCategory(cat)
+			p.sendf("  [%d] %-16s  %d listing(s)", int(cat), market.CategoryName(cat), len(items))
+		}
+		p.send("  Use: ah browse <number>")
+		p.prompt()
+		return
+	}
+	catNum := 0
+	fmt.Sscanf(args[0], "%d", &catNum)
+	cat := market.Category(catNum)
+	items := gw.ah.BrowseCategory(cat)
+	p.sendf("\r\n=== AH: %s ===", market.CategoryName(cat))
+	if len(items) == 0 {
+		p.send("  (no listings)")
+	}
+	for _, it := range items {
+		p.sendf("  %-24s  x%d listing(s)  lowest: %d gil  last: %d gil",
+			it.ItemName, it.ListingCount, it.LowestPrice, it.LastPrice)
+	}
+	p.prompt()
+}
+
+func ahSell(p *player, itemID string, price int64) {
+	if p.inventory[itemID] == 0 {
+		p.sendf("You don't have any %s.", itemName(itemID))
+		p.prompt()
+		return
+	}
+	cat, ok := itemCategory[itemID]
+	if !ok {
+		cat = market.CatMisc
+	}
+	l, err := gw.ah.List(p.slot, itemID, itemName(itemID), cat, price, 1)
+	if err != nil {
+		p.sendf("AH error: %v", err)
+		p.prompt()
+		return
+	}
+	p.inventory[itemID]--
+	if p.inventory[itemID] == 0 {
+		delete(p.inventory, itemID)
+	}
+	p.sendf("Listed %s for %d gil. (ID: %s)", itemName(itemID), price, l.ID)
+	p.prompt()
+}
+
+func ahBuy(p *player, listingID string) {
+	// We need to find which itemID this listing belongs to — scan active listings.
+	// Instead, expose via ItemPage indirectly: iterate categories to find it.
+	var targetItemID string
+	for _, cat := range market.AllCategories() {
+		for _, summary := range gw.ah.BrowseCategory(cat) {
+			pg := gw.ah.ItemPage(summary.ItemID)
+			for _, l := range pg.Listings {
+				if l.ID == listingID {
+					targetItemID = l.ItemID
+					break
+				}
+			}
+			if targetItemID != "" {
+				break
+			}
+		}
+		if targetItemID != "" {
+			break
+		}
+	}
+	if targetItemID == "" {
+		p.send("Listing not found.")
+		p.prompt()
+		return
+	}
+	pg := gw.ah.ItemPage(targetItemID)
+	var listing *market.Listing
+	for i := range pg.Listings {
+		if pg.Listings[i].ID == listingID {
+			listing = &pg.Listings[i]
+			break
+		}
+	}
+	if listing == nil {
+		p.send("Listing not found.")
+		p.prompt()
+		return
+	}
+	if int64(p.gil) < listing.Price {
+		p.sendf("Not enough gil. Need %d, have %d.", listing.Price, p.gil)
+		p.prompt()
+		return
+	}
+	rec, err := gw.ah.Buy(p.slot, targetItemID)
+	if err != nil {
+		p.sendf("Purchase failed: %v", err)
+		p.prompt()
+		return
+	}
+	p.gil -= int(rec.Price)
+	p.inventory[rec.ItemID] += rec.Qty
+	p.sendf("You purchase %dx %s for %d gil. (gil remaining: %d)", rec.Qty, rec.ItemName, rec.Price, p.gil)
+	p.prompt()
+}
+
+func ahHistory(p *player, itemID string) {
+	history := gw.ah.HistoryFor(itemID)
+	p.sendf("\r\n=== AH History: %s ===", itemName(itemID))
+	if len(history) == 0 {
+		p.send("  (no sales recorded)")
+		p.prompt()
+		return
+	}
+	for _, r := range history {
+		p.sendf("  %s  %dx %s  %d gil", r.SoldAt.Format("01/02 15:04"), r.Qty, r.ItemName, r.Price)
+	}
+	p.prompt()
+}
+
+func ahStatus(p *player) {
+	listings := gw.ah.SellerListings(p.slot)
+	p.sendf("\r\n=== Your AH Listings (gil: %d) ===", p.gil)
+	if len(listings) == 0 {
+		p.send("  (none)")
+	}
+	for _, l := range listings {
+		p.sendf("  [%s]  %-24s  %d gil  (listed %s)", l.ID, l.ItemName, l.Price, l.ListedAt.Format("01/02 15:04"))
+	}
+	p.prompt()
+}
+
+func ahCancel(p *player, listingID string) {
+	l, err := gw.ah.CancelListing(p.slot, listingID)
+	if err != nil {
+		p.sendf("Cannot cancel: %v", err)
+		p.prompt()
+		return
+	}
+	p.inventory[l.ItemID] += l.Qty
+	p.sendf("Listing cancelled. %dx %s returned to your inventory.", l.Qty, l.ItemName)
+	p.prompt()
+}
+
 func cmdConquest(p *player) {
 	p.send("\r\n=== Conquest — Region Control ===")
 	for _, r := range conquest.DefaultRegions() {
@@ -1688,12 +1919,12 @@ func cmdDeclare(p *player, input string) {
 }
 
 func cmdInventory(p *player) {
+	p.sendf("\r\n=== Inventory (Gil: %d) ===", p.gil)
 	if len(p.inventory) == 0 {
-		p.send("\r\nInventory: empty")
+		p.send("  (empty)")
 		p.prompt()
 		return
 	}
-	p.send("\r\n=== Inventory ===")
 	ids := make([]string, 0, len(p.inventory))
 	for id := range p.inventory {
 		ids = append(ids, id)
@@ -1944,6 +2175,7 @@ func handleConn(conn net.Conn) {
 		jobID:      job.WAR,
 		inventory:  make(map[string]int),
 		craftSkill: craft.NewCraftSkill(),
+		gil:        500, // starting gil
 		conn:       conn,
 		w:           w,
 	}
