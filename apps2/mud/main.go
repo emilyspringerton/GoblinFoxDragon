@@ -4432,8 +4432,181 @@ func cmdCast(p *player, spell string, targetName string) {
 	case "katon", "suiton", "doton", "raiton", "hyoton", "huton",
 		"katon2", "suiton2", "doton2", "raiton2", "hyoton2", "huton2":
 		cmdNinjutsu(p, spell)
+	case "flash", "sentinel", "rampart", "holy", "banish", "banish2":
+		cmdCastPaladinMagic(p, spell)
 	default:
 		p.sendf("Unknown spell %q. Try: invisible, sneak, cure/cure2, protect, shell, haste, regen, refresh, dia, fire/blizzard/thunder/stone/water/aero [I-III], march/paeon/ballad/minne/carol/mambo, teleport-meadow/hills/caves/swamp, drain, aspir, absorb-str/dex/vit/int/mnd", spell)
+	}
+	p.prompt()
+}
+
+func cmdCastPaladinMagic(p *player, spell string) {
+	if p.jobID != job.PLD && (p.charJob == nil || p.charJob.Sub != job.PLD) {
+		p.sendf("%s requires Paladin job or sub-job.", spell)
+		p.prompt()
+		return
+	}
+	if p.statFX.IsSilenced() {
+		p.send("You are silenced and cannot cast spells.")
+		p.prompt()
+		return
+	}
+	now := time.Now()
+	switch spell {
+	case "flash":
+		const flashCost = 40
+		if p.mp < flashCost {
+			p.sendf("Not enough MP. (need %d, have %d)", flashCost, p.mp)
+			p.prompt()
+			return
+		}
+		if p.combat.TargetMobID == "" {
+			p.send("No target. Use 'target <mob>' first.")
+			p.prompt()
+			return
+		}
+		reg := gw.mobRegs[p.zoneID]
+		m, ok := reg.Get(p.combat.TargetMobID)
+		if !ok || m.HP <= 0 {
+			p.send("Your target is dead or gone.")
+			p.prompt()
+			return
+		}
+		p.mp -= flashCost
+		// Flash: massive enmity spike (1500 CE) — forces mob to target this PLD.
+		if gw.mobEnmity[p.combat.TargetMobID] == nil {
+			gw.mobEnmity[p.combat.TargetMobID] = enmity.NewTable()
+		}
+		gw.mobEnmity[p.combat.TargetMobID].Add(p.slot, 1500)
+		p.sendf("Flash: %s is blinded and enraged! (massive enmity spike. MP: %d)", m.Kind, p.mp)
+		_ = now
+	case "sentinel":
+		const sentinelCost = 50
+		if p.mp < sentinelCost {
+			p.sendf("Not enough MP. (need %d, have %d)", sentinelCost, p.mp)
+			p.prompt()
+			return
+		}
+		p.mp -= sentinelCost
+		p.statFX.Apply(status.Effect{Kind: status.Protect, Potency: 30, ExpiresAt: now.Add(30 * time.Second)})
+		p.sendf("Sentinel: physical defense +30 for 30s. MP: %d", p.mp)
+	case "rampart":
+		const rampartCost = 70
+		if p.mp < rampartCost {
+			p.sendf("Not enough MP. (need %d, have %d)", rampartCost, p.mp)
+			p.prompt()
+			return
+		}
+		p.mp -= rampartCost
+		expires := now.Add(30 * time.Second)
+		count := 0
+		for _, other := range gw.players {
+			if other.zoneID != p.zoneID {
+				continue
+			}
+			other.statFX.Apply(status.Effect{Kind: status.Protect, Potency: 20, ExpiresAt: expires})
+			if other != p {
+				other.sendf("\r\n[Rampart from %s] Physical defense +20 for 30s.", p.name)
+			}
+			count++
+		}
+		p.sendf("Rampart: physical defense +20 to %d players for 30s. MP: %d", count, p.mp)
+	case "holy":
+		const holyCost = 80
+		if p.mp < holyCost {
+			p.sendf("Not enough MP. (need %d, have %d)", holyCost, p.mp)
+			p.prompt()
+			return
+		}
+		if p.combat.TargetMobID == "" {
+			p.send("No target. Use 'target <mob>' first.")
+			p.prompt()
+			return
+		}
+		reg := gw.mobRegs[p.zoneID]
+		m, ok := reg.Get(p.combat.TargetMobID)
+		if !ok || m.HP <= 0 {
+			p.send("Your target is dead or gone.")
+			p.prompt()
+			return
+		}
+		p.mp -= holyCost
+		dmg := 200
+		if dmg > m.HP {
+			dmg = m.HP
+		}
+		m.HP -= dmg
+		p.sendf("Holy: %d light damage on %s. (mob HP: %d/%d  MP: %d)", dmg, m.Kind, m.HP, m.MaxHP, p.mp)
+		if m.HP <= 0 {
+			m.State = mob.StateDead
+			p.send("  The creature falls!")
+			p.combat.TargetMobID = ""
+			resolveKill(p, m, reg, now)
+		}
+	case "banish":
+		const banishCost = 45
+		if p.mp < banishCost {
+			p.sendf("Not enough MP. (need %d, have %d)", banishCost, p.mp)
+			p.prompt()
+			return
+		}
+		if p.combat.TargetMobID == "" {
+			p.send("No target. Use 'target <mob>' first.")
+			p.prompt()
+			return
+		}
+		reg := gw.mobRegs[p.zoneID]
+		m, ok := reg.Get(p.combat.TargetMobID)
+		if !ok || m.HP <= 0 {
+			p.send("Your target is dead or gone.")
+			p.prompt()
+			return
+		}
+		p.mp -= banishCost
+		dmg := 80
+		if dmg > m.HP {
+			dmg = m.HP
+		}
+		m.HP -= dmg
+		p.sendf("Banish: %d light damage on %s. (mob HP: %d/%d  MP: %d)", dmg, m.Kind, m.HP, m.MaxHP, p.mp)
+		if m.HP <= 0 {
+			m.State = mob.StateDead
+			p.send("  The creature falls!")
+			p.combat.TargetMobID = ""
+			resolveKill(p, m, reg, now)
+		}
+	case "banish2":
+		const banish2Cost = 90
+		if p.mp < banish2Cost {
+			p.sendf("Not enough MP. (need %d, have %d)", banish2Cost, p.mp)
+			p.prompt()
+			return
+		}
+		if p.combat.TargetMobID == "" {
+			p.send("No target. Use 'target <mob>' first.")
+			p.prompt()
+			return
+		}
+		reg := gw.mobRegs[p.zoneID]
+		m, ok := reg.Get(p.combat.TargetMobID)
+		if !ok || m.HP <= 0 {
+			p.send("Your target is dead or gone.")
+			p.prompt()
+			return
+		}
+		p.mp -= banish2Cost
+		dmg := 190
+		if dmg > m.HP {
+			dmg = m.HP
+		}
+		m.HP -= dmg
+		p.sendf("Banish II: %d light damage on %s. (mob HP: %d/%d  MP: %d)", dmg, m.Kind, m.HP, m.MaxHP, p.mp)
+		if m.HP <= 0 {
+			m.State = mob.StateDead
+			p.send("  The creature falls!")
+			p.combat.TargetMobID = ""
+			resolveKill(p, m, reg, now)
+		}
 	}
 	p.prompt()
 }
