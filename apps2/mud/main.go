@@ -219,8 +219,12 @@ type player struct {
 	inventory   map[string]int // itemID → quantity
 	craftSkill  *craft.CraftSkill
 	gil         int
-	guildID     string // linkshell guild ID ("" = none)
-	equip       *gear.Equipment
+	guildID      string // linkshell guild ID ("" = none)
+	equip        *gear.Equipment
+	isInvisible  bool
+	invisExpires time.Time
+	isSneaking   bool
+	sneakExpires time.Time
 	charJob     *job.CharJob // main+sub job pairing (nil until initialized)
 	meritBank   *merit.MeritBank
 	conn        net.Conn
@@ -657,11 +661,34 @@ func tickAll() {
 	for zoneID, reg := range gw.mobRegs {
 		events := reg.Tick(now, dt, playerPosByZone[zoneID])
 		for _, ev := range events {
+			// Invisible/Sneak aggro block: cancel aggro on invisible/sneaking players.
+			if ev.Kind == mob.EvtMobAggro {
+				if pp, ok := gw.players[ev.Slot]; ok {
+					if (pp.isInvisible && pp.invisExpires.After(now)) ||
+						(pp.isSneaking && pp.sneakExpires.After(now)) {
+						if m, ok2 := reg.Get(ev.MobID); ok2 && m.AggroSlot == ev.Slot {
+							m.AggroSlot = ""
+						}
+						continue // suppress this aggro event
+					}
+				}
+			}
 			broadcastMobEvent(zoneID, ev)
 		}
 	}
 
 	for _, p := range gw.players {
+		// Expire Invisible/Sneak.
+		if p.isInvisible && now.After(p.invisExpires) {
+			p.isInvisible = false
+			p.sendf("\r\n[Invisible fades.]")
+			p.prompt()
+		}
+		if p.isSneaking && now.After(p.sneakExpires) {
+			p.isSneaking = false
+			p.sendf("\r\n[Sneak fades.]")
+			p.prompt()
+		}
 		if p.homePoint.IsKO || p.combat.TargetMobID == "" {
 			continue
 		}
@@ -1040,6 +1067,12 @@ func handle(p *player, line string) {
 			return
 		}
 		cmdTravel(p, args[0])
+	case "cast":
+		if len(args) < 1 {
+			p.send("Usage: cast <spell>  (spells: invisible, sneak)")
+			return
+		}
+		cmdCast(p, strings.ToLower(args[0]))
 	case "crisis":
 		cmdCrisis(p)
 	case "crisis-ley":
@@ -2776,6 +2809,43 @@ func cmdTouchCrystal(p *player) {
 	}
 	p.sendf("You touch the crystal. [%s] (→ %s, cost %d Gil)", touched.ID, touched.TargetName, touched.CastCost)
 	p.sendf("Use 'travel %s' to teleport.", touched.ID)
+	p.prompt()
+}
+
+func cmdCast(p *player, spell string) {
+	if p.statFX.IsSilenced() {
+		p.send("You are silenced and cannot cast spells.")
+		p.prompt()
+		return
+	}
+	const mpCostInvis = 50
+	const mpCostSneak = 50
+	const duration = 60 * time.Second
+	now := time.Now()
+	switch spell {
+	case "invisible", "invis":
+		if p.mp < mpCostInvis {
+			p.sendf("Not enough MP. (need %d, have %d)", mpCostInvis, p.mp)
+			p.prompt()
+			return
+		}
+		p.mp -= mpCostInvis
+		p.isInvisible = true
+		p.invisExpires = now.Add(duration)
+		p.sendf("You cast Invisible. (60s — sight aggro blocked. MP: %d)", p.mp)
+	case "sneak":
+		if p.mp < mpCostSneak {
+			p.sendf("Not enough MP. (need %d, have %d)", mpCostSneak, p.mp)
+			p.prompt()
+			return
+		}
+		p.mp -= mpCostSneak
+		p.isSneaking = true
+		p.sneakExpires = now.Add(duration)
+		p.sendf("You cast Sneak. (60s — sound aggro blocked. MP: %d)", p.mp)
+	default:
+		p.sendf("Unknown spell %q. Available: invisible, sneak", spell)
+	}
 	p.prompt()
 }
 
