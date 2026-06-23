@@ -2,16 +2,21 @@ package main
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"math"
+	"math/rand"
 	"net"
 	"net/http"
 	"strings"
 	"time"
 
+	"sync"
+
 	"dragonsnshit/packages2/common"
 	"dragonsnshit/server/chat"
+	"dragonsnshit/server/craft"
 	"dragonsnshit/server/idunaclient"
 	"dragonsnshit/server/idunaauth"
 	"dragonsnshit/server/player"
@@ -223,6 +228,93 @@ func main() {
 				info.playerID, crystal.TargetScene,
 				crystal.SpawnPos.X, crystal.SpawnPos.Y, crystal.SpawnPos.Z)
 
+		case common.PacketCraftRequest:
+			// Payload: JSON {"recipe_id":"...","character_id":"...","reagent_ids":["...","..."]}
+			// Server: look up recipe, validate reagents exist in IDUNA, run craft.Attempt,
+			// create item + destroy reagents in IDUNA, reply PacketCraftResult JSON.
+			slot := remote.String()
+			info, ok := clients[slot]
+			if !ok || info.playerID == "" {
+				sendCraftResult(conn, remote, false, 0, "", "", "unauthenticated")
+				continue
+			}
+			if n < 2 {
+				sendCraftResult(conn, remote, false, 0, "", "", "empty payload")
+				continue
+			}
+			var craftReq struct {
+				RecipeID    string   `json:"recipe_id"`
+				CharacterID string   `json:"character_id"`
+				ReagentIDs  []string `json:"reagent_ids"`
+			}
+			if err := json.Unmarshal(buf[1:n], &craftReq); err != nil {
+				sendCraftResult(conn, remote, false, 0, "", "", "invalid JSON")
+				continue
+			}
+			// Look up recipe by ID.
+			recipe, recipeErr := craft.LookupRecipe(craftReq.RecipeID)
+			if recipeErr != nil {
+				sendCraftResult(conn, remote, false, 0, "", "", "unknown recipe")
+				continue
+			}
+			// Validate reagents exist in IDUNA and are owned by the character.
+			items, itemsErr := idunaClient.ListItems(craftReq.CharacterID)
+			if itemsErr != nil {
+				sendCraftResult(conn, remote, false, 0, "", "", "could not load inventory")
+				continue
+			}
+			ownedIDs := map[string]bool{}
+			for _, it := range items {
+				ownedIDs[it.ItemID] = true
+			}
+			allOwned := true
+			for _, rid := range craftReq.ReagentIDs {
+				if !ownedIDs[rid] {
+					allOwned = false
+					break
+				}
+			}
+			if !allOwned {
+				sendCraftResult(conn, remote, false, 0, "", "", "reagent not owned by character")
+				continue
+			}
+			// Fetch character skill for this craft type.
+			ch, chErr := idunaClient.GetCharacter(craftReq.CharacterID)
+			if chErr != nil {
+				sendCraftResult(conn, remote, false, 0, "", "", "character not found")
+				continue
+			}
+			// For now use a fixed skill of 0; skill XP is wired in S76-06.
+			_ = ch
+			rng := craftRNG()
+			result, craftErr := craft.Attempt(recipe, 0.0, rng)
+			if craftErr == craft.ErrBreak {
+				// Reagents consumed even on break.
+				for _, rid := range craftReq.ReagentIDs {
+					idunaClient.DestroyItem(rid)
+				}
+				sendCraftResult(conn, remote, false, 0, "", "", "break")
+				continue
+			}
+			if !result.Success {
+				sendCraftResult(conn, remote, false, 0, "", "", "failed")
+				continue
+			}
+			// Remove reagents and create the crafted item.
+			for _, rid := range craftReq.ReagentIDs {
+				idunaClient.DestroyItem(rid)
+			}
+			newItemID, createErr := idunaClient.CreateItem(
+				craftReq.CharacterID, craftReq.CharacterID,
+				recipe.CraftType, result.ItemID, 0)
+			if createErr != nil {
+				sendCraftResult(conn, remote, false, 0, "", "", "item create failed")
+				continue
+			}
+			sendCraftResult(conn, remote, true, result.HQTier, newItemID, result.ItemID, "")
+			fmt.Printf("[craft] %s crafted %s (HQ%d) → %s\n",
+				craftReq.CharacterID, result.ItemID, result.HQTier, newItemID)
+
 		case common.PacketChat:
 			if n < 4 {
 				continue
@@ -241,6 +333,28 @@ func main() {
 			fmt.Printf("[chat/%s] %s: %s\n", channelName(channel), slot, msg)
 		}
 	}
+}
+
+var craftSeed = rand.NewSource(time.Now().UnixNano())
+var craftRandMu sync.Mutex
+
+func craftRNG() *rand.Rand {
+	craftRandMu.Lock()
+	defer craftRandMu.Unlock()
+	return rand.New(rand.NewSource(craftSeed.Int63()))
+}
+
+func sendCraftResult(conn *net.UDPConn, remote *net.UDPAddr, success bool, hqTier int, itemID, itemName, errMsg string) {
+	payload := map[string]interface{}{
+		"success": success, "hq_tier": hqTier,
+		"item_id": itemID, "item_name": itemName,
+	}
+	if errMsg != "" {
+		payload["error"] = errMsg
+	}
+	b, _ := json.Marshal(payload)
+	pkt := append([]byte{common.PacketCraftResult}, b...)
+	conn.WriteToUDP(pkt, remote)
 }
 
 func sendAuthReject(conn *net.UDPConn, remote *net.UDPAddr) {

@@ -20,6 +20,9 @@ const (
 	PacketTelecrystalUse = 9  // client→server: use telecrystal; payload: crystal_id string (null-terminated)
 	PacketTelecrystalAck = 10 // server→client: telecrystal travel approved; payload = PacketSceneChange body
 	PacketTelecrystalErr = 11 // server→client: telecrystal rejected; payload: uint8 error code
+	// Crafting (S76-04)
+	PacketCraftRequest = 12 // client→server: JSON payload {recipe_id,character_id,reagent_ids:[]}
+	PacketCraftResult  = 13 // server→client: JSON payload {success,hq_tier,item_id,item_name,error}
 )
 
 // Chat channel IDs (byte 1 of PacketChat).

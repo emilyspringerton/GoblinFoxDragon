@@ -215,3 +215,23 @@ func HerbalRemedyRecipe() Recipe {
 		HQ3ItemID:  "herbal-remedy+3",
 	}
 }
+
+// registry is the server-side recipe lookup table.
+var registry = func() map[string]Recipe {
+	m := map[string]Recipe{}
+	for _, r := range []Recipe{IronIngotRecipe(), HerbalRemedyRecipe()} {
+		m[r.ID] = r
+	}
+	return m
+}()
+
+var ErrUnknownRecipe = errors.New("craft: unknown recipe ID")
+
+// LookupRecipe returns the Recipe for the given ID, or ErrUnknownRecipe.
+func LookupRecipe(id string) (Recipe, error) {
+	r, ok := registry[id]
+	if !ok {
+		return Recipe{}, ErrUnknownRecipe
+	}
+	return r, nil
+}

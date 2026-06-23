@@ -134,6 +134,83 @@ func (c *Client) DeductGold(characterID string, amount int) error {
 	}
 }
 
+// Item is one row from GET /api/v1/characters/:id/items.
+type Item struct {
+	ItemID   string `json:"item_id"`
+	ItemType string `json:"item_type"`
+	Name     string `json:"name"`
+	IL       int    `json:"item_level"`
+	Quantity int    `json:"quantity"`
+}
+
+// ListItems returns all non-destroyed items owned by characterID.
+func (c *Client) ListItems(characterID string) ([]Item, error) {
+	req, _ := http.NewRequest(http.MethodGet,
+		c.baseURL+"/api/v1/characters/"+characterID+"/items", nil)
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, fmt.Errorf("idunaclient: ListItems: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+	var body struct {
+		Items []Item `json:"items"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		return nil, fmt.Errorf("idunaclient: ListItems decode: %w", err)
+	}
+	return body.Items, nil
+}
+
+// CreateItem calls POST /api/v1/items to record a newly crafted item.
+// Returns the new item_id.
+func (c *Client) CreateItem(ownerID, crafterID, itemType, name string, il int) (string, error) {
+	body, _ := json.Marshal(map[string]interface{}{
+		"owner_character_id": ownerID,
+		"crafter_id":        crafterID,
+		"item_type":         itemType,
+		"name":              name,
+		"item_level":        il,
+		"quantity":          1,
+	})
+	req, _ := http.NewRequest(http.MethodPost, c.baseURL+"/api/v1/items", bytes.NewReader(body))
+	resp, err := c.do(req)
+	if err != nil {
+		return "", fmt.Errorf("idunaclient: CreateItem: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		return "", fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+	var result struct {
+		ItemID string `json:"item_id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("idunaclient: CreateItem decode: %w", err)
+	}
+	return result.ItemID, nil
+}
+
+// DestroyItem calls DELETE /api/v1/items/:id (soft-delete).
+func (c *Client) DestroyItem(itemID string) error {
+	req, _ := http.NewRequest(http.MethodDelete, c.baseURL+"/api/v1/items/"+itemID, nil)
+	resp, err := c.do(req)
+	if err != nil {
+		return fmt.Errorf("idunaclient: DestroyItem: %w", err)
+	}
+	defer resp.Body.Close()
+	switch resp.StatusCode {
+	case http.StatusNoContent, http.StatusOK:
+		return nil
+	case http.StatusNotFound:
+		return ErrNotFound
+	default:
+		return fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+}
+
 // TravelTelecrystal validates gold, deducts cost, and moves character to target scene/pos.
 // This is an idempotent compound operation: GetCharacter → DeductGold → UpdatePosition.
 func (c *Client) TravelTelecrystal(characterID string, castCost, targetScene int, tx, ty, tz float64) error {
