@@ -124,6 +124,7 @@ var itemDisplayName = map[string]string{
 	"water-crystal-hq": "Water Crystal (HQ)",
 	"gil-drop":         "100 Gil",
 	"crisis-shard":     "Crisis Shard",
+	"echo-drop":        "Echo Drop",
 	"iron-ingot":       "Iron Ingot",
 	"iron-ingot+1":     "Iron Ingot +1",
 	"iron-ingot+2":     "Iron Ingot +2",
@@ -155,6 +156,7 @@ var itemCategory = map[string]market.Category{
 	"marsh-blood":   market.CatMaterials,
 	"nm-leech-fang": market.CatMaterials,
 	"crisis-shard":  market.CatMaterials,
+	"echo-drop":     market.CatMaterials,
 	"iron-ingot":    market.CatCraftItems,
 	"iron-ingot+1":  market.CatCraftItems,
 	"iron-ingot+2":  market.CatCraftItems,
@@ -522,7 +524,10 @@ func dropsForMob(kind string) []loot.Item {
 			{ID: "water-crystal", Name: "Water Crystal"},
 		}
 	case "slime":
-		return []loot.Item{{ID: "slime-oil", Name: "Slime Oil"}}
+		return []loot.Item{
+			{ID: "slime-oil", Name: "Slime Oil"},
+			{ID: "echo-drop", Name: "Echo Drop"},
+		}
 	case "lizard":
 		return []loot.Item{
 			{ID: "lizard-tail", Name: "Lizard Tail"},
@@ -953,6 +958,7 @@ func broadcastMobEvent(zoneID int, ev mob.Event) {
 					knockOut(p)
 				} else {
 					p.sendf("\r\n[!] %s hits you for %d damage! HP: %d/%d", ev.MobID, ev.Damage, p.hp, p.maxHP)
+					mobSpellcast(p, ev.MobID, time.Now())
 					p.prompt()
 				}
 			}
@@ -1110,10 +1116,12 @@ func handle(p *player, line string) {
 		cmdTravel(p, args[0])
 	case "cast":
 		if len(args) < 1 {
-			p.send("Usage: cast <spell>  (spells: invisible, sneak)")
+			p.send("Usage: cast <spell>  (spells: invisible, sneak, cure, cure2)")
 			return
 		}
 		cmdCast(p, strings.ToLower(args[0]))
+	case "removedebuffs", "erase":
+		cmdRemoveDebuffs(p)
 	case "ja":
 		if len(args) < 1 {
 			p.send("Usage: ja <ability-id>  (e.g. ja provoke)")
@@ -2947,6 +2955,78 @@ func cmdRecasts(p *player) {
 	p.prompt()
 }
 
+// mobSpellPool maps mob kind prefix → debuffs it might cast.
+var mobSpellPool = map[string][]status.Kind{
+	"Slime":  {status.Poison, status.Slow},
+	"Lizard": {status.Paralyze, status.Slow},
+	"Zombie": {status.Bind, status.Silence},
+	"Chaos":  {status.Paralyze, status.Bind, status.Silence, status.Poison},
+	"Leech":  {status.Bind, status.Poison},
+	"Worm":   {status.Slow, status.Poison},
+}
+
+// mobSpellNames maps status.Kind to display names.
+var mobSpellNames = map[status.Kind]string{
+	status.Poison:   "Poison",
+	status.Paralyze: "Paralyze",
+	status.Slow:     "Slow",
+	status.Silence:  "Silence",
+	status.Bind:     "Bind",
+}
+
+func mobSpellcast(p *player, mobID string, now time.Time) {
+	if gw.rng.Intn(5) != 0 { // 20% chance
+		return
+	}
+	// Pick spell pool based on mob kind prefix.
+	var pool []status.Kind
+	for prefix, spells := range mobSpellPool {
+		if strings.Contains(mobID, prefix) {
+			pool = spells
+			break
+		}
+	}
+	if len(pool) == 0 {
+		// Generic fallback.
+		pool = []status.Kind{status.Slow, status.Poison}
+	}
+	kind := pool[gw.rng.Intn(len(pool))]
+	effect := status.Effect{
+		Kind:     kind,
+		Potency:  10,
+		ExpiresAt: now.Add(30 * time.Second),
+	}
+	result := p.statFX.Apply(effect)
+	if result != status.ApplyRejected {
+		name := mobSpellNames[kind]
+		p.sendf("\r\n[!] %s casts %s on you!", mobID, name)
+	}
+}
+
+func cmdRemoveDebuffs(p *player) {
+	if p.inventory["echo-drop"] <= 0 {
+		p.send("You need an Echo Drop to remove debuffs.")
+		p.prompt()
+		return
+	}
+	// Remove all negative (debuff) effects.
+	debuffs := []status.Kind{status.Poison, status.Paralyze, status.Slow, status.Silence, status.Bind}
+	removed := 0
+	for _, k := range debuffs {
+		if p.statFX.Has(k) {
+			p.statFX.Remove(k)
+			removed++
+		}
+	}
+	p.inventory["echo-drop"]--
+	if removed > 0 {
+		p.sendf("Echo Drop used. %d debuff(s) removed.", removed)
+	} else {
+		p.send("Echo Drop used. No active debuffs to remove.")
+	}
+	p.prompt()
+}
+
 func cmdCast(p *player, spell string) {
 	if p.statFX.IsSilenced() {
 		p.send("You are silenced and cannot cast spells.")
@@ -2978,8 +3058,46 @@ func cmdCast(p *player, spell string) {
 		p.isSneaking = true
 		p.sneakExpires = now.Add(duration)
 		p.sendf("You cast Sneak. (60s — sound aggro blocked. MP: %d)", p.mp)
+	case "cure":
+		if p.jobID != job.WHM && (p.charJob == nil || p.charJob.Sub != job.WHM) {
+			p.send("Cure requires White Mage job or sub-job.")
+			p.prompt()
+			return
+		}
+		const cureCost = 50
+		if p.mp < cureCost {
+			p.sendf("Not enough MP. (need %d, have %d)", cureCost, p.mp)
+			p.prompt()
+			return
+		}
+		p.mp -= cureCost
+		healed := 100
+		p.hp += healed
+		if p.hp > p.maxHP {
+			p.hp = p.maxHP
+		}
+		p.sendf("Cure: +%d HP. (HP: %d/%d  MP: %d)", healed, p.hp, p.maxHP, p.mp)
+	case "cure2":
+		if p.jobID != job.WHM && (p.charJob == nil || p.charJob.Sub != job.WHM) {
+			p.send("Cure II requires White Mage job or sub-job.")
+			p.prompt()
+			return
+		}
+		const cure2Cost = 80
+		if p.mp < cure2Cost {
+			p.sendf("Not enough MP. (need %d, have %d)", cure2Cost, p.mp)
+			p.prompt()
+			return
+		}
+		p.mp -= cure2Cost
+		healed := 250
+		p.hp += healed
+		if p.hp > p.maxHP {
+			p.hp = p.maxHP
+		}
+		p.sendf("Cure II: +%d HP. (HP: %d/%d  MP: %d)", healed, p.hp, p.maxHP, p.mp)
 	default:
-		p.sendf("Unknown spell %q. Available: invisible, sneak", spell)
+		p.sendf("Unknown spell %q. Available: invisible, sneak, cure, cure2", spell)
 	}
 	p.prompt()
 }
