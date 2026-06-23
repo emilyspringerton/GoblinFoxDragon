@@ -40,6 +40,7 @@ import (
 	"dragonsnshit/server/nm"
 	"dragonsnshit/server/party"
 	"dragonsnshit/server/pet"
+	"dragonsnshit/server/quest"
 	"dragonsnshit/server/skillchain"
 	"dragonsnshit/server/status"
 	"dragonsnshit/server/xp"
@@ -188,6 +189,49 @@ var zoneDesc = map[int]string{
 	3: "Swampville. Thick air, murky water, dead mangrove trees. Something slithers nearby.",
 }
 
+// ── NPC definitions ───────────────────────────────────────────────────────────
+
+type npcDef struct {
+	ID      string
+	Name    string
+	ZoneID  int
+	Greeting string
+}
+
+var npcs = []npcDef{
+	{
+		ID:      "guildmaster",
+		Name:    "Guildmaster",
+		ZoneID:  0, // Meadow
+		Greeting: "Welcome, adventurer. I have work for those bold enough to take it.",
+	},
+	{
+		ID:      "merchant",
+		Name:    "Merchant",
+		ZoneID:  1, // Hills
+		Greeting: "Ah, a traveler! I deal in rare goods. Help me and I'll make it worth your while.",
+	},
+	{
+		ID:      "scout",
+		Name:    "Scout",
+		ZoneID:  3, // Swamp
+		Greeting: "Careful out here — the swamp is dangerous. But there is coin in clearing it.",
+	},
+}
+
+// npcByID returns the NPC definition for the given ID, or nil.
+func npcByID(id string) *npcDef {
+	for i := range npcs {
+		if npcs[i].ID == id {
+			return &npcs[i]
+		}
+	}
+	return nil
+}
+
+// questBank is the global quest registry.
+var questBank = quest.NewBank(quest.StarterQuests)
+
 // ── world state ───────────────────────────────────────────────────────────────
 
 type deadMob struct {
@@ -274,8 +318,9 @@ type player struct {
 	charJob      *job.CharJob // main+sub job pairing (nil until initialized)
 	meritBank    *merit.MeritBank
 	recastTracker *job.RecastTracker
-	petSlot      *pet.Slot // BST pet companion (non-nil always; pet.IsAlive() = has pet)
-	petHeel      bool      // true = pet does not attack (heel mode)
+	petSlot      *pet.Slot       // BST pet companion (non-nil always; pet.IsAlive() = has pet)
+	petHeel      bool            // true = pet does not attack (heel mode)
+	questJournal *quest.Journal  // NPC quest progress
 	conn        net.Conn
 	w           *bufio.Writer
 	inbox       chan string
@@ -476,6 +521,18 @@ func resolveKill(p *player, killedMob *mob.Mob, reg *mob.Registry, now time.Time
 	if nation := gw.playerNation[p.slot]; nation != conquest.NationNeutral {
 		pts := 1 + killedMob.MaxHP/50
 		_ = gw.conquestMap.AddPoints(p.zoneID, nation, pts)
+	}
+
+	// Quest kill tracking.
+	updated := p.questJournal.RecordKill(killedMob.Kind)
+	for _, qid := range updated {
+		if st, ok := p.questJournal.Active[qid]; ok {
+			if q, err := questBank.Get(qid); err == nil {
+				need := q.RequireKills[killedMob.Kind]
+				have := st.KillProgress[killedMob.Kind]
+				p.sendf("  [Quest] %s — %s: %d/%d", q.Title, killedMob.Kind, have, need)
+			}
+		}
 	}
 
 	// NM placeholder check.
@@ -1411,6 +1468,31 @@ func handle(p *player, line string) {
 		p.prompt()
 	case "pet-heal", "cure-pet":
 		cmdPetHeal(p)
+	case "npcs":
+		cmdNPCs(p)
+	case "talk":
+		if len(args) == 0 {
+			p.send("Usage: talk <npc-id>")
+			p.prompt()
+			return
+		}
+		cmdTalk(p, args[0])
+	case "quest-accept", "qa":
+		if len(args) == 0 {
+			p.send("Usage: quest-accept <quest-id>")
+			p.prompt()
+			return
+		}
+		cmdQuestAccept(p, args[0])
+	case "quest-turn-in", "qti":
+		if len(args) == 0 {
+			p.send("Usage: quest-turn-in <quest-id>")
+			p.prompt()
+			return
+		}
+		cmdQuestTurnIn(p, args[0])
+	case "quests", "qlog":
+		cmdQuestLog(p)
 	case "help", "?":
 		cmdHelp(p)
 	case "quit", "exit", "q":
@@ -1419,6 +1501,113 @@ func handle(p *player, line string) {
 	default:
 		p.sendf("Unknown command: %q — type HELP for a list.", cmd)
 	}
+}
+
+func cmdNPCs(p *player) {
+	found := false
+	for _, n := range npcs {
+		if n.ZoneID == p.zoneID {
+			p.sendf("  [NPC] %s  (id: %s)  — type 'talk %s' to speak", n.Name, n.ID, n.ID)
+			found = true
+		}
+	}
+	if !found {
+		p.send("No NPCs in this area.")
+	}
+	p.prompt()
+}
+
+func cmdTalk(p *player, npcID string) {
+	n := npcByID(npcID)
+	if n == nil || n.ZoneID != p.zoneID {
+		p.sendf("There is no %s here.", npcID)
+		p.prompt()
+		return
+	}
+	p.sendf("\r\n%s says: \"%s\"", n.Name, n.Greeting)
+	available := questBank.ForNPC(n.ID)
+	if len(available) == 0 {
+		p.send("  (no quests available)")
+	} else {
+		p.send("  Quests available:")
+		for _, q := range available {
+			status := " [ ] "
+			if p.questJournal.Completed[q.ID] {
+				status = " [done] "
+			} else if _, active := p.questJournal.Active[q.ID]; active {
+				status = " [active] "
+			}
+			p.sendf("   %s%s — %s (type 'quest-accept %s')", status, q.Title, q.Desc, q.ID)
+		}
+	}
+	p.prompt()
+}
+
+func cmdQuestAccept(p *player, questID string) {
+	q, err := questBank.Get(questID)
+	if err != nil {
+		p.sendf("Unknown quest: %q", questID)
+		p.prompt()
+		return
+	}
+	if err := p.questJournal.Accept(q); err != nil {
+		p.sendf("Cannot accept quest: %v", err)
+		p.prompt()
+		return
+	}
+	p.sendf("Quest accepted: %s", q.Title)
+	p.sendf("  %s", q.Desc)
+	p.prompt()
+}
+
+func cmdQuestTurnIn(p *player, questID string) {
+	gil, item, err := p.questJournal.TurnIn(questBank, questID, p.inventory)
+	if err != nil {
+		p.sendf("Cannot turn in quest: %v", err)
+		p.prompt()
+		return
+	}
+	p.gil += gil
+	p.sendf("Quest complete! +%d gil.", gil)
+	if item != "" {
+		p.inventory[item]++
+		p.sendf("  You received: %s", item)
+	}
+	p.prompt()
+}
+
+func cmdQuestLog(p *player) {
+	if len(p.questJournal.Active) == 0 && len(p.questJournal.Completed) == 0 {
+		p.send("You have no quests in your log.")
+		p.prompt()
+		return
+	}
+	if len(p.questJournal.Active) > 0 {
+		p.send("  Active quests:")
+		for id, st := range p.questJournal.Active {
+			q, _ := questBank.Get(id)
+			if q == nil {
+				continue
+			}
+			p.sendf("   [active] %s", q.Title)
+			for kind, need := range st.RequireKills {
+				p.sendf("     kill %s: %d/%d", kind, st.KillProgress[kind], need)
+			}
+			for itemID, need := range st.RequireItems {
+				have := p.inventory[itemID]
+				p.sendf("     %s: %d/%d", itemID, have, need)
+			}
+		}
+	}
+	if len(p.questJournal.Completed) > 0 {
+		p.send("  Completed quests:")
+		for id := range p.questJournal.Completed {
+			if q, err := questBank.Get(id); err == nil {
+				p.sendf("   [done] %s", q.Title)
+			}
+		}
+	}
+	p.prompt()
 }
 
 // isBST returns true if the player's main or sub job is BST.
@@ -3778,6 +3967,7 @@ func handleConn(conn net.Conn) {
 		meritBank:     merit.NewMeritBank(),
 		recastTracker: job.NewRecastTracker(job.WarriorAbilities()),
 		petSlot:       pet.NewSlot(),
+		questJournal:  quest.NewJournal(),
 		inventory:  make(map[string]int),
 		craftSkill: craft.NewCraftSkill(),
 		gil:        500, // starting gil
