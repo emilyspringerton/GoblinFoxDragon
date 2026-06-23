@@ -4422,9 +4422,69 @@ func cmdCast(p *player, spell string, targetName string) {
 		"water", "water2", "water3",
 		"aero", "aero2", "aero3":
 		cmdCastBlackMagic(p, spell)
+	case "march", "paeon", "ballad", "minne", "carol", "mambo":
+		cmdCastBardSong(p, spell)
 	default:
-		p.sendf("Unknown spell %q. Available: invisible, sneak, cure, cure2, protect, shell, haste, regen, refresh, dia, fire/fire2/fire3, blizzard/blizzard2/blizzard3, thunder/thunder2/thunder3, stone, water, aero", spell)
+		p.sendf("Unknown spell %q. Try: invisible, sneak, cure/cure2, protect, shell, haste, regen, refresh, dia, fire/blizzard/thunder/stone/water/aero [I-III], march/paeon/ballad/minne/carol/mambo", spell)
 	}
+	p.prompt()
+}
+
+// bardSongDef describes a Bard song's zone-wide effect.
+type bardSongDef struct {
+	Name    string
+	MPCost  int
+	Kind    status.Kind
+	Potency int
+	Desc    string
+}
+
+var bardSongs = map[string]bardSongDef{
+	"march":  {Name: "Advancing March", MPCost: 40, Kind: status.Haste, Potency: 10, Desc: "attack speed +10%% to all"},
+	"paeon":  {Name: "Army's Paeon", MPCost: 35, Kind: status.Regen, Potency: 4, Desc: "+4 HP/tick to all"},
+	"ballad": {Name: "Mage's Ballad", MPCost: 40, Kind: status.Refresh, Potency: 3, Desc: "+3 MP/tick to all"},
+	"minne":  {Name: "Knight's Minne", MPCost: 45, Kind: status.Protect, Potency: 12, Desc: "physical defense +12 to all"},
+	"carol":  {Name: "Ice Carol", MPCost: 45, Kind: status.Shell, Potency: 12, Desc: "magic defense +12 to all"},
+	"mambo":  {Name: "Chocobo Mambo", MPCost: 30, Kind: status.Haste, Potency: 5, Desc: "light haste +5%% to all (50% efficacy)"},
+}
+
+func cmdCastBardSong(p *player, song string) {
+	def, ok := bardSongs[song]
+	if !ok {
+		p.sendf("Unknown song: %q", song)
+		p.prompt()
+		return
+	}
+	if p.jobID != job.BRD && (p.charJob == nil || p.charJob.Sub != job.BRD) {
+		p.sendf("%s requires Bard job or sub-job.", def.Name)
+		p.prompt()
+		return
+	}
+	if p.statFX.IsSilenced() {
+		p.send("You are silenced and cannot sing.")
+		p.prompt()
+		return
+	}
+	if p.mp < def.MPCost {
+		p.sendf("Not enough MP. (need %d, have %d)", def.MPCost, p.mp)
+		p.prompt()
+		return
+	}
+	p.mp -= def.MPCost
+	now := time.Now()
+	expires := now.Add(3 * time.Minute)
+	count := 0
+	for _, other := range gw.players {
+		if other.zoneID != p.zoneID {
+			continue
+		}
+		other.statFX.Apply(status.Effect{Kind: def.Kind, Potency: def.Potency, ExpiresAt: expires})
+		if other != p {
+			other.sendf("\r\n[Song: %s from %s] %s (3m)", def.Name, p.name, def.Desc)
+		}
+		count++
+	}
+	p.sendf("%s: %s (3m, %d players affected). MP: %d", def.Name, def.Desc, count, p.mp)
 	p.prompt()
 }
 
