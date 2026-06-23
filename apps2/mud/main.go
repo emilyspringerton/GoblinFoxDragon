@@ -19,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"dragonsnshit/server/craft"
 	"dragonsnshit/server/field"
 	"dragonsnshit/server/gather"
 	"dragonsnshit/server/homepoint"
@@ -53,6 +54,46 @@ const (
 	// Range within which party members receive XP (same zone = always in range).
 	partyXPRange  = 99999.0
 )
+
+// recipeIngredients maps recipe ID → { itemID: quantity required }.
+// The craft package handles success/HQ, but ingredient requirements live here.
+var recipeIngredients = map[string]map[string]int{
+	"iron-ingot":    {"earth-crystal": 2, "worm-sinew": 1},
+	"herbal-remedy": {"slime-oil": 1, "water-crystal": 1},
+}
+
+// itemDisplayName maps item IDs to human-readable names.
+var itemDisplayName = map[string]string{
+	"worm-sinew":       "Worm Sinew",
+	"earth-crystal":    "Earth Crystal",
+	"leech-blood":      "Leech Blood",
+	"water-crystal":    "Water Crystal",
+	"slime-oil":        "Slime Oil",
+	"lizard-tail":      "Lizard Tail",
+	"fire-crystal":     "Fire Crystal",
+	"king-sinew":       "King Worm Sinew",
+	"nm-worm-shell":    "Royal Worm Shell",
+	"earth-crystal-hq": "Earth Crystal (HQ)",
+	"marsh-blood":      "Marsh Leech Blood",
+	"nm-leech-fang":    "Marsh Leech Fang",
+	"water-crystal-hq": "Water Crystal (HQ)",
+	"gil-drop":         "100 Gil",
+	"iron-ingot":       "Iron Ingot",
+	"iron-ingot+1":     "Iron Ingot +1",
+	"iron-ingot+2":     "Iron Ingot +2",
+	"iron-ingot+3":     "Iron Ingot +3",
+	"herbal-remedy":    "Herbal Remedy",
+	"herbal-remedy+1":  "Herbal Remedy +1",
+	"herbal-remedy+2":  "Herbal Remedy +2",
+	"herbal-remedy+3":  "Herbal Remedy +3",
+}
+
+func itemName(id string) string {
+	if n, ok := itemDisplayName[id]; ok {
+		return n
+	}
+	return id
+}
 
 // Zone adjacency: zoneID → direction → destination zoneID
 var exits = map[int]map[string]int{
@@ -133,6 +174,8 @@ type player struct {
 	homePoint   *homepoint.State
 	wsSkill     string // current weapon skill name (from CanonicalWeaponSkills)
 	jobID       string // current job (job.JobID, default "WAR")
+	inventory   map[string]int // itemID → quantity
+	craftSkill  *craft.CraftSkill
 	conn        net.Conn
 	w           *bufio.Writer
 	inbox       chan string
@@ -412,6 +455,7 @@ func openLootPool(killer *player, m *mob.Mob, now time.Time) {
 	if len(eligible) == 0 {
 		// Solo: auto-award all drops to the killer.
 		for _, it := range drops {
+			killer.inventory[it.ID]++
 			killer.sendf("  You obtain: %s.", it.Name)
 		}
 		return
@@ -455,6 +499,7 @@ func resolvePool(alp *activeLootPool) {
 		if award.Slot == "" {
 			broadcastZoneNoLock(alp.zoneID, fmt.Sprintf("[Loot] %s — no one claimed it.", name), "")
 		} else if op, ok := gw.players[award.Slot]; ok {
+			op.inventory[award.ItemID]++
 			broadcastZoneNoLock(alp.zoneID,
 				fmt.Sprintf("[Loot] %s obtains %s! (lot: %d)", op.name, name, award.Roll), "")
 		}
@@ -766,6 +811,19 @@ func handle(p *player, line string) {
 		cmdParty(p)
 	case "leave-party", "lp":
 		cmdLeaveParty(p)
+	case "inv", "inventory", "i":
+		cmdInventory(p)
+	case "craft":
+		if len(args) == 0 {
+			p.send("Usage: craft <recipe-id>  (see 'recipes')")
+			p.prompt()
+			return
+		}
+		cmdCraft(p, args[0])
+	case "recipes":
+		cmdRecipes(p)
+	case "craft-skills", "cs":
+		cmdCraftSkills(p)
 	case "lot":
 		if len(args) == 0 {
 			p.send("Usage: lot <item-number>  (e.g. 'lot 1')")
@@ -1050,9 +1108,11 @@ func cmdMine(p *player) {
 		p.sendf("You swing your pickaxe at %s but find nothing.", pt.Name)
 	} else if y.HQ {
 		p.sendf(">>> HQ! <<< You excavate %s from %s! (x%d)", y.ItemName, pt.Name, y.Qty)
+		p.inventory[y.ItemID] += y.Qty
 		p.miningSkill += 0.5
 	} else {
 		p.sendf("You mine %s from %s.", y.ItemName, pt.Name)
+		p.inventory[y.ItemID] += y.Qty
 		p.miningSkill += 0.1
 	}
 	if p.miningSkill > gather.SkillCap {
@@ -1540,6 +1600,122 @@ func cmdPass(p *player, what string) {
 	p.prompt()
 }
 
+func cmdInventory(p *player) {
+	if len(p.inventory) == 0 {
+		p.send("\r\nInventory: empty")
+		p.prompt()
+		return
+	}
+	p.send("\r\n=== Inventory ===")
+	ids := make([]string, 0, len(p.inventory))
+	for id := range p.inventory {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		p.sendf("  %-30s  x%d", itemName(id), p.inventory[id])
+	}
+	p.prompt()
+}
+
+func cmdRecipes(p *player) {
+	p.send("\r\n=== Known Recipes ===")
+	for recipeID, ingredients := range recipeIngredients {
+		recipe, err := craft.LookupRecipe(recipeID)
+		if err != nil {
+			continue
+		}
+		skillLvl, _ := p.craftSkill.Level(recipe.CraftType)
+		pct := craft.SuccessChance(skillLvl, recipe.Difficulty) * 100
+		p.sendf("  %-20s  [%s lv%.0f]  success: %.0f%%", recipeID, recipe.CraftType, recipe.Difficulty, pct)
+		for ingID, qty := range ingredients {
+			have := p.inventory[ingID]
+			haveStr := fmt.Sprintf("(have %d)", have)
+			if have < qty {
+				haveStr = fmt.Sprintf("(MISSING: need %d, have %d)", qty, have)
+			}
+			p.sendf("    %dx %s %s", qty, itemName(ingID), haveStr)
+		}
+		p.sendf("    → %s", itemName(recipe.ItemID))
+	}
+	p.prompt()
+}
+
+func cmdCraftSkills(p *player) {
+	p.send("\r\n=== Craft Skills ===")
+	for _, ct := range craft.AllCrafts {
+		lvl, _ := p.craftSkill.Level(ct)
+		p.sendf("  %-14s  %.1f / %.0f", ct, lvl, craft.SkillCap)
+	}
+	p.prompt()
+}
+
+func cmdCraft(p *player, recipeID string) {
+	if p.homePoint.IsKO {
+		p.send("You are KO'd.")
+		p.prompt()
+		return
+	}
+	recipe, err := craft.LookupRecipe(recipeID)
+	if err != nil {
+		p.sendf("Unknown recipe %q. Use 'recipes' to see available recipes.", recipeID)
+		p.prompt()
+		return
+	}
+	ingredients, ok := recipeIngredients[recipeID]
+	if !ok {
+		p.sendf("No ingredient table for recipe %q.", recipeID)
+		p.prompt()
+		return
+	}
+
+	// Check inventory has all ingredients.
+	for ingID, qty := range ingredients {
+		if p.inventory[ingID] < qty {
+			p.sendf("Missing ingredient: %dx %s (have %d).", qty, itemName(ingID), p.inventory[ingID])
+			p.prompt()
+			return
+		}
+	}
+
+	// Consume ingredients.
+	for ingID, qty := range ingredients {
+		p.inventory[ingID] -= qty
+		if p.inventory[ingID] == 0 {
+			delete(p.inventory, ingID)
+		}
+	}
+
+	skillLvl, _ := p.craftSkill.Level(recipe.CraftType)
+	result, err := craft.Attempt(recipe, skillLvl, gw.rng)
+	if err == craft.ErrBreak {
+		p.send(">>> BREAK! <<< Your synthesis failed catastrophically — ingredients destroyed.")
+		p.sendf("  (craft skill: %s %.1f)", recipe.CraftType, skillLvl)
+		p.prompt()
+		return
+	}
+	if !result.Success {
+		// Failure: ingredients are gone (already consumed), no output.
+		p.sendf("Your synthesis failed. (craft skill: %s %.1f  difficulty: %.0f)",
+			recipe.CraftType, skillLvl, recipe.Difficulty)
+		// Small skill gain on failure.
+		_ = p.craftSkill.SetLevel(recipe.CraftType, skillLvl+0.05)
+		p.prompt()
+		return
+	}
+
+	// Success.
+	p.inventory[result.ItemID]++
+	_ = p.craftSkill.SetLevel(recipe.CraftType, skillLvl+0.1)
+	newSkill, _ := p.craftSkill.Level(recipe.CraftType)
+	if result.HQTier > 0 {
+		p.sendf(">>> HQ%d! <<< You synthesise %s! (craft skill: %.1f)", result.HQTier, itemName(result.ItemID), newSkill)
+	} else {
+		p.sendf("Synthesis complete: %s. (craft skill: %.1f)", itemName(result.ItemID), newSkill)
+	}
+	p.prompt()
+}
+
 func cmdSetJob(p *player, jobID string) {
 	if p.homePoint.IsKO {
 		p.send("You cannot change jobs while KO'd.")
@@ -1677,9 +1853,11 @@ func handleConn(conn net.Conn) {
 		miningSkill: 0,
 		charXP:      xp.NewCharXP(),
 		homePoint:   homepoint.NewState(0),
-		wsSkill:     "Fast Blade",
-		jobID:       job.WAR,
-		conn:        conn,
+		wsSkill:    "Fast Blade",
+		jobID:      job.WAR,
+		inventory:  make(map[string]int),
+		craftSkill: craft.NewCraftSkill(),
+		conn:       conn,
 		w:           w,
 	}
 
