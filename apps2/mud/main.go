@@ -4429,8 +4429,93 @@ func cmdCast(p *player, spell string, targetName string) {
 		cmdCastTeleport(p, spell)
 	case "drain", "aspir", "absorb-str", "absorb-dex", "absorb-vit", "absorb-int", "absorb-mnd":
 		cmdCastDarkMagic(p, spell)
+	case "katon", "suiton", "doton", "raiton", "hyoton", "huton",
+		"katon2", "suiton2", "doton2", "raiton2", "hyoton2", "huton2":
+		cmdNinjutsu(p, spell)
 	default:
 		p.sendf("Unknown spell %q. Try: invisible, sneak, cure/cure2, protect, shell, haste, regen, refresh, dia, fire/blizzard/thunder/stone/water/aero [I-III], march/paeon/ballad/minne/carol/mambo, teleport-meadow/hills/caves/swamp, drain, aspir, absorb-str/dex/vit/int/mnd", spell)
+	}
+	p.prompt()
+}
+
+type ninjutsuDef struct {
+	Name    string
+	MPCost  int
+	BaseDmg int
+	Element string
+}
+
+var ninjutsuSpells = map[string]ninjutsuDef{
+	"katon":   {Name: "Katon: Ichi", MPCost: 25, BaseDmg: 40, Element: "Fire"},
+	"katon2":  {Name: "Katon: Ni", MPCost: 55, BaseDmg: 95, Element: "Fire"},
+	"suiton":  {Name: "Suiton: Ichi", MPCost: 25, BaseDmg: 38, Element: "Water"},
+	"suiton2": {Name: "Suiton: Ni", MPCost: 55, BaseDmg: 90, Element: "Water"},
+	"doton":   {Name: "Doton: Ichi", MPCost: 25, BaseDmg: 36, Element: "Earth"},
+	"doton2":  {Name: "Doton: Ni", MPCost: 55, BaseDmg: 85, Element: "Earth"},
+	"raiton":  {Name: "Raiton: Ichi", MPCost: 28, BaseDmg: 45, Element: "Lightning"},
+	"raiton2": {Name: "Raiton: Ni", MPCost: 60, BaseDmg: 108, Element: "Lightning"},
+	"hyoton":  {Name: "Hyoton: Ichi", MPCost: 25, BaseDmg: 37, Element: "Ice"},
+	"hyoton2": {Name: "Hyoton: Ni", MPCost: 55, BaseDmg: 87, Element: "Ice"},
+	"huton":   {Name: "Huton: Ichi", MPCost: 25, BaseDmg: 35, Element: "Wind"},
+	"huton2":  {Name: "Huton: Ni", MPCost: 55, BaseDmg: 82, Element: "Wind"},
+}
+
+func cmdNinjutsu(p *player, spell string) {
+	def, ok := ninjutsuSpells[spell]
+	if !ok {
+		p.sendf("Unknown ninjutsu: %q", spell)
+		p.prompt()
+		return
+	}
+	if p.jobID != job.NIN && (p.charJob == nil || p.charJob.Sub != job.NIN) {
+		p.sendf("%s requires Ninja job or sub-job.", def.Name)
+		p.prompt()
+		return
+	}
+	if p.statFX.IsSilenced() {
+		p.send("You are silenced and cannot perform ninjutsu.")
+		p.prompt()
+		return
+	}
+	if p.combat.TargetMobID == "" {
+		p.send("No target. Use 'target <mob>' first.")
+		p.prompt()
+		return
+	}
+	if p.mp < def.MPCost {
+		p.sendf("Not enough MP. (need %d, have %d)", def.MPCost, p.mp)
+		p.prompt()
+		return
+	}
+	reg := gw.mobRegs[p.zoneID]
+	m, ok2 := reg.Get(p.combat.TargetMobID)
+	if !ok2 || m.HP <= 0 {
+		p.send("Your target is dead or gone.")
+		p.prompt()
+		return
+	}
+	p.mp -= def.MPCost
+	// DEX scaling: +1 dmg per DEX above 10 (like INT for BLM)
+	dexBonus := 0
+	if p.charJob != nil {
+		if stats, err := p.charJob.CombinedStats(); err == nil {
+			if stats.DEX > 10 {
+				dexBonus = stats.DEX - 10
+			}
+		}
+	}
+	dmg := def.BaseDmg + dexBonus
+	if dmg > m.HP {
+		dmg = m.HP
+	}
+	m.HP -= dmg
+	now := time.Now()
+	p.sendf("%s: %d %s damage. (mob HP: %d/%d  MP: %d)", def.Name, dmg, def.Element, m.HP, m.MaxHP, p.mp)
+	if m.HP <= 0 {
+		m.State = mob.StateDead
+		p.send("  The creature falls!")
+		p.combat.TargetMobID = ""
+		resolveKill(p, m, reg, now)
 	}
 	p.prompt()
 }
