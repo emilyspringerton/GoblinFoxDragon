@@ -16,7 +16,10 @@ const (
 	PacketImpact      = 5
 	PacketChat        = 6
 	PacketSceneChange = 7 // server→client: zone transfer; payload: zoneID uint8 + spawnXYZ float32×3
-	PacketAuthReject  = 8 // server→client: PACKET_CONNECT rejected (bad/missing JWT); no payload
+	PacketAuthReject     = 8  // server→client: PACKET_CONNECT rejected (bad/missing JWT); no payload
+	PacketTelecrystalUse = 9  // client→server: use telecrystal; payload: crystal_id string (null-terminated)
+	PacketTelecrystalAck = 10 // server→client: telecrystal travel approved; payload = PacketSceneChange body
+	PacketTelecrystalErr = 11 // server→client: telecrystal rejected; payload: uint8 error code
 )
 
 // Chat channel IDs (byte 1 of PacketChat).

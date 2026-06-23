@@ -12,10 +12,12 @@ import (
 
 	"dragonsnshit/packages2/common"
 	"dragonsnshit/server/chat"
+	"dragonsnshit/server/idunaclient"
 	"dragonsnshit/server/idunaauth"
 	"dragonsnshit/server/player"
 	"dragonsnshit/server/store"
 	"dragonsnshit/server/system"
+	"dragonsnshit/server/telecrystal"
 	"dragonsnshit/server/worldapi"
 )
 
@@ -94,6 +96,7 @@ func main() {
 
 	fmt.Println("Go backend listening on :6969")
 	authVerifier := idunaauth.NewVerifier()
+	idunaClient := idunaclient.New()
 	buf := make([]byte, 2048)
 	p := &shankPlayer{pos: system.Vec3{}, eyeHeight: 1.62, world: world{}}
 	clientStore := store.NewMemoryClientStore()
@@ -176,6 +179,49 @@ func main() {
 					sendImpact(conn, remote, pos, hitEntity, 0)
 				}
 			}
+
+		case common.PacketTelecrystalUse:
+			// Payload: buf[1:n] — null-terminated crystal ID string.
+			slot := remote.String()
+			info, ok := clients[slot]
+			if !ok || info.playerID == "" {
+				// Reject unauthenticated or unknown clients.
+				conn.WriteToUDP([]byte{common.PacketTelecrystalErr, 1}, remote)
+				continue
+			}
+			crystalID := strings.TrimRight(string(buf[1:n]), "\x00")
+			// Fetch character from IDUNA to get current scene + gold.
+			ch, err := idunaClient.GetCharacter(info.playerID)
+			if err != nil {
+				fmt.Printf("[telecrystal] GetCharacter %s: %v\n", info.playerID, err)
+				conn.WriteToUDP([]byte{common.PacketTelecrystalErr, 2}, remote)
+				continue
+			}
+			playerPos := telecrystal.Vec3{X: ch.PosX, Y: ch.PosY, Z: ch.PosZ}
+			crystal, valErr := telecrystal.Validate(crystalID, ch.SceneID, playerPos, ch.GoldBalance)
+			if valErr != nil {
+				fmt.Printf("[telecrystal] validate %s: %v\n", crystalID, valErr)
+				conn.WriteToUDP([]byte{common.PacketTelecrystalErr, 3}, remote)
+				continue
+			}
+			// Deduct gold + update scene/pos atomically via IDUNA.
+			if err := idunaClient.TravelTelecrystal(info.playerID, crystal.CastCost,
+				crystal.TargetScene, crystal.SpawnPos.X, crystal.SpawnPos.Y, crystal.SpawnPos.Z); err != nil {
+				fmt.Printf("[telecrystal] travel %s: %v\n", crystalID, err)
+				conn.WriteToUDP([]byte{common.PacketTelecrystalErr, 4}, remote)
+				continue
+			}
+			// Send PacketTelecrystalAck = same wire layout as PacketSceneChange.
+			ack := make([]byte, 14)
+			ack[0] = common.PacketTelecrystalAck
+			ack[1] = uint8(crystal.TargetScene)
+			binary.LittleEndian.PutUint32(ack[2:], math.Float32bits(float32(crystal.SpawnPos.X)))
+			binary.LittleEndian.PutUint32(ack[6:], math.Float32bits(float32(crystal.SpawnPos.Y)))
+			binary.LittleEndian.PutUint32(ack[10:], math.Float32bits(float32(crystal.SpawnPos.Z)))
+			conn.WriteToUDP(ack, remote)
+			fmt.Printf("[telecrystal] %s → scene=%d spawn=(%.1f,%.1f,%.1f)\n",
+				info.playerID, crystal.TargetScene,
+				crystal.SpawnPos.X, crystal.SpawnPos.Y, crystal.SpawnPos.Z)
 
 		case common.PacketChat:
 			if n < 4 {
