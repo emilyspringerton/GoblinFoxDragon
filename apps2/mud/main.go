@@ -4206,8 +4206,121 @@ func cmdCast(p *player, spell string) {
 			p.hp = p.maxHP
 		}
 		p.sendf("Cure II: +%d HP. (HP: %d/%d  MP: %d)", healed, p.hp, p.maxHP, p.mp)
+	case "protect":
+		if p.jobID != job.WHM && (p.charJob == nil || p.charJob.Sub != job.WHM) {
+			p.send("Protect requires White Mage job or sub-job.")
+			p.prompt()
+			return
+		}
+		const protCost = 60
+		if p.mp < protCost {
+			p.sendf("Not enough MP. (need %d, have %d)", protCost, p.mp)
+			p.prompt()
+			return
+		}
+		p.mp -= protCost
+		p.statFX.Apply(status.Effect{Kind: status.Protect, Potency: 15, ExpiresAt: now.Add(3 * time.Minute)})
+		p.sendf("Protect: physical defense +15 for 3m. MP: %d", p.mp)
+	case "shell":
+		if p.jobID != job.WHM && (p.charJob == nil || p.charJob.Sub != job.WHM) {
+			p.send("Shell requires White Mage job or sub-job.")
+			p.prompt()
+			return
+		}
+		const shellCost = 60
+		if p.mp < shellCost {
+			p.sendf("Not enough MP. (need %d, have %d)", shellCost, p.mp)
+			p.prompt()
+			return
+		}
+		p.mp -= shellCost
+		p.statFX.Apply(status.Effect{Kind: status.Shell, Potency: 15, ExpiresAt: now.Add(3 * time.Minute)})
+		p.sendf("Shell: magic defense +15 for 3m. MP: %d", p.mp)
+	case "haste":
+		if p.jobID != job.WHM && (p.charJob == nil || p.charJob.Sub != job.WHM) {
+			p.send("Haste requires White Mage job or sub-job.")
+			p.prompt()
+			return
+		}
+		const hasteCost = 75
+		if p.mp < hasteCost {
+			p.sendf("Not enough MP. (need %d, have %d)", hasteCost, p.mp)
+			p.prompt()
+			return
+		}
+		p.mp -= hasteCost
+		p.statFX.Apply(status.Effect{Kind: status.Haste, Potency: 15, ExpiresAt: now.Add(3 * time.Minute)})
+		p.sendf("Haste: attack speed +15%% for 3m. MP: %d", p.mp)
+	case "regen":
+		if p.jobID != job.WHM && (p.charJob == nil || p.charJob.Sub != job.WHM) {
+			p.send("Regen requires White Mage job or sub-job.")
+			p.prompt()
+			return
+		}
+		const regenCost = 40
+		if p.mp < regenCost {
+			p.sendf("Not enough MP. (need %d, have %d)", regenCost, p.mp)
+			p.prompt()
+			return
+		}
+		p.mp -= regenCost
+		p.statFX.Apply(status.Effect{Kind: status.Regen, Potency: 5, ExpiresAt: now.Add(3 * time.Minute)})
+		p.sendf("Regen: +5 HP/tick for 3m. MP: %d", p.mp)
+	case "refresh":
+		if p.jobID != job.RDM && p.jobID != job.WHM && (p.charJob == nil || (p.charJob.Sub != job.RDM && p.charJob.Sub != job.WHM)) {
+			p.send("Refresh requires Red Mage or White Mage job or sub-job.")
+			p.prompt()
+			return
+		}
+		const refreshCost = 50
+		if p.mp < refreshCost {
+			p.sendf("Not enough MP. (need %d, have %d)", refreshCost, p.mp)
+			p.prompt()
+			return
+		}
+		p.mp -= refreshCost
+		p.statFX.Apply(status.Effect{Kind: status.Refresh, Potency: 3, ExpiresAt: now.Add(3 * time.Minute)})
+		p.sendf("Refresh: +3 MP/tick for 3m. MP: %d", p.mp)
+	case "dia":
+		// Dia: debuff DoT on target mob (Poison equivalent — applied to combat target)
+		if p.jobID != job.WHM && (p.charJob == nil || p.charJob.Sub != job.WHM) {
+			p.send("Dia requires White Mage job or sub-job.")
+			p.prompt()
+			return
+		}
+		if p.combat.TargetMobID == "" {
+			p.send("No target. Use 'target <mob>' first.")
+			p.prompt()
+			return
+		}
+		const diaCost = 30
+		if p.mp < diaCost {
+			p.sendf("Not enough MP. (need %d, have %d)", diaCost, p.mp)
+			p.prompt()
+			return
+		}
+		reg := gw.mobRegs[p.zoneID]
+		m, ok := reg.Get(p.combat.TargetMobID)
+		if !ok || m.HP <= 0 {
+			p.send("Your target is dead or gone.")
+			p.prompt()
+			return
+		}
+		p.mp -= diaCost
+		// Apply Dia as a mild DoT: 2 HP/tick for 1 minute on the mob.
+		m.HP -= 5 // immediate tick damage
+		if m.HP < 0 {
+			m.HP = 0
+		}
+		p.sendf("Dia: -5 HP on %s. (mob HP: %d/%d  MP: %d)", m.Kind, m.HP, m.MaxHP, p.mp)
+		if m.HP <= 0 {
+			m.State = mob.StateDead
+			p.send("  The creature falls!")
+			p.combat.TargetMobID = ""
+			resolveKill(p, m, reg, now)
+		}
 	default:
-		p.sendf("Unknown spell %q. Available: invisible, sneak, cure, cure2", spell)
+		p.sendf("Unknown spell %q. Available: invisible, sneak, cure, cure2, protect, shell, haste, regen, refresh, dia", spell)
 	}
 	p.prompt()
 }
