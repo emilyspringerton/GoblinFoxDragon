@@ -1,4 +1,5 @@
 ## 2026-06-23
+- S89-02: MUD job system — 22 FFXI jobs (WAR default), HP/MP per-level scaling, setjob/jobs commands
 - S89-01: MUD skillchain — real WS names+resonances, per-mob chain state, 8s window, zone-wide SC announcements
 - S88-01: MUD progression wiring — XP+leveling, homepoint, field manuals, party+XPChain, KO/return system
 - feat: S76-06 skill XP server-side — PacketSkillXP=16, server-go async IncrementSkill (cap 1.0/action), idunaclient.IncrementSkill
