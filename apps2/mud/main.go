@@ -40,6 +40,7 @@ import (
 	"dragonsnshit/server/nm"
 	"dragonsnshit/server/party"
 	"dragonsnshit/server/cartography"
+	"dragonsnshit/server/duel"
 	"dragonsnshit/server/pet"
 	"dragonsnshit/server/quest"
 	"dragonsnshit/server/skillchain"
@@ -296,6 +297,7 @@ type world struct {
 	weatherByZone  map[int]string            // zoneID → current weather (legacy, replaced below)
 	lastWeatherTick time.Time
 	weatherEngine  *weather.Engine           // global weather engine (replaces weatherByZone)
+	duelMgr        *duel.Manager             // PvP duel state
 	mobEnmity      map[string]*enmity.Table // mobID → enmity table
 	chatRouter     *chat.Router
 	guildReg       *guild.Registry
@@ -398,6 +400,7 @@ func initWorld() *world {
 		weatherByZone:   map[int]string{0: "Clear", 1: "Clear", 2: "Clear", 3: "Clear"},
 		lastWeatherTick: time.Now(),
 		weatherEngine:   weather.New(),
+		duelMgr:         duel.NewManager(),
 		mobEnmity:      make(map[string]*enmity.Table),
 		chatRouter:     chat.New(),
 		guildReg:       guild.New(),
@@ -861,6 +864,37 @@ func tickAll() {
 				p.prompt()
 			}
 		}
+		// Duel combat: if player is in an active duel, route auto-attack to opponent.
+		if activeDuel := gw.duelMgr.ActiveDuel(p.slot); activeDuel != nil {
+			oppSlot := activeDuel.Defender
+			if oppSlot == p.slot {
+				oppSlot = activeDuel.Challenger
+			}
+			if opp, ok := gw.players[oppSlot]; ok {
+				res, _, _ := gw.mobRegs[p.zoneID].TickPlayer(p.slot, p.combat, p.pos, p.zoneID, now)
+				if res.Dealt > 0 {
+					opp.hp -= res.Dealt
+					p.sendf("\r\n[Duel] You hit %s for %d. (%s HP: %d/%d)", opp.name, res.Dealt, opp.name, opp.hp, opp.maxHP)
+					opp.sendf("\r\n[Duel] %s hits you for %d! (Your HP: %d/%d)", p.name, res.Dealt, opp.hp, opp.maxHP)
+					opp.prompt()
+					p.prompt()
+					if winner, done := gw.duelMgr.ReportHP(activeDuel, func() int {
+						if p.slot == activeDuel.Challenger { return p.hp }; return opp.hp
+					}(), func() int {
+						if p.slot == activeDuel.Defender { return p.hp }; return opp.hp
+					}()); done {
+						winName, loseName := p.name, opp.name
+						if winner == opp.slot { winName, loseName = opp.name, p.name }
+						broadcastZoneNoLock(p.zoneID, fmt.Sprintf("[Duel] %s defeats %s! (+%d rating)", winName, loseName, duel.WinRating), "")
+						// Restore both players to 1 HP (non-lethal duel).
+						if p.hp < 1 { p.hp = 1 }
+						if opp.hp < 1 { opp.hp = 1 }
+					}
+				}
+			}
+			continue // skip normal mob combat while in duel
+		}
+
 		if p.homePoint.IsKO || p.combat.TargetMobID == "" {
 			continue
 		}
@@ -998,6 +1032,15 @@ func tickAll() {
 					cp.prompt()
 				}
 			}
+		}
+	}
+
+	// Duel pending challenge expiry check.
+	expired := gw.duelMgr.ExpirePending(now)
+	for _, challenger := range expired {
+		if p, ok := gw.players[challenger]; ok {
+			p.send("\r\n[Duel] Your challenge expired (no response).")
+			p.prompt()
 		}
 	}
 
@@ -1495,6 +1538,19 @@ func handle(p *player, line string) {
 		p.prompt()
 	case "pet-heal", "cure-pet":
 		cmdPetHeal(p)
+	case "duel":
+		if len(args) == 0 {
+			p.send("Usage: duel <player-name>  — challenge a player to a duel")
+			p.prompt()
+			return
+		}
+		cmdDuelChallenge(p, args[0])
+	case "duel-accept", "da":
+		cmdDuelAccept(p)
+	case "duel-forfeit", "df":
+		cmdDuelForfeit(p)
+	case "leaderboard", "lb":
+		cmdLeaderboard(p)
 	case "explore", "atlas":
 		p.send(p.atlas.ExitMap(exits, zoneNamesMap(), p.zoneID))
 		p.prompt()
@@ -1531,6 +1587,89 @@ func handle(p *player, line string) {
 	default:
 		p.sendf("Unknown command: %q — type HELP for a list.", cmd)
 	}
+}
+
+// ── PvP duel commands ─────────────────────────────────────────────────────────
+
+// findPlayerByName returns the first player slot with the given name, or "".
+func findPlayerByName(name string) *player {
+	for _, op := range gw.players {
+		if strings.EqualFold(op.name, name) {
+			return op
+		}
+	}
+	return nil
+}
+
+func cmdDuelChallenge(p *player, targetName string) {
+	target := findPlayerByName(targetName)
+	if target == nil {
+		p.sendf("No player named %q online.", targetName)
+		p.prompt()
+		return
+	}
+	if err := gw.duelMgr.Challenge(p.slot, target.slot, time.Now()); err != nil {
+		p.sendf("Cannot challenge: %v", err)
+		p.prompt()
+		return
+	}
+	p.sendf("You challenge %s to a duel! They have %ds to accept.", target.name, int(duel.ChallengeTimeout.Seconds()))
+	target.sendf("\r\n%s challenges you to a duel! Type 'duel-accept' within %ds.", p.name, int(duel.ChallengeTimeout.Seconds()))
+	target.prompt()
+	p.prompt()
+}
+
+func cmdDuelAccept(p *player) {
+	st, err := gw.duelMgr.Accept(p.slot, time.Now())
+	if err != nil {
+		p.sendf("Cannot accept duel: %v", err)
+		p.prompt()
+		return
+	}
+	challenger := gw.players[st.Challenger]
+	p.send("Duel accepted! The fight begins — defeat your opponent!")
+	if challenger != nil {
+		challenger.sendf("\r\n%s accepted your duel challenge! Fight!", p.name)
+		challenger.combat.TargetMobID = "" // clear mob target
+		challenger.prompt()
+	}
+	p.combat.TargetMobID = ""
+	p.prompt()
+}
+
+func cmdDuelForfeit(p *player) {
+	st, err := gw.duelMgr.Forfeit(p.slot, time.Now())
+	if err != nil {
+		p.sendf("Cannot forfeit: %v", err)
+		p.prompt()
+		return
+	}
+	winner := gw.players[st.Winner]
+	loser := p
+	if winner != nil {
+		winner.sendf("\r\n%s forfeited. You win! (+%d rating)", loser.name, duel.WinRating)
+		winner.prompt()
+	}
+	p.sendf("You forfeit the duel. (-0 rating)")
+	p.prompt()
+}
+
+func cmdLeaderboard(p *player) {
+	top := gw.duelMgr.TopN(10)
+	if len(top) == 0 {
+		p.send("No duel records yet.")
+		p.prompt()
+		return
+	}
+	p.send("\r\n=== Duel Leaderboard ===")
+	for i, slot := range top {
+		name := slot
+		if op, ok := gw.players[slot]; ok {
+			name = op.name
+		}
+		p.sendf("  %2d. %-16s  rating: %d", i+1, name, gw.duelMgr.Rating(slot))
+	}
+	p.prompt()
 }
 
 func cmdNPCs(p *player) {
