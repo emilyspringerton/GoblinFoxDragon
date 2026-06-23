@@ -39,6 +39,7 @@ import (
 	"dragonsnshit/server/mob"
 	"dragonsnshit/server/nm"
 	"dragonsnshit/server/party"
+	"dragonsnshit/server/pet"
 	"dragonsnshit/server/skillchain"
 	"dragonsnshit/server/status"
 	"dragonsnshit/server/xp"
@@ -273,6 +274,8 @@ type player struct {
 	charJob      *job.CharJob // main+sub job pairing (nil until initialized)
 	meritBank    *merit.MeritBank
 	recastTracker *job.RecastTracker
+	petSlot      *pet.Slot // BST pet companion (non-nil always; pet.IsAlive() = has pet)
+	petHeel      bool      // true = pet does not attack (heel mode)
 	conn        net.Conn
 	w           *bufio.Writer
 	inbox       chan string
@@ -827,6 +830,29 @@ func tickAll() {
 			p.prompt()
 		}
 		_ = evts
+
+		// Pet auto-attack: BST pet strikes the player's current target.
+		if !p.petHeel && p.petSlot.IsAlive() && p.combat.TargetMobID != "" {
+			if evt := p.petSlot.Tick(p.combat.TargetMobID, now); evt != nil {
+				reg := gw.mobRegs[p.zoneID]
+				if m, ok := reg.Get(evt.TargetSlot); ok && m.HP > 0 {
+					dmg := evt.Damage
+					if dmg > m.HP {
+						dmg = m.HP
+					}
+					m.HP -= dmg
+					p.sendf("\r\n[Pet] %s hits for %d damage. (mob HP: %d/%d)",
+						p.petSlot.Pet.Kind, dmg, m.HP, m.MaxHP)
+					if m.HP <= 0 {
+						m.State = mob.StateDead
+						p.send("  [Pet] The creature falls!")
+						p.combat.TargetMobID = ""
+						resolveKill(p, m, reg, now)
+					}
+					p.prompt()
+				}
+			}
+		}
 	}
 
 	for _, p := range gw.players {
@@ -1352,6 +1378,39 @@ func handle(p *player, line string) {
 		cmdSetJob(p, strings.ToUpper(args[0]))
 	case "jobs":
 		cmdJobs(p)
+	case "bst", "charm", "tame":
+		if len(args) == 0 {
+			p.send("Usage: bst <mob-id>  — attempt to charm the target mob (BST job required)")
+			p.prompt()
+			return
+		}
+		cmdBST(p, args[0])
+	case "jug-pet", "jugpet":
+		if len(args) == 0 {
+			p.send("Usage: jug-pet <kind>  — summon a jug pet (wolf/bird/lizard/crab/leech/slime/worm/bear)")
+			p.prompt()
+			return
+		}
+		cmdJugPet(p, args[0])
+	case "pet-release", "release-pet":
+		cmdPetRelease(p)
+	case "pet-status", "ps":
+		p.sendf("Pet: %s", p.petSlot.Status())
+		p.prompt()
+	case "pet-heel", "heel":
+		if p.petSlot.IsAlive() {
+			p.petHeel = !p.petHeel
+			if p.petHeel {
+				p.send("[Pet heels — no longer attacking.]")
+			} else {
+				p.send("[Pet resumes attacking your target.]")
+			}
+		} else {
+			p.send("No active pet.")
+		}
+		p.prompt()
+	case "pet-heal", "cure-pet":
+		cmdPetHeal(p)
 	case "help", "?":
 		cmdHelp(p)
 	case "quit", "exit", "q":
@@ -1360,6 +1419,95 @@ func handle(p *player, line string) {
 	default:
 		p.sendf("Unknown command: %q — type HELP for a list.", cmd)
 	}
+}
+
+// isBST returns true if the player's main or sub job is BST.
+func isBST(p *player) bool {
+	if p.charJob != nil {
+		return p.charJob.Main == job.BST || p.charJob.Sub == job.BST
+	}
+	return p.jobID == job.BST
+}
+
+func cmdBST(p *player, mobID string) {
+	if !isBST(p) {
+		p.send("You must have BST as main or sub job to charm.")
+		p.prompt()
+		return
+	}
+	reg := gw.mobRegs[p.zoneID]
+	m, ok := reg.Get(mobID)
+	if !ok || m.HP <= 0 {
+		p.send("No such mob in this zone.")
+		p.prompt()
+		return
+	}
+	hpPct := float64(m.HP) / float64(m.MaxHP)
+	bstLvl := p.charXP.Level
+	if p.charJob != nil && p.charJob.Main == job.BST {
+		bstLvl = p.charJob.MainLvl
+	} else if p.charJob != nil && p.charJob.Sub == job.BST {
+		bstLvl = p.charJob.SubLvl
+	}
+	petP, err := p.petSlot.Tame(m.Kind, hpPct, bstLvl, p.slot)
+	if err != nil {
+		p.sendf("Charm failed: %v", err)
+		p.prompt()
+		return
+	}
+	p.sendf("You charm the %s! Pet: %s", m.Kind, p.petSlot.Status())
+	// Remove the mob from the registry (it became your pet).
+	m.HP = 0
+	m.State = mob.StateDead
+	_ = petP
+	p.prompt()
+}
+
+func cmdJugPet(p *player, kindStr string) {
+	if !isBST(p) {
+		p.send("You must have BST as main or sub job to call a jug pet.")
+		p.prompt()
+		return
+	}
+	k := pet.Kind(strings.ToLower(kindStr))
+	petP, err := p.petSlot.JugPet(k, p.slot)
+	if err != nil {
+		p.sendf("Jug pet failed: %v", err)
+		p.prompt()
+		return
+	}
+	p.sendf("You call forth a %s Lv%d. (HP: %d/%d)", petP.Kind, petP.Level, petP.HP, petP.MaxHP)
+	p.prompt()
+}
+
+func cmdPetRelease(p *player) {
+	if err := p.petSlot.Release(); err != nil {
+		p.send("No active pet to release.")
+	} else {
+		p.send("Your pet is dismissed.")
+	}
+	p.petHeel = false
+	p.prompt()
+}
+
+func cmdPetHeal(p *player) {
+	if !p.petSlot.IsAlive() {
+		p.send("No active pet to heal.")
+		p.prompt()
+		return
+	}
+	// WHM sub or high MND allows curing pet; cost: 8 MP.
+	const healAmt = 40
+	const mpCost = 8
+	if p.mp < mpCost {
+		p.send("Not enough MP.")
+		p.prompt()
+		return
+	}
+	p.mp -= mpCost
+	healed, _ := p.petSlot.Heal(healAmt)
+	p.sendf("You cure your pet for %d HP. Pet: %s", healed, p.petSlot.Status())
+	p.prompt()
 }
 
 func cmdLook(p *player) {
@@ -3629,6 +3777,7 @@ func handleConn(conn net.Conn) {
 		charJob:       func() *job.CharJob { cj, _ := job.NewCharJob(job.WAR, "", 1, 0); return cj }(),
 		meritBank:     merit.NewMeritBank(),
 		recastTracker: job.NewRecastTracker(job.WarriorAbilities()),
+		petSlot:       pet.NewSlot(),
 		inventory:  make(map[string]int),
 		craftSkill: craft.NewCraftSkill(),
 		gil:        500, // starting gil
