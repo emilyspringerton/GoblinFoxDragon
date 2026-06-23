@@ -4427,8 +4427,105 @@ func cmdCast(p *player, spell string, targetName string) {
 	case "teleport-meadow", "teleport-hills", "teleport-caves", "teleport-swamp",
 		"tele-meadow", "tele-hills", "tele-caves", "tele-swamp":
 		cmdCastTeleport(p, spell)
+	case "drain", "aspir", "absorb-str", "absorb-dex", "absorb-vit", "absorb-int", "absorb-mnd":
+		cmdCastDarkMagic(p, spell)
 	default:
-		p.sendf("Unknown spell %q. Try: invisible, sneak, cure/cure2, protect, shell, haste, regen, refresh, dia, fire/blizzard/thunder/stone/water/aero [I-III], march/paeon/ballad/minne/carol/mambo, teleport-meadow/hills/caves/swamp", spell)
+		p.sendf("Unknown spell %q. Try: invisible, sneak, cure/cure2, protect, shell, haste, regen, refresh, dia, fire/blizzard/thunder/stone/water/aero [I-III], march/paeon/ballad/minne/carol/mambo, teleport-meadow/hills/caves/swamp, drain, aspir, absorb-str/dex/vit/int/mnd", spell)
+	}
+	p.prompt()
+}
+
+// cmdCastDarkMagic handles DRK/RDM dark magic: Drain, Aspir, Absorb-*
+func cmdCastDarkMagic(p *player, spell string) {
+	if p.jobID != job.DRK && p.jobID != job.RDM &&
+		(p.charJob == nil || (p.charJob.Sub != job.DRK && p.charJob.Sub != job.RDM)) {
+		p.sendf("%s requires Dark Knight or Red Mage job or sub-job.", spell)
+		p.prompt()
+		return
+	}
+	if p.statFX.IsSilenced() {
+		p.send("You are silenced and cannot cast spells.")
+		p.prompt()
+		return
+	}
+	if p.combat.TargetMobID == "" {
+		p.send("No target. Use 'target <mob>' first.")
+		p.prompt()
+		return
+	}
+	reg := gw.mobRegs[p.zoneID]
+	m, ok := reg.Get(p.combat.TargetMobID)
+	if !ok || m.HP <= 0 {
+		p.send("Your target is dead or gone.")
+		p.prompt()
+		return
+	}
+	now := time.Now()
+	switch spell {
+	case "drain":
+		const drainCost = 50
+		if p.mp < drainCost {
+			p.sendf("Not enough MP. (need %d, have %d)", drainCost, p.mp)
+			p.prompt()
+			return
+		}
+		p.mp -= drainCost
+		dmg := 80
+		if dmg > m.HP {
+			dmg = m.HP
+		}
+		m.HP -= dmg
+		p.hp += dmg
+		if p.hp > p.maxHP {
+			p.hp = p.maxHP
+		}
+		p.sendf("Drain: -%d HP on %s, +%d HP to you. (HP: %d/%d  MP: %d)", dmg, m.Kind, dmg, p.hp, p.maxHP, p.mp)
+	case "aspir":
+		const aspirCost = 40
+		if p.mp < aspirCost {
+			p.sendf("Not enough MP. (need %d, have %d)", aspirCost, p.mp)
+			p.prompt()
+			return
+		}
+		p.mp -= aspirCost
+		// Drain MP from mob (mob MP represented symbolically as current HP/10)
+		absorbed := m.HP / 10
+		if absorbed < 5 {
+			absorbed = 5
+		}
+		if absorbed > 60 {
+			absorbed = 60
+		}
+		m.HP -= absorbed / 5 // small HP damage
+		if m.HP < 0 {
+			m.HP = 0
+		}
+		p.mp += absorbed
+		if p.mp > p.maxMP {
+			p.mp = p.maxMP
+		}
+		p.sendf("Aspir: absorbed %d MP from %s. (MP: %d/%d)", absorbed, m.Kind, p.mp, p.maxMP)
+	case "absorb-str", "absorb-dex", "absorb-vit", "absorb-int", "absorb-mnd":
+		const absorbCost = 45
+		if p.mp < absorbCost {
+			p.sendf("Not enough MP. (need %d, have %d)", absorbCost, p.mp)
+			p.prompt()
+			return
+		}
+		p.mp -= absorbCost
+		stat := strings.TrimPrefix(spell, "absorb-")
+		dmg := 10 // absorbed stat → symbolic HP damage on mob
+		if dmg > m.HP {
+			dmg = m.HP
+		}
+		m.HP -= dmg
+		p.sendf("Absorb-%s: drained %s from %s, -%d HP. (MP: %d)", strings.ToUpper(stat), strings.ToUpper(stat), m.Kind, dmg, p.mp)
+	}
+	if m.HP <= 0 {
+		m.State = mob.StateDead
+		p.send("  The creature falls!")
+		p.combat.TargetMobID = ""
+		resolveKill(p, m, reg, now)
 	}
 	p.prompt()
 }
