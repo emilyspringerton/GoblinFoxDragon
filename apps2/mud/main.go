@@ -132,6 +132,8 @@ var itemDisplayName = map[string]string{
 	"gil-drop":         "100 Gil",
 	"crisis-shard":     "Crisis Shard",
 	"echo-drop":        "Echo Drop",
+	"antidote":         "Antidote",
+	"hi-potion":        "Hi-Potion",
 	"iron-ingot":       "Iron Ingot",
 	"iron-ingot+1":     "Iron Ingot +1",
 	"iron-ingot+2":     "Iron Ingot +2",
@@ -172,6 +174,37 @@ var itemCategory = map[string]market.Category{
 	"herbal-remedy+1": market.CatCraftItems,
 	"herbal-remedy+2": market.CatCraftItems,
 	"herbal-remedy+3": market.CatCraftItems,
+}
+
+// VendorItem is one line in an NPC vendor catalog.
+type VendorItem struct {
+	ID    string
+	Price int // gil to buy; sell back = Price/2 (rounded down)
+}
+
+// npcVendorCatalog maps NPC ID → items for sale.
+var npcVendorCatalog = map[string][]VendorItem{
+	"guildmaster": {
+		{ID: "echo-drop", Price: 50},
+		{ID: "antidote", Price: 80},
+		{ID: "hi-potion", Price: 250},
+		{ID: "earth-crystal", Price: 120},
+	},
+	"merchant": {
+		{ID: "echo-drop", Price: 50},
+		{ID: "antidote", Price: 80},
+		{ID: "hi-potion", Price: 250},
+		{ID: "fire-crystal", Price: 120},
+		{ID: "water-crystal", Price: 120},
+		{ID: "iron-ingot", Price: 400},
+	},
+	"scout": {
+		{ID: "echo-drop", Price: 50},
+		{ID: "antidote", Price: 80},
+		{ID: "hi-potion", Price: 250},
+		{ID: "leather-body", Price: 600},
+		{ID: "leather-legs", Price: 450},
+	},
 }
 
 // Zone adjacency: zoneID → direction → destination zoneID
@@ -1362,6 +1395,18 @@ func handle(p *player, line string) {
 		cmdLSLeave(p)
 	case "ls-info":
 		cmdLSInfo(p)
+	case "ls-kick":
+		if len(args) < 1 {
+			p.send("Usage: ls-kick <player-name>")
+			return
+		}
+		cmdLSKick(p, args[0])
+	case "ls-promote":
+		if len(args) < 1 {
+			p.send("Usage: ls-promote <player-name>")
+			return
+		}
+		cmdLSPromote(p, args[0])
 	case "equip":
 		if len(args) < 2 {
 			p.send("Usage: equip <slot> <item-id>")
@@ -1483,6 +1528,27 @@ func handle(p *player, line string) {
 		cmdFoodBuff(p)
 	case "fame", "reputation", "rep":
 		cmdFame(p)
+	case "shop":
+		if len(args) == 0 {
+			cmdShopList(p)
+		} else if args[0] == "buy" {
+			if len(args) < 2 {
+				p.send("Usage: shop buy <item-id>")
+				p.prompt()
+				return
+			}
+			cmdShopBuy(p, args[1])
+		} else if args[0] == "sell" {
+			if len(args) < 2 {
+				p.send("Usage: shop sell <item-id>")
+				p.prompt()
+				return
+			}
+			cmdShopSell(p, args[1])
+		} else {
+			p.send("Usage: shop  |  shop buy <item-id>  |  shop sell <item-id>")
+			p.prompt()
+		}
 	case "sethome":
 		if p.homePoint.IsKO {
 			p.send("Cannot set home while KO'd.")
@@ -2530,6 +2596,76 @@ func cmdLSInfo(p *player) {
 	p.prompt()
 }
 
+func cmdLSKick(p *player, targetName string) {
+	if p.guildID == "" {
+		p.send("You are not in a linkshell.")
+		p.prompt()
+		return
+	}
+	g, err := gw.guildReg.GetGuild(p.guildID)
+	if err != nil {
+		p.send("Linkshell not found.")
+		p.prompt()
+		return
+	}
+	// Find the target member by name (slot = name for MUD players).
+	var targetFeatherID string
+	for _, m := range g.Members() {
+		if m.CharacterID == targetName {
+			targetFeatherID = m.FeatherID
+			break
+		}
+	}
+	if targetFeatherID == "" {
+		p.sendf("%s is not in your linkshell.", targetName)
+		p.prompt()
+		return
+	}
+	if err := gw.guildReg.RevokeItem(p.guildID, p.slot, targetFeatherID); err != nil {
+		p.sendf("Cannot kick %s: %v", targetName, err)
+		p.prompt()
+		return
+	}
+	// Notify target if online and clear their guild.
+	if target, ok := gw.players[targetName]; ok {
+		target.guildID = ""
+		syncChatSession(target)
+		target.sendf("[Linkshell] You have been removed from [%s].", g.Name)
+	}
+	lsAnnounce(p.guildID, fmt.Sprintf("[Linkshell] %s has been removed from the linkshell.", targetName))
+	p.prompt()
+}
+
+func cmdLSPromote(p *player, targetName string) {
+	if p.guildID == "" {
+		p.send("You are not in a linkshell.")
+		p.prompt()
+		return
+	}
+	g, err := gw.guildReg.GetGuild(p.guildID)
+	if err != nil {
+		p.send("Linkshell not found.")
+		p.prompt()
+		return
+	}
+	if _, err := gw.guildReg.ForgeFeatherSack(p.guildID, p.slot, targetName); err != nil {
+		p.sendf("Cannot promote %s: %v", targetName, err)
+		p.prompt()
+		return
+	}
+	lsAnnounce(p.guildID, fmt.Sprintf("[Linkshell] %s has been promoted to Officer in [%s].", targetName, g.Name))
+	p.prompt()
+}
+
+// lsAnnounce sends a message to all online members of a guild.
+func lsAnnounce(guildID, msg string) {
+	for _, p := range gw.players {
+		if p.guildID == guildID {
+			p.send(msg)
+		}
+	}
+}
+
 // itemIL maps known equippable item IDs to their item level.
 var itemIL = map[string]int{
 	"bronze-sword":    1,
@@ -2830,6 +2966,101 @@ func formatDuration(d time.Duration) string {
 		return fmt.Sprintf("%dm", m)
 	}
 	return fmt.Sprintf("%ds", s)
+}
+
+// zoneNPC returns the first NPC in the player's current zone that has a vendor catalog.
+func zoneVendorNPC(zoneID int) *npcDef {
+	for i := range npcs {
+		if npcs[i].ZoneID == zoneID {
+			if _, ok := npcVendorCatalog[npcs[i].ID]; ok {
+				return &npcs[i]
+			}
+		}
+	}
+	return nil
+}
+
+func cmdShopList(p *player) {
+	npc := zoneVendorNPC(p.zoneID)
+	if npc == nil {
+		p.send("There is no vendor here.")
+		p.prompt()
+		return
+	}
+	items := npcVendorCatalog[npc.ID]
+	p.sendf("\r\n=== %s's Shop ===", npc.Name)
+	for _, vi := range items {
+		p.sendf("  %-22s  %4d gil  (shop buy %s)", itemName(vi.ID), vi.Price, vi.ID)
+	}
+	p.sendf("  Sell items back at 50%% price: shop sell <item-id>")
+	p.prompt()
+}
+
+func cmdShopBuy(p *player, itemID string) {
+	npc := zoneVendorNPC(p.zoneID)
+	if npc == nil {
+		p.send("There is no vendor here.")
+		p.prompt()
+		return
+	}
+	var entry *VendorItem
+	for i := range npcVendorCatalog[npc.ID] {
+		if npcVendorCatalog[npc.ID][i].ID == itemID {
+			entry = &npcVendorCatalog[npc.ID][i]
+			break
+		}
+	}
+	if entry == nil {
+		p.sendf("%s doesn't carry %q.", npc.Name, itemID)
+		p.prompt()
+		return
+	}
+	if p.gil < entry.Price {
+		p.sendf("You need %d gil but only have %d.", entry.Price, p.gil)
+		p.prompt()
+		return
+	}
+	p.gil -= entry.Price
+	p.inventory[itemID]++
+	p.sendf("You buy %s for %d gil. (Gil remaining: %d)", itemName(itemID), entry.Price, p.gil)
+	p.prompt()
+}
+
+func cmdShopSell(p *player, itemID string) {
+	npc := zoneVendorNPC(p.zoneID)
+	if npc == nil {
+		p.send("There is no vendor here.")
+		p.prompt()
+		return
+	}
+	// Find the item in the zone's catalog to get the NPC buy price.
+	var refPrice int
+	for _, vi := range npcVendorCatalog[npc.ID] {
+		if vi.ID == itemID {
+			refPrice = vi.Price
+			break
+		}
+	}
+	if refPrice == 0 {
+		// Not in vendor catalog — sell at a flat salvage rate based on AH data (not supported).
+		// For items not in catalog, reject.
+		p.sendf("%s doesn't want to buy %q.", npc.Name, itemID)
+		p.prompt()
+		return
+	}
+	if p.inventory[itemID] < 1 {
+		p.sendf("You don't have any %s.", itemName(itemID))
+		p.prompt()
+		return
+	}
+	sellPrice := refPrice / 2
+	if sellPrice < 1 {
+		sellPrice = 1
+	}
+	p.inventory[itemID]--
+	p.gil += sellPrice
+	p.sendf("You sell %s to %s for %d gil. (Gil: %d)", itemName(itemID), npc.Name, sellPrice, p.gil)
+	p.prompt()
 }
 
 func cmdFame(p *player) {
