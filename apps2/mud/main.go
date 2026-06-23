@@ -43,6 +43,7 @@ import (
 	"dragonsnshit/server/pet"
 	"dragonsnshit/server/quest"
 	"dragonsnshit/server/skillchain"
+	"dragonsnshit/server/weather"
 	"dragonsnshit/server/status"
 	"dragonsnshit/server/xp"
 	"dragonsnshit/server/zone"
@@ -292,8 +293,9 @@ type world struct {
 	lastConquestTick time.Time
 	bazaars        map[string]map[string]int // slot → { itemID: price }
 	bankBySlot     map[string]int            // slot → bank balance (gil)
-	weatherByZone  map[int]string            // zoneID → current weather
+	weatherByZone  map[int]string            // zoneID → current weather (legacy, replaced below)
 	lastWeatherTick time.Time
+	weatherEngine  *weather.Engine           // global weather engine (replaces weatherByZone)
 	mobEnmity      map[string]*enmity.Table // mobID → enmity table
 	chatRouter     *chat.Router
 	guildReg       *guild.Registry
@@ -354,9 +356,16 @@ func (p *player) sendf(f string, args ...interface{}) {
 
 func (p *player) prompt() {
 	netHaste := p.statFX.NetHastePct()
-	p.sendf("\r\n[ Lv.%d  HP:%d/%d  MP:%d/%d  TP:%d  Haste:%d%%  Zone:%s ]",
+	wx := ""
+	if gw != nil && gw.weatherEngine != nil {
+		ph := gw.weatherEngine.Phase()
+		if ph != "" && ph != "Clear" && ph != "None" {
+			wx = fmt.Sprintf("  %s", ph)
+		}
+	}
+	p.sendf("\r\n[ Lv.%d  HP:%d/%d  MP:%d/%d  TP:%d  Haste:%d%%  Zone:%s%s ]",
 		p.charXP.Level, p.hp, p.maxHP, p.mp, p.maxMP, p.tp.Current,
-		netHaste, zoneName(p.zoneID))
+		netHaste, zoneName(p.zoneID), wx)
 	p.sendf("> ")
 }
 
@@ -386,8 +395,9 @@ func initWorld() *world {
 		lastConquestTick: time.Now(),
 		bazaars:       make(map[string]map[string]int),
 		bankBySlot:    make(map[string]int),
-		weatherByZone: map[int]string{0: "Clear", 1: "Clear", 2: "Clear", 3: "Clear"},
+		weatherByZone:   map[int]string{0: "Clear", 1: "Clear", 2: "Clear", 3: "Clear"},
 		lastWeatherTick: time.Now(),
+		weatherEngine:   weather.New(),
 		mobEnmity:      make(map[string]*enmity.Table),
 		chatRouter:     chat.New(),
 		guildReg:       guild.New(),
@@ -991,23 +1001,23 @@ func tickAll() {
 		}
 	}
 
-	// Weather tick: every 60s, 10% chance to change weather per zone.
-	if now.Sub(gw.lastWeatherTick) >= 60*time.Second {
-		gw.lastWeatherTick = now
-		weathers := []string{"Clear", "Cloudy", "Rain", "Thunder", "Fog"}
+	// Weather engine tick — drives phase-based weather using weather.Engine.
+	if changed, oldPhase, newPhase := gw.weatherEngine.Tick(now); changed {
+		mods := weather.ModifiersFor(newPhase)
+		msg := fmt.Sprintf("\r\n[Weather] The weather changes: %s → %s.", oldPhase, newPhase)
+		if mods.MobDamageBonus > 0 {
+			msg += fmt.Sprintf(" (monster damage +%d)", mods.MobDamageBonus)
+		}
+		if mods.BSTTameBonus > 0 {
+			msg += fmt.Sprintf(" (BST tame +%.0f%%)", mods.BSTTameBonus*100)
+		}
+		for _, cp := range gw.players {
+			cp.send(msg)
+			cp.prompt()
+		}
+		// Update legacy weatherByZone map.
 		for zid := range gw.weatherByZone {
-			if gw.rng.Intn(10) == 0 {
-				newWeather := weathers[gw.rng.Intn(len(weathers))]
-				if newWeather != gw.weatherByZone[zid] {
-					gw.weatherByZone[zid] = newWeather
-					for _, cp := range gw.players {
-						if cp.zoneID == zid {
-							cp.sendf("\r\n[Weather] %s — the weather changes to %s.", zoneName(zid), newWeather)
-							cp.prompt()
-						}
-					}
-				}
-			}
+			gw.weatherByZone[zid] = string(newPhase)
 		}
 	}
 
@@ -1657,6 +1667,14 @@ func cmdBST(p *player, mobID string) {
 		bstLvl = p.charJob.MainLvl
 	} else if p.charJob != nil && p.charJob.Sub == job.BST {
 		bstLvl = p.charJob.SubLvl
+	}
+	// Weather bonus: Storm/Rain grant additional tame success chance.
+	weatherBonus := gw.weatherEngine.Mods().BSTTameBonus
+	if weatherBonus > 0 {
+		p.sendf("[Weather] Storm tame bonus: +%.0f%%", weatherBonus*100)
+		// Apply as extra virtual levels (2%/lvl → bonus/0.02 extra lvls).
+		extraLvls := int(weatherBonus / pet.TameSuccessPerLevel)
+		bstLvl += extraLvls
 	}
 	petP, err := p.petSlot.Tame(m.Kind, hpPct, bstLvl, p.slot)
 	if err != nil {
@@ -3683,11 +3701,16 @@ func cmdBank(p *player, args []string) {
 }
 
 func cmdWeather(p *player) {
-	w := gw.weatherByZone[p.zoneID]
-	if w == "" {
-		w = "Clear"
+	phase := gw.weatherEngine.Phase()
+	mods := gw.weatherEngine.Mods()
+	msg := fmt.Sprintf("Current weather: %s", phase)
+	if mods.MobDamageBonus > 0 {
+		msg += fmt.Sprintf("  [monster damage +%d]", mods.MobDamageBonus)
 	}
-	p.sendf("Current weather in %s: %s", zoneName(p.zoneID), w)
+	if mods.BSTTameBonus > 0 {
+		msg += fmt.Sprintf("  [BST tame +%.0f%%]", mods.BSTTameBonus*100)
+	}
+	p.send(msg)
 	p.prompt()
 }
 
