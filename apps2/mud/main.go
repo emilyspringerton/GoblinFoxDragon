@@ -49,6 +49,7 @@ import (
 	"dragonsnshit/server/xp"
 	"dragonsnshit/server/zone"
 	"dragonsnshit/server/idunaclient"
+	"dragonsnshit/server/food"
 	combatTp "dragonsnshit/server/combat"
 )
 
@@ -277,6 +278,8 @@ type world struct {
 	zoneMgr        *zone.Manager
 	mobRegs        map[int]*mob.Registry
 	minePoints     map[int][]*gather.MiningPoint
+	fishPts        map[int][]*gather.FishingPoint
+	foodReg        *food.Registry
 	deadQueue      []deadMob
 	players        map[string]*player // slot → player
 	rng            *rand.Rand
@@ -320,7 +323,9 @@ type player struct {
 	tp          *combatTp.TPState
 	statFX      *status.Stack
 	combat      *mob.PlayerCombat
-	miningSkill float64
+	miningSkill  float64
+	fishingSkill float64
+	foodEffect   *food.FoodEffect
 	charXP      *xp.CharXP
 	homePoint   *homepoint.State
 	wsSkill     string // current weapon skill name (from CanonicalWeaponSkills)
@@ -434,6 +439,12 @@ func initWorld() *world {
 
 	w.minePoints[0] = gather.MeadowMiningPoints()
 	w.minePoints[3] = gather.SwampMiningPoints()
+
+	w.fishPts = make(map[int][]*gather.FishingPoint)
+	w.fishPts[0] = gather.MeadowFishingPoints()
+	w.fishPts[3] = gather.SwampFishingPoints()
+
+	w.foodReg = food.DefaultRegistry()
 
 	return w
 }
@@ -1431,6 +1442,19 @@ func handle(p *player, line string) {
 		cmdMobs(p)
 	case "mine-points", "mp":
 		cmdMinePoints(p)
+	case "fish":
+		cmdFish(p)
+	case "fish-points", "fp":
+		cmdFishPoints(p)
+	case "eat":
+		if len(args) < 2 {
+			p.send("Usage: eat <item-id>")
+			p.prompt()
+		} else {
+			cmdEat(p, args[1])
+		}
+	case "food":
+		cmdFoodBuff(p)
 	case "sethome":
 		if p.homePoint.IsKO {
 			p.send("Cannot set home while KO'd.")
@@ -2184,6 +2208,10 @@ func cmdStatus(p *player) {
 	}
 	p.sendf("  TP:           %d / 300  (WS at 100 — %s [%s])", p.tp.Current, p.wsSkill, strings.Join(wsAttrs, ", "))
 	p.sendf("  Mining skill: %.1f / %.0f", p.miningSkill, gather.SkillCap)
+	p.sendf("  Fishing skill: %.1f / %.0f", p.fishingSkill, gather.SkillCap)
+	if p.foodEffect != nil && p.foodEffect.IsActive(time.Now()) {
+		p.sendf("  Food buff:    %s (%s)", p.foodEffect.Food.Name, foodStatSummary(p.foodEffect.Food))
+	}
 	p.sendf("  Haste:        %d%%", p.statFX.NetHastePct())
 	if p.statFX.IsParalyzed() {
 		p.send("  ** PARALYZED **")
@@ -2613,6 +2641,140 @@ func cmdMinePoints(p *player) {
 			pt.SuccessChance(p.miningSkill), pt.HQChance(p.miningSkill), p.miningSkill)
 	}
 	p.prompt()
+}
+
+func cmdFish(p *player) {
+	pts := gw.fishPts[p.zoneID]
+	if len(pts) == 0 {
+		p.send("There are no fishing spots in this zone.")
+		p.prompt()
+		return
+	}
+	var pt *gather.FishingPoint
+	for _, fp := range pts {
+		if !fp.Depleted() {
+			pt = fp
+			break
+		}
+	}
+	if pt == nil {
+		p.send("All fishing spots here are empty. Wait for them to replenish.")
+		p.prompt()
+		return
+	}
+	skill := gather.FishSkill{Level: p.fishingSkill}
+	y, err := pt.Attempt(skill)
+	if err != nil {
+		p.sendf("Fishing failed: %v", err)
+		p.prompt()
+		return
+	}
+	if y.ItemID == "" {
+		p.sendf("You cast your line at %s but catch nothing.", pt.Name)
+	} else if y.Trophy {
+		p.sendf(">>> TROPHY! <<< You reel in %s from %s! (x%d)", y.ItemName, pt.Name, y.Qty)
+		p.inventory[y.ItemID] += y.Qty
+		p.fishingSkill += 0.5
+	} else {
+		p.sendf("You catch a %s from %s.", y.ItemName, pt.Name)
+		p.inventory[y.ItemID] += y.Qty
+		p.fishingSkill += 0.1
+	}
+	if p.fishingSkill > gather.SkillCap {
+		p.fishingSkill = gather.SkillCap
+	}
+	p.sendf("  (Fishing skill: %.1f)", p.fishingSkill)
+	p.prompt()
+}
+
+func cmdFishPoints(p *player) {
+	pts := gw.fishPts[p.zoneID]
+	if len(pts) == 0 {
+		p.send("No fishing spots in this zone.")
+		p.prompt()
+		return
+	}
+	skill := gather.FishSkill{Level: p.fishingSkill}
+	p.sendf("\r\n=== Fishing Spots in %s ===", zoneName(p.zoneID))
+	for _, pt := range pts {
+		dep := ""
+		if pt.Depleted() {
+			dep = "  [EMPTY]"
+		}
+		p.sendf("  %-22s  diff=%.0f  remaining=%d/%d%s",
+			pt.Name, pt.Difficulty, pt.Remaining(), pt.MaxAttempts, dep)
+		p.sendf("    Success: %.0f%%  Trophy: %.0f%%  (your skill: %.1f)",
+			pt.SuccessChance(skill), pt.SuccessChance(gather.FishSkill{Level: p.fishingSkill + gather.HQThreshold}), p.fishingSkill)
+	}
+	p.prompt()
+}
+
+func cmdEat(p *player, itemID string) {
+	now := time.Now()
+	effect, err := gw.foodReg.Eat(itemID, now)
+	if err != nil {
+		p.sendf("You don't have that food or it's not edible (%v).", err)
+		p.prompt()
+		return
+	}
+	p.foodEffect = effect
+	p.sendf("You eat %s. (%s for %s)", effect.Food.Name,
+		foodStatSummary(effect.Food), formatDuration(effect.Food.Duration))
+	p.prompt()
+}
+
+func cmdFoodBuff(p *player) {
+	now := time.Now()
+	if p.foodEffect == nil || !p.foodEffect.IsActive(now) {
+		p.send("You have no active food buff.")
+		p.prompt()
+		return
+	}
+	f := p.foodEffect.Food
+	p.sendf("Food buff: %s — %s (%.0fs remaining)",
+		f.Name, foodStatSummary(f), p.foodEffect.Remaining(now).Seconds())
+	p.prompt()
+}
+
+func foodStatSummary(f food.Food) string {
+	parts := []string{}
+	if f.STRBonus != 0 {
+		parts = append(parts, fmt.Sprintf("STR+%d", f.STRBonus))
+	}
+	if f.DEXBonus != 0 {
+		parts = append(parts, fmt.Sprintf("DEX+%d", f.DEXBonus))
+	}
+	if f.VITBonus != 0 {
+		parts = append(parts, fmt.Sprintf("VIT+%d", f.VITBonus))
+	}
+	if f.INTBonus != 0 {
+		parts = append(parts, fmt.Sprintf("INT+%d", f.INTBonus))
+	}
+	if f.MNDBonus != 0 {
+		parts = append(parts, fmt.Sprintf("MND+%d", f.MNDBonus))
+	}
+	if f.HPBonus != 0 {
+		parts = append(parts, fmt.Sprintf("HP+%d", f.HPBonus))
+	}
+	if f.MPBonus != 0 {
+		parts = append(parts, fmt.Sprintf("MP+%d", f.MPBonus))
+	}
+	if len(parts) == 0 {
+		return "no stat bonus"
+	}
+	return strings.Join(parts, " ")
+}
+
+func formatDuration(d time.Duration) string {
+	m := int(d.Minutes())
+	s := int(d.Seconds()) % 60
+	if m > 0 && s > 0 {
+		return fmt.Sprintf("%dm%ds", m, s)
+	}
+	if m > 0 {
+		return fmt.Sprintf("%dm", m)
+	}
+	return fmt.Sprintf("%ds", s)
 }
 
 func cmdHome(p *player) {
@@ -4076,6 +4238,10 @@ Commands:
   pass <N> / pass all — decline item(s) in the loot pool
   mine                — attempt mining at a nearby point
   mine-points / mp    — list mining points in this zone
+  fish                — cast a line at a nearby fishing spot
+  fish-points / fp    — list fishing spots in this zone
+  eat <item-id>       — eat food to gain a stat buff
+  food                — show current food buff status
   status / st         — show your stats (level, XP, homepoint, party)
   who                 — list online players
   say <text>  / ' msg — speak in zone
