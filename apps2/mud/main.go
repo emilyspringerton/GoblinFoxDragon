@@ -197,30 +197,54 @@ var zoneDesc = map[int]string{
 // ── NPC definitions ───────────────────────────────────────────────────────────
 
 type npcDef struct {
-	ID      string
-	Name    string
-	ZoneID  int
-	Greeting string
+	ID          string
+	Name        string
+	ZoneID      int
+	Greeting    string
+	MinFameRank int         // 0 = no gate
+	FameNation  fame.Nation // which nation's fame is required
 }
 
 var npcs = []npcDef{
 	{
-		ID:      "guildmaster",
-		Name:    "Guildmaster",
-		ZoneID:  0, // Meadow
-		Greeting: "Welcome, adventurer. I have work for those bold enough to take it.",
+		ID:          "guildmaster",
+		Name:        "Guildmaster",
+		ZoneID:      0, // Meadow — San d'Oria territory
+		Greeting:    "Welcome, adventurer. I have work for those bold enough to take it.",
+		MinFameRank: 0,
+		FameNation:  fame.Sandoria,
 	},
 	{
-		ID:      "merchant",
-		Name:    "Merchant",
-		ZoneID:  1, // Hills
-		Greeting: "Ah, a traveler! I deal in rare goods. Help me and I'll make it worth your while.",
+		ID:          "merchant",
+		Name:        "Merchant",
+		ZoneID:      1, // Hills — Bastok territory
+		Greeting:    "Ah, a traveler! I deal in rare goods. Help me and I'll make it worth your while.",
+		MinFameRank: 0,
+		FameNation:  fame.Bastok,
 	},
 	{
-		ID:      "scout",
-		Name:    "Scout",
-		ZoneID:  3, // Swamp
-		Greeting: "Careful out here — the swamp is dangerous. But there is coin in clearing it.",
+		ID:          "scout",
+		Name:        "Scout",
+		ZoneID:      3, // Swamp — Windurst territory
+		Greeting:    "Careful out here — the swamp is dangerous. But there is coin in clearing it.",
+		MinFameRank: 0,
+		FameNation:  fame.Windurst,
+	},
+	{
+		ID:          "elder",
+		Name:        "Village Elder",
+		ZoneID:      0, // Meadow
+		Greeting:    "Ah, I see you've earned some respect around here. Let me tell you what I know.",
+		MinFameRank: 2, // requires Liked (200 pts) with Sandoria
+		FameNation:  fame.Sandoria,
+	},
+	{
+		ID:          "master-blacksmith",
+		Name:        "Master Blacksmith",
+		ZoneID:      1, // Hills — Bastok
+		Greeting:    "So you've proven yourself useful to Bastok. I may have work for a trusted ally.",
+		MinFameRank: 3, // requires Trusted (500 pts)
+		FameNation:  fame.Bastok,
 	},
 }
 
@@ -1704,7 +1728,15 @@ func cmdNPCs(p *player) {
 	found := false
 	for _, n := range npcs {
 		if n.ZoneID == p.zoneID {
-			p.sendf("  [NPC] %s  (id: %s)  — type 'talk %s' to speak", n.Name, n.ID, n.ID)
+			fameTag := ""
+			if n.MinFameRank > 0 {
+				suffix := ""
+				if !p.fameStore.MeetsRank(n.FameNation, n.MinFameRank) {
+					suffix = " [LOCKED]"
+				}
+				fameTag = fmt.Sprintf("  (needs %s rank %d%s)", fame.NationName(n.FameNation), n.MinFameRank, suffix)
+			}
+			p.sendf("  [NPC] %s  (id: %s)%s  — type 'talk %s' to speak", n.Name, n.ID, fameTag, n.ID)
 			found = true
 		}
 	}
@@ -1721,6 +1753,16 @@ func cmdTalk(p *player, npcID string) {
 		p.prompt()
 		return
 	}
+	// Fame gate: NPC requires minimum fame rank.
+	if n.MinFameRank > 0 && !p.fameStore.MeetsRank(n.FameNation, n.MinFameRank) {
+		cur := p.fameStore.Rank(n.FameNation)
+		p.sendf("%s glances at you dismissively.", n.Name)
+		p.sendf("  \"Your reputation isn't strong enough yet.\"")
+		p.sendf("  (%s fame: rank %d / %d required — type 'fame' to see your standing)",
+			fame.NationName(n.FameNation), cur, n.MinFameRank)
+		p.prompt()
+		return
+	}
 	p.sendf("\r\n%s says: \"%s\"", n.Name, n.Greeting)
 	available := questBank.ForNPC(n.ID)
 	if len(available) == 0 {
@@ -1734,7 +1776,11 @@ func cmdTalk(p *player, npcID string) {
 			} else if _, active := p.questJournal.Active[q.ID]; active {
 				status = " [active] "
 			}
-			p.sendf("   %s%s — %s (type 'quest-accept %s')", status, q.Title, q.Desc, q.ID)
+			fameTag := ""
+			if q.RewardFame > 0 {
+				fameTag = fmt.Sprintf("  [+%d %s fame]", q.RewardFame, fame.NationName(fame.Nation(q.FameNation)))
+			}
+			p.sendf("   %s%s — %s (type 'quest-accept %s')%s", status, q.Title, q.Desc, q.ID, fameTag)
 		}
 	}
 	p.prompt()
