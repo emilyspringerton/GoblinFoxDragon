@@ -259,6 +259,52 @@ func (c *Client) PatchWorldEvent(eventID, phase string, leyIntegrity int) error 
 	}
 }
 
+// CreateCharacter creates a new character record in IDUNA. Returns the new character_id.
+func (c *Client) CreateCharacter(playerID, name, jobMain string) (string, error) {
+	body, _ := json.Marshal(map[string]string{
+		"player_id": playerID,
+		"name":      name,
+		"job_main":  jobMain,
+	})
+	req, _ := http.NewRequest(http.MethodPost, c.baseURL+"/api/v1/characters", bytes.NewReader(body))
+	resp, err := c.do(req)
+	if err != nil {
+		return "", fmt.Errorf("idunaclient: CreateCharacter: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusConflict {
+		return "", ErrConflict
+	}
+	if resp.StatusCode != http.StatusCreated {
+		return "", fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+	var res struct {
+		CharacterID string `json:"character_id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return "", fmt.Errorf("idunaclient: CreateCharacter decode: %w", err)
+	}
+	return res.CharacterID, nil
+}
+
+// UpdateCharacterLevel patches a character's level and current_xp.
+func (c *Client) UpdateCharacterLevel(characterID string, level, currentXP int) error {
+	body, _ := json.Marshal(map[string]any{
+		"level":      level,
+		"current_xp": currentXP,
+	})
+	req, _ := http.NewRequest(http.MethodPatch, c.baseURL+"/api/v1/characters/"+characterID, bytes.NewReader(body))
+	resp, err := c.do(req)
+	if err != nil {
+		return fmt.Errorf("idunaclient: UpdateCharacterLevel: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+	return nil
+}
+
 // TravelTelecrystal validates gold, deducts cost, and moves character to target scene/pos.
 // This is an idempotent compound operation: GetCharacter → DeductGold → UpdatePosition.
 func (c *Client) TravelTelecrystal(characterID string, castCost, targetScene int, tx, ty, tz float64) error {

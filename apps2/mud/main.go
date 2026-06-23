@@ -10,10 +10,12 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"math/rand"
 	"net"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -41,6 +43,7 @@ import (
 	"dragonsnshit/server/status"
 	"dragonsnshit/server/xp"
 	"dragonsnshit/server/zone"
+	"dragonsnshit/server/idunaclient"
 	combatTp "dragonsnshit/server/combat"
 )
 
@@ -63,6 +66,39 @@ const (
 	// Range within which party members receive XP (same zone = always in range).
 	partyXPRange  = 99999.0
 )
+
+// mudCharCache is a lightweight name→character_id persistence layer backed by var/mud-chars.json.
+// It is loaded once at startup and written on each new character creation.
+var mudCharCache = newCharCache("var/mud-chars.json")
+
+type charCacheStore struct {
+	path string
+	mu   sync.Mutex
+	data map[string]string // name → character_id
+}
+
+func newCharCache(path string) *charCacheStore {
+	c := &charCacheStore{path: path, data: make(map[string]string)}
+	if raw, err := os.ReadFile(path); err == nil {
+		_ = json.Unmarshal(raw, &c.data)
+	}
+	return c
+}
+
+func (c *charCacheStore) get(name string) string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.data[name]
+}
+
+func (c *charCacheStore) set(name, charID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.data[name] = charID
+	if raw, err := json.Marshal(c.data); err == nil {
+		_ = os.WriteFile(c.path, raw, 0644)
+	}
+}
 
 // recipeIngredients maps recipe ID → { itemID: quantity required }.
 // The craft package handles success/HQ, but ingredient requirements live here.
@@ -195,6 +231,8 @@ type world struct {
 	chatRouter     *chat.Router
 	guildReg       *guild.Registry
 	wcrisis        *worldcrisis.Crisis
+	iduna          *idunaclient.Client
+	charIDBySlot   map[string]string // slot → IDUNA character_id
 }
 
 var gw *world
@@ -278,6 +316,8 @@ func initWorld() *world {
 		chatRouter:     chat.New(),
 		guildReg:       guild.New(),
 		wcrisis:        worldcrisis.New(),
+		iduna:          idunaclient.New(),
+		charIDBySlot:   make(map[string]string),
 		nmSpawns: map[int][]*nm.NMSpawn{
 			0: nm.MeadowNMs(),
 			3: nm.SwampNMs(),
@@ -3099,6 +3139,30 @@ func handleConn(conn net.Conn) {
 		w:           w,
 	}
 
+	// IDUNA character fetch-or-create (best-effort; non-blocking).
+	// charCache maps name → character_id and persists to var/mud-chars.json.
+	if cachedID := mudCharCache.get(name); cachedID != "" {
+		if ch, err := gw.iduna.GetCharacter(cachedID); err == nil {
+			gw.mu.Lock()
+			gw.charIDBySlot[slot] = ch.CharacterID
+			gw.mu.Unlock()
+			if ch.Level > 1 {
+				p.charXP.Level = ch.Level
+				p.charXP.CurrentXP = ch.CurrentXP
+			}
+			if ch.GoldBalance > 0 {
+				p.gil = ch.GoldBalance
+			}
+		}
+	} else {
+		if newID, err := gw.iduna.CreateCharacter(slot, name, job.WAR); err == nil {
+			mudCharCache.set(name, newID)
+			gw.mu.Lock()
+			gw.charIDBySlot[slot] = newID
+			gw.mu.Unlock()
+		}
+	}
+
 	gw.mu.Lock()
 	gw.players[slot] = p
 	_ = gw.zoneMgr.Enter(slot, name, 0)
@@ -3107,7 +3171,18 @@ func handleConn(conn net.Conn) {
 	gw.mu.Unlock()
 
 	defer func() {
+		// S98-02: save level/xp on disconnect.
 		gw.mu.Lock()
+		charID, hasChar := gw.charIDBySlot[slot]
+		lvl, cxp := p.charXP.Level, p.charXP.CurrentXP
+		gw.mu.Unlock()
+		if hasChar {
+			_ = gw.iduna.UpdateCharacterLevel(charID, lvl, cxp)
+			_ = gw.iduna.UpdatePosition(charID, p.zoneID, p.pos.X, p.pos.Y, float64(p.zoneID)*1000)
+		}
+
+		gw.mu.Lock()
+		delete(gw.charIDBySlot, slot)
 		// Leave party if in one.
 		if partyID, ok := gw.playerParty[slot]; ok {
 			pt := gw.parties[partyID]
