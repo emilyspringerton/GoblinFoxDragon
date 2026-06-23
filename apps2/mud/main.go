@@ -230,6 +230,9 @@ type world struct {
 	playerNation   map[string]conquest.Nation // slot → declared nation
 	lastConquestTick time.Time
 	bazaars        map[string]map[string]int // slot → { itemID: price }
+	bankBySlot     map[string]int            // slot → bank balance (gil)
+	weatherByZone  map[int]string            // zoneID → current weather
+	lastWeatherTick time.Time
 	mobEnmity      map[string]*enmity.Table // mobID → enmity table
 	chatRouter     *chat.Router
 	guildReg       *guild.Registry
@@ -316,7 +319,10 @@ func initWorld() *world {
 		lootPools:      make(map[string]*activeLootPool),
 		playerNation:   make(map[string]conquest.Nation),
 		lastConquestTick: time.Now(),
-		bazaars:        make(map[string]map[string]int),
+		bazaars:       make(map[string]map[string]int),
+		bankBySlot:    make(map[string]int),
+		weatherByZone: map[int]string{0: "Clear", 1: "Clear", 2: "Clear", 3: "Clear"},
+		lastWeatherTick: time.Now(),
 		mobEnmity:      make(map[string]*enmity.Table),
 		chatRouter:     chat.New(),
 		guildReg:       guild.New(),
@@ -885,6 +891,26 @@ func tickAll() {
 		}
 	}
 
+	// Weather tick: every 60s, 10% chance to change weather per zone.
+	if now.Sub(gw.lastWeatherTick) >= 60*time.Second {
+		gw.lastWeatherTick = now
+		weathers := []string{"Clear", "Cloudy", "Rain", "Thunder", "Fog"}
+		for zid := range gw.weatherByZone {
+			if gw.rng.Intn(10) == 0 {
+				newWeather := weathers[gw.rng.Intn(len(weathers))]
+				if newWeather != gw.weatherByZone[zid] {
+					gw.weatherByZone[zid] = newWeather
+					for _, cp := range gw.players {
+						if cp.zoneID == zid {
+							cp.sendf("\r\n[Weather] %s — the weather changes to %s.", zoneName(zid), newWeather)
+							cp.prompt()
+						}
+					}
+				}
+			}
+		}
+	}
+
 	// World Crisis tick.
 	if gw.wcrisis.Status().Phase == worldcrisis.PhaseIdle && len(gw.players) > 0 {
 		_ = gw.wcrisis.Start(now, "")
@@ -1218,6 +1244,12 @@ func handle(p *player, line string) {
 			return
 		}
 		cmdBazaar(p, args)
+	case "bank":
+		cmdBank(p, args)
+	case "weather":
+		cmdWeather(p)
+	case "survey":
+		cmdSurvey(p)
 	case "ja":
 		if len(args) < 1 {
 			p.send("Usage: ja <ability-id>  (e.g. ja provoke)")
@@ -3234,6 +3266,98 @@ func hpBar(pct, width int) string {
 		filled = width
 	}
 	return "[" + strings.Repeat("█", filled) + strings.Repeat("░", width-filled) + "]"
+}
+
+func cmdBank(p *player, args []string) {
+	if len(args) == 0 {
+		balance := gw.bankBySlot[p.slot]
+		p.sendf("Bank balance: %d gil  (wallet: %d gil)", balance, p.gil)
+		p.prompt()
+		return
+	}
+	switch args[0] {
+	case "balance":
+		balance := gw.bankBySlot[p.slot]
+		p.sendf("Bank balance: %d gil  (wallet: %d gil)", balance, p.gil)
+	case "deposit":
+		if len(args) < 2 {
+			p.send("Usage: bank deposit <amount>")
+			p.prompt()
+			return
+		}
+		amount := 0
+		fmt.Sscanf(args[1], "%d", &amount)
+		if amount <= 0 || amount > p.gil {
+			p.sendf("Cannot deposit %d gil (wallet: %d gil).", amount, p.gil)
+			p.prompt()
+			return
+		}
+		p.gil -= amount
+		gw.bankBySlot[p.slot] += amount
+		p.sendf("Deposited %d gil. (bank: %d  wallet: %d)", amount, gw.bankBySlot[p.slot], p.gil)
+	case "withdraw":
+		if len(args) < 2 {
+			p.send("Usage: bank withdraw <amount>")
+			p.prompt()
+			return
+		}
+		amount := 0
+		fmt.Sscanf(args[1], "%d", &amount)
+		balance := gw.bankBySlot[p.slot]
+		if amount <= 0 || amount > balance {
+			p.sendf("Cannot withdraw %d gil (bank: %d gil).", amount, balance)
+			p.prompt()
+			return
+		}
+		gw.bankBySlot[p.slot] -= amount
+		p.gil += amount
+		p.sendf("Withdrew %d gil. (bank: %d  wallet: %d)", amount, gw.bankBySlot[p.slot], p.gil)
+	default:
+		p.send("Usage: bank balance | bank deposit <amount> | bank withdraw <amount>")
+	}
+	p.prompt()
+}
+
+func cmdWeather(p *player) {
+	w := gw.weatherByZone[p.zoneID]
+	if w == "" {
+		w = "Clear"
+	}
+	p.sendf("Current weather in %s: %s", zoneName(p.zoneID), w)
+	p.prompt()
+}
+
+func cmdSurvey(p *player) {
+	inParty := gw.playerParty[p.slot]
+	found := false
+	for slot, op := range gw.players {
+		if slot == p.slot || op.zoneID != p.zoneID {
+			continue
+		}
+		found = true
+		dx := op.pos.X - p.pos.X
+		dy := op.pos.Y - p.pos.Y
+		dir := "here"
+		if dx > 5 {
+			dir = "E"
+		} else if dx < -5 {
+			dir = "W"
+		} else if dy > 5 {
+			dir = "N"
+		} else if dy < -5 {
+			dir = "S"
+		}
+		extra := ""
+		if inParty != "" && gw.playerParty[slot] == inParty {
+			bar := hpBar(op.hp*100/op.maxHP, 10)
+			extra = fmt.Sprintf(" HP:%s", bar)
+		}
+		p.sendf("  %-16s Lv%d %s (%s)%s", op.name, op.charXP.Level, op.jobID, dir, extra)
+	}
+	if !found {
+		p.send("No other players in this zone.")
+	}
+	p.prompt()
 }
 
 func cmdBazaar(p *player, args []string) {
