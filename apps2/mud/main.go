@@ -4424,10 +4424,57 @@ func cmdCast(p *player, spell string, targetName string) {
 		cmdCastBlackMagic(p, spell)
 	case "march", "paeon", "ballad", "minne", "carol", "mambo":
 		cmdCastBardSong(p, spell)
+	case "teleport-meadow", "teleport-hills", "teleport-caves", "teleport-swamp",
+		"tele-meadow", "tele-hills", "tele-caves", "tele-swamp":
+		cmdCastTeleport(p, spell)
 	default:
-		p.sendf("Unknown spell %q. Try: invisible, sneak, cure/cure2, protect, shell, haste, regen, refresh, dia, fire/blizzard/thunder/stone/water/aero [I-III], march/paeon/ballad/minne/carol/mambo", spell)
+		p.sendf("Unknown spell %q. Try: invisible, sneak, cure/cure2, protect, shell, haste, regen, refresh, dia, fire/blizzard/thunder/stone/water/aero [I-III], march/paeon/ballad/minne/carol/mambo, teleport-meadow/hills/caves/swamp", spell)
 	}
 	p.prompt()
+}
+
+var teleportSpells = map[string]int{
+	"teleport-meadow": 0, "tele-meadow": 0,
+	"teleport-hills":  1, "tele-hills": 1,
+	"teleport-caves":  2, "tele-caves": 2,
+	"teleport-swamp":  3, "tele-swamp": 3,
+}
+
+func cmdCastTeleport(p *player, spell string) {
+	dest, ok := teleportSpells[spell]
+	if !ok {
+		p.sendf("Unknown teleport spell: %q", spell)
+		p.prompt()
+		return
+	}
+	if p.jobID != job.WHM && (p.charJob == nil || p.charJob.Sub != job.WHM) {
+		p.send("Teleport spells require White Mage job or sub-job.")
+		p.prompt()
+		return
+	}
+	if p.statFX.IsSilenced() {
+		p.send("You are silenced and cannot cast spells.")
+		p.prompt()
+		return
+	}
+	const teleCost = 100
+	if p.mp < teleCost {
+		p.sendf("Not enough MP. (need %d, have %d)", teleCost, p.mp)
+		p.prompt()
+		return
+	}
+	p.mp -= teleCost
+	// Execute teleport.
+	p.combat.TargetMobID = ""
+	_ = gw.zoneMgr.Transfer(p.slot, dest)
+	p.zoneID = dest
+	p.atlas.Visit(dest)
+	destZone, _ := gw.zoneMgr.Get(dest)
+	p.pos = mob.Pos{X: destZone.SpawnX, Y: destZone.SpawnY, Z: destZone.SpawnZ}
+	syncChatSession(p)
+	p.sendf("Teleport! You appear in %s. (MP: %d)", zoneName(dest), p.mp)
+	broadcastZoneNoLock(dest, fmt.Sprintf("%s appears in a flash of light.", p.name), p.slot)
+	cmdLook(p)
 }
 
 // bardSongDef describes a Bard song's zone-wide effect.
