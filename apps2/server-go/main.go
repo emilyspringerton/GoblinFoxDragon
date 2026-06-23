@@ -23,6 +23,7 @@ import (
 	"dragonsnshit/server/store"
 	"dragonsnshit/server/system"
 	"dragonsnshit/server/telecrystal"
+	"dragonsnshit/server/worldcrisis"
 	"dragonsnshit/server/worldapi"
 )
 
@@ -109,6 +110,49 @@ func main() {
 	nextClientID := uint8(0)
 	chatRouter := chat.New()
 	clientAddrs := make(map[string]*net.UDPAddr) // slot → addr for chat delivery
+
+	// World Crisis state machine (S76-05).
+	crisis := worldcrisis.New()
+	broadcastCh := make(chan []byte, 64) // server goroutine → broadcast goroutine
+
+	// Broadcast goroutine: sends packets from broadcastCh to all connected clients.
+	go func() {
+		var addrsMu sync.RWMutex
+		_ = addrsMu // clients/clientAddrs are accessed from main loop; broadcast via channel
+		for pkt := range broadcastCh {
+			for slot, addr := range clientAddrs {
+				if _, ok := clients[slot]; ok {
+					conn.WriteToUDP(pkt, addr)
+				}
+			}
+		}
+	}()
+
+	// World Crisis tick goroutine: drives phase machine + periodic meter broadcast.
+	go func() {
+		ticker := time.NewTicker(250 * time.Millisecond)
+		defer ticker.Stop()
+		lastPhase := worldcrisis.PhaseIdle
+		for t := range ticker.C {
+			changed, oldP, newP := crisis.Tick(t)
+			s := crisis.Status()
+			// Always broadcast the world crisis update every 5s (for meter sync).
+			// On phase change: broadcast immediately + PATCH IDUNA.
+			if changed {
+				fmt.Printf("[worldcrisis] %s → %s (ley=%d)\n", oldP, newP, s.LeyIntegrity)
+				if s.EventID != "" {
+					_ = idunaClient.PatchWorldEvent(s.EventID, string(newP), s.LeyIntegrity)
+				}
+				lastPhase = newP
+			}
+			_ = lastPhase
+			pkt := buildWorldCrisisPacket(s)
+			select {
+			case broadcastCh <- pkt:
+			default:
+			}
+		}
+	}()
 
 	for {
 		conn.SetReadDeadline(time.Now().Add(250 * time.Millisecond))
@@ -315,6 +359,31 @@ func main() {
 			fmt.Printf("[craft] %s crafted %s (HQ%d) → %s\n",
 				craftReq.CharacterID, result.ItemID, result.HQTier, newItemID)
 
+		case common.PacketObjectiveComplete:
+			// Payload: JSON {"character_id":"...","objective_type":"anchor|ritual|intercept","stabilize_amount":N}
+			slot := remote.String()
+			if _, ok := clients[slot]; !ok {
+				continue
+			}
+			if n < 2 {
+				continue
+			}
+			var objReq struct {
+				CharacterID     string `json:"character_id"`
+				ObjectiveType   string `json:"objective_type"`
+				StabilizeAmount int    `json:"stabilize_amount"`
+			}
+			if err := json.Unmarshal(buf[1:n], &objReq); err != nil {
+				continue
+			}
+			objType := worldcrisis.ObjectiveType(objReq.ObjectiveType)
+			if err := crisis.CompleteObjective(objType, objReq.StabilizeAmount, time.Now()); err != nil {
+				fmt.Printf("[worldcrisis] objective %s rejected: %v\n", objType, err)
+				continue
+			}
+			s := crisis.Status()
+			fmt.Printf("[worldcrisis] objective %s completed (ley=%d)\n", objType, s.LeyIntegrity)
+
 		case common.PacketChat:
 			if n < 4 {
 				continue
@@ -355,6 +424,17 @@ func sendCraftResult(conn *net.UDPConn, remote *net.UDPAddr, success bool, hqTie
 	b, _ := json.Marshal(payload)
 	pkt := append([]byte{common.PacketCraftResult}, b...)
 	conn.WriteToUDP(pkt, remote)
+}
+
+func buildWorldCrisisPacket(s worldcrisis.Status) []byte {
+	payload := map[string]interface{}{
+		"phase":                string(s.Phase),
+		"ley_integrity":        s.LeyIntegrity,
+		"phase_deadline_unix":  s.PhaseDeadline.Unix(),
+		"outcome":              string(s.Outcome),
+	}
+	b, _ := json.Marshal(payload)
+	return append([]byte{common.PacketWorldCrisisUpdate}, b...)
 }
 
 func sendAuthReject(conn *net.UDPConn, remote *net.UDPAddr) {

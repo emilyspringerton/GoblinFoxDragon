@@ -211,6 +211,30 @@ func (c *Client) DestroyItem(itemID string) error {
 	}
 }
 
+// PatchWorldEvent patches a world event's phase and ley_integrity in IDUNA.
+func (c *Client) PatchWorldEvent(eventID, phase string, leyIntegrity int) error {
+	body, _ := json.Marshal(map[string]interface{}{
+		"phase":         phase,
+		"ley_integrity": leyIntegrity,
+	})
+	req, _ := http.NewRequest(http.MethodPatch,
+		c.baseURL+"/api/v1/world-events/"+eventID,
+		bytes.NewReader(body))
+	resp, err := c.do(req)
+	if err != nil {
+		return fmt.Errorf("idunaclient: PatchWorldEvent: %w", err)
+	}
+	defer resp.Body.Close()
+	switch resp.StatusCode {
+	case http.StatusNoContent, http.StatusOK:
+		return nil
+	case http.StatusNotFound:
+		return ErrNotFound
+	default:
+		return fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+}
+
 // TravelTelecrystal validates gold, deducts cost, and moves character to target scene/pos.
 // This is an idempotent compound operation: GetCharacter → DeductGold → UpdatePosition.
 func (c *Client) TravelTelecrystal(characterID string, castCost, targetScene int, tx, ty, tz float64) error {

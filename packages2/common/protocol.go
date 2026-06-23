@@ -23,6 +23,9 @@ const (
 	// Crafting (S76-04)
 	PacketCraftRequest = 12 // client→server: JSON payload {recipe_id,character_id,reagent_ids:[]}
 	PacketCraftResult  = 13 // server→client: JSON payload {success,hq_tier,item_id,item_name,error}
+	// World Crisis (S76-05)
+	PacketWorldCrisisUpdate = 14 // server→client: JSON {phase,ley_integrity,phase_deadline_unix,outcome}
+	PacketObjectiveComplete = 15 // client→server: JSON {character_id,objective_type,stabilize_amount}
 )
 
 // Chat channel IDs (byte 1 of PacketChat).
