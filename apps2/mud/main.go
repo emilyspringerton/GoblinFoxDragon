@@ -1447,10 +1447,14 @@ func handle(p *player, line string) {
 		cmdTravel(p, args[0])
 	case "cast":
 		if len(args) < 1 {
-			p.send("Usage: cast <spell>  (spells: invisible, sneak, cure, cure2)")
+			p.send("Usage: cast <spell> [player]  (spells: invisible, sneak, cure, cure2, protect, shell, haste, regen, refresh, dia)")
 			return
 		}
-		cmdCast(p, strings.ToLower(args[0]))
+		target := ""
+		if len(args) >= 2 {
+			target = args[1]
+		}
+		cmdCast(p, strings.ToLower(args[0]), target)
 	case "removedebuffs", "erase":
 		cmdRemoveDebuffs(p)
 	case "rest", "meditate":
@@ -4137,7 +4141,22 @@ func cmdRemoveDebuffs(p *player) {
 	p.prompt()
 }
 
-func cmdCast(p *player, spell string) {
+// resolveSpellTarget returns the target player for a spell. If targetName is empty or
+// matches the caster, returns (p, ""). If it names a party member in the same zone,
+// returns (member, ""). Otherwise returns (nil, errorMessage).
+func resolveSpellTarget(p *player, targetName string) (*player, string) {
+	if targetName == "" || targetName == p.name {
+		return p, ""
+	}
+	for _, other := range gw.players {
+		if other.name == targetName && other.zoneID == p.zoneID {
+			return other, ""
+		}
+	}
+	return nil, fmt.Sprintf("Cannot find %q in this zone.", targetName)
+}
+
+func cmdCast(p *player, spell string, targetName string) {
 	if p.statFX.IsSilenced() {
 		p.send("You are silenced and cannot cast spells.")
 		p.prompt()
@@ -4174,6 +4193,12 @@ func cmdCast(p *player, spell string) {
 			p.prompt()
 			return
 		}
+		tgt, errMsg := resolveSpellTarget(p, targetName)
+		if tgt == nil {
+			p.send(errMsg)
+			p.prompt()
+			return
+		}
 		const cureCost = 50
 		if p.mp < cureCost {
 			p.sendf("Not enough MP. (need %d, have %d)", cureCost, p.mp)
@@ -4182,14 +4207,25 @@ func cmdCast(p *player, spell string) {
 		}
 		p.mp -= cureCost
 		healed := 100
-		p.hp += healed
-		if p.hp > p.maxHP {
-			p.hp = p.maxHP
+		tgt.hp += healed
+		if tgt.hp > tgt.maxHP {
+			tgt.hp = tgt.maxHP
 		}
-		p.sendf("Cure: +%d HP. (HP: %d/%d  MP: %d)", healed, p.hp, p.maxHP, p.mp)
+		if tgt == p {
+			p.sendf("Cure: +%d HP. (HP: %d/%d  MP: %d)", healed, p.hp, p.maxHP, p.mp)
+		} else {
+			p.sendf("Cure on %s: +%d HP. (MP: %d)", tgt.name, healed, p.mp)
+			tgt.sendf("\r\n[Cure from %s] +%d HP. HP: %d/%d", p.name, healed, tgt.hp, tgt.maxHP)
+		}
 	case "cure2":
 		if p.jobID != job.WHM && (p.charJob == nil || p.charJob.Sub != job.WHM) {
 			p.send("Cure II requires White Mage job or sub-job.")
+			p.prompt()
+			return
+		}
+		tgt, errMsg := resolveSpellTarget(p, targetName)
+		if tgt == nil {
+			p.send(errMsg)
 			p.prompt()
 			return
 		}
@@ -4201,14 +4237,25 @@ func cmdCast(p *player, spell string) {
 		}
 		p.mp -= cure2Cost
 		healed := 250
-		p.hp += healed
-		if p.hp > p.maxHP {
-			p.hp = p.maxHP
+		tgt.hp += healed
+		if tgt.hp > tgt.maxHP {
+			tgt.hp = tgt.maxHP
 		}
-		p.sendf("Cure II: +%d HP. (HP: %d/%d  MP: %d)", healed, p.hp, p.maxHP, p.mp)
+		if tgt == p {
+			p.sendf("Cure II: +%d HP. (HP: %d/%d  MP: %d)", healed, p.hp, p.maxHP, p.mp)
+		} else {
+			p.sendf("Cure II on %s: +%d HP. (MP: %d)", tgt.name, healed, p.mp)
+			tgt.sendf("\r\n[Cure II from %s] +%d HP. HP: %d/%d", p.name, healed, tgt.hp, tgt.maxHP)
+		}
 	case "protect":
 		if p.jobID != job.WHM && (p.charJob == nil || p.charJob.Sub != job.WHM) {
 			p.send("Protect requires White Mage job or sub-job.")
+			p.prompt()
+			return
+		}
+		tgt, errMsg := resolveSpellTarget(p, targetName)
+		if tgt == nil {
+			p.send(errMsg)
 			p.prompt()
 			return
 		}
@@ -4219,11 +4266,22 @@ func cmdCast(p *player, spell string) {
 			return
 		}
 		p.mp -= protCost
-		p.statFX.Apply(status.Effect{Kind: status.Protect, Potency: 15, ExpiresAt: now.Add(3 * time.Minute)})
-		p.sendf("Protect: physical defense +15 for 3m. MP: %d", p.mp)
+		tgt.statFX.Apply(status.Effect{Kind: status.Protect, Potency: 15, ExpiresAt: now.Add(3 * time.Minute)})
+		if tgt == p {
+			p.sendf("Protect: physical defense +15 for 3m. MP: %d", p.mp)
+		} else {
+			p.sendf("Protect on %s: physical defense +15 for 3m. MP: %d", tgt.name, p.mp)
+			tgt.sendf("\r\n[Protect from %s] Physical defense +15 for 3m.", p.name)
+		}
 	case "shell":
 		if p.jobID != job.WHM && (p.charJob == nil || p.charJob.Sub != job.WHM) {
 			p.send("Shell requires White Mage job or sub-job.")
+			p.prompt()
+			return
+		}
+		tgt, errMsg := resolveSpellTarget(p, targetName)
+		if tgt == nil {
+			p.send(errMsg)
 			p.prompt()
 			return
 		}
@@ -4234,11 +4292,22 @@ func cmdCast(p *player, spell string) {
 			return
 		}
 		p.mp -= shellCost
-		p.statFX.Apply(status.Effect{Kind: status.Shell, Potency: 15, ExpiresAt: now.Add(3 * time.Minute)})
-		p.sendf("Shell: magic defense +15 for 3m. MP: %d", p.mp)
+		tgt.statFX.Apply(status.Effect{Kind: status.Shell, Potency: 15, ExpiresAt: now.Add(3 * time.Minute)})
+		if tgt == p {
+			p.sendf("Shell: magic defense +15 for 3m. MP: %d", p.mp)
+		} else {
+			p.sendf("Shell on %s: magic defense +15 for 3m. MP: %d", tgt.name, p.mp)
+			tgt.sendf("\r\n[Shell from %s] Magic defense +15 for 3m.", p.name)
+		}
 	case "haste":
 		if p.jobID != job.WHM && (p.charJob == nil || p.charJob.Sub != job.WHM) {
 			p.send("Haste requires White Mage job or sub-job.")
+			p.prompt()
+			return
+		}
+		tgt, errMsg := resolveSpellTarget(p, targetName)
+		if tgt == nil {
+			p.send(errMsg)
 			p.prompt()
 			return
 		}
@@ -4249,11 +4318,22 @@ func cmdCast(p *player, spell string) {
 			return
 		}
 		p.mp -= hasteCost
-		p.statFX.Apply(status.Effect{Kind: status.Haste, Potency: 15, ExpiresAt: now.Add(3 * time.Minute)})
-		p.sendf("Haste: attack speed +15%% for 3m. MP: %d", p.mp)
+		tgt.statFX.Apply(status.Effect{Kind: status.Haste, Potency: 15, ExpiresAt: now.Add(3 * time.Minute)})
+		if tgt == p {
+			p.sendf("Haste: attack speed +15%% for 3m. MP: %d", p.mp)
+		} else {
+			p.sendf("Haste on %s: attack speed +15%% for 3m. MP: %d", tgt.name, p.mp)
+			tgt.sendf("\r\n[Haste from %s] Attack speed +15%% for 3m.", p.name)
+		}
 	case "regen":
 		if p.jobID != job.WHM && (p.charJob == nil || p.charJob.Sub != job.WHM) {
 			p.send("Regen requires White Mage job or sub-job.")
+			p.prompt()
+			return
+		}
+		tgt, errMsg := resolveSpellTarget(p, targetName)
+		if tgt == nil {
+			p.send(errMsg)
 			p.prompt()
 			return
 		}
@@ -4264,11 +4344,22 @@ func cmdCast(p *player, spell string) {
 			return
 		}
 		p.mp -= regenCost
-		p.statFX.Apply(status.Effect{Kind: status.Regen, Potency: 5, ExpiresAt: now.Add(3 * time.Minute)})
-		p.sendf("Regen: +5 HP/tick for 3m. MP: %d", p.mp)
+		tgt.statFX.Apply(status.Effect{Kind: status.Regen, Potency: 5, ExpiresAt: now.Add(3 * time.Minute)})
+		if tgt == p {
+			p.sendf("Regen: +5 HP/tick for 3m. MP: %d", p.mp)
+		} else {
+			p.sendf("Regen on %s: +5 HP/tick for 3m. MP: %d", tgt.name, p.mp)
+			tgt.sendf("\r\n[Regen from %s] +5 HP/tick for 3m.", p.name)
+		}
 	case "refresh":
 		if p.jobID != job.RDM && p.jobID != job.WHM && (p.charJob == nil || (p.charJob.Sub != job.RDM && p.charJob.Sub != job.WHM)) {
 			p.send("Refresh requires Red Mage or White Mage job or sub-job.")
+			p.prompt()
+			return
+		}
+		tgt, errMsg := resolveSpellTarget(p, targetName)
+		if tgt == nil {
+			p.send(errMsg)
 			p.prompt()
 			return
 		}
@@ -4279,8 +4370,13 @@ func cmdCast(p *player, spell string) {
 			return
 		}
 		p.mp -= refreshCost
-		p.statFX.Apply(status.Effect{Kind: status.Refresh, Potency: 3, ExpiresAt: now.Add(3 * time.Minute)})
-		p.sendf("Refresh: +3 MP/tick for 3m. MP: %d", p.mp)
+		tgt.statFX.Apply(status.Effect{Kind: status.Refresh, Potency: 3, ExpiresAt: now.Add(3 * time.Minute)})
+		if tgt == p {
+			p.sendf("Refresh: +3 MP/tick for 3m. MP: %d", p.mp)
+		} else {
+			p.sendf("Refresh on %s: +3 MP/tick for 3m. MP: %d", tgt.name, p.mp)
+			tgt.sendf("\r\n[Refresh from %s] +3 MP/tick for 3m.", p.name)
+		}
 	case "dia":
 		// Dia: debuff DoT on target mob (Poison equivalent — applied to combat target)
 		if p.jobID != job.WHM && (p.charJob == nil || p.charJob.Sub != job.WHM) {
