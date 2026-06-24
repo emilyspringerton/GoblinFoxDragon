@@ -1,4 +1,5 @@
 ## 2026-06-24
+- feat: S126-03 world event broadcast — server/worldevent, /api/world-events endpoint, faction war→worldEventReg, 12 tests (Apple #3536)
 - feat: S126-02 weather → mood loop — Storm:Fear+15, Rain:Fatigue+10, Clear:Fatigue-5 per district tick (Apple #3533)
 - feat: S126-01 NPC schedule system — server/schedule, 3 NPCs seeded, hourly tick → broadcastAll, 14 tests (Apple #3531)
 - feat: S125-13 Mog House personal storage — server/moghouse, 50-item cap, Store/Retrieve/List MUD commands, 20 tests (Apple #3528)
