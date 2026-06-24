@@ -16,6 +16,7 @@ import (
 	"math"
 	"math/rand"
 	"net"
+	"net/http"
 	"os"
 	"sort"
 	"strings"
@@ -31,6 +32,7 @@ import (
 	"dragonsnshit/server/merit"
 	"dragonsnshit/server/telecrystal"
 	"dragonsnshit/server/worldcrisis"
+	"dragonsnshit/server/worldevent"
 	"dragonsnshit/server/market"
 	"dragonsnshit/server/field"
 	"dragonsnshit/server/gather"
@@ -560,6 +562,13 @@ var (
 	timelineReg       = timeline.NewRegistry()
 	seenRogueBranches = make(map[int]bool) // ledger seq → already branched
 	mogReg            = moghouse.NewRegistry()
+	worldEventReg     = func() *worldevent.Registry {
+		reg := worldevent.NewRegistry()
+		reg.Subscribe(func(e worldevent.Event) {
+			broadcastAll(worldevent.FormatMessage(e))
+		})
+		return reg
+	}()
 	npcScheduleReg    = func() *schedule.Registry {
 		reg := schedule.NewRegistry()
 		for _, s := range schedule.DefaultSchedules() {
@@ -1540,12 +1549,18 @@ func tickAll() {
 	// Faction war engine tick — trigger/resolve conflicts.
 	triggered, resolved := warEngine.Tick()
 	for _, w := range triggered {
-		msg := fmt.Sprintf("*** FACTION WAR: %s is contested! All field offices open. ***", w.DistrictID)
-		broadcastAll(msg)
+		worldEventReg.Post(worldevent.Event{
+			Type:     worldevent.FactionWarStart,
+			Message:  w.DistrictID + " is contested! All field offices open.",
+			District: w.DistrictID,
+		})
 	}
 	for _, w := range resolved {
-		msg := fmt.Sprintf("*** FACTION WAR RESOLVED: %s — conflict ended. ***", w.DistrictID)
-		broadcastAll(msg)
+		worldEventReg.Post(worldevent.Event{
+			Type:     worldevent.FieldOfficeFallen,
+			Message:  w.DistrictID + " — faction conflict resolved.",
+			District: w.DistrictID,
+		})
 	}
 
 	// Emily OS ambient voice (VS0 Detroit School, S123-05).
@@ -6694,16 +6709,69 @@ func cmdCAST(p *player, docID string) {
 	p.prompt()
 }
 
+// startWorldEventAPI runs a minimal HTTP server on the given port.
+// POST /api/world-events: Emily Prime can inject world events.
+// GET  /api/world-events: Returns the 20 most recent events.
+func startWorldEventAPI(port int) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/world-events", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			var req struct {
+				Type    string `json:"type"`
+				Message string `json:"message"`
+				District string `json:"district"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				http.Error(w, "bad request", http.StatusBadRequest)
+				return
+			}
+			if req.Type == "" || req.Message == "" {
+				http.Error(w, "type and message required", http.StatusBadRequest)
+				return
+			}
+			worldEventReg.Post(worldevent.Event{
+				Type:     worldevent.EventType(req.Type),
+				Message:  req.Message,
+				District: req.District,
+			})
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		case http.MethodGet:
+			recent := worldEventReg.Recent(20)
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"count":  len(recent),
+				"events": recent,
+			})
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	addr := fmt.Sprintf(":%d", port)
+	fmt.Printf("[WorldEvent API] listening on %s\n", addr)
+	if err := http.ListenAndServe(addr, mux); err != nil {
+		fmt.Printf("[WorldEvent API] error: %v\n", err)
+	}
+}
+
 // ── main ──────────────────────────────────────────────────────────────────────
 
 func main() {
-	port := flag.Int("port", mudPort, "MUD TCP port")
+	port    := flag.Int("port", mudPort, "MUD TCP port")
+	apiPort := flag.Int("api-port", 7171, "world-events HTTP API port (0 = disabled)")
 	flag.Parse()
 
 	gw = initWorld()
 	initTRAPXCity()
 
 	go gameLoop()
+
+	// Start world-event HTTP API if enabled.
+	if *apiPort > 0 {
+		go startWorldEventAPI(*apiPort)
+	}
 
 	addr := fmt.Sprintf(":%d", *port)
 	ln, err := net.Listen("tcp", addr)
