@@ -63,6 +63,7 @@ import (
 	"dragonsnshit/server/neighborhood"
 	"dragonsnshit/server/timeline"
 	"dragonsnshit/server/autotranslate"
+	"dragonsnshit/server/factionwar"
 )
 
 // ── constants ──────────────────────────────────────────────────────────────────
@@ -555,6 +556,10 @@ var (
 	nbhdReg           = neighborhood.NewRegistry()
 	timelineReg       = timeline.NewRegistry()
 	seenRogueBranches = make(map[int]bool) // ledger seq → already branched
+	warEngine         = factionwar.NewEngine([]string{
+		"district-residential", "district-commercial", "district-industrial",
+		"district-underground", "district-abandoned",
+	})
 )
 
 func initTRAPXCity() {
@@ -772,6 +777,13 @@ func awardXP(p *player, baseXP int, now time.Time) {
 
 // broadcastZoneNoLock sends msg to all players in zoneID except exceptSlot.
 // Does NOT acquire gw.mu — only call when already holding the lock.
+func broadcastAll(msg string) {
+	for _, op := range gw.players {
+		op.send("\r\n" + msg)
+		op.prompt()
+	}
+}
+
 func broadcastZoneNoLock(zoneID int, msg, exceptSlot string) {
 	for _, op := range gw.players {
 		if op.zoneID == zoneID && op.slot != exceptSlot {
@@ -1487,6 +1499,17 @@ func tickAll() {
 		}
 	}
 
+	// Faction war engine tick — trigger/resolve conflicts.
+	triggered, resolved := warEngine.Tick()
+	for _, w := range triggered {
+		msg := fmt.Sprintf("*** FACTION WAR: %s is contested! All field offices open. ***", w.DistrictID)
+		broadcastAll(msg)
+	}
+	for _, w := range resolved {
+		msg := fmt.Sprintf("*** FACTION WAR RESOLVED: %s — conflict ended. ***", w.DistrictID)
+		broadcastAll(msg)
+	}
+
 	// Emily OS ambient voice (VS0 Detroit School, S123-05).
 	broadcastEmilyOS(now)
 
@@ -1642,6 +1665,13 @@ func handle(p *player, line string) {
 		cmdStatus(p)
 	case "who":
 		cmdWho(p)
+	case "examine", "exa", "inspect":
+		if len(args) == 0 {
+			p.send("Examine who? Usage: examine <player-name>")
+			p.prompt()
+		} else {
+			cmdExamine(p, args[0])
+		}
 	case "say", "'":
 		msg := strings.Join(args, " ")
 		if cmd == "'" {
@@ -2070,6 +2100,8 @@ func handle(p *player, line string) {
 	// ── VS0 entry point (S123-05) ────────────────────────────────────────────
 	case "takecontrol", "take-control":
 		cmdTakeControl(p)
+	case "war", "factionwar", "fw":
+		cmdFactionWar(p)
 	// ── Flip phone interface (S123-04) ───────────────────────────────────────
 	case "phone", "flip":
 		tab := "1"
@@ -2472,7 +2504,10 @@ func cmdGo(p *player, dir string) {
 		return
 	}
 
+	oldZone := p.zoneID
 	p.combat.TargetMobID = ""
+	broadcastZoneNoLock(oldZone, fmt.Sprintf("%s leaves heading %s.", p.name, dir), p.slot)
+
 	_ = gw.zoneMgr.Transfer(p.slot, dest)
 	p.zoneID = dest
 	p.atlas.Visit(dest) // cartography: mark zone discovered
@@ -2765,6 +2800,64 @@ func cmdWho(p *player) {
 			koStr = " [KO]"
 		}
 		p.sendf("  Lv.%-3d %-16s  %s%s%s", op.charXP.Level, op.name, zoneName(op.zoneID), partyStr, koStr)
+	}
+	p.prompt()
+}
+
+func cmdExamine(p *player, targetName string) {
+	targetName = strings.ToLower(targetName)
+	for _, op := range gw.players {
+		if strings.ToLower(op.name) == targetName {
+			if op.zoneID != p.zoneID {
+				p.sendf("%s is not here.", op.name)
+				p.prompt()
+				return
+			}
+			jobName := op.jobID
+			if jobName == "" {
+				jobName = "None"
+			}
+			if op.charJob != nil && string(op.charJob.Sub) != "" {
+				jobName += "/" + string(op.charJob.Sub)
+			}
+			factionFreq := op.fameStore.Rank(fame.Sandoria)
+			factionBloc := op.fameStore.Rank(fame.Bastok)
+			factionProc := op.fameStore.Rank(fame.Windurst)
+			p.sendf("\r\n=== %s ===", op.name)
+			p.sendf("  Level : %d", op.charXP.Level)
+			p.sendf("  Job   : %s", jobName)
+			p.sendf("  Zone  : %s", zoneName(op.zoneID))
+			p.sendf("  Freq  : rank %d  |  Bloc: rank %d  |  Procure: rank %d",
+				factionFreq, factionBloc, factionProc)
+			if op.homePoint.IsKO {
+				p.send("  Status: KO")
+			}
+			p.prompt()
+			return
+		}
+	}
+	p.sendf("No player named %q here.", targetName)
+	p.prompt()
+}
+
+func cmdFactionWar(p *player) {
+	wars := warEngine.AllWars()
+	if len(wars) == 0 {
+		p.send("\r\n=== TRAPX Faction Wars ===\r\n  No active conflicts.")
+		p.prompt()
+		return
+	}
+	p.send("\r\n=== TRAPX Active Faction Wars ===")
+	for _, w := range wars {
+		remaining := w.EndsAt.Sub(time.Now().UTC())
+		if remaining < 0 {
+			remaining = 0
+		}
+		p.sendf("  [%s]  %s  — expires in %s", w.ID, w.DistrictID,
+			remaining.Round(time.Minute).String())
+		for faction, count := range w.FOsHeld {
+			p.sendf("    %-24s  FOs held: %d", faction, count)
+		}
 	}
 	p.prompt()
 }
