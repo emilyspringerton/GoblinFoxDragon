@@ -1,4 +1,5 @@
 ## 2026-06-24
+- feat: S125-04 TRAPX economy — 5 items, 3 TRAPX vendors, enforcement.DistrictPressure price scaling (Apple #3656)
 - feat: S126-15 TRAPX craft recipes — repaired-bike/faction-gear/atlas-page; cartography.DiscoverAll on atlas-page (Apple #3644)
 - feat: S126-14 campaign battle mode — server/campaign, 10 nodes, /campaign join/status, weekly reset, 15 tests (Apple #3641)
 - feat: S126-13 NM respawn scheduler — nm.Registry, NMRespawnScheduler, RespawnMinutes, announceNMPop, 8 tests (Apple #3566)
