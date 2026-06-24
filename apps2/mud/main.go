@@ -52,6 +52,12 @@ import (
 	"dragonsnshit/server/food"
 	"dragonsnshit/server/fame"
 	combatTp "dragonsnshit/server/combat"
+	"dragonsnshit/server/fieldoffice"
+	"dragonsnshit/server/k9"
+	"dragonsnshit/server/attention"
+	"dragonsnshit/server/integrity"
+	"dragonsnshit/server/techpressure"
+	"dragonsnshit/server/ledger"
 )
 
 // ── constants ──────────────────────────────────────────────────────────────────
@@ -369,6 +375,26 @@ type world struct {
 
 var gw *world
 
+// ── TRAPX city simulation state ───────────────────────────────────────────────
+
+var (
+	foReg    = fieldoffice.NewRegistry()
+	attnReg  = attention.NewRegistry()
+	intReg   = integrity.NewRegistry()
+	techClock = techpressure.NewClock()
+	cityLedger = ledger.NewLedger()
+)
+
+func initTRAPXCity() {
+	for _, fo := range fieldoffice.DefaultFieldOffices(nil) {
+		foReg.Add(fo)
+	}
+	// Initialise integrity state for each TRAPX district (scenes 200–204).
+	for _, id := range []string{"district-residential", "district-commercial", "district-industrial", "district-underground", "district-abandoned"} {
+		intReg.GetOrCreate(id)
+	}
+}
+
 // ── player ────────────────────────────────────────────────────────────────────
 
 type player struct {
@@ -404,6 +430,7 @@ type player struct {
 	recastTracker *job.RecastTracker
 	petSlot      *pet.Slot       // BST pet companion (non-nil always; pet.IsAlive() = has pet)
 	petHeel      bool            // true = pet does not attack (heel mode)
+	k9Swarm      *k9.Swarm      // TRAPX: active K9 swarm (nil if none deployed)
 	questJournal *quest.Journal        // NPC quest progress
 	atlas        *cartography.Atlas   // explored zone map
 	conn        net.Conn
@@ -1215,6 +1242,42 @@ func tickAll() {
 			}
 		}
 	}
+
+	// ── TRAPX city simulation tick ────────────────────────────────────────────
+
+	// FO tick: auto-defend expired contests, accumulate Flow+Pressure.
+	foReceipts := foReg.TickAll(now, tickRate)
+	for _, r := range foReceipts {
+		cityLedger.Append(ledger.VerbType(r.Verb), r.FOID, r.Actor, r.Subject, r.Detail, now)
+		for _, p := range gw.players {
+			p.sendf("\r\n\033[33m[FIELD] %s\033[0m", r.String())
+			p.prompt()
+		}
+	}
+
+	// Attention decay tick.
+	attnReg.TickAll(tickRate, now)
+
+	// Integrity tick: 0 dogs per district (no active swarms in idle tick).
+	intReg.TickAll(tickRate, map[string]int{}, now)
+
+	// Tech Pressure decay tick.
+	tpEvts := techClock.Tick(tickRate, now)
+	for _, e := range tpEvts {
+		if e.Verb == "TIER_ACTIVATED" || e.Verb == "CROWN_PROTOCOL" {
+			msg := fmt.Sprintf("\r\n\033[1;31m[TECH PRESSURE] %s activated! Pressure=%.0f\033[0m",
+				techpressure.TierName(e.Tier), e.Pressure)
+			for _, p := range gw.players {
+				p.send(msg)
+				p.prompt()
+			}
+		}
+	}
+
+	// Prune flip log once per minute.
+	if now.Second() == 0 {
+		cityLedger.PruneFlipLog(now)
+	}
 }
 
 func broadcastMobEvent(zoneID int, ev mob.Event) {
@@ -1701,6 +1764,58 @@ func handle(p *player, line string) {
 		cmdQuestTurnIn(p, args[0])
 	case "quests", "qlog":
 		cmdQuestLog(p)
+	// ── TRAPX Field Office commands ─────────────────────────────────────────────
+	case "claim":
+		if len(args) == 0 {
+			p.send("Usage: claim <fo-id>  (see 'fo-list')")
+			p.prompt()
+			return
+		}
+		cmdFOClaim(p, args[0])
+	case "contest":
+		if len(args) == 0 {
+			p.send("Usage: contest <fo-id>")
+			p.prompt()
+			return
+		}
+		cmdFOContest(p, args[0])
+	case "fo-status", "fos":
+		if len(args) == 0 {
+			p.send("Usage: fo-status <fo-id>  (see 'fo-list')")
+			p.prompt()
+			return
+		}
+		cmdFOStatus(p, args[0])
+	case "fo-list", "fol":
+		cmdFOList(p)
+	case "k9-deploy":
+		if len(args) == 0 {
+			p.send("Usage: k9-deploy <sentry|escort|audit>")
+			p.prompt()
+			return
+		}
+		cmdK9Deploy(p, args[0])
+	case "k9-swarm":
+		if len(args) == 0 {
+			p.send("Usage: k9-swarm <count>  (deploy <count> dogs from your K9 Doctrine)")
+			p.prompt()
+			return
+		}
+		cmdK9Swarm(p, args[0])
+	case "receipts", "rec":
+		cmdReceipts(p)
+	case "attention", "attn":
+		if len(args) == 0 {
+			p.send("Usage: attention <fo-id>")
+			p.prompt()
+			return
+		}
+		cmdAttention(p, args[0])
+	case "integrity", "ci":
+		cmdIntegrity(p)
+	case "tech-pressure", "tp-doom":
+		cmdTechPressure(p)
+
 	case "help", "?":
 		cmdHelp(p)
 	case "quit", "exit", "q":
@@ -5486,6 +5601,214 @@ func handleConn(conn net.Conn) {
 	}
 }
 
+// ── TRAPX Field Office commands ───────────────────────────────────────────────
+
+func cmdFOClaim(p *player, foID string) {
+	fo, ok := foReg.Get(foID)
+	if !ok {
+		p.sendf("Unknown Field Office: %q", foID)
+		p.prompt()
+		return
+	}
+	r, err := fo.Claim(p.name, time.Now())
+	if err != nil {
+		p.sendf("[FO] %s: %v", foID, err)
+		p.prompt()
+		return
+	}
+	cityLedger.Append(ledger.VerbClaimed, foID, p.name, "", r.Detail, r.At)
+	p.sendf("\033[33m[FIELD] %s\033[0m", r.String())
+
+	// Raise Tech Pressure on claim (approximates tier-1 activity).
+	techClock.AddDogDeploy(r.At)
+
+	p.prompt()
+}
+
+func cmdFOContest(p *player, foID string) {
+	fo, ok := foReg.Get(foID)
+	if !ok {
+		p.sendf("Unknown Field Office: %q", foID)
+		p.prompt()
+		return
+	}
+	r, err := fo.Contest(p.name, time.Now(), false)
+	if err != nil {
+		p.sendf("[FO] %s: %v", foID, err)
+		p.prompt()
+		return
+	}
+	cityLedger.Append(ledger.VerbContested, foID, p.name, fo.HolderID, r.Detail, r.At)
+	p.sendf("\033[33m[FIELD] %s\033[0m", r.String())
+	p.prompt()
+}
+
+func cmdFOStatus(p *player, foID string) {
+	fo, ok := foReg.Get(foID)
+	if !ok {
+		p.sendf("Unknown Field Office: %q", foID)
+		p.prompt()
+		return
+	}
+	m := attnReg.Get(foID)
+	attn := 0.0
+	if m != nil {
+		attn = m.Value
+	}
+	p.sendf("%s | Attention: %.0f/1000", fo.Summary(), attn)
+	if fo.Phase == fieldoffice.PhaseContested {
+		p.sendf("  Contest window closes in: %s", fo.ContestTimeRemaining(time.Now()))
+	}
+	p.prompt()
+}
+
+func cmdFOList(p *player) {
+	fos := foReg.All()
+	if len(fos) == 0 {
+		p.send("[FO] No Field Offices registered.")
+		p.prompt()
+		return
+	}
+	p.send("\033[1m[FIELD OFFICES]\033[0m")
+	for _, fo := range fos {
+		p.sendf("  %s", fo.Summary())
+	}
+	p.prompt()
+}
+
+func cmdK9Deploy(p *player, mode string) {
+	var m k9.Mode
+	switch strings.ToLower(mode) {
+	case "sentry":
+		m = k9.ModeSentry
+	case "escort":
+		m = k9.ModeEscort
+	case "audit":
+		m = k9.ModeAudit
+	default:
+		p.sendf("Unknown mode %q — use sentry, escort, or audit.", mode)
+		p.prompt()
+		return
+	}
+	if p.k9Swarm == nil {
+		p.send("[K9] You have no active swarm. Use 'k9-swarm <count>' to deploy dogs first.")
+		p.prompt()
+		return
+	}
+	for _, d := range p.k9Swarm.Dogs {
+		if d.IsAlive() {
+			d.SetMode(m, time.Now())
+		}
+	}
+	p.sendf("[K9] All active dogs set to %s mode.", k9.ModeName(m))
+	p.prompt()
+}
+
+func cmdK9Swarm(p *player, countStr string) {
+	count := 0
+	for _, c := range countStr {
+		if c >= '0' && c <= '9' {
+			count = count*10 + int(c-'0')
+		}
+	}
+	if count <= 0 || count > k9.MaxActivePerOffice {
+		p.sendf("[K9] Invalid dog count. Must be 1–%d.", k9.MaxActivePerOffice)
+		p.prompt()
+		return
+	}
+	if p.k9Swarm == nil {
+		p.k9Swarm = k9.NewSwarm("")
+	}
+	added := 0
+	for i := 0; i < count; i++ {
+		d := k9.NewDog(fmt.Sprintf("%s-dog-%d", p.name, i+1), p.name)
+		if err := p.k9Swarm.Add(d); err != nil {
+			break
+		}
+		added++
+	}
+	p.sendf("[K9] Deployed %d dog(s). Active swarm: %d dogs.", added, p.k9Swarm.ActiveCount())
+	// Raise Tech Pressure.
+	now := time.Now()
+	for i := 0; i < added; i++ {
+		techClock.AddDogDeploy(now)
+	}
+	p.prompt()
+}
+
+func cmdReceipts(p *player) {
+	all := cityLedger.All()
+	if len(all) == 0 {
+		p.send("[RECEIPTS] Ledger is empty.")
+		p.prompt()
+		return
+	}
+	start := len(all) - 10
+	if start < 0 {
+		start = 0
+	}
+	p.send("\033[1m[RECEIPTS — last 10]\033[0m")
+	for _, r := range all[start:] {
+		p.sendf("  %s", r.String())
+	}
+	p.prompt()
+}
+
+func cmdAttention(p *player, foID string) {
+	m := attnReg.GetOrCreate(foID)
+	mig, tax, contest := m.EcosystemEffects()
+	p.sendf("[ATTENTION] FO:%s  value=%.0f/1000  audit=%v  vendor=%v",
+		foID, m.Value, m.IsUnderAudit(), m.IsUnderVendorPressure())
+	p.sendf("  Effects: migration_weight=%.2f  ah_tax_mult=%.2fx  contest_scaler=%.2fx",
+		mig, tax, contest)
+	p.prompt()
+}
+
+func cmdIntegrity(p *player) {
+	rogues := intReg.RogueDistricts()
+	p.send("\033[1m[CONTROL INTEGRITY]\033[0m")
+	for _, s := range []string{"district-residential", "district-commercial", "district-industrial", "district-underground", "district-abandoned"} {
+		st := intReg.Get(s)
+		if st == nil {
+			continue
+		}
+		rouge := ""
+		if st.IsRogue {
+			rouge = " \033[1;31m[ROGUE SWARM]\033[0m"
+		}
+		p.sendf("  %-25s CI=%.3f  scars=%d%s", s, st.CI, st.ScarCount(), rouge)
+	}
+	if len(rogues) == 0 {
+		p.send("  No active Rogue Swarms.")
+	}
+	p.prompt()
+}
+
+func cmdTechPressure(p *player) {
+	c := techClock
+	tier := techpressure.TierForPressure(c.Pressure)
+	p.sendf("[TECH PRESSURE] %.0f/1000  tier=%s  crown_fired=%v",
+		c.Pressure, techpressure.TierName(tier), c.CrownFired)
+	thresholds := []struct {
+		name      string
+		threshold float64
+	}{
+		{"LeashFrays", techpressure.T1LeashFrays},
+		{"ProcurementWar", techpressure.T2ProcurementWar},
+		{"QuietAudit", techpressure.T3QuietAudit},
+		{"Packmind", techpressure.T4Packmind},
+		{"CrownProtocol", techpressure.T5CrownProtocol},
+	}
+	for _, t := range thresholds {
+		active := ""
+		if c.Pressure >= t.threshold {
+			active = " [ACTIVE]"
+		}
+		p.sendf("  T=%.0f %-18s%s", t.threshold, t.name, active)
+	}
+	p.prompt()
+}
+
 // ── main ──────────────────────────────────────────────────────────────────────
 
 func main() {
@@ -5493,6 +5816,7 @@ func main() {
 	flag.Parse()
 
 	gw = initWorld()
+	initTRAPXCity()
 
 	go gameLoop()
 
