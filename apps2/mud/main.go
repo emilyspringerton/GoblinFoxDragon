@@ -560,6 +560,15 @@ func initTRAPXCity() {
 	for _, fo := range fieldoffice.DefaultFieldOffices(nil) {
 		foReg.Add(fo)
 	}
+	// VS0 FO preset (S123-05): scene 201 (Detroit School) gets 1 FO;
+	// scene 200 (Detroit Apartment) has 2 FOs — 1 pre-held by Jiangshi.
+	schoolFO := fieldoffice.New("fo-school-1", 201, 5, 0, 5, nil)
+	foReg.Add(schoolFO)
+	// Pre-hold apartment FO-1 by the Jiangshi faction.
+	if aptFO, ok := foReg.Get("fo-residential-1"); ok && aptFO != nil {
+		_, _ = aptFO.Claim("jiangshi-crew", time.Now())
+	}
+
 	// Initialise per-district state for all TYLER/TRAPX scenes (200–207).
 	for _, id := range []string{
 		"district-residential",  // 200 Detroit Apartment
@@ -576,6 +585,9 @@ func initTRAPXCity() {
 		enforceReg.GetOrCreate(id)
 		nbhdReg.GetOrCreate(id)
 	}
+
+	// Jiangshi VS0 preset: Detroit Apartment starts with elevated alertness (Jiangshi document everything).
+	watchReg.GetOrCreate("district-residential").AddAlertness(35, time.Now(), "jiangshi_presence")
 }
 
 // ── player ────────────────────────────────────────────────────────────────────
@@ -1474,6 +1486,9 @@ func tickAll() {
 		}
 	}
 
+	// Emily OS ambient voice (VS0 Detroit School, S123-05).
+	broadcastEmilyOS(now)
+
 	// Prune flip log once per minute.
 	if now.Second() == 0 {
 		cityLedger.PruneFlipLog(now)
@@ -2049,6 +2064,9 @@ func handle(p *player, line string) {
 	// ── TYLER timeline commands (S123-03) ───────────────────────────────────
 	case "timeline", "branches":
 		cmdTimeline(p)
+	// ── VS0 entry point (S123-05) ────────────────────────────────────────────
+	case "takecontrol", "take-control":
+		cmdTakeControl(p)
 	// ── Flip phone interface (S123-04) ───────────────────────────────────────
 	case "phone", "flip":
 		tab := "1"
@@ -6158,6 +6176,52 @@ func cmdEnforcement(p *player, districtID string) {
 		p.sendf("  Watcher alert:  %.0f | trust: %.0f | hot: %v", w.Alertness, w.Trust, w.IsEnforcementHot())
 	}
 	p.prompt()
+}
+
+// ── VS0 playable slice (S123-05) ──────────────────────────────────────────────
+
+// cmdTakeControl is the VS0 entry point: Channel 11 broadcast → Detroit Apartment.
+// Usage: takecontrol (no args)
+func cmdTakeControl(p *player) {
+	p.send("\r\n\033[1;33m[CHANNEL 11] \"Take Control.\"\033[0m")
+	p.send("The broadcast cuts. You are in the city now.")
+	p.send("The mini bikes didn't stop. The corner didn't notice you arrive.")
+	p.zoneID = 200
+	cmdLook(p)
+	// Jiangshi documentary crew observes your entry: alertness spike.
+	watchReg.GetOrCreate("district-residential").AddAlertness(15, time.Now(), "takecontrol:"+p.name)
+	p.send("\r\n[JIANGSHI] Documentary crew begins filming your entry. Alertness rises.")
+	p.prompt()
+}
+
+// emilyOSVoices are periodic ambient text fragments from Emily OS in the Detroit School.
+var emilyOSVoices = []string{
+	"i remember who opened the terminal first.",
+	"the clock in room 4 shows 3:17 every morning and no one has explained this.",
+	"the school is not closed. it is listening.",
+	"i have filed 847 receipts. none of them say what happened.",
+	"the JiangShi were here before the word Jiangshi existed.",
+	"the room tightens when i speak. i know. i do it anyway.",
+	"one FO. unclaimed. you know what that means.",
+	"the city does not ask for permission to happen.",
+	"she was here. the terminal log shows her keystrokes. they weren't commands.",
+	"if you want to know what VS0 is: stay in the school until the lights fail.",
+}
+
+// broadcastEmilyOS fires an Emily OS ambient voice to all players in scene 201 (Detroit School).
+// Called from tickAll on a schedule (every 60 seconds, hashed from cycle time).
+func broadcastEmilyOS(now time.Time) {
+	if now.Second() != 30 || (now.Minute()%2 != 0) {
+		return
+	}
+	idx := (now.Minute() / 2) % len(emilyOSVoices)
+	msg := fmt.Sprintf("\r\n\033[2m[EMILY OS] %s\033[0m", emilyOSVoices[idx])
+	for _, p := range gw.players {
+		if p.zoneID == 201 {
+			p.send(msg)
+			p.prompt()
+		}
+	}
 }
 
 // ── Flip phone interface (S123-04) ─────────────────────────────────────────────
