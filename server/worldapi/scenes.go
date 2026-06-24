@@ -19,8 +19,8 @@ func ProceduralWorldStore(sceneID, chunkX, chunkZ int) []WorldBlock {
 		return cavesChunk(chunkX, chunkZ)
 	case 3:
 		return swampChunk(chunkX, chunkZ)
-	// TRAPX city districts (S122-01): scenes 200–299 → urban terrain
-	case 200, 201, 202, 203, 204:
+	// TRAPX city districts / TYLER scene cluster (S122-01 + S123-01)
+	case 200, 201, 202, 203, 204, 205, 206, 207:
 		return urbanChunk(sceneID, chunkX, chunkZ)
 	default:
 		return meadowChunk(chunkX, chunkZ)
@@ -68,13 +68,86 @@ func urbanChunk(sceneID, chunkX, chunkZ int) []WorldBlock {
 				out = append(out, WorldBlock{X: wx, Y: 72, Z: wz, BlockName: "minecraft:stone"})
 			}
 		}
-	case 204: // Abandoned: crumbled bricks scattered
+	case 204: // Vatican Corridors: crumbled stone with salt-water channels
 		for _, pos := range [][3]int{{3, 65, 3}, {7, 65, 9}, {11, 65, 4}, {1, 65, 13}} {
 			wx := chunkX*16 + pos[0]
 			wz := chunkZ*16 + pos[2]
 			for dy := 0; dy < pos[1]-64; dy++ {
 				out = append(out, WorldBlock{X: wx, Y: 64 + dy, Z: wz, BlockName: "minecraft:cracked_stone_bricks"})
 			}
+		}
+		// Narrow water channel along center (z=7)
+		for lx := 0; lx < 16; lx++ {
+			wx := chunkX*16 + lx
+			wz := chunkZ*16 + 7
+			out = append(out, WorldBlock{X: wx, Y: 64, Z: wz, BlockName: "minecraft:water"})
+		}
+	case 205: // Osaka Underport: flooded docks with iron bulkhead doors
+		for lx := 0; lx < 16; lx++ {
+			for lz := 0; lz < 16; lz++ {
+				wx := chunkX*16 + lx
+				wz := chunkZ*16 + lz
+				if lz < 3 || lz > 12 { // flooded edges
+					out = append(out, WorldBlock{X: wx, Y: 64, Z: wz, BlockName: "minecraft:water"})
+				}
+			}
+		}
+		// Iron bulkhead doors on east and west walls
+		for lz := 3; lz <= 12; lz++ {
+			wx0 := chunkX * 16
+			wx1 := chunkX*16 + 15
+			wz := chunkZ*16 + lz
+			for dy := 0; dy < 3; dy++ {
+				out = append(out, WorldBlock{X: wx0, Y: 65 + dy, Z: wz, BlockName: "minecraft:iron_bars"})
+				out = append(out, WorldBlock{X: wx1, Y: 65 + dy, Z: wz, BlockName: "minecraft:iron_bars"})
+			}
+		}
+	case 206: // Kuroshio Coast: rocky shoreline with kelp and cliff face
+		for lx := 0; lx < 16; lx++ {
+			for lz := 0; lz < 16; lz++ {
+				wx := chunkX*16 + lx
+				wz := chunkZ*16 + lz
+				if lz > 10 { // ocean side
+					out = append(out, WorldBlock{X: wx, Y: 64, Z: wz, BlockName: "minecraft:water"})
+					// Kelp scattered
+					if (lx+lz+chunkX+chunkZ)%4 == 0 {
+						out = append(out, WorldBlock{X: wx, Y: 65, Z: wz, BlockName: "minecraft:kelp"})
+					}
+				} else {
+					out = append(out, WorldBlock{X: wx, Y: 64, Z: wz, BlockName: "minecraft:gravel"})
+				}
+			}
+		}
+		// Cliff face on north edge (z=0..2): packed stone columns
+		for lx := 0; lx < 16; lx++ {
+			wx := chunkX*16 + lx
+			for lz := 0; lz <= 2; lz++ {
+				wz := chunkZ*16 + lz
+				for dy := 0; dy < 4; dy++ {
+					out = append(out, WorldBlock{X: wx, Y: 65 + dy, Z: wz, BlockName: "minecraft:stone"})
+				}
+			}
+		}
+	case 207: // Bacon's Table: collapsed warehouse, neon shrine-gate arch
+		// Scattered debris floor
+		for _, pos := range [][2]int{{2, 3}, {5, 8}, {9, 4}, {13, 11}, {7, 7}, {3, 13}} {
+			wx := chunkX*16 + pos[0]
+			wz := chunkZ*16 + pos[1]
+			out = append(out, WorldBlock{X: wx, Y: 65, Z: wz, BlockName: "minecraft:soul_sand"})
+		}
+		// Shrine-gate arch: two pillars + crossbar at entrance (z=0)
+		for _, lx := range []int{5, 10} {
+			wx := chunkX*16 + lx
+			wz := chunkZ * 16
+			for dy := 0; dy < 4; dy++ {
+				out = append(out, WorldBlock{X: wx, Y: 65 + dy, Z: wz, BlockName: "minecraft:crimson_planks"})
+			}
+		}
+		// Crossbar
+		for lx := 5; lx <= 10; lx++ {
+			wx := chunkX*16 + lx
+			wz := chunkZ * 16
+			out = append(out, WorldBlock{X: wx, Y: 68, Z: wz, BlockName: "minecraft:crimson_planks"})
 		}
 	}
 	return out

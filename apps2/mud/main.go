@@ -222,12 +222,15 @@ var exits = map[int]map[string]int{
 	1: {"south": 0},
 	2: {"north": 0},
 	3: {"west": 0},
-	// TRAPX city districts — scenes 200–204 (S122-01)
-	200: {"south": 201, "east": 202, "down": 203},        // Residential → Commercial, Industrial, Underground
-	201: {"north": 200, "east": 202, "west": 204},        // Commercial → Residential, Industrial, Abandoned
-	202: {"west": 201, "south": 204, "down": 203},        // Industrial → Commercial, Abandoned, Underground
-	203: {"up": 200, "east": 204},                        // Underground → Residential, Abandoned
-	204: {"north": 201, "east": 202, "up": 203},          // Abandoned → Commercial, Industrial, Underground
+	// TRAPX city districts — scenes 200–207 (S123-01 TYLER layer)
+	200: {"south": 201, "east": 202, "down": 203},             // Detroit Apartment → School, Osaka, Underground
+	201: {"north": 200, "west": 204},                          // Detroit School → Apartment, Vatican
+	202: {"west": 200, "south": 204, "down": 203, "east": 206}, // Osaka → Apartment, Vatican, Underground, Coastal
+	203: {"up": 200, "east": 204, "south": 205},               // Cairngorms → Apartment, Vatican, Underport
+	204: {"east": 201, "west": 202, "up": 203, "south": 205}, // Vatican → School, Osaka, Cairngorms, Underport
+	205: {"north": 203, "up": 204, "east": 206},               // Osaka Underport → Cairngorms, Vatican, Coastal
+	206: {"west": 202, "south": 207, "down": 205},             // Kuroshio → Osaka, Bacon's Table, Underport
+	207: {"north": 206},                                        // Bacon's Table → Kuroshio
 }
 
 var dirAliases = map[string]string{
@@ -240,22 +243,40 @@ var zoneDesc = map[int]string{
 	1: "Rolling green hills stretch to the horizon. The wind is strong up here.",
 	2: "A dark stone cave. Water drips somewhere in the darkness. Your footsteps echo.",
 	3: "Swampville. Thick air, murky water, dead mangrove trees. Something slithers nearby.",
-	// ── TRAPX city districts (S122-01) ───────────────────────────────────────
-	200: "[DISTRICT: RESIDENTIAL] Low-rise apartment blocks, chain-link fences, a corner store with iron bars on the windows. " +
-		"Young adults on mini bikes weave between dumpsters. CRT static hums from an upper window. " +
-		"Exits: south (Commercial), east (Industrial), down (Underground).",
-	201: "[DISTRICT: COMMERCIAL] Strip malls, blinking LED signs, a shuttered check-cashing spot. " +
-		"Coverage drones cruise at rooftop height. A mini bike crew idles near the pawn shop entrance. " +
-		"Exits: north (Residential), east (Industrial), west (Abandoned).",
-	202: "[DISTRICT: INDUSTRIAL] Corrugated metal warehouses, chain-link topped with razor wire. " +
-		"Forklifts ghost through loading bays. The air smells of diesel and hot asphalt. " +
-		"Exits: west (Commercial), south (Abandoned), down (Underground).",
-	203: "[DISTRICT: UNDERGROUND] Subway tunnels repurposed as corridors. Water-stained concrete, " +
-		"flickering fluorescents, CAST terminals graffitied into the walls. " +
-		"The Frequency runs cable through here. Exits: up (Residential), east (Abandoned).",
-	204: "[DISTRICT: ABANDONED] Burnt-out storefronts, scorched concrete, Scar graffiti from old Rogue Swarms. " +
-		"Baphomet's sigil is scratched into a load-bearing column. The air is still. " +
-		"Exits: north (Commercial), east (Industrial), up (Underground).",
+	// ── TRAPX city districts / TYLER scene cluster (S122-01 + S123-01) ───────
+	200: "[TYLER: DETROIT APARTMENT / Jiangshi / Residential] Low-rise apartment blocks, chain-link fences, " +
+		"a corner store with iron bars on the windows. Young adults on mini bikes weave between dumpsters. " +
+		"Jiangshi faction tags at eye level. CRT static from upstairs. " +
+		"Exits: south (Detroit School), east (Osaka), down (Cairngorms).",
+	201: "[TYLER: DETROIT SCHOOL / Emily OS / Abandoned] Gutted school building. Lockers pried open. " +
+		"Emily OS terminal in the former computer lab, still running. " +
+		"Abandoned-district energy — high tolerance, deep pride, thin cohesion. " +
+		"Exits: north (Detroit Apartment), west (Vatican Corridors).",
+	202: "[TYLER: OSAKA CONVENIENCE STORE / Hashashin+Yōkai / Commercial] A 24-hour party store " +
+		"operating as a faction meeting ground. Hashashin and Yōkai rotate the counter. " +
+		"Coverage drones park on the roof rack. Mini bikes idle at the pump. " +
+		"Exits: west (Detroit Apartment), south (Vatican), down (Cairngorms), east (Kuroshio Coast).",
+	203: "[TYLER: CAIRNGORMS ARCHIVE / Eastwind Owls / Institutional] Climate-controlled corridor, " +
+		"endless shelving of sealed document boxes. Eastwind Owls maintain order here. " +
+		"CAST terminals line the east wall, each streaming archive data. " +
+		"Exits: up (Detroit Apartment), east (Vatican Corridors), south (Osaka Underport).",
+	204: "[TYLER: VATICAN CORRIDORS / Ichthyosapiens / Underground] Ancient stone passages beneath an institutional complex. " +
+		"The corridor smells of salt water. Ichthyosapien shell markings line the lower walls. " +
+		"A CAST terminal in the alcove shows Eastwind archive streams. " +
+		"Exits: east (Detroit School), west (Osaka), up (Cairngorms), south (Osaka Underport).",
+	205: "[TYLER: OSAKA UNDERPORT / Heikegani / Industrial] Flooded loading docks beneath the Underport. " +
+		"Red crab carapace — Heikegani faction insignia — is welded above every bulkhead door. " +
+		"Bilge water sloshes at ankle height. Deep hum of cargo movers above. " +
+		"Exits: north (Cairngorms), up (Vatican), east (Kuroshio Coast).",
+	206: "[TYLER: KUROSHIO COAST / Kuroshio / Abandoned Coastal] Rocky shoreline. Kelp mats. " +
+		"Kuroshio faction buoys mark the perimeter — pulsing bioluminescent markers, slow and cold. " +
+		"An abandoned party store sits at the cliff edge, gutted, door open. " +
+		"Exits: west (Osaka), south (Bacon's Table), down (Osaka Underport).",
+	207: "[TYLER: BACON'S TABLE / Yōkai Rotating / Party Store FO] A rotating cast of entities " +
+		"occupies this collapsed food warehouse. Mismatched shelving, shrine offerings on old pallets, " +
+		"neon shrine-gate arch above the entrance. This is where the Yōkai faction holds council. " +
+		"The Field Office here changes hands every 7 minutes. " +
+		"Exits: north (Kuroshio Coast).",
 }
 
 // ── NPC definitions ───────────────────────────────────────────────────────────
@@ -368,11 +389,62 @@ var npcs = []npcDef{
 	{
 		ID:      "scar-keeper",
 		Name:    "Scar Keeper",
-		ZoneID:  204, // Abandoned
+		ZoneID:  204, // Vatican Corridors (Abandoned)
 		Greeting: "Count the scars on that column. Each one is a Rogue Swarm that burned through here. " +
 			"Baphomet was the first. She always comes back when the CI drops below the floor.",
 		MinFameRank: 0,
 		FameNation:  fame.Neutral,
+	},
+	// ── TYLER scene faction NPCs (S123-01) ─────────────────────────────────────
+	{
+		ID:     "heikegani-dock-boss",
+		Name:   "Heikegani Dock Boss",
+		ZoneID: 205, // Osaka Underport
+		Greeting: "You watch the tide mark. You learn which cargo runs disappear. " +
+			"Heikegani doesn't move product. Heikegani moves information about product. " +
+			"You want access to the bulkhead manifest, you talk to me.",
+		MinFameRank: 0,
+		FameNation:  fame.Bastok, // The Bloc
+	},
+	{
+		ID:     "kuroshio-signal-runner",
+		Name:   "Kuroshio Signal Runner",
+		ZoneID: 206, // Kuroshio Coast
+		Greeting: "The buoys pulse at a different frequency every third night. " +
+			"If you're reading them right you know what's moving through the current. " +
+			"If you're not, you drown thinking you found something.",
+		MinFameRank: 0,
+		FameNation:  fame.Sandoria, // The Frequency
+	},
+	{
+		ID:     "yokai-shrine-tender",
+		Name:   "Yōkai Shrine Tender",
+		ZoneID: 207, // Bacon's Table
+		Greeting: "We rotate who holds this FO. That's the doctrine. Not one faction, not one face. " +
+			"Whoever holds it for 7 minutes adds one offering to the shrine. " +
+			"The Dragon watches the offering count. You should too.",
+		MinFameRank: 0,
+		FameNation:  fame.Neutral,
+	},
+	{
+		ID:     "eastwind-archivist",
+		Name:   "Eastwind Archivist",
+		ZoneID: 203, // Cairngorms Archive
+		Greeting: "The archive records every city event. Every flip, every rogue swarm, every myth. " +
+			"The Eastwind Owls do not interfere. We catalogue. We remember. " +
+			"Ask me what the CAST terminals show and I will answer. Ask me to act and I will not.",
+		MinFameRank: 0,
+		FameNation:  fame.Sandoria, // The Frequency (archives = information)
+	},
+	{
+		ID:     "jiangshi-warden",
+		Name:   "Jiangshi Warden",
+		ZoneID: 200, // Detroit Apartment
+		Greeting: "The apartment block has been here longer than any crew. " +
+			"Jiangshi don't chase the FOs. We hold the building. " +
+			"You want to understand the Residential district you talk to the people who never left it.",
+		MinFameRank: 0,
+		FameNation:  fame.Bastok, // The Bloc
 	},
 }
 
@@ -485,8 +557,17 @@ func initTRAPXCity() {
 	for _, fo := range fieldoffice.DefaultFieldOffices(nil) {
 		foReg.Add(fo)
 	}
-	// Initialise per-district state for all systems.
-	for _, id := range []string{"district-residential", "district-commercial", "district-industrial", "district-underground", "district-abandoned"} {
+	// Initialise per-district state for all TYLER/TRAPX scenes (200–207).
+	for _, id := range []string{
+		"district-residential",  // 200 Detroit Apartment
+		"district-commercial",   // 201 Detroit School
+		"district-industrial",   // 202 Osaka Convenience Store
+		"district-underground",  // 203 Cairngorms Archive
+		"district-abandoned",    // 204 Vatican Corridors
+		"district-underport",    // 205 Osaka Underport
+		"district-coastal",      // 206 Kuroshio Coast
+		"district-bacons-table", // 207 Bacon's Table
+	} {
 		intReg.GetOrCreate(id)
 		watchReg.GetOrCreate(id)
 		enforceReg.GetOrCreate(id)
@@ -5970,7 +6051,11 @@ func cmdDistrict(p *player, districtID string) {
 // cmdCity shows a compact multi-district city overview.
 func cmdCity(p *player) {
 	p.send("[CITY OVERVIEW]")
-	districts := []string{"district-residential", "district-commercial", "district-industrial", "district-underground", "district-abandoned"}
+	districts := []string{
+		"district-residential", "district-commercial", "district-industrial",
+		"district-underground", "district-abandoned",
+		"district-underport", "district-coastal", "district-bacons-table",
+	}
 	for _, id := range districts {
 		w := watchReg.Get(id)
 		e := enforceReg.Get(id)
