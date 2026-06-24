@@ -384,7 +384,11 @@ func npcByID(id string) *npcDef {
 }
 
 // questBank is the global quest registry.
-var questBank = quest.NewBank(quest.StarterQuests)
+// Includes StarterQuests + TRAPX job unlock chains (S122-04).
+var questBank = func() *quest.Bank {
+	all := append(quest.StarterQuests, quest.TRAPXChainQuests()...)
+	return quest.NewBank(all)
+}()
 
 // zoneNamesMap returns zone ID → display name for the cartography package.
 func zoneNamesMap() map[int]string {
