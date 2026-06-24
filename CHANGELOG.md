@@ -1,4 +1,5 @@
 ## 2026-06-24
+- S123-03: multi-timeline branch system — Branch/Registry, rogue_swarm auto-branch, 'timeline' MUD command, conflict detection, 16 tests
 - S123-02: TYLER ledger bridge; 4 TYLER verb types, 4 CAST lore docs, 'terminal' MUD command, archive entry receipts
 - S123-01: TYLER scene cluster 200–207; 8 districts, portal connections (VS0+Tyler's route), TYLER faction NPCs (Heikegani/Kuroshio/Yōkai/Eastwind/Jiangshi), urban terrain for 205-207
 - S122-06: city/district/align/broadcast/enforcement MUD commands; watcher+enforcement+neighborhood wired into initTRAPXCity and tickAll
