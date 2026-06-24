@@ -15,9 +15,36 @@ import "strings"
 type Lang int
 
 const (
-	EN Lang = iota
+	EN   Lang = iota
 	JP
+	BOTH // receives phrases in both EN and JP side-by-side
 )
+
+// ParseLang converts "en", "jp", or "both" to the corresponding Lang constant.
+// Returns EN and false if unrecognized.
+func ParseLang(s string) (Lang, bool) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "en":
+		return EN, true
+	case "jp":
+		return JP, true
+	case "both":
+		return BOTH, true
+	}
+	return EN, false
+}
+
+// LangName returns the canonical lowercase name for a Lang constant.
+func LangName(l Lang) string {
+	switch l {
+	case JP:
+		return "jp"
+	case BOTH:
+		return "both"
+	default:
+		return "en"
+	}
+}
 
 // Phrase is a single auto-translate entry.
 type Phrase struct {
@@ -29,11 +56,16 @@ type Phrase struct {
 }
 
 // Render returns the phrase rendered for the given language, bracket-wrapped.
+// BOTH renders EN and JP side-by-side.
 func (p Phrase) Render(l Lang) string {
-	if l == JP {
+	switch l {
+	case JP:
 		return "[" + p.JP + "]"
+	case BOTH:
+		return p.RenderBoth()
+	default:
+		return "[" + p.EN + "]"
 	}
-	return "[" + p.EN + "]"
 }
 
 // RenderBoth returns EN/JP side-by-side as FFXI would display to a bilingual party.

@@ -654,6 +654,7 @@ type player struct {
 	k9Swarm      *k9.Swarm      // TRAPX: active K9 swarm (nil if none deployed)
 	questJournal *quest.Journal        // NPC quest progress
 	atlas        *cartography.Atlas   // explored zone map
+	chatLang    autotranslate.Lang // preferred chat language; default EN
 	conn        net.Conn
 	w           *bufio.Writer
 	inbox       chan string
@@ -1740,6 +1741,8 @@ func handle(p *player, line string) {
 			msg = strings.Join(parts[1:], " ")
 		}
 		cmdSay(p, msg)
+	case "setlang":
+		cmdSetLang(p, strings.Join(args, " "))
 	case "at", "autotranslate", "autotrans":
 		cmdAutoTranslate(p, strings.Join(args, " "))
 	case "tell", "t":
@@ -3018,6 +3021,8 @@ func deliverChat(fromSlot string, channel int, target, msg string) {
 		if !found {
 			continue
 		}
+		// Expand auto-translate tokens in the recipient's preferred language.
+		body = autotranslate.ExpandLine(body, op.chatLang)
 		prefix := ""
 		switch ch {
 		case chat.ChatSay:
@@ -3041,9 +3046,20 @@ func cmdSay(p *player, msg string) {
 		return
 	}
 	syncChatSession(p)
-	// Expand auto-translate tokens before delivery.
-	msg = autotranslate.ExpandLine(msg, autotranslate.EN)
+	// Pass raw message; deliverChat expands auto-translate tokens per-recipient lang.
 	deliverChat(p.slot, chat.ChatSay, "", msg)
+	p.prompt()
+}
+
+func cmdSetLang(p *player, args string) {
+	lang, ok := autotranslate.ParseLang(strings.TrimSpace(args))
+	if !ok {
+		p.sendf("Usage: setlang en|jp|both  (current: %s)", autotranslate.LangName(p.chatLang))
+		p.prompt()
+		return
+	}
+	p.chatLang = lang
+	p.sendf("Chat language set to: %s", autotranslate.LangName(lang))
 	p.prompt()
 }
 
