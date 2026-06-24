@@ -1,4 +1,5 @@
 ## 2026-06-24
+- S119-04: server/integrity — Control Integrity + Rogue Swarm (per-district CI 0-1, dog decay superlinear, jammer/flip decay, CleanAudit/BirdCorrection recovery, ROGUE_SWARM trigger at 0.15, containment objectives, SCAR_WRITTEN, Registry, 24 tests) — Apple #3349
 - S119-03: server/attention — Attention meter (0-1000, superlinear dog gain n^1.3, decay, AUDIT_THRESHOLD→OversightSect, VENDOR_THRESHOLD→ShadowOperator, ecosystem effects, Registry, 18 tests) — Apple #3346
 - S119-02: server/k9 — K9 unit + Swarm (Sentry/Escort/Audit modes, 0.85^n diminishing returns, Mark/Latch/HowlBeacon/CustodyLock/ReceiptBurst, Battery drain, BATTERY_LOW/DEAD events, cap=8 per FO, 33 tests) — Apple #3344
 
