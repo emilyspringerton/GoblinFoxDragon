@@ -61,6 +61,7 @@ import (
 	"dragonsnshit/server/watcher"
 	"dragonsnshit/server/enforcement"
 	"dragonsnshit/server/neighborhood"
+	"dragonsnshit/server/timeline"
 )
 
 // ── constants ──────────────────────────────────────────────────────────────────
@@ -548,9 +549,11 @@ var (
 	intReg     = integrity.NewRegistry()
 	techClock  = techpressure.NewClock()
 	cityLedger = ledger.NewLedger()
-	watchReg   = watcher.NewRegistry()
-	enforceReg = enforcement.NewRegistry()
-	nbhdReg    = neighborhood.NewRegistry()
+	watchReg          = watcher.NewRegistry()
+	enforceReg        = enforcement.NewRegistry()
+	nbhdReg           = neighborhood.NewRegistry()
+	timelineReg       = timeline.NewRegistry()
+	seenRogueBranches = make(map[int]bool) // ledger seq → already branched
 )
 
 func initTRAPXCity() {
@@ -1463,6 +1466,14 @@ func tickAll() {
 	// Neighborhood mood tick: uses watcher alertness to drive fatigue.
 	nbhdReg.TickAll(tickRate, alertByDistrict, now)
 
+	// Timeline: scan ledger for ROGUE_SWARM events, cut new branches for unseen ones.
+	for _, rec := range cityLedger.All() {
+		if rec.Verb == ledger.VerbRogueSwarm && !seenRogueBranches[rec.Seq] {
+			seenRogueBranches[rec.Seq] = true
+			cutTimelineBranchFromRogueSwarm(rec.FOID, rec.At)
+		}
+	}
+
 	// Prune flip log once per minute.
 	if now.Second() == 0 {
 		cityLedger.PruneFlipLog(now)
@@ -2035,6 +2046,9 @@ func handle(p *player, line string) {
 			return
 		}
 		cmdEnforcement(p, args[0])
+	// ── TYLER timeline commands (S123-03) ───────────────────────────────────
+	case "timeline", "branches":
+		cmdTimeline(p)
 	// ── TYLER CAST terminal (S123-02) ────────────────────────────────────────
 	case "terminal", "cast-terminal", "castterm":
 		if len(args) == 0 {
@@ -6137,6 +6151,53 @@ func cmdEnforcement(p *player, districtID string) {
 		p.sendf("  Watcher alert:  %.0f | trust: %.0f | hot: %v", w.Alertness, w.Trust, w.IsEnforcementHot())
 	}
 	p.prompt()
+}
+
+// ── TYLER timeline system (S123-03) ───────────────────────────────────────────
+
+// cmdTimeline shows all city timeline branches.
+func cmdTimeline(p *player) {
+	lines := timelineReg.SummaryLines()
+	for _, l := range lines {
+		p.send(l)
+	}
+	// Hint about district conflicts.
+	all := timelineReg.All()
+	if len(all) >= 2 {
+		districts := []string{"district-residential", "district-commercial", "district-industrial", "district-abandoned"}
+		for _, dist := range districts {
+			if timelineReg.DistrictHasConflict(dist, all[len(all)-1].ID, timeline.DefaultBranch) {
+				p.sendf("  [CONFLICT] %s: this district shows dual-state contradiction between branches.", dist)
+			}
+		}
+	}
+	p.prompt()
+}
+
+// cutTimelineBranchFromRogueSwarm is called by Dragon ACT when a rogue_swarm event fires.
+// It cuts a new branch snapshot from the current city social state.
+func cutTimelineBranchFromRogueSwarm(districtID string, now time.Time) {
+	branchID := fmt.Sprintf("rogue-%s-%s", districtID, now.Format("15-04-05"))
+	var inputs []timeline.SnapshotInput
+	for _, id := range []string{
+		"district-residential", "district-commercial", "district-industrial",
+		"district-underground", "district-abandoned",
+		"district-underport", "district-coastal", "district-bacons-table",
+	} {
+		h := nbhdReg.Get(id)
+		w := watchReg.Get(id)
+		sc := 0
+		al := 0.0
+		if h != nil {
+			sc = h.MythCount()
+		}
+		if w != nil {
+			al = w.Alertness
+		}
+		inputs = append(inputs, timeline.SnapshotInput{DistrictID: id, ScarCount: sc, Alertness: al})
+	}
+	desc := fmt.Sprintf("Rogue Swarm in %s — city state preserved at %s", districtID, now.Format("15:04:05"))
+	_, _ = timelineReg.Cut(branchID, timeline.DefaultBranch, "rogue_swarm", desc, now, inputs)
 }
 
 // ── TYLER CAST terminal (S123-02) ─────────────────────────────────────────────
