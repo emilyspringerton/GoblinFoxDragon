@@ -1,4 +1,5 @@
 ## 2026-06-24
+- S123-01: TYLER scene cluster 200–207; 8 districts, portal connections (VS0+Tyler's route), TYLER faction NPCs (Heikegani/Kuroshio/Yōkai/Eastwind/Jiangshi), urban terrain for 205-207
 - S122-06: city/district/align/broadcast/enforcement MUD commands; watcher+enforcement+neighborhood wired into initTRAPXCity and tickAll
 - S122-05: TRAPX faction rep overlay — Frequency/Bloc/Procurement Houses on fame.Nation; rank-gated benefits, 11 tests
 - S122-04: TRAPX RPG class unlock chains — 8 chains (DRK/BST/BRD/SAM/SMN/BLU/GEO/RUN), 24 quests total, job-stone rewards, wired into questBank
