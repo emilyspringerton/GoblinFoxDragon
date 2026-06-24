@@ -1,4 +1,5 @@
 ## 2026-06-24
+- feat: S125-03 TRAPX faction war engine — 72h cycle, 24h conflicts, FO win condition, war/fw MUD command (Apple #3514)
 - feat: S125-02 zone presence — departure broadcasts, cmdExamine player inspect (Apple #3513)
 - feat: FFXI auto-translate — server/autotranslate 72 JP/EN phrases, ExpandLine(), at MUD command, [alias] token expansion in say (Apple #3505)
 - S123-05: VS0 Detroit slice — fo-school-1 seeded, Jiangshi FO pre-held, alertness=35 preset, takecontrol entry, Emily OS ambient voice (10 fragments)
