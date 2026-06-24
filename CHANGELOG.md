@@ -1,4 +1,5 @@
 ## 2026-06-24
+- feat: S126-13 NM respawn scheduler — nm.Registry, NMRespawnScheduler, RespawnMinutes, announceNMPop, 8 tests (Apple #3566)
 - feat: S126-04 bilingual party chat — BOTH lang, setlang command, per-recipient AT expansion in deliverChat (Apple #3538)
 - feat: S126-03 world event broadcast — server/worldevent, /api/world-events endpoint, faction war→worldEventReg, 12 tests (Apple #3536)
 - feat: S126-02 weather → mood loop — Storm:Fear+15, Rain:Fatigue+10, Clear:Fatigue-5 per district tick (Apple #3533)
