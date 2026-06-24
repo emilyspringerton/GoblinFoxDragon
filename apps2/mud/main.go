@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"dragonsnshit/server/chat"
+	"dragonsnshit/server/campaign"
 	"dragonsnshit/server/conquest"
 	"dragonsnshit/server/craft"
 	"dragonsnshit/server/enmity"
@@ -531,6 +532,7 @@ type world struct {
 	nmReg          *nm.Registry            // all NMs keyed by ID
 	nmSched        *nm.NMRespawnScheduler  // S126-13 respawn scheduler
 	conquestMap    *conquest.Map
+	campaignBattle *campaign.Battle // S126-14 weekly campaign battle
 	ah             *market.AuctionHouse
 	playerNation   map[string]conquest.Nation // slot → declared nation
 	lastConquestTick time.Time
@@ -693,6 +695,17 @@ func zoneName(id int) string {
 	return fmt.Sprintf("Zone%d", id)
 }
 
+// nextWeeklyReset returns the next Monday 00:00 UTC at or after now.
+func nextWeeklyReset(now time.Time) time.Time {
+	// Monday = weekday 1.
+	daysTillMonday := (int(time.Monday) - int(now.Weekday()) + 7) % 7
+	if daysTillMonday == 0 && (now.Hour() > 0 || now.Minute() > 0 || now.Second() > 0) {
+		daysTillMonday = 7
+	}
+	next := time.Date(now.Year(), now.Month(), now.Day()+daysTillMonday, 0, 0, 0, 0, time.UTC)
+	return next
+}
+
 // ── game world init ───────────────────────────────────────────────────────────
 
 func initWorld() *world {
@@ -742,6 +755,13 @@ func initWorld() *world {
 	w.conquestMap = conquest.NewMap()
 	for _, r := range conquest.DefaultRegions() {
 		w.conquestMap.AddRegion(r)
+	}
+
+	// Campaign Battle: starts at next Monday 00:00 UTC, 24h cycle (S126-14).
+	campaignStart := nextWeeklyReset(time.Now().UTC())
+	w.campaignBattle = campaign.NewBattle(campaignStart, campaign.DefaultCycleDuration)
+	for _, cn := range campaign.DefaultNodes() {
+		w.campaignBattle.AddNode(cn)
 	}
 
 	w.ah = market.New()
@@ -920,11 +940,27 @@ func resolveKill(p *player, killedMob *mob.Mob, reg *mob.Registry, now time.Time
 		}
 		// Schedule respawn (S126-13): NMs with RespawnMinutes > 0 will repop.
 		gw.nmSched.OnKill(killedMob.ID, p.zoneID, now)
-		// Chaos Elementals drop crisis-shards.
-		if killedMob.Kind == "Chaos Elemental" {
-			p.inventory["crisis-shard"]++
-			p.sendf("[Crisis] You obtain: Crisis Shard.")
+	}
+
+	// Campaign kill contribution (S126-14).
+	if gw.campaignBattle.IsActive() {
+		if changedNode := gw.campaignBattle.RecordKill(p.slot, p.zoneID); changedNode != "" {
+			if snap, ok := gw.campaignBattle.NodeSnapshot(changedNode); ok {
+				for _, cp := range gw.players {
+					if cp.zoneID == p.zoneID {
+						cp.sendf("\r\n[Campaign] Node %s HP: %d (Holder: %s)",
+							snap.ID, snap.HP, conquest.NationName(snap.Holder))
+						cp.prompt()
+					}
+				}
+			}
 		}
+	}
+
+	// Chaos Elementals drop crisis-shards.
+	if strings.HasPrefix(killedMob.ID, "nm-") && killedMob.Kind == "Chaos Elemental" {
+		p.inventory["crisis-shard"]++
+		p.sendf("[Crisis] You obtain: Crisis Shard.")
 	}
 }
 
@@ -1382,6 +1418,28 @@ func tickAll() {
 					cp.prompt()
 				}
 			}
+		}
+	}
+
+	// Campaign Battle tick (S126-14): activate at start, resolve at end.
+	if ended, result := gw.campaignBattle.Tick(now); ended {
+		msg := "[Campaign] Battle cycle complete! "
+		if result.Winner == conquest.NationNeutral {
+			msg += "No clear winner — tie."
+		} else {
+			msg += fmt.Sprintf("Winner: %s (%d nodes).",
+				conquest.NationName(result.Winner),
+				result.NodesByNation[result.Winner])
+		}
+		for _, cp := range gw.players {
+			cp.sendf("\r\n%s", msg)
+			cp.prompt()
+		}
+		// Reschedule next week's battle.
+		nextStart := nextWeeklyReset(now)
+		gw.campaignBattle = campaign.NewBattle(nextStart, campaign.DefaultCycleDuration)
+		for _, cn := range campaign.DefaultNodes() {
+			gw.campaignBattle.AddNode(cn)
 		}
 	}
 
@@ -1982,6 +2040,8 @@ func handle(p *player, line string) {
 		cmdAH(p, args)
 	case "enmity", "en":
 		cmdEnmity(p)
+	case "campaign":
+		cmdCampaign(p, args)
 	case "conquest", "con":
 		cmdConquest(p)
 	case "declare":
@@ -4317,6 +4377,48 @@ func ahCancel(p *player, listingID string) {
 	p.inventory[l.ItemID] += l.Qty
 	p.sendf("Listing cancelled. %dx %s returned to your inventory.", l.Qty, l.ItemName)
 	p.prompt()
+}
+
+// cmdCampaign handles /campaign [join|status] (S126-14).
+func cmdCampaign(p *player, args []string) {
+	sub := ""
+	if len(args) > 0 {
+		sub = strings.ToLower(args[0])
+	}
+	switch sub {
+	case "join":
+		nation := gw.playerNation[p.slot]
+		if nation == conquest.NationNeutral {
+			p.send("[Campaign] You must declare a nation first (/declare).")
+			p.prompt()
+			return
+		}
+		if err := gw.campaignBattle.Enroll(p.slot, nation); err != nil {
+			p.sendf("[Campaign] Error: %s", err)
+			p.prompt()
+			return
+		}
+		p.sendf("[Campaign] Joined campaign battle for %s.", conquest.NationName(nation))
+		p.prompt()
+	default:
+		// Status display.
+		if !gw.campaignBattle.IsActive() {
+			p.send("[Campaign] No campaign battle is active. Check back later.")
+			p.prompt()
+			return
+		}
+		p.send("\r\n=== Campaign Battle — Nodes ===")
+		for _, n := range gw.campaignBattle.AllNodes() {
+			p.sendf("  [%s] Scene %d  HP:%d  Holder:%s",
+				n.ID, n.SceneID, n.HP, conquest.NationName(n.Holder))
+		}
+		enrolled := ""
+		if gw.campaignBattle.IsEnrolled(p.slot) {
+			enrolled = fmt.Sprintf(" (enrolled for %s)", conquest.NationName(gw.playerNation[p.slot]))
+		}
+		p.sendf("Type /campaign join to join the battle.%s", enrolled)
+		p.prompt()
+	}
 }
 
 func cmdConquest(p *player) {
