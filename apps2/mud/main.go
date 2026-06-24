@@ -62,6 +62,7 @@ import (
 	"dragonsnshit/server/enforcement"
 	"dragonsnshit/server/neighborhood"
 	"dragonsnshit/server/timeline"
+	"dragonsnshit/server/autotranslate"
 )
 
 // ── constants ──────────────────────────────────────────────────────────────────
@@ -1647,6 +1648,8 @@ func handle(p *player, line string) {
 			msg = strings.Join(parts[1:], " ")
 		}
 		cmdSay(p, msg)
+	case "at", "autotranslate", "autotrans":
+		cmdAutoTranslate(p, strings.Join(args, " "))
 	case "tell", "t":
 		if len(args) < 2 {
 			p.send("Usage: tell <name> <message>")
@@ -2811,7 +2814,49 @@ func cmdSay(p *player, msg string) {
 		return
 	}
 	syncChatSession(p)
+	// Expand auto-translate tokens before delivery.
+	msg = autotranslate.ExpandLine(msg, autotranslate.EN)
 	deliverChat(p.slot, chat.ChatSay, "", msg)
+	p.prompt()
+}
+
+func cmdAutoTranslate(p *player, query string) {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		// List categories.
+		p.send("=== Auto-Translate Phrase Menu ===")
+		for _, cat := range autotranslate.Categories() {
+			phrases := autotranslate.ByCategory(cat)
+			p.sendf("  %-14s  %d phrases", cat, len(phrases))
+		}
+		p.send("Usage: at <alias|id>   — preview phrase")
+		p.send("       at list <category> — show all phrases in category")
+		p.send("In chat: type [alias] or [id] to embed phrase")
+		p.prompt()
+		return
+	}
+	if strings.HasPrefix(query, "list ") {
+		cat := strings.TrimPrefix(query, "list ")
+		phrases := autotranslate.ByCategory(cat)
+		if len(phrases) == 0 {
+			p.sendf("No phrases in category %q.", cat)
+			p.prompt()
+			return
+		}
+		p.sendf("=== %s ===", cat)
+		for _, ph := range phrases {
+			p.sendf("  [%s] / [%d]  %s / %s", ph.Alias, ph.ID, ph.EN, ph.JP)
+		}
+		p.prompt()
+		return
+	}
+	ph := autotranslate.Lookup(query)
+	if ph == nil {
+		p.sendf("No phrase found for %q. Try: at list <category>", query)
+		p.prompt()
+		return
+	}
+	p.sendf("%s  %s", ph.Render(autotranslate.EN), ph.Render(autotranslate.JP))
 	p.prompt()
 }
 
