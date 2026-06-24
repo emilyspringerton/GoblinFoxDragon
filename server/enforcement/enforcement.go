@@ -206,6 +206,28 @@ func (r *Registry) EvaluateAll(alertness, trust map[string]float64, now time.Tim
 	return out
 }
 
+// DistrictPressure returns the vendor price multiplier for a district based on
+// its current Enforcement Level: Held=1.0, Alert=1.10, Active=1.20, Heavy=1.40, Lockdown=1.60.
+// Returns 1.0 for unknown districts (no enforcement state yet).
+func (r *Registry) DistrictPressure(districtID string) float64 {
+	s, ok := r.states[districtID]
+	if !ok {
+		return 1.0
+	}
+	switch s.Level {
+	case LevelAlert:
+		return 1.10
+	case LevelActive:
+		return 1.20
+	case LevelHeavy:
+		return 1.40
+	case LevelLockdown:
+		return 1.60
+	default:
+		return 1.0
+	}
+}
+
 // LockdownDistricts returns all districts at LevelLockdown.
 func (r *Registry) LockdownDistricts() []*State {
 	var out []*State

@@ -164,6 +164,9 @@ var itemDisplayName = map[string]string{
 	"herbal-remedy+1":  "Herbal Remedy +1",
 	"herbal-remedy+2":  "Herbal Remedy +2",
 	"herbal-remedy+3":  "Herbal Remedy +3",
+	// TRAPX economy consumables (S125-04):
+	"ramen-bowl":       "Ramen Bowl",
+	"burner-phone":     "Burner Phone",
 	// TRAPX items and craft results (S126-15):
 	"mini-bike-key":    "Mini Bike Key",
 	"faction-patch":    "Faction Patch",
@@ -238,6 +241,40 @@ var npcVendorCatalog = map[string][]VendorItem{
 		{ID: "leather-body", Price: 600},
 		{ID: "leather-legs", Price: 450},
 	},
+	// TRAPX zone vendors (S125-04): dynamic pricing via enforcement.DistrictPressure.
+	"corner-kid": {
+		{ID: "ramen-bowl", Price: 80},
+		{ID: "burner-phone", Price: 350},
+		{ID: "mini-bike-key", Price: 1200},
+		{ID: "echo-drop", Price: 60},
+		{ID: "antidote", Price: 90},
+	},
+	"pawn-shop-runner": {
+		{ID: "ramen-bowl", Price: 80},
+		{ID: "burner-phone", Price: 350},
+		{ID: "faction-patch", Price: 500},
+		{ID: "city-map", Price: 200},
+		{ID: "wind-crystal", Price: 130},
+	},
+	"warehouse-contact": {
+		{ID: "mini-bike-key", Price: 1200},
+		{ID: "faction-patch", Price: 500},
+		{ID: "city-map", Price: 200},
+		{ID: "earth-crystal", Price: 120},
+		{ID: "fire-crystal", Price: 120},
+	},
+}
+
+// zoneDistrictID maps TRAPX zone IDs to enforcement district IDs for price scaling.
+var zoneDistrictID = map[int]string{
+	200: "residential",
+	201: "commercial",
+	202: "industrial",
+	203: "underground",
+	204: "abandoned",
+	205: "underport",
+	206: "coastal",
+	207: "bacons-table",
 }
 
 // Zone adjacency: zoneID → direction → destination zoneID
@@ -3754,6 +3791,19 @@ func zoneVendorNPC(zoneID int) *npcDef {
 	return nil
 }
 
+// shopPriceMult returns the enforcement price multiplier for the given zone (S125-04).
+func shopPriceMult(zoneID int) float64 {
+	if distID, ok := zoneDistrictID[zoneID]; ok {
+		return enforceReg.DistrictPressure(distID)
+	}
+	return 1.0
+}
+
+// scaledPrice applies the district pressure multiplier to a base vendor price.
+func scaledPrice(basePrice int, mult float64) int {
+	return int(float64(basePrice) * mult)
+}
+
 func cmdShopList(p *player) {
 	npc := zoneVendorNPC(p.zoneID)
 	if npc == nil {
@@ -3762,9 +3812,14 @@ func cmdShopList(p *player) {
 		return
 	}
 	items := npcVendorCatalog[npc.ID]
+	mult := shopPriceMult(p.zoneID)
 	p.sendf("\r\n=== %s's Shop ===", npc.Name)
+	if mult > 1.0 {
+		p.sendf("  [District pressure: %.0f%% surcharge]", (mult-1.0)*100)
+	}
 	for _, vi := range items {
-		p.sendf("  %-22s  %4d gil  (shop buy %s)", itemName(vi.ID), vi.Price, vi.ID)
+		price := scaledPrice(vi.Price, mult)
+		p.sendf("  %-22s  %4d gil  (shop buy %s)", itemName(vi.ID), price, vi.ID)
 	}
 	p.sendf("  Sell items back at 50%% price: shop sell <item-id>")
 	p.prompt()
@@ -3789,14 +3844,15 @@ func cmdShopBuy(p *player, itemID string) {
 		p.prompt()
 		return
 	}
-	if p.gil < entry.Price {
-		p.sendf("You need %d gil but only have %d.", entry.Price, p.gil)
+	price := scaledPrice(entry.Price, shopPriceMult(p.zoneID))
+	if p.gil < price {
+		p.sendf("You need %d gil but only have %d.", price, p.gil)
 		p.prompt()
 		return
 	}
-	p.gil -= entry.Price
+	p.gil -= price
 	p.inventory[itemID]++
-	p.sendf("You buy %s for %d gil. (Gil remaining: %d)", itemName(itemID), entry.Price, p.gil)
+	p.sendf("You buy %s for %d gil. (Gil remaining: %d)", itemName(itemID), price, p.gil)
 	p.prompt()
 }
 
