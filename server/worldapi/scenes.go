@@ -19,9 +19,105 @@ func ProceduralWorldStore(sceneID, chunkX, chunkZ int) []WorldBlock {
 		return cavesChunk(chunkX, chunkZ)
 	case 3:
 		return swampChunk(chunkX, chunkZ)
+	// TRAPX city districts (S122-01): scenes 200–299 → urban terrain
+	case 200, 201, 202, 203, 204:
+		return urbanChunk(sceneID, chunkX, chunkZ)
 	default:
 		return meadowChunk(chunkX, chunkZ)
 	}
+}
+
+// urbanChunk generates a flat concrete city block with apartment walls (scenes 200–204).
+// Block palette: stone_bricks (concrete), chiseled_stone (road), oak_planks (interior floors).
+// District 200 (Residential): apartment stacks. 201 (Commercial): strip-mall facades.
+// 202 (Industrial): warehouse walls. 203 (Underground): tunnel ceiling + floor.
+// 204 (Abandoned): crumbled stone_bricks variants.
+func urbanChunk(sceneID, chunkX, chunkZ int) []WorldBlock {
+	out := make([]WorldBlock, 0, 256)
+	// Ground plane: concrete road surface
+	roadBlock := "minecraft:stone_bricks"
+	if sceneID == 203 { // underground: coarse stone floor
+		roadBlock = "minecraft:cobblestone"
+	}
+	for lx := 0; lx < 16; lx++ {
+		for lz := 0; lz < 16; lz++ {
+			wx := chunkX*16 + lx
+			wz := chunkZ*16 + lz
+			out = append(out, WorldBlock{X: wx, Y: 64, Z: wz, BlockName: roadBlock})
+			// Sub-surface: solid stone
+			for dy := 1; dy <= 3; dy++ {
+				out = append(out, WorldBlock{X: wx, Y: 64 - dy, Z: wz, BlockName: "minecraft:stone"})
+			}
+		}
+	}
+
+	// District-specific features.
+	switch sceneID {
+	case 200: // Residential: apartment block on north and east edges
+		out = append(out, urbanApartmentBlock(chunkX, chunkZ, 0, 65, 0, 5)...)
+		out = append(out, urbanApartmentBlock(chunkX, chunkZ, 12, 65, 0, 5)...)
+	case 201: // Commercial: strip-mall facade on north edge
+		out = append(out, urbanFacadeRow(chunkX, chunkZ, 0, 65, 4)...)
+	case 202: // Industrial: warehouse walls on perimeter
+		out = append(out, urbanWarehouseWalls(chunkX, chunkZ)...)
+	case 203: // Underground: tunnel ceiling at Y=72
+		for lx := 0; lx < 16; lx++ {
+			for lz := 0; lz < 16; lz++ {
+				wx := chunkX*16 + lx
+				wz := chunkZ*16 + lz
+				out = append(out, WorldBlock{X: wx, Y: 72, Z: wz, BlockName: "minecraft:stone"})
+			}
+		}
+	case 204: // Abandoned: crumbled bricks scattered
+		for _, pos := range [][3]int{{3, 65, 3}, {7, 65, 9}, {11, 65, 4}, {1, 65, 13}} {
+			wx := chunkX*16 + pos[0]
+			wz := chunkZ*16 + pos[2]
+			for dy := 0; dy < pos[1]-64; dy++ {
+				out = append(out, WorldBlock{X: wx, Y: 64 + dy, Z: wz, BlockName: "minecraft:cracked_stone_bricks"})
+			}
+		}
+	}
+	return out
+}
+
+func urbanApartmentBlock(chunkX, chunkZ, lx, baseY, lz, height int) []WorldBlock {
+	out := make([]WorldBlock, 0, height*4)
+	wx := chunkX*16 + lx
+	wz := chunkZ*16 + lz
+	for dy := 0; dy < height; dy++ {
+		out = append(out, WorldBlock{X: wx, Y: baseY + dy, Z: wz, BlockName: "minecraft:stone_bricks"})
+		out = append(out, WorldBlock{X: wx + 1, Y: baseY + dy, Z: wz, BlockName: "minecraft:stone_bricks"})
+		out = append(out, WorldBlock{X: wx, Y: baseY + dy, Z: wz + 1, BlockName: "minecraft:stone_bricks"})
+	}
+	return out
+}
+
+func urbanFacadeRow(chunkX, chunkZ, lx, baseY, height int) []WorldBlock {
+	out := make([]WorldBlock, 0, 16*height)
+	for x := 0; x < 16; x++ {
+		wx := chunkX*16 + lx + x
+		wz := chunkZ * 16
+		for dy := 0; dy < height; dy++ {
+			out = append(out, WorldBlock{X: wx, Y: baseY + dy, Z: wz, BlockName: "minecraft:smooth_stone"})
+		}
+	}
+	return out
+}
+
+func urbanWarehouseWalls(chunkX, chunkZ int) []WorldBlock {
+	out := make([]WorldBlock, 0, 64)
+	baseY := 65
+	height := 6
+	for lx := 0; lx < 16; lx++ {
+		for _, lz := range []int{0, 15} {
+			wx := chunkX*16 + lx
+			wz := chunkZ*16 + lz
+			for dy := 0; dy < height; dy++ {
+				out = append(out, WorldBlock{X: wx, Y: baseY + dy, Z: wz, BlockName: "minecraft:iron_bars"})
+			}
+		}
+	}
+	return out
 }
 
 // ── scene 0: flat meadow ──────────────────────────────────────────────────────

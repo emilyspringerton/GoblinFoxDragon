@@ -219,6 +219,12 @@ var exits = map[int]map[string]int{
 	1: {"south": 0},
 	2: {"north": 0},
 	3: {"west": 0},
+	// TRAPX city districts — scenes 200–204 (S122-01)
+	200: {"south": 201, "east": 202, "down": 203},        // Residential → Commercial, Industrial, Underground
+	201: {"north": 200, "east": 202, "west": 204},        // Commercial → Residential, Industrial, Abandoned
+	202: {"west": 201, "south": 204, "down": 203},        // Industrial → Commercial, Abandoned, Underground
+	203: {"up": 200, "east": 204},                        // Underground → Residential, Abandoned
+	204: {"north": 201, "east": 202, "up": 203},          // Abandoned → Commercial, Industrial, Underground
 }
 
 var dirAliases = map[string]string{
@@ -231,6 +237,22 @@ var zoneDesc = map[int]string{
 	1: "Rolling green hills stretch to the horizon. The wind is strong up here.",
 	2: "A dark stone cave. Water drips somewhere in the darkness. Your footsteps echo.",
 	3: "Swampville. Thick air, murky water, dead mangrove trees. Something slithers nearby.",
+	// ── TRAPX city districts (S122-01) ───────────────────────────────────────
+	200: "[DISTRICT: RESIDENTIAL] Low-rise apartment blocks, chain-link fences, a corner store with iron bars on the windows. " +
+		"Young adults on mini bikes weave between dumpsters. CRT static hums from an upper window. " +
+		"Exits: south (Commercial), east (Industrial), down (Underground).",
+	201: "[DISTRICT: COMMERCIAL] Strip malls, blinking LED signs, a shuttered check-cashing spot. " +
+		"Coverage drones cruise at rooftop height. A mini bike crew idles near the pawn shop entrance. " +
+		"Exits: north (Residential), east (Industrial), west (Abandoned).",
+	202: "[DISTRICT: INDUSTRIAL] Corrugated metal warehouses, chain-link topped with razor wire. " +
+		"Forklifts ghost through loading bays. The air smells of diesel and hot asphalt. " +
+		"Exits: west (Commercial), south (Abandoned), down (Underground).",
+	203: "[DISTRICT: UNDERGROUND] Subway tunnels repurposed as corridors. Water-stained concrete, " +
+		"flickering fluorescents, CAST terminals graffitied into the walls. " +
+		"The Frequency runs cable through here. Exits: up (Residential), east (Abandoned).",
+	204: "[DISTRICT: ABANDONED] Burnt-out storefronts, scorched concrete, Scar graffiti from old Rogue Swarms. " +
+		"Baphomet's sigil is scratched into a load-bearing column. The air is still. " +
+		"Exits: north (Commercial), east (Industrial), up (Underground).",
 }
 
 // ── NPC definitions ───────────────────────────────────────────────────────────
@@ -284,6 +306,70 @@ var npcs = []npcDef{
 		Greeting:    "So you've proven yourself useful to Bastok. I may have work for a trusted ally.",
 		MinFameRank: 3, // requires Trusted (500 pts)
 		FameNation:  fame.Bastok,
+	},
+	// ── TRAPX city district NPCs (S122-01) ───────────────────────────────────
+	{
+		ID:      "minibike-rider",
+		Name:    "Mini Bike Rider",
+		ZoneID:  200, // Residential
+		Greeting: "Yo. You new around here? Keep it movin' if you ain't got business. " +
+			"Field Office three blocks north flipped last night — whole block was watchin'.",
+		MinFameRank: 0,
+		FameNation:  fame.Neutral,
+	},
+	{
+		ID:      "corner-kid",
+		Name:    "Corner Kid",
+		ZoneID:  200, // Residential
+		Greeting: "Heard the dogs were out on Gratiot last night. Four of 'em, at least. " +
+			"CI was already weak on this block. Now it's in the red.",
+		MinFameRank: 0,
+		FameNation:  fame.Neutral,
+	},
+	{
+		ID:      "pawn-shop-runner",
+		Name:    "Pawn Shop Runner",
+		ZoneID:  201, // Commercial
+		Greeting: "Coverage drone clocked you coming in. You on the roll or what? " +
+			"I run receipts for The Frequency. They pay better than the Bloc right now.",
+		MinFameRank: 0,
+		FameNation:  fame.Neutral,
+	},
+	{
+		ID:      "broadcast-operator",
+		Name:    "Broadcast Operator",
+		ZoneID:  201, // Commercial
+		Greeting: "Channel 11 going live in four. You want screen time? Control a Field Office " +
+			"when the heat is high — the cameras follow the attention.",
+		MinFameRank: 0,
+		FameNation:  fame.Neutral,
+	},
+	{
+		ID:      "warehouse-contact",
+		Name:    "Warehouse Contact",
+		ZoneID:  202, // Industrial
+		Greeting: "Don't make eye contact with the drones up there. They got LIDAR now. " +
+			"The Procurement Houses run this quadrant. Pay your dues or flip the FO and take it.",
+		MinFameRank: 0,
+		FameNation:  fame.Neutral,
+	},
+	{
+		ID:      "frequency-runner",
+		Name:    "Frequency Runner",
+		ZoneID:  203, // Underground
+		Greeting: "CAST terminal is live if you got the access code. " +
+			"The Dragon put something in the stream last cycle — three districts went amber at once.",
+		MinFameRank: 0,
+		FameNation:  fame.Neutral,
+	},
+	{
+		ID:      "scar-keeper",
+		Name:    "Scar Keeper",
+		ZoneID:  204, // Abandoned
+		Greeting: "Count the scars on that column. Each one is a Rogue Swarm that burned through here. " +
+			"Baphomet was the first. She always comes back when the CI drops below the floor.",
+		MinFameRank: 0,
+		FameNation:  fame.Neutral,
 	},
 }
 
