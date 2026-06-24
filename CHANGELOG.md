@@ -1,4 +1,5 @@
 ## 2026-06-24
+- S122-03: Neighborhood personality — Tolerance/Pride/Cohesion/Visibility axes, Fear/Fatigue mood drift, myth seeding (10 lore fragments per district), 23 tests
 - S122-02: Watcher (alertness/trust/bias per district) + Enforcement (5-level state machine: Quiet→Lockdown, cop density 0-8, K9 eligibility, FO effects)
 - S122-01: TRAPX city scene cluster — 5 districts (200-204) + zone exits + 7 city NPCs (mini bike, corner kid, pawn shop, broadcast, warehouse, frequency, scar keeper) + urbanChunk() worldapi terrain
 - S121-01: TRAPX city state API — server/trapxapi package; GET /api/v1/trapx/city-state + POST /api/v1/trapx/events at :7071; Emily Prime Dragon integration
