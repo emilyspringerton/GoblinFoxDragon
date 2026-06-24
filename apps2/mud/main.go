@@ -528,6 +528,8 @@ type world struct {
 	mobChains      map[string]*mobChainState // mobID → last WS chain state
 	lootPools      map[string]*activeLootPool // poolID → pool
 	nmSpawns       map[int][]*nm.NMSpawn // zoneID → NM spawn definitions
+	nmReg          *nm.Registry            // all NMs keyed by ID
+	nmSched        *nm.NMRespawnScheduler  // S126-13 respawn scheduler
 	conquestMap    *conquest.Map
 	ah             *market.AuctionHouse
 	playerNation   map[string]conquest.Nation // slot → declared nation
@@ -726,6 +728,15 @@ func initWorld() *world {
 		},
 	}
 
+	// Build NM registry + respawn scheduler (S126-13).
+	w.nmReg = nm.NewRegistry()
+	for _, spawns := range w.nmSpawns {
+		for _, s := range spawns {
+			w.nmReg.Register(s)
+		}
+	}
+	w.nmSched = nm.NewNMRespawnScheduler(w.nmReg)
+
 	w.zoneMgr = zone.New(zone.DefaultZones())
 
 	w.conquestMap = conquest.NewMap()
@@ -907,6 +918,8 @@ func resolveKill(p *player, killedMob *mob.Mob, reg *mob.Registry, now time.Time
 			cp.sendf("\r\n[Crisis] %s vanquished! Intercept objective advanced. (LEY +10)", killedMob.Kind)
 			cp.prompt()
 		}
+		// Schedule respawn (S126-13): NMs with RespawnMinutes > 0 will repop.
+		gw.nmSched.OnKill(killedMob.ID, p.zoneID, now)
 		// Chaos Elementals drop crisis-shards.
 		if killedMob.Kind == "Chaos Elemental" {
 			p.inventory["crisis-shard"]++
@@ -998,6 +1011,17 @@ func nmMobFor(nmID string) mob.Mob {
 			HP: 500, MaxHP: 500,
 			AggroRange: 10, LeashRange: 30, MeleeRange: 3,
 			MoveSpeed: 4, MeleeDamage: 40,
+		}
+	}
+}
+
+// announceNMPop broadcasts an NM pop message to all players in the zone.
+// Must be called with gw.mu held.
+func announceNMPop(zoneID int, kind string) {
+	for _, p := range gw.players {
+		if p.zoneID == zoneID {
+			p.sendf("\r\n[!!!] %s has appeared in %s!", kind, zoneName(zoneID))
+			p.prompt()
 		}
 	}
 }
@@ -1462,14 +1486,16 @@ func tickAll() {
 			if spawn.InWindow(now) && spawn.TrySpawn(now, gw.rng) {
 				nmMob := nmMobFor(spawn.ID)
 				_ = gw.mobRegs[zoneID].Spawn(nmMob)
-				for _, p := range gw.players {
-					if p.zoneID == zoneID {
-						p.sendf("\r\n[!!!] %s has appeared in %s!", nmMob.Kind, zoneName(zoneID))
-						p.prompt()
-					}
-				}
+				announceNMPop(zoneID, nmMob.Kind)
 			}
 		}
+	}
+
+	// S126-13: NM respawn scheduler tick — pop NMs whose timers have expired.
+	for _, pop := range gw.nmSched.Tick(now) {
+		nmMob := nmMobFor(pop.NMID)
+		_ = gw.mobRegs[pop.ZoneID].Spawn(nmMob)
+		announceNMPop(pop.ZoneID, nmMob.Kind)
 	}
 
 	// ── TRAPX city simulation tick ────────────────────────────────────────────
