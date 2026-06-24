@@ -1,4 +1,5 @@
 ## 2026-06-24
+- feat: S126-01 NPC schedule system — server/schedule, 3 NPCs seeded, hourly tick → broadcastAll, 14 tests (Apple #3531)
 - feat: S125-13 Mog House personal storage — server/moghouse, 50-item cap, Store/Retrieve/List MUD commands, 20 tests (Apple #3528)
 - feat: S125-12 server/auction — standalone AH engine (List/Buy/Cancel, 5% fee, 15-min expiry, 15 tests) Apple #3526
 - feat: S125-03 TRAPX faction war engine — 72h cycle, 24h conflicts, FO win condition, war/fw MUD command (Apple #3514)
