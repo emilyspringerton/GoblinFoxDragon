@@ -1,3 +1,7 @@
+## 2026-06-24
+
+- S119-01: server/fieldoffice — FieldOffice state machine (4-phase: Unclaimed/Held/Contested/Containment; Flow/Pressure tick; Flip/Defend/Contest windows; Rogue Swarm containment objectives; 20 tests pass) — Apple #3340
+
 ## 2026-06-23
 - S118-01: PLD spells (Flash enmity spike, Sentinel/Rampart def buffs, Holy/Banish/Banish II light dmg); PLD job gate
 - S117-01: NIN ninjutsu (6 elements × 2 tiers); DEX scaling; NIN job gate; cast <spell> dispatch
