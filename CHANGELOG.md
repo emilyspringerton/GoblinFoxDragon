@@ -1,4 +1,5 @@
 ## 2026-06-24
+- S121-01: TRAPX city state API — server/trapxapi package; GET /api/v1/trapx/city-state + POST /api/v1/trapx/events at :7071; Emily Prime Dragon integration
 - S120-03: FIELDOFFICE MUD wiring — claim/contest/fo-status/fo-list/k9-deploy/k9-swarm/receipts/attention/integrity/tech-pressure commands wired into apps2/mud/main.go; 1Hz city sim tick
 - S120-02: server/beatsync — BeatSync stub (Engine/Tick/Run, 4 beat types in 4/4, Kick/Snare/Bass/Hat, WorldEffect city hooks, sine strength curve, 17 tests) — Apple #3356
 - S120-01: server/ledger — Receipt ledger + anti-exploit (append-only, verb types, ByFO/ByActor/ByVerb/Since, ReceiptBurst 30s, flip-score exploit detection, SUSPICIOUS_PATTERN flag, 15 tests) — Apple #3353
