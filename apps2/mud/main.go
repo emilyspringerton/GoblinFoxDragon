@@ -64,6 +64,7 @@ import (
 	"dragonsnshit/server/timeline"
 	"dragonsnshit/server/autotranslate"
 	"dragonsnshit/server/factionwar"
+	"dragonsnshit/server/moghouse"
 )
 
 // ── constants ──────────────────────────────────────────────────────────────────
@@ -556,6 +557,7 @@ var (
 	nbhdReg           = neighborhood.NewRegistry()
 	timelineReg       = timeline.NewRegistry()
 	seenRogueBranches = make(map[int]bool) // ledger seq → already branched
+	mogReg            = moghouse.NewRegistry()
 	warEngine         = factionwar.NewEngine([]string{
 		"district-residential", "district-commercial", "district-industrial",
 		"district-underground", "district-abandoned",
@@ -2100,6 +2102,30 @@ func handle(p *player, line string) {
 	// ── VS0 entry point (S123-05) ────────────────────────────────────────────
 	case "takecontrol", "take-control":
 		cmdTakeControl(p)
+	case "mog-store", "mog store":
+		if len(args) == 0 {
+			p.send("Usage: mog-store <item-id> [qty]")
+			p.prompt()
+		} else {
+			qty := 1
+			if len(args) >= 2 {
+				fmt.Sscanf(args[1], "%d", &qty)
+			}
+			cmdMogStore(p, args[0], qty)
+		}
+	case "mog-retrieve", "mog retrieve":
+		if len(args) == 0 {
+			p.send("Usage: mog-retrieve <item-id> [qty]")
+			p.prompt()
+		} else {
+			qty := 1
+			if len(args) >= 2 {
+				fmt.Sscanf(args[1], "%d", &qty)
+			}
+			cmdMogRetrieve(p, args[0], qty)
+		}
+	case "mog-list", "mog list", "moglist":
+		cmdMogList(p)
 	case "war", "factionwar", "fw":
 		cmdFactionWar(p)
 	// ── Flip phone interface (S123-04) ───────────────────────────────────────
@@ -2837,6 +2863,54 @@ func cmdExamine(p *player, targetName string) {
 		}
 	}
 	p.sendf("No player named %q here.", targetName)
+	p.prompt()
+}
+
+func cmdMogStore(p *player, itemID string, qty int) {
+	if p.inventory[itemID] < qty {
+		p.sendf("You don't have %d x %s in your inventory.", qty, itemName(itemID))
+		p.prompt()
+		return
+	}
+	mog := mogReg.Get(p.slot)
+	if err := mog.Store(itemID, qty); err != nil {
+		p.sendf("Mog House: %v", err)
+		p.prompt()
+		return
+	}
+	p.inventory[itemID] -= qty
+	if p.inventory[itemID] == 0 {
+		delete(p.inventory, itemID)
+	}
+	p.sendf("Stored %d x %s in your Mog House. (%d/%d used)",
+		qty, itemName(itemID), mog.TotalItems(), moghouse.Capacity)
+	p.prompt()
+}
+
+func cmdMogRetrieve(p *player, itemID string, qty int) {
+	mog := mogReg.Get(p.slot)
+	if err := mog.Retrieve(itemID, qty); err != nil {
+		p.sendf("Mog House: %v", err)
+		p.prompt()
+		return
+	}
+	p.inventory[itemID] += qty
+	p.sendf("Retrieved %d x %s from your Mog House.", qty, itemName(itemID))
+	p.prompt()
+}
+
+func cmdMogList(p *player) {
+	mog := mogReg.Get(p.slot)
+	snap := mog.Snapshot()
+	if len(snap) == 0 {
+		p.sendf("\r\n=== Mog House (%d/%d) — Empty ===", mog.TotalItems(), moghouse.Capacity)
+		p.prompt()
+		return
+	}
+	p.sendf("\r\n=== Mog House (%d/%d) ===", mog.TotalItems(), moghouse.Capacity)
+	for itemID, qty := range snap {
+		p.sendf("  %-6d  %s", qty, itemName(itemID))
+	}
 	p.prompt()
 }
 
