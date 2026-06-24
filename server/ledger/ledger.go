@@ -58,6 +58,12 @@ const (
 
 	// Anti-exploit.
 	VerbSuspicious VerbType = "SUSPICIOUS_PATTERN"
+
+	// TYLER universe layer verbs (S123-02).
+	VerbTYLEREpisodeReceipt  VerbType = "TYLER_EPISODE_RECEIPT"
+	VerbTYLERMigrationEvent  VerbType = "TYLER_MIGRATION_EVENT"
+	VerbTYLERFieldActivation VerbType = "TYLER_FIELD_ACTIVATION"
+	VerbTYLERArchiveEntry    VerbType = "TYLER_ARCHIVE_ENTRY"
 )
 
 // Receipt is an immutable diegetic log line.

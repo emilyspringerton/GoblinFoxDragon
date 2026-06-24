@@ -2035,6 +2035,13 @@ func handle(p *player, line string) {
 			return
 		}
 		cmdEnforcement(p, args[0])
+	// ── TYLER CAST terminal (S123-02) ────────────────────────────────────────
+	case "terminal", "cast-terminal", "castterm":
+		if len(args) == 0 {
+			cmdCAST(p, "")
+		} else {
+			cmdCAST(p, args[0])
+		}
 
 	case "help", "?":
 		cmdHelp(p)
@@ -6129,6 +6136,52 @@ func cmdEnforcement(p *player, districtID string) {
 	if w != nil {
 		p.sendf("  Watcher alert:  %.0f | trust: %.0f | hot: %v", w.Alertness, w.Trust, w.IsEnforcementHot())
 	}
+	p.prompt()
+}
+
+// ── TYLER CAST terminal (S123-02) ─────────────────────────────────────────────
+
+// cmdCAST displays the CAST terminal lore index for the current scene, or reads a doc.
+// CAST terminals exist in scenes 200, 203, 204, 205 — Cairngorms is the primary archive.
+func cmdCAST(p *player, docID string) {
+	castScenes := map[int]bool{200: true, 203: true, 204: true, 205: true}
+	if !castScenes[p.zoneID] {
+		p.send("[CAST] No terminal in this area. Look for one in the Cairngorms Archive (scene 203) or Vatican Corridors (204).")
+		p.prompt()
+		return
+	}
+	if docID == "" {
+		docs := ledger.TYLERLoreDocsForScene(p.zoneID)
+		if len(docs) == 0 {
+			p.send("[CAST] This terminal shows no accessible archive records.")
+			p.prompt()
+			return
+		}
+		p.send("[CAST TERMINAL — EASTWIND ARCHIVE]")
+		p.send("Available documents (type 'cast <doc-id>' to read):")
+		for _, d := range docs {
+			p.sendf("  %-38s — %s", d.ID, d.Title)
+		}
+		p.prompt()
+		return
+	}
+	doc := ledger.TYLERLoreDocByID(docID)
+	if doc == nil {
+		p.sendf("[CAST] No document with ID %q. Type 'cast' for available docs.", docID)
+		p.prompt()
+		return
+	}
+	if doc.Scene != p.zoneID {
+		p.sendf("[CAST] Document %q is not accessible from this terminal.", docID)
+		p.prompt()
+		return
+	}
+	p.sendf("[CAST] Reading: %s", doc.Title)
+	p.send("─────────────────────────────────────────────────────────────")
+	p.send(doc.Body)
+	p.send("─────────────────────────────────────────────────────────────")
+	// File an archive entry receipt.
+	cityLedger.Append(ledger.VerbTYLERArchiveEntry, "district-cairngorms", p.name, doc.ID, fmt.Sprintf("title=%q", doc.Title), time.Now())
 	p.prompt()
 }
 
