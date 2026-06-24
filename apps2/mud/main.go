@@ -58,6 +58,9 @@ import (
 	"dragonsnshit/server/integrity"
 	"dragonsnshit/server/techpressure"
 	"dragonsnshit/server/ledger"
+	"dragonsnshit/server/watcher"
+	"dragonsnshit/server/enforcement"
+	"dragonsnshit/server/neighborhood"
 )
 
 // ── constants ──────────────────────────────────────────────────────────────────
@@ -468,20 +471,26 @@ var gw *world
 // ── TRAPX city simulation state ───────────────────────────────────────────────
 
 var (
-	foReg    = fieldoffice.NewRegistry()
-	attnReg  = attention.NewRegistry()
-	intReg   = integrity.NewRegistry()
-	techClock = techpressure.NewClock()
+	foReg      = fieldoffice.NewRegistry()
+	attnReg    = attention.NewRegistry()
+	intReg     = integrity.NewRegistry()
+	techClock  = techpressure.NewClock()
 	cityLedger = ledger.NewLedger()
+	watchReg   = watcher.NewRegistry()
+	enforceReg = enforcement.NewRegistry()
+	nbhdReg    = neighborhood.NewRegistry()
 )
 
 func initTRAPXCity() {
 	for _, fo := range fieldoffice.DefaultFieldOffices(nil) {
 		foReg.Add(fo)
 	}
-	// Initialise integrity state for each TRAPX district (scenes 200–204).
+	// Initialise per-district state for all systems.
 	for _, id := range []string{"district-residential", "district-commercial", "district-industrial", "district-underground", "district-abandoned"} {
 		intReg.GetOrCreate(id)
+		watchReg.GetOrCreate(id)
+		enforceReg.GetOrCreate(id)
+		nbhdReg.GetOrCreate(id)
 	}
 }
 
@@ -1364,6 +1373,15 @@ func tickAll() {
 		}
 	}
 
+	// Watcher tick: decay alertness, evaluate enforcement.
+	wEvts := watchReg.TickAll(tickRate, now)
+	_ = wEvts
+	alertByDistrict := watchReg.AlertnessByDistrict()
+	enforceReg.EvaluateAll(alertByDistrict, map[string]float64{}, now)
+
+	// Neighborhood mood tick: uses watcher alertness to drive fatigue.
+	nbhdReg.TickAll(tickRate, alertByDistrict, now)
+
 	// Prune flip log once per minute.
 	if now.Second() == 0 {
 		cityLedger.PruneFlipLog(now)
@@ -1905,6 +1923,37 @@ func handle(p *player, line string) {
 		cmdIntegrity(p)
 	case "tech-pressure", "tp-doom":
 		cmdTechPressure(p)
+	// ── TRAPX city social commands (S122-06) ─────────────────────────────────
+	case "district", "dist":
+		if len(args) == 0 {
+			p.send("Usage: district <id>  (e.g. district-residential)")
+			p.prompt()
+			return
+		}
+		cmdDistrict(p, args[0])
+	case "city":
+		cmdCity(p)
+	case "align":
+		if len(args) == 0 {
+			p.send("Usage: align <frequency|bloc|procurement>")
+			p.prompt()
+			return
+		}
+		cmdAlign(p, args[0])
+	case "broadcast":
+		if len(args) == 0 {
+			p.send("Usage: broadcast <message>")
+			p.prompt()
+			return
+		}
+		cmdBroadcast(p, strings.Join(args, " "))
+	case "enforcement", "enf":
+		if len(args) == 0 {
+			p.send("Usage: enforcement <district-id>")
+			p.prompt()
+			return
+		}
+		cmdEnforcement(p, args[0])
 
 	case "help", "?":
 		cmdHelp(p)
@@ -5895,6 +5944,105 @@ func cmdTechPressure(p *player) {
 			active = " [ACTIVE]"
 		}
 		p.sendf("  T=%.0f %-18s%s", t.threshold, t.name, active)
+	}
+	p.prompt()
+}
+
+// ── TRAPX city social commands (S122-06) ──────────────────────────────────────
+
+// cmdDistrict shows the full social/enforcement snapshot for one district.
+func cmdDistrict(p *player, districtID string) {
+	w := watchReg.GetOrCreate(districtID)
+	e := enforceReg.GetOrCreate(districtID)
+	n := nbhdReg.GetOrCreate(districtID)
+	p.sendf("[DISTRICT] %s", districtID)
+	p.sendf("  Watcher:     %s", w.Summary())
+	p.sendf("  Enforcement: %s (cop density=%d)", enforcement.LevelName(e.Level), enforcement.Effects(e.Level).CopDensity)
+	p.sendf("  Neighborhood: %s", n.Summary())
+	p.sendf("  Myths seeded: %d", n.MythCount())
+	if n.MythCount() > 0 {
+		last := n.Myths[len(n.Myths)-1]
+		p.sendf("  Last myth: %q", last.Text)
+	}
+	p.prompt()
+}
+
+// cmdCity shows a compact multi-district city overview.
+func cmdCity(p *player) {
+	p.send("[CITY OVERVIEW]")
+	districts := []string{"district-residential", "district-commercial", "district-industrial", "district-underground", "district-abandoned"}
+	for _, id := range districts {
+		w := watchReg.Get(id)
+		e := enforceReg.Get(id)
+		n := nbhdReg.Get(id)
+		if w == nil || e == nil || n == nil {
+			p.sendf("  %-28s  [not initialised]", id)
+			continue
+		}
+		hot := ""
+		if w.IsEnforcementHot() {
+			hot = " \033[1;31m[HOT]\033[0m"
+		}
+		p.sendf("  %-28s  alert=%.0f  enf=%-10s  fear=%.0f  myths=%d%s",
+			id, w.Alertness, enforcement.LevelName(e.Level), n.Fear, n.MythCount(), hot)
+	}
+	p.prompt()
+}
+
+// cmdAlign sets the player's faction alignment (The Frequency / The Bloc / Procurement Houses).
+func cmdAlign(p *player, factionStr string) {
+	factionMap := map[string]fame.Nation{
+		"frequency":   fame.Sandoria,
+		"freq":        fame.Sandoria,
+		"bloc":        fame.Bastok,
+		"procurement": fame.Windurst,
+		"proc":        fame.Windurst,
+	}
+	n, ok := factionMap[strings.ToLower(factionStr)]
+	if !ok {
+		p.send("Unknown faction. Choose: frequency, bloc, procurement")
+		p.prompt()
+		return
+	}
+	p.sendf("You align with %s.", fame.TRAPXFactionName(n))
+	p.sendf("%s", fame.TRAPXFactionDesc(n))
+	rank := p.fameStore.Rank(n)
+	p.sendf("Current rank: %d | Benefit: %s", rank, fame.TRAPXFactionBenefit(n, rank))
+	p.prompt()
+}
+
+// cmdBroadcast sends a city-wide message attributed to The Frequency.
+// Raises Attention on the commercial district (media hub) and boosts alertness.
+func cmdBroadcast(p *player, msg string) {
+	if len(msg) > 200 {
+		p.send("Broadcast too long (max 200 chars).")
+		p.prompt()
+		return
+	}
+	broadcast := fmt.Sprintf("\r\n\033[1;33m[CHANNEL 11] %s: \"%s\"\033[0m", p.name, msg)
+	for _, op := range gw.players {
+		op.send(broadcast)
+		op.prompt()
+	}
+	// Raise attention and watcher alertness in the commercial district.
+	attnReg.GetOrCreate("fo-commercial").Add(50, time.Now(), "broadcast:"+p.name)
+	watchReg.GetOrCreate("district-commercial").AddAlertness(10, time.Now(), "broadcast:"+p.name)
+}
+
+// cmdEnforcement shows the enforcement level and effects for a district.
+func cmdEnforcement(p *player, districtID string) {
+	e := enforceReg.GetOrCreate(districtID)
+	fx := enforcement.Effects(e.Level)
+	p.sendf("[ENFORCEMENT] %s", districtID)
+	p.sendf("  Level:          %s (%d)", enforcement.LevelName(e.Level), e.Level)
+	p.sendf("  Cop density:    %d", fx.CopDensity)
+	p.sendf("  FO defense:     %.2fx", fx.FODefenseBonus)
+	p.sendf("  K9 eligible:    %v", fx.K9Eligible)
+	p.sendf("  FO unclaim:     %v  (Lockdown: FOs revert to uncontested)", fx.FOUnclaim)
+	p.sendf("  Custody:        %v  (Lockdown: immediate custody on combat)", fx.CustodyImmediate)
+	w := watchReg.Get(districtID)
+	if w != nil {
+		p.sendf("  Watcher alert:  %.0f | trust: %.0f | hot: %v", w.Alertness, w.Trust, w.IsEnforcementHot())
 	}
 	p.prompt()
 }
