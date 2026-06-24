@@ -107,3 +107,31 @@ func (a *Atlas) ExitMap(exits map[int]map[string]int, zoneNames map[int]string, 
 	sb.WriteString("└──────────────────────────────────────┘")
 	return sb.String()
 }
+
+// MergeFrom copies all visited zones from src into a.
+// Used when a player crafts an Atlas Page to absorb region data.
+func (a *Atlas) MergeFrom(src *Atlas) int {
+	if src == nil {
+		return 0
+	}
+	added := 0
+	for zoneID := range src.visited {
+		if !a.visited[zoneID] {
+			a.visited[zoneID] = true
+			added++
+		}
+	}
+	return added
+}
+
+// DiscoverAll marks all of the given zone IDs as visited, returning the count of new discoveries.
+func (a *Atlas) DiscoverAll(zoneIDs []int) int {
+	added := 0
+	for _, id := range zoneIDs {
+		if !a.visited[id] {
+			a.visited[id] = true
+			added++
+		}
+	}
+	return added
+}

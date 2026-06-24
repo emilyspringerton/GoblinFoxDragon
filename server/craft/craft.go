@@ -216,10 +216,56 @@ func HerbalRemedyRecipe() Recipe {
 	}
 }
 
+// RepairedBikeRecipe returns the TRAPX synthesis recipe: Mini Bike Key → Repaired Bike (MNK weapon).
+func RepairedBikeRecipe() Recipe {
+	return Recipe{
+		ID:        "repaired-bike",
+		CraftType: Blacksmith,
+		// Difficulty 30: requires journeyman blacksmithing
+		Difficulty: 30.0,
+		ItemID:     "repaired-bike",
+		HQ1ItemID:  "repaired-bike+1",
+		HQ2ItemID:  "repaired-bike+1",
+		HQ3ItemID:  "repaired-bike+1",
+	}
+}
+
+// FactionGearRecipe returns the TRAPX synthesis recipe: Faction Patch (×3) → Faction Gear.
+func FactionGearRecipe() Recipe {
+	return Recipe{
+		ID:        "faction-gear",
+		CraftType: Clothcraft,
+		// Difficulty 20: mid-tier clothcraft
+		Difficulty: 20.0,
+		ItemID:     "faction-gear",
+		HQ1ItemID:  "faction-gear+1",
+		HQ2ItemID:  "faction-gear+1",
+		HQ3ItemID:  "faction-gear+1",
+	}
+}
+
+// AtlasPageRecipe returns the TRAPX synthesis recipe: City Map → Atlas Page (cartography merge).
+func AtlasPageRecipe() Recipe {
+	return Recipe{
+		ID:        "atlas-page",
+		CraftType: Woodworking,
+		// Difficulty 10: beginner woodworking
+		Difficulty: 10.0,
+		ItemID:     "atlas-page",
+		HQ1ItemID:  "atlas-page+1",
+		HQ2ItemID:  "atlas-page+1",
+		HQ3ItemID:  "atlas-page+1",
+	}
+}
+
 // registry is the server-side recipe lookup table.
 var registry = func() map[string]Recipe {
 	m := map[string]Recipe{}
-	for _, r := range []Recipe{IronIngotRecipe(), HerbalRemedyRecipe()} {
+	for _, r := range []Recipe{
+		IronIngotRecipe(), HerbalRemedyRecipe(),
+		// TRAPX synthesis recipes (S126-15):
+		RepairedBikeRecipe(), FactionGearRecipe(), AtlasPageRecipe(),
+	} {
 		m[r.ID] = r
 	}
 	return m

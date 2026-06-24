@@ -130,6 +130,10 @@ func (c *charCacheStore) set(name, charID string) {
 var recipeIngredients = map[string]map[string]int{
 	"iron-ingot":    {"earth-crystal": 2, "worm-sinew": 1},
 	"herbal-remedy": {"slime-oil": 1, "water-crystal": 1},
+	// TRAPX synthesis recipes (S126-15):
+	"repaired-bike": {"mini-bike-key": 1, "fire-crystal": 1},
+	"faction-gear":  {"faction-patch": 3, "earth-crystal": 1},
+	"atlas-page":    {"city-map": 1, "wind-crystal": 1},
 }
 
 // itemDisplayName maps item IDs to human-readable names.
@@ -160,6 +164,17 @@ var itemDisplayName = map[string]string{
 	"herbal-remedy+1":  "Herbal Remedy +1",
 	"herbal-remedy+2":  "Herbal Remedy +2",
 	"herbal-remedy+3":  "Herbal Remedy +3",
+	// TRAPX items and craft results (S126-15):
+	"mini-bike-key":    "Mini Bike Key",
+	"faction-patch":    "Faction Patch",
+	"city-map":         "City Map",
+	"wind-crystal":     "Wind Crystal",
+	"repaired-bike":    "Repaired Bike",
+	"repaired-bike+1":  "Repaired Bike +1",
+	"faction-gear":     "Faction Gear",
+	"faction-gear+1":   "Faction Gear +1",
+	"atlas-page":       "Atlas Page",
+	"atlas-page+1":     "Atlas Page +1",
 }
 
 func itemName(id string) string {
@@ -4579,6 +4594,16 @@ func cmdCraft(p *player, recipeID string) {
 		p.sendf(">>> HQ%d! <<< You synthesise %s! (craft skill: %.1f)", result.HQTier, itemName(result.ItemID), newSkill)
 	} else {
 		p.sendf("Synthesis complete: %s. (craft skill: %.1f)", itemName(result.ItemID), newSkill)
+	}
+
+	// Post-synthesis special effects (S126-15):
+	if strings.HasPrefix(result.ItemID, "atlas-page") {
+		// Atlas Page merges all known zone IDs into the player's cartography atlas.
+		zoneIDs := gw.zoneMgr.ZoneIDs()
+		added := p.atlas.DiscoverAll(zoneIDs)
+		if added > 0 {
+			p.sendf("[Cartography] Atlas merged: %d new zones discovered.", added)
+		}
 	}
 	p.prompt()
 }
