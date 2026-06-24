@@ -1,4 +1,5 @@
 ## 2026-06-24
+- S123-05: VS0 Detroit slice — fo-school-1 seeded, Jiangshi FO pre-held, alertness=35 preset, takecontrol entry, Emily OS ambient voice (10 fragments)
 - S123-04: flip phone MUD interface — 5 tabs (FO/heat/receipts/crew/CAST), CRT box-drawing, Watcher alertness contribution, districtIDForZone
 - S123-03: multi-timeline branch system — Branch/Registry, rogue_swarm auto-branch, 'timeline' MUD command, conflict detection, 16 tests
 - S123-02: TYLER ledger bridge; 4 TYLER verb types, 4 CAST lore docs, 'terminal' MUD command, archive entry receipts
