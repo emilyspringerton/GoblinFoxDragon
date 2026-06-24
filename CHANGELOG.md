@@ -1,4 +1,5 @@
 ## 2026-06-24
+- S120-01: server/ledger — Receipt ledger + anti-exploit (append-only, verb types, ByFO/ByActor/ByVerb/Since, ReceiptBurst 30s, flip-score exploit detection, SUSPICIOUS_PATTERN flag, 15 tests) — Apple #3353
 - S119-05: server/techpressure — Tech Pressure doom clock (5-tier: LeashFrays/ProcurementWar/QuietAudit/Packmind/CrownProtocol; TierUnlock/DogDeploy/SwarmActivity inputs; decay; BirdCorrection; CROWN_PROTOCOL one-shot; 18 tests) — Apple #3351. S119 ENGINE FOUNDATION COMPLETE.
 - S119-04: server/integrity — Control Integrity + Rogue Swarm (per-district CI 0-1, dog decay superlinear, jammer/flip decay, CleanAudit/BirdCorrection recovery, ROGUE_SWARM trigger at 0.15, containment objectives, SCAR_WRITTEN, Registry, 24 tests) — Apple #3349
 - S119-03: server/attention — Attention meter (0-1000, superlinear dog gain n^1.3, decay, AUDIT_THRESHOLD→OversightSect, VENDOR_THRESHOLD→ShadowOperator, ecosystem effects, Registry, 18 tests) — Apple #3346
