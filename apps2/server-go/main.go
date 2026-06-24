@@ -25,6 +25,12 @@ import (
 	"dragonsnshit/server/telecrystal"
 	"dragonsnshit/server/worldcrisis"
 	"dragonsnshit/server/worldapi"
+	"dragonsnshit/server/trapxapi"
+	"dragonsnshit/server/fieldoffice"
+	"dragonsnshit/server/attention"
+	"dragonsnshit/server/integrity"
+	"dragonsnshit/server/techpressure"
+	"dragonsnshit/server/ledger"
 )
 
 type world struct{}
@@ -73,9 +79,30 @@ type clientInfo struct {
 	chunkIndex    int
 }
 
+// TRAPX city simulation state (shared across server tick and trapxapi HTTP handler).
+var (
+	cityFOReg    = fieldoffice.NewRegistry()
+	cityAttnReg  = attention.NewRegistry()
+	cityIntReg   = integrity.NewRegistry()
+	cityTechClock = techpressure.NewClock()
+	cityLedger   = ledger.NewLedger()
+)
+
+func initCityState() {
+	for _, fo := range fieldoffice.DefaultFieldOffices(nil) {
+		cityFOReg.Add(fo)
+	}
+	for _, id := range []string{"district-residential", "district-commercial", "district-industrial", "district-underground", "district-abandoned"} {
+		cityIntReg.GetOrCreate(id)
+	}
+}
+
 func main() {
 	worldapiPort := flag.Int("worldapi-port", 7070, "HTTP port for the worldapi /chunks endpoint (0 = disabled)")
+	trapxPort := flag.Int("trapx-port", 7071, "HTTP port for the TRAPX city-state API (0 = disabled)")
 	flag.Parse()
+
+	initCityState()
 
 	// Start the worldapi HTTP server — SHANKPIT connects here with --dragonfly-url http://localhost:7070
 	if *worldapiPort > 0 {
@@ -86,6 +113,18 @@ func main() {
 			fmt.Printf("worldapi listening on %s (scene 0=meadow, 1=hills, 2=caves)\n", addr)
 			if err := http.ListenAndServe(addr, srv); err != nil {
 				fmt.Printf("worldapi: %v\n", err)
+			}
+		}()
+	}
+
+	// Start the TRAPX city-state API — Emily Prime Dragon reads this each RSI cycle.
+	if *trapxPort > 0 {
+		tsrv := trapxapi.New(cityFOReg, cityAttnReg, cityIntReg, cityTechClock, cityLedger)
+		go func() {
+			addr := fmt.Sprintf(":%d", *trapxPort)
+			fmt.Printf("trapxapi listening on %s (GET /api/v1/trapx/city-state, POST /api/v1/trapx/events)\n", addr)
+			if err := http.ListenAndServe(addr, tsrv); err != nil {
+				fmt.Printf("trapxapi: %v\n", err)
 			}
 		}()
 	}
