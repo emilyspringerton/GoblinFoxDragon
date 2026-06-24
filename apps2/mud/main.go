@@ -2049,6 +2049,13 @@ func handle(p *player, line string) {
 	// ── TYLER timeline commands (S123-03) ───────────────────────────────────
 	case "timeline", "branches":
 		cmdTimeline(p)
+	// ── Flip phone interface (S123-04) ───────────────────────────────────────
+	case "phone", "flip":
+		tab := "1"
+		if len(args) > 0 {
+			tab = args[0]
+		}
+		cmdPhone(p, tab)
 	// ── TYLER CAST terminal (S123-02) ────────────────────────────────────────
 	case "terminal", "cast-terminal", "castterm":
 		if len(args) == 0 {
@@ -6151,6 +6158,126 @@ func cmdEnforcement(p *player, districtID string) {
 		p.sendf("  Watcher alert:  %.0f | trust: %.0f | hot: %v", w.Alertness, w.Trust, w.IsEnforcementHot())
 	}
 	p.prompt()
+}
+
+// ── Flip phone interface (S123-04) ─────────────────────────────────────────────
+
+const phoneBorder = "╔══════════════════════════════╗"
+const phoneBottom = "╚══════════════════════════════╝"
+
+// cmdPhone renders the diegetic city device. 5 tabs, CRT-scanline aesthetic.
+// Usage: phone [1-5]  (default: tab 1 FO STATUS)
+// Tabs: 1=FO STATUS, 2=CITY HEAT, 3=RECEIPTS, 4=CREW, 5=CAST STREAM
+func cmdPhone(p *player, tab string) {
+	// Phone contributes to Watcher alertness (documenting yourself documents yourself).
+	watchReg.GetOrCreate(districtIDForZone(p.zoneID)).AddAlertness(2, time.Now(), "phone:"+p.name)
+
+	header := func(title string) {
+		p.send(phoneBorder)
+		p.sendf("║ 📡 CITY DEVICE    %-12s║", "")
+		p.sendf("║ [1]FO [2]HEAT [3]REC [4]CREW [5]CAST  ║")
+		p.sendf("║ ▶ TAB %s: %-20s║", tab, title)
+		p.send("╠══════════════════════════════╣")
+	}
+	footer := func() {
+		p.send("╠══════════════════════════════╣")
+		p.send("║ type: phone <tab>            ║")
+		p.send(phoneBottom)
+	}
+
+	switch tab {
+	case "1": // FO STATUS
+		header("FO STATUS")
+		var matching []string
+		for _, fo := range foReg.All() {
+			if fo.SceneID == p.zoneID {
+				matching = append(matching, fmt.Sprintf("║ %-11s %-8s flow=%.0f ║", fo.ID, fieldoffice.PhaseName(fo.Phase), fo.Flow))
+			}
+		}
+		if len(matching) == 0 {
+			p.send("║ No FOs in this area.         ║")
+		}
+		for _, l := range matching {
+			p.send(l)
+		}
+	case "2": // CITY HEAT
+		header("CITY HEAT")
+		districts := []string{"district-residential", "district-commercial", "district-industrial",
+			"district-underground", "district-abandoned"}
+		for _, id := range districts {
+			w := watchReg.Get(id)
+			e := enforceReg.Get(id)
+			if w == nil || e == nil {
+				continue
+			}
+			p.sendf("║ %-20s a=%.0f e=%s ║", id[9:], w.Alertness, enforcement.LevelName(e.Level)[:1])
+		}
+		tp := techClock
+		p.sendf("║ TECH PRESSURE: %.0f/1000     ║", tp.Pressure)
+	case "3": // RECEIPTS
+		header("RECEIPTS (last 15)")
+		all := cityLedger.All()
+		start := len(all) - 15
+		if start < 0 {
+			start = 0
+		}
+		for _, r := range all[start:] {
+			p.sendf("║ #%-4d %-10s %-12s║", r.Seq, string(r.Verb)[:min10(len(string(r.Verb)), 10)], r.FOID[:min10(len(r.FOID), 12)])
+		}
+	case "4": // CREW
+		header("CREW")
+		for _, op := range gw.players {
+			if op.slot == "" {
+				continue
+			}
+			dogs := 0
+			if op.k9Swarm != nil {
+				dogs = op.k9Swarm.ActiveCount()
+			}
+			p.sendf("║ %-12s HP:%-5d K9:%-3d  ║", op.name, op.hp, dogs)
+		}
+	case "5": // CAST STREAM
+		header("CAST STREAM")
+		docs := ledger.TYLERLoreDocsForScene(p.zoneID)
+		if len(docs) == 0 {
+			p.send("║ No CAST docs in this area.   ║")
+		}
+		for _, d := range docs {
+			p.sendf("║ %-28s ║", d.ID[:min10(len(d.ID), 28)])
+		}
+		p.send("║ type: terminal <doc-id>      ║")
+	default:
+		header("INVALID TAB")
+		p.send("║ Choose tab 1-5               ║")
+	}
+	footer()
+	p.prompt()
+}
+
+// min10 returns the min of a and b (helper to avoid import of math for this).
+func min10(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// districtIDForZone maps a MUD zone ID to a district social state ID.
+func districtIDForZone(zoneID int) string {
+	m := map[int]string{
+		200: "district-residential",
+		201: "district-commercial",
+		202: "district-industrial",
+		203: "district-underground",
+		204: "district-abandoned",
+		205: "district-underport",
+		206: "district-coastal",
+		207: "district-bacons-table",
+	}
+	if id, ok := m[zoneID]; ok {
+		return id
+	}
+	return "district-residential"
 }
 
 // ── TYLER timeline system (S123-03) ───────────────────────────────────────────
