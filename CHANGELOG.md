@@ -1,4 +1,5 @@
 ## 2026-06-24
+- S122-05: TRAPX faction rep overlay — Frequency/Bloc/Procurement Houses on fame.Nation; rank-gated benefits, 11 tests
 - S122-04: TRAPX RPG class unlock chains — 8 chains (DRK/BST/BRD/SAM/SMN/BLU/GEO/RUN), 24 quests total, job-stone rewards, wired into questBank
 - S122-03: Neighborhood personality — Tolerance/Pride/Cohesion/Visibility axes, Fear/Fatigue mood drift, myth seeding (10 lore fragments per district), 23 tests
 - S122-02: Watcher (alertness/trust/bias per district) + Enforcement (5-level state machine: Quiet→Lockdown, cop density 0-8, K9 eligibility, FO effects)
