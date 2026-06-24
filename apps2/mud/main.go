@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"math"
 	"math/rand"
 	"net"
 	"os"
@@ -1497,6 +1498,33 @@ func tickAll() {
 	_ = wEvts
 	alertByDistrict := watchReg.AlertnessByDistrict()
 	enforceReg.EvaluateAll(alertByDistrict, map[string]float64{}, now)
+
+	// Weather → district mood feedback (S126-02).
+	// Apply weather modifiers to each district's Mood before the neighborhood tick.
+	if gw != nil && gw.weatherEngine != nil {
+		phase := gw.weatherEngine.Phase()
+		districtIDs := []string{
+			"district-residential", "district-commercial", "district-industrial",
+			"district-underground", "district-abandoned",
+		}
+		for _, did := range districtIDs {
+			hood := nbhdReg.Get(did)
+			if hood == nil {
+				continue
+			}
+			switch phase {
+			case weather.PhaseStorm:
+				// Thunderstorm: Fear+15 everywhere.
+				hood.Fear = math.Min(neighborhood.FearMax, hood.Fear+15)
+			case weather.PhaseRain:
+				// Heavy rain: Fatigue+10 in outdoor districts.
+				hood.FatigueVal = math.Min(neighborhood.FatigueMax, hood.FatigueVal+10)
+			case weather.PhaseClear:
+				// Clear sky: Fatigue-5 (recovery).
+				hood.FatigueVal = math.Max(0, hood.FatigueVal-5)
+			}
+		}
+	}
 
 	// Neighborhood mood tick: uses watcher alertness to drive fatigue.
 	nbhdReg.TickAll(tickRate, alertByDistrict, now)
