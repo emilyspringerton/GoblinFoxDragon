@@ -65,6 +65,7 @@ import (
 	"dragonsnshit/server/autotranslate"
 	"dragonsnshit/server/factionwar"
 	"dragonsnshit/server/moghouse"
+	"dragonsnshit/server/schedule"
 )
 
 // ── constants ──────────────────────────────────────────────────────────────────
@@ -558,6 +559,13 @@ var (
 	timelineReg       = timeline.NewRegistry()
 	seenRogueBranches = make(map[int]bool) // ledger seq → already branched
 	mogReg            = moghouse.NewRegistry()
+	npcScheduleReg    = func() *schedule.Registry {
+		reg := schedule.NewRegistry()
+		for _, s := range schedule.DefaultSchedules() {
+			reg.Register(s)
+		}
+		return reg
+	}()
 	warEngine         = factionwar.NewEngine([]string{
 		"district-residential", "district-commercial", "district-industrial",
 		"district-underground", "district-abandoned",
@@ -1518,6 +1526,15 @@ func tickAll() {
 	// Prune flip log once per minute.
 	if now.Second() == 0 {
 		cityLedger.PruneFlipLog(now)
+	}
+	// NPC schedule tick — fires once per hour (minute=0, second=0).
+	if now.Minute() == 0 && now.Second() == 0 {
+		if moves := npcScheduleReg.Tick(now.UTC().Hour()); len(moves) > 0 {
+			for _, mv := range moves {
+				msg := fmt.Sprintf("%s heads toward zone %d.", mv.NPCID, mv.ToZone)
+				broadcastAll(msg)
+			}
+		}
 	}
 }
 
