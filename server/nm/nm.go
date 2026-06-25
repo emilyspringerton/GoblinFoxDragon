@@ -123,6 +123,73 @@ func SwampNMs() []*NMSpawn {
 	}
 }
 
+// HillsNMs returns NM spawn definitions for Hills (zone 1).
+//
+// nm-great-beetle: popped from any beetle-hills placeholder, 20% chance per
+// check in a 30-minute window. Boss beetle with enrage at low HP.
+//
+// nm-ancient-wolf: window-only (no placeholder requirement); spawns once every
+// 90 minutes at the Hills far north, independent of normal wolf kills.
+func HillsNMs() []*NMSpawn {
+	return []*NMSpawn{
+		{
+			ID:             "nm-great-beetle",
+			PlaceholderID:  "beetle-hills-0",
+			SpawnChance:    0.20,
+			WindowOpen:     8 * time.Minute,
+			WindowClose:    38 * time.Minute,
+			RespawnMinutes: 90,
+		},
+		{
+			ID:             "nm-ancient-wolf",
+			PlaceholderID:  "", // window-only; scheduled via OpenWindow
+			SpawnChance:    1.0,
+			WindowOpen:     0,
+			WindowClose:    15 * time.Minute,
+			RespawnMinutes: 90,
+		},
+	}
+}
+
+// CavesNMs returns NM spawn definitions for Caves (zone 2).
+//
+// nm-bone-knight: popped from skeleton-caves-0 placeholder, 35% chance per
+// check in a 30-minute window. Undead boss; wide aggro, heavy melee.
+//
+// nm-venom-queen: popped from spider-caves-0 placeholder, 25% chance per
+// check. The Venom Queen drops rare accessories.
+func CavesNMs() []*NMSpawn {
+	return []*NMSpawn{
+		{
+			ID:             "nm-bone-knight",
+			PlaceholderID:  "skeleton-caves-0",
+			SpawnChance:    0.35,
+			WindowOpen:     5 * time.Minute,
+			WindowClose:    35 * time.Minute,
+			RespawnMinutes: 75,
+		},
+		{
+			ID:             "nm-venom-queen",
+			PlaceholderID:  "spider-caves-0",
+			SpawnChance:    0.25,
+			WindowOpen:     12 * time.Minute,
+			WindowClose:    42 * time.Minute,
+			RespawnMinutes: 60,
+		},
+	}
+}
+
+// AllStartingZoneNMs returns all NM definitions for the four default starting zones.
+// Callers can register these with a Registry at startup.
+func AllStartingZoneNMs() []*NMSpawn {
+	var all []*NMSpawn
+	all = append(all, MeadowNMs()...)
+	all = append(all, HillsNMs()...)
+	all = append(all, CavesNMs()...)
+	all = append(all, SwampNMs()...)
+	return all
+}
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 
 // Registry holds all NMSpawn definitions for a single zone.
