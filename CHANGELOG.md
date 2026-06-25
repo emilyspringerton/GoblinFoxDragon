@@ -1,4 +1,5 @@
 ## 2026-06-25
+- feat(watcher): TRAPX vigilante anomaly spawn system — DisruptionDebt accumulator, 4 archetypes (Founder/Chemist/Apparition/RiotBreaker), 3 power tiers, chaotic-neutral targeting by Trust score, 19 tests
 - docs2/INVENTORY_EQUIPMENT_NORTHSTAR.md: FFXI-era inventory+equipment northstar with art direction (low-poly)
 - server/npcattention: per-NPC stealth awareness (Hitman C47 parity) — disguise factions, suspicion [0,100], witness system, Scene tick
 - server/nm: HillsNMs + CavesNMs + AllStartingZoneNMs — all 4 default zones now have NM spawn definitions
