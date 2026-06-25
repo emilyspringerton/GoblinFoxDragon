@@ -1,4 +1,5 @@
 ## 2026-06-25
+- data/items.json: 52-item seed (weapons/armor/accessories/consumables/crystals/materials/key items)
 - server/inventory: bag container (Bag/Stack/Mog, stack merge, Rare conflict, Gobbiebag expand, key items)
 - server/itemdef: item definition registry (JobMask, ItemFlags, Category, Registry/LoadJSON/ByID/ByName, CanEquip)
 
