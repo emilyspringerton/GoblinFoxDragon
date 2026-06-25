@@ -87,6 +87,10 @@ type WatcherState struct {
 	BiasScore  float64 // [-100, 100] — magnitude of factional pull
 
 	EnforcementTriggered bool // true when alertness ≥ 65 AND trust ≤ -20
+
+	// DisruptionDebt accumulates when alertness stays above AlertHighViz (80).
+	// When it crosses SpawnDebtThreshold, CheckVigilanteSpawn may produce an anomaly.
+	DisruptionDebt float64 // [0, SpawnDebtMax]
 }
 
 // NewState creates a fresh WatcherState for a district.
@@ -169,9 +173,11 @@ func (w *WatcherState) ShiftBias(biasTarget Bias, delta float64, now time.Time, 
 	}}
 }
 
-// Tick runs one time step. Decays alertness passively.
+// Tick runs one time step. Decays alertness passively and updates disruption debt.
 func (w *WatcherState) Tick(dt time.Duration, now time.Time) []Event {
-	return w.DecayAlertness(dt, now)
+	events := w.DecayAlertness(dt, now)
+	w.AccumulateDisruptionDebt(dt, now)
+	return events
 }
 
 // IsEnforcementHot returns true when both trigger conditions are met.

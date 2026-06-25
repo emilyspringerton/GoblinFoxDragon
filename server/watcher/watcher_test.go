@@ -5,6 +5,11 @@ import (
 	"time"
 )
 
+// deterministicRand is a test double for RandSource.
+type deterministicRand struct{ val float64 }
+
+func (d *deterministicRand) Float64() float64 { return d.val }
+
 var t0 = time.Date(2026, 6, 24, 12, 0, 0, 0, time.UTC)
 
 // ── NewState ──────────────────────────────────────────────────────────────────
@@ -213,5 +218,175 @@ func TestRegistryAlertnessByDistrict(t *testing.T) {
 	m := r.AlertnessByDistrict()
 	if m["district-residential"] != 45 {
 		t.Errorf("expected 45, got %.1f", m["district-residential"])
+	}
+}
+
+// ── Vigilante anomaly system ──────────────────────────────────────────────────
+
+func TestDisruptionDebtAccumulatesAboveHighViz(t *testing.T) {
+	s := NewState("d1")
+	s.Alertness = AlertHighViz + 20 // 20 points above threshold
+	s.AccumulateDisruptionDebt(60*time.Second, t0)
+	if s.DisruptionDebt <= 0 {
+		t.Error("disruption debt should accumulate when alertness > AlertHighViz")
+	}
+}
+
+func TestDisruptionDebtDoesNotAccumulateBelowThreshold(t *testing.T) {
+	s := NewState("d1")
+	s.Alertness = AlertHighViz - 1 // just below threshold
+	s.AccumulateDisruptionDebt(60*time.Second, t0)
+	if s.DisruptionDebt != 0 {
+		t.Errorf("expected no debt below AlertHighViz, got %.2f", s.DisruptionDebt)
+	}
+}
+
+func TestDisruptionDebtDecaysWhenAlertLow(t *testing.T) {
+	s := NewState("d1")
+	s.DisruptionDebt = 20.0
+	s.Alertness = 30 // well below AlertHighViz
+	s.AccumulateDisruptionDebt(60*time.Second, t0)
+	if s.DisruptionDebt >= 20.0 {
+		t.Error("disruption debt should decay when alertness drops")
+	}
+}
+
+func TestDisruptionDebtClampedToMax(t *testing.T) {
+	s := NewState("d1")
+	s.Alertness = AlertnessMax
+	s.AccumulateDisruptionDebt(10000*time.Second, t0) // extreme duration
+	if s.DisruptionDebt > SpawnDebtMax {
+		t.Errorf("disruption debt should not exceed SpawnDebtMax, got %.2f", s.DisruptionDebt)
+	}
+}
+
+func TestSpawnProbabilityZeroBelowThreshold(t *testing.T) {
+	p := spawnProbability(SpawnDebtThreshold - 1)
+	if p != 0 {
+		t.Errorf("expected 0 probability below threshold, got %.3f", p)
+	}
+}
+
+func TestSpawnProbabilityPositiveAtThreshold(t *testing.T) {
+	p := spawnProbability(SpawnDebtThreshold)
+	if p <= 0 {
+		t.Errorf("expected positive probability at threshold, got %.3f", p)
+	}
+}
+
+func TestSpawnProbabilityCappedAtMax(t *testing.T) {
+	p := spawnProbability(SpawnDebtMax)
+	if p > SpawnProbMax {
+		t.Errorf("probability should not exceed SpawnProbMax (%.2f), got %.3f", SpawnProbMax, p)
+	}
+}
+
+func TestCheckVigilanteSpawnReturnsNilWhenDebtLow(t *testing.T) {
+	s := NewState("d1")
+	s.DisruptionDebt = SpawnDebtThreshold - 1
+	rng := &deterministicRand{val: 0.0} // always rolls lowest
+	v, _ := s.CheckVigilanteSpawn(rng, t0)
+	if v != nil {
+		t.Error("should not spawn when debt below threshold")
+	}
+}
+
+func TestCheckVigilanteSpawnSucceedsWithSufficientDebt(t *testing.T) {
+	s := NewState("d1")
+	s.DisruptionDebt = SpawnDebtThreshold + 10
+	rng := &deterministicRand{val: 0.0} // always rolls 0.0 — guarantees spawn
+	v, evts := s.CheckVigilanteSpawn(rng, t0)
+	if v == nil {
+		t.Fatal("expected a vigilante to spawn")
+	}
+	if v.Alignment != "chaotic_neutral" {
+		t.Errorf("vigilante should be chaotic_neutral, got %q", v.Alignment)
+	}
+	if len(evts) == 0 {
+		t.Error("expected VIGILANTE_SPAWN event")
+	}
+	if evts[0].Verb != "VIGILANTE_SPAWN" {
+		t.Errorf("expected VIGILANTE_SPAWN verb, got %q", evts[0].Verb)
+	}
+}
+
+func TestCheckVigilanteSpawnResetsDebt(t *testing.T) {
+	s := NewState("d1")
+	s.DisruptionDebt = 50.0
+	rng := &deterministicRand{val: 0.0} // forces spawn
+	s.CheckVigilanteSpawn(rng, t0)
+	if s.DisruptionDebt != 0 {
+		t.Errorf("debt should reset to 0 after spawn, got %.2f", s.DisruptionDebt)
+	}
+}
+
+func TestCheckVigilanteSpawnNoSpawnOnHighRoll(t *testing.T) {
+	s := NewState("d1")
+	s.DisruptionDebt = SpawnDebtThreshold + 5 // probability ~15-25%
+	rng := &deterministicRand{val: 0.99}      // rolls near max — above spawn probability
+	v, _ := s.CheckVigilanteSpawn(rng, t0)
+	if v != nil {
+		t.Error("high roll should not produce a spawn")
+	}
+}
+
+func TestAnomalyTierRequiresHighDebt(t *testing.T) {
+	tier := selectTier(AnomalyDebtThreshold - 1)
+	if tier == TierAnomaly {
+		t.Error("anomaly tier should require debt ≥ AnomalyDebtThreshold")
+	}
+	tier = selectTier(AnomalyDebtThreshold)
+	if tier != TierAnomaly {
+		t.Errorf("expected TierAnomaly at AnomalyDebtThreshold, got %d", tier)
+	}
+}
+
+func TestRiotBreakerSpawnsAtSaturation(t *testing.T) {
+	s := NewState("d1")
+	s.Alertness = AlertSaturation + 1
+	rng := &deterministicRand{val: 0.5}
+	archetype := selectArchetype(s, rng)
+	if archetype != ArchetypeRiotBreaker {
+		t.Errorf("expected RiotBreaker at saturation, got %d", archetype)
+	}
+}
+
+func TestVigilanteTargetPriorityTrustAdjustment(t *testing.T) {
+	// High trust should reduce priority.
+	highTrust := VigilanteTargetPriority(50, 20, 100)
+	lowTrust := VigilanteTargetPriority(50, 20, -100)
+	if highTrust >= lowTrust {
+		t.Errorf("high trust (%.2f) should reduce priority vs low trust (%.2f)", highTrust, lowTrust)
+	}
+}
+
+func TestVigilanteHasValidStats(t *testing.T) {
+	s := NewState("d1")
+	s.DisruptionDebt = 50.0
+	rng := &deterministicRand{val: 0.0} // forces spawn
+	v, _ := s.CheckVigilanteSpawn(rng, t0)
+	if v == nil {
+		t.Fatal("expected spawn")
+	}
+	if v.HP <= 0 {
+		t.Errorf("vigilante HP should be positive, got %d", v.HP)
+	}
+	if v.Damage <= 0 {
+		t.Errorf("vigilante Damage should be positive, got %d", v.Damage)
+	}
+	if v.Name == "" {
+		t.Error("vigilante should have a name")
+	}
+	if v.Special == "" {
+		t.Error("vigilante should have a special ability")
+	}
+}
+
+func TestTickAccumulatesDebt(t *testing.T) {
+	s := NewState("d1")
+	s.Alertness = AlertHighViz + 10
+	s.Tick(60*time.Second, t0)
+	if s.DisruptionDebt <= 0 {
+		t.Error("Tick should accumulate disruption debt when alertness is high")
 	}
 }
