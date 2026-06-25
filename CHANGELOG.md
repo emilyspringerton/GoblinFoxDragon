@@ -1,3 +1,7 @@
+## 2026-06-25
+
+- feat: S128-06 Scar system (scar/scar.go — Registry, 4 causes, +5%/scar visibility bonus, ScarBurn, MUD command, 11 tests) + S128-07 K9 Merciless Operation (k9/operation.go — 4-phase, 3 counterplay lanes, 18 tests) (Apple #3870)
+
 ## 2026-06-24
 - feat: S125-04 TRAPX economy — 5 items, 3 TRAPX vendors, enforcement.DistrictPressure price scaling (Apple #3656)
 - feat: S126-15 TRAPX craft recipes — repaired-bike/faction-gear/atlas-page; cartography.DiscoverAll on atlas-page (Apple #3644)
