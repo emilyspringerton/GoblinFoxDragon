@@ -1,4 +1,5 @@
 ## 2026-06-25
+- server/nm: HillsNMs + CavesNMs + AllStartingZoneNMs — all 4 default zones now have NM spawn definitions
 - server/mob/hills.go + caves.go: rabbit/beetle/wolf (Hills), bat/spider/skeleton (Caves) with spawn sets
 - data/items.json: 52-item seed (weapons/armor/accessories/consumables/crystals/materials/key items)
 - server/inventory: bag container (Bag/Stack/Mog, stack merge, Rare conflict, Gobbiebag expand, key items)
