@@ -1,4 +1,5 @@
 ## 2026-06-25
+- server/inventory: bag container (Bag/Stack/Mog, stack merge, Rare conflict, Gobbiebag expand, key items)
 - server/itemdef: item definition registry (JobMask, ItemFlags, Category, Registry/LoadJSON/ByID/ByName, CanEquip)
 
 - feat: S128-06 Scar system (scar/scar.go — Registry, 4 causes, +5%/scar visibility bonus, ScarBurn, MUD command, 11 tests) + S128-07 K9 Merciless Operation (k9/operation.go — 4-phase, 3 counterplay lanes, 18 tests) (Apple #3870)
