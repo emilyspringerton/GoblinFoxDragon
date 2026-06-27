@@ -1,3 +1,7 @@
+## 2026-06-27
+
+- S129-06: gear.ComputeStats() + CanEquip() using itemdef.Registry; DefID added to ItemEntry; 10 tests
+
 ## 2026-06-25
 - feat(watcher): TRAPX vigilante anomaly spawn system — DisruptionDebt accumulator, 4 archetypes (Founder/Chemist/Apparition/RiotBreaker), 3 power tiers, chaotic-neutral targeting by Trust score, 19 tests
 - docs2/INVENTORY_EQUIPMENT_NORTHSTAR.md: FFXI-era inventory+equipment northstar with art direction (low-poly)
