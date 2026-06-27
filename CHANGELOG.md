@@ -1,4 +1,5 @@
 ## 2026-06-27
+- S129-10: Art direction reference sheets at docs2/art_direction_tiers.md — 5-tier palette guide (Initiate→Endgame), per-armor poly budgets + UV spec + shader rules
 - S130-02/03/04: npcattention tick wired; disguise items (Guard/Civilian/Merchant); WEAR + REMOVE DISGUISE commands; sneak feeds attention state
 - S129-07: equip/unequip job+level enforcement via itemdef.Registry; stat delta broadcast; gear list shows stat totals
 
