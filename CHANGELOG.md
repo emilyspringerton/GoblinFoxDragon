@@ -1,4 +1,5 @@
 ## 2026-06-27
+- S130-02/03/04: npcattention tick wired; disguise items (Guard/Civilian/Merchant); WEAR + REMOVE DISGUISE commands; sneak feeds attention state
 - S129-07: equip/unequip job+level enforcement via itemdef.Registry; stat delta broadcast; gear list shows stat totals
 
 - S129-06: gear.ComputeStats() + CanEquip() using itemdef.Registry; DefID added to ItemEntry; 10 tests
