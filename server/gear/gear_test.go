@@ -1,6 +1,10 @@
 package gear
 
-import "testing"
+import (
+	"testing"
+
+	"dragonsnshit/server/itemdef"
+)
 
 func equip(e *Equipment, slot Slot, il int) {
 	e.Equip(slot, ItemEntry{ItemID: "item-" + slot, IL: il})
@@ -125,5 +129,109 @@ func TestOccupiedCount_AfterUnequip(t *testing.T) {
 	eq.Unequip(SlotHead)
 	if eq.OccupiedCount() != 0 {
 		t.Errorf("after unequip: got %d, want 0", eq.OccupiedCount())
+	}
+}
+
+// ── ComputeStats ──────────────────────────────────────────────────────────────
+
+func makeTestRegistry(t *testing.T) *itemdef.Registry {
+	t.Helper()
+	reg := itemdef.NewRegistry()
+	if err := reg.LoadJSON([]byte(`[
+		{"id":1,"name":"Iron Sword","category":"weapon","equip_slots":["main"],"jobs":["WAR","DRK"],"level":1,"stats":{"attack":12,"str":2},"stack_size":1},
+		{"id":2,"name":"Leather Helm","category":"armor","equip_slots":["head"],"level":1,"stats":{"defense":8,"vit":1},"stack_size":1},
+		{"id":3,"name":"Bronze Ring","category":"accessory","equip_slots":["ring-l","ring-r"],"level":1,"stats":{"mnd":3},"stack_size":1}
+	]`)); err != nil {
+		t.Fatalf("load registry: %v", err)
+	}
+	return reg
+}
+
+func TestComputeStats_Empty(t *testing.T) {
+	eq := NewEquipment()
+	reg := makeTestRegistry(t)
+	stats := eq.ComputeStats(reg)
+	if len(stats) != 0 {
+		t.Errorf("expected empty stats, got %v", stats)
+	}
+}
+
+func TestComputeStats_SingleItem(t *testing.T) {
+	eq := NewEquipment()
+	eq.Equip(SlotMainHand, ItemEntry{ItemID: "sword-1", IL: 1, DefID: 1})
+	reg := makeTestRegistry(t)
+	stats := eq.ComputeStats(reg)
+	if stats["attack"] != 12 || stats["str"] != 2 {
+		t.Errorf("single item stats: got %v", stats)
+	}
+}
+
+func TestComputeStats_MultipleItems(t *testing.T) {
+	eq := NewEquipment()
+	eq.Equip(SlotMainHand, ItemEntry{ItemID: "sword-1", IL: 1, DefID: 1}) // attack+12, str+2
+	eq.Equip(SlotHead, ItemEntry{ItemID: "helm-1", IL: 1, DefID: 2})      // defense+8, vit+1
+	eq.Equip(SlotRingL, ItemEntry{ItemID: "ring-1", IL: 1, DefID: 3})     // mnd+3
+	reg := makeTestRegistry(t)
+	stats := eq.ComputeStats(reg)
+	if stats["attack"] != 12 || stats["defense"] != 8 || stats["mnd"] != 3 {
+		t.Errorf("multi-item stats: got %v", stats)
+	}
+}
+
+func TestComputeStats_UnknownDefIDSkipped(t *testing.T) {
+	eq := NewEquipment()
+	eq.Equip(SlotHead, ItemEntry{ItemID: "mystery", IL: 50, DefID: 999})
+	reg := makeTestRegistry(t)
+	stats := eq.ComputeStats(reg)
+	if len(stats) != 0 {
+		t.Errorf("unknown def_id should contribute no stats, got %v", stats)
+	}
+}
+
+// ── CanEquip ─────────────────────────────────────────────────────────────────
+
+func TestCanEquip_ValidWAR(t *testing.T) {
+	eq := NewEquipment()
+	reg := makeTestRegistry(t)
+	def, _ := reg.ByID(1) // Iron Sword: WAR/DRK, main, level 1
+	if err := eq.CanEquip(SlotMainHand, def, "WAR", 1); err != nil {
+		t.Errorf("WAR should be able to equip Iron Sword: %v", err)
+	}
+}
+
+func TestCanEquip_WrongJob(t *testing.T) {
+	eq := NewEquipment()
+	reg := makeTestRegistry(t)
+	def, _ := reg.ByID(1) // Iron Sword: WAR/DRK only
+	if err := eq.CanEquip(SlotMainHand, def, "WHM", 1); err == nil {
+		t.Error("WHM should not be able to equip Iron Sword")
+	}
+}
+
+func TestCanEquip_LevelTooLow(t *testing.T) {
+	eq := NewEquipment()
+	reg := itemdef.NewRegistry()
+	reg.LoadJSON([]byte(`[{"id":10,"name":"HQ Sword","category":"weapon","equip_slots":["main"],"level":30,"stats":{},"stack_size":1}]`))
+	def, _ := reg.ByID(10)
+	if err := eq.CanEquip(SlotMainHand, def, "WAR", 5); err == nil {
+		t.Error("level 5 should not equip a level 30 item")
+	}
+}
+
+func TestCanEquip_WrongSlot(t *testing.T) {
+	eq := NewEquipment()
+	reg := makeTestRegistry(t)
+	def, _ := reg.ByID(1) // Iron Sword: main slot only
+	if err := eq.CanEquip(SlotHead, def, "WAR", 1); err == nil {
+		t.Error("sword should not equip in head slot")
+	}
+}
+
+func TestCanEquip_UnknownSlot(t *testing.T) {
+	eq := NewEquipment()
+	reg := makeTestRegistry(t)
+	def, _ := reg.ByID(2)
+	if err := eq.CanEquip("noggin", def, "WAR", 1); err != ErrUnknownSlot {
+		t.Errorf("unknown slot: got %v, want ErrUnknownSlot", err)
 	}
 }

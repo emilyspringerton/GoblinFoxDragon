@@ -9,7 +9,11 @@
 // Equipment slots match FFXI standard slots.
 package gear
 
-import "errors"
+import (
+	"errors"
+
+	"dragonsnshit/server/itemdef"
+)
 
 // Slot is a named equipment position.
 type Slot = string
@@ -52,6 +56,7 @@ var (
 type ItemEntry struct {
 	ItemID string
 	IL     int // item level
+	DefID  int // itemdef.Registry key for stat/restriction lookup
 }
 
 // Equipment holds a character's equipped gear.
@@ -132,4 +137,35 @@ func (e *Equipment) OccupiedCount() int {
 		}
 	}
 	return n
+}
+
+// ComputeStats sums stat bonuses from all equipped items using the registry.
+// Items whose DefID is not in the registry are skipped (no stats contributed).
+// Returns an empty map (never nil) if nothing is equipped or no stats are defined.
+func (e *Equipment) ComputeStats(reg *itemdef.Registry) map[string]int {
+	total := make(map[string]int)
+	for _, entry := range e.slots {
+		if entry == nil {
+			continue
+		}
+		def, ok := reg.ByID(entry.DefID)
+		if !ok {
+			continue
+		}
+		for stat, val := range def.Stats {
+			total[stat] += val
+		}
+	}
+	return total
+}
+
+// CanEquip reports whether an item definition can be placed in the given slot
+// by a character with the specified job and level.
+// Returns ErrUnknownSlot if the slot is not in AllSlots.
+// Delegates job mask + level + slot checks to itemdef.ItemDef.CanEquip.
+func (e *Equipment) CanEquip(slot string, def *itemdef.ItemDef, job string, level int) error {
+	if _, ok := e.slots[slot]; !ok {
+		return ErrUnknownSlot
+	}
+	return def.CanEquip(slot, job, level)
 }
