@@ -70,6 +70,7 @@ import (
 	"dragonsnshit/server/factionwar"
 	"dragonsnshit/server/itemdef"
 	"dragonsnshit/server/moghouse"
+	"dragonsnshit/server/npcattention"
 	"dragonsnshit/server/schedule"
 )
 
@@ -601,6 +602,7 @@ type world struct {
 	wcrisis        *worldcrisis.Crisis
 	iduna          *idunaclient.Client
 	charIDBySlot   map[string]string // slot → IDUNA character_id
+	npcAttnScenes  map[int]*npcattention.Scene // zoneID → NPC awareness scene (S130-02)
 }
 
 var gw *world
@@ -675,6 +677,18 @@ func initTRAPXCity() {
 
 	// Jiangshi VS0 preset: Detroit Apartment starts with elevated alertness (Jiangshi document everything).
 	watchReg.GetOrCreate("district-residential").AddAlertness(35, time.Now(), "jiangshi_presence")
+
+	// Seed NPC attention scenes (S130-02): 3 canonical TRAPX NPCs.
+	// sceneID mirrors TRAPX district zone IDs (200-207).
+	// Zone 200 = Detroit Apartment (residential); 203 = Cairngorms Archive (underground).
+	scene200 := npcattention.NewScene(200)
+	scene200.AddNPC(npcattention.NewNPC("jiangshi-warden", npcattention.FactionGuard, 200))
+	scene200.AddNPC(npcattention.NewNPC("heikegani-dock-boss", npcattention.FactionCrimeBoss, 200))
+	gw.npcAttnScenes[200] = scene200
+
+	scene203 := npcattention.NewScene(203)
+	scene203.AddNPC(npcattention.NewNPC("eastwind-archivist", npcattention.FactionCivilian, 203))
+	gw.npcAttnScenes[203] = scene203
 }
 
 // ── player ────────────────────────────────────────────────────────────────────
@@ -713,6 +727,7 @@ type player struct {
 	petSlot      *pet.Slot       // BST pet companion (non-nil always; pet.IsAlive() = has pet)
 	petHeel      bool            // true = pet does not attack (heel mode)
 	k9Swarm      *k9.Swarm      // TRAPX: active K9 swarm (nil if none deployed)
+	disguise     npcattention.Disguise // stealth identity (S130-02); default = no disguise
 	questJournal *quest.Journal        // NPC quest progress
 	atlas        *cartography.Atlas   // explored zone map
 	chatLang    autotranslate.Lang // preferred chat language; default EN
@@ -792,6 +807,7 @@ func initWorld() *world {
 		wcrisis:        worldcrisis.New(),
 		iduna:          idunaclient.New(),
 		charIDBySlot:   make(map[string]string),
+		npcAttnScenes:  make(map[int]*npcattention.Scene),
 		nmSpawns: map[int][]*nm.NMSpawn{
 			0: nm.MeadowNMs(),
 			3: nm.SwampNMs(),
@@ -1721,6 +1737,55 @@ func tickAll() {
 			}
 		}
 	}
+
+	// NPC attention tick (S130-02): per-scene LOS check; convert events to player messages.
+	// In a text MUD there is no real geometry, so all NPCs in a scene have LOS to all players.
+	losAll := func(_, _ string) bool { return true }
+	for sceneID, scene := range gw.npcAttnScenes {
+		var pStates []npcattention.PlayerState
+		for _, p := range gw.players {
+			if p.zoneID != sceneID {
+				continue
+			}
+			dis := p.disguise
+			// Sneak spell suppresses running state (reduces attention gain).
+			if p.isSneaking && p.sneakExpires.After(now) {
+				dis.Running = false
+			}
+			pStates = append(pStates, npcattention.PlayerState{
+				PlayerID: p.slot,
+				Disguise: dis,
+				SceneID:  sceneID,
+			})
+		}
+		if len(pStates) == 0 {
+			continue
+		}
+		events := scene.Tick(pStates, losAll, dt, now)
+		for _, ev := range events {
+			p, ok := gw.players[ev.PlayerID]
+			if !ok {
+				continue
+			}
+			var msg string
+			switch ev.Verb {
+			case npcattention.VerbBecameSuspicious:
+				msg = fmt.Sprintf("\r\n[NPC: %s] narrows their eyes at you.", ev.NPCID)
+			case npcattention.VerbBecameAlerted:
+				msg = fmt.Sprintf("\r\n[NPC: %s] calls out: \"Hey, you there! Stop!\"", ev.NPCID)
+			case npcattention.VerbBecameHostile:
+				msg = fmt.Sprintf("\r\n[NPC: %s] draws their weapon: \"Get them!\"", ev.NPCID)
+			case npcattention.VerbCalmedDown:
+				msg = fmt.Sprintf("\r\n[NPC: %s] resumes patrol.", ev.NPCID)
+			case npcattention.VerbWitnessAlerted:
+				msg = fmt.Sprintf("\r\n[NPC: %s] shouts: \"I saw that! Stop!\"", ev.NPCID)
+			}
+			if msg != "" {
+				p.send(msg)
+				p.prompt()
+			}
+		}
+	}
 }
 
 func broadcastMobEvent(zoneID int, ev mob.Event) {
@@ -1938,6 +2003,20 @@ func handle(p *player, line string) {
 		cmdUnequip(p, args[0])
 	case "gear":
 		cmdGear(p)
+	case "wear":
+		if len(args) < 1 {
+			p.send("Usage: wear <item-name>")
+			p.prompt()
+			return
+		}
+		cmdWearDisguise(p, strings.Join(args, " "))
+	case "remove":
+		if len(args) > 0 && strings.EqualFold(args[0], "disguise") {
+			cmdRemoveDisguise(p)
+		} else {
+			p.send("Usage: remove disguise")
+			p.prompt()
+		}
 	case "setsubjob", "ssj":
 		if len(args) < 1 {
 			p.send("Usage: setsubjob <JOB>")
@@ -3615,6 +3694,57 @@ func cmdUnequip(p *player, slotName string) {
 		dispName = dn
 	}
 	p.sendf("Unequipped %s from %s.", dispName, slotName)
+	p.prompt()
+}
+
+// cmdWearDisguise equips a disguise item from the player's inventory.
+// Sets p.disguise.Faction if the item has a disguise_faction in the registry.
+func cmdWearDisguise(p *player, itemName string) {
+	def, ok := itemdefReg.ByName(itemName)
+	if !ok {
+		p.sendf("Unknown item: %s", itemName)
+		p.prompt()
+		return
+	}
+	if !def.IsDisguise() {
+		p.sendf("%s is not a disguise item.", def.Name)
+		p.prompt()
+		return
+	}
+	// Check inventory (by item name key as well as ID string).
+	inInv := p.inventory[def.Name] > 0
+	if !inInv {
+		// also check by numeric id string as fallback
+		for k, qty := range p.inventory {
+			if qty > 0 && strings.EqualFold(k, def.Name) {
+				inInv = true
+				break
+			}
+		}
+	}
+	if !inInv {
+		p.sendf("You don't have %s in your inventory.", def.Name)
+		p.prompt()
+		return
+	}
+	oldFaction := p.disguise.Faction
+	p.disguise.Faction = npcattention.Faction(def.DisguiseFaction)
+	if oldFaction != "" && oldFaction != p.disguise.Faction {
+		p.sendf("You remove your %s disguise.", oldFaction)
+	}
+	p.sendf("You put on the %s. You now appear as: %s.", def.Name, def.DisguiseFaction)
+	p.prompt()
+}
+
+// cmdRemoveDisguise strips the current disguise, reverting to no identity.
+func cmdRemoveDisguise(p *player) {
+	if p.disguise.Faction == "" {
+		p.send("You are not wearing a disguise.")
+		p.prompt()
+		return
+	}
+	p.sendf("You remove your %s disguise.", p.disguise.Faction)
+	p.disguise.Faction = ""
 	p.prompt()
 }
 

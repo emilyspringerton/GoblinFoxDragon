@@ -57,5 +57,9 @@
   {"id":505,"name":"Bone Chip","category":"material","level":0,"stats":{},"stack_size":12,"model_id":"material_bone_chip"},
 
   {"id":901,"name":"Key to the Old Fort","category":"key_item","level":0,"stats":{},"stack_size":1,"flags":["rare","ex"]},
-  {"id":902,"name":"Gobbiebag Voucher I","category":"key_item","level":0,"stats":{},"stack_size":1,"flags":["rare","ex"],"description":"Presented to the Goblin Emporium to expand inventory capacity by 10 slots."}
+  {"id":902,"name":"Gobbiebag Voucher I","category":"key_item","level":0,"stats":{},"stack_size":1,"flags":["rare","ex"],"description":"Presented to the Goblin Emporium to expand inventory capacity by 10 slots."},
+
+  {"id":1001,"name":"Guard Uniform","category":"accessory","level":1,"stats":{},"stack_size":1,"flags":["ex"],"disguise_faction":"guard","description":"Authentic patrol uniform. Guards see through it faster than civilians do."},
+  {"id":1002,"name":"Civilian Clothes","category":"accessory","level":1,"stats":{},"stack_size":1,"disguise_faction":"civilian","description":"Unremarkable street clothes. Passes inspection from most NPCs except civilians who know the area."},
+  {"id":1003,"name":"Merchant Coat","category":"accessory","level":1,"stats":{},"stack_size":1,"disguise_faction":"merchant","description":"A merchant's long coat with hidden pockets. Accepted by market NPCs; arouses suspicion from guards."}
 ]

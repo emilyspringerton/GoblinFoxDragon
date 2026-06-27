@@ -120,23 +120,27 @@ var (
 // ItemDef describes what an item is.
 // JSON tags match data/items.json schema.
 type ItemDef struct {
-	ID          int               `json:"id"`
-	Name        string            `json:"name"`
-	Description string            `json:"description,omitempty"`
-	Category    Category          `json:"category"`
-	EquipSlots  []string          `json:"equip_slots,omitempty"` // subset of gear.AllSlots
-	Jobs        []string          `json:"jobs,omitempty"`        // [] = all jobs; listed = restriction
-	Level       int               `json:"level,omitempty"`
-	Stats       map[string]int    `json:"stats,omitempty"`
-	StackSize   int               `json:"stack_size"`
-	FlagsRaw    []string          `json:"flags,omitempty"` // ["rare","ex",...]
-	ModelID     string            `json:"model_id,omitempty"`
-	IconID      int               `json:"icon_id,omitempty"`
+	ID              int            `json:"id"`
+	Name            string         `json:"name"`
+	Description     string         `json:"description,omitempty"`
+	Category        Category       `json:"category"`
+	EquipSlots      []string       `json:"equip_slots,omitempty"` // subset of gear.AllSlots
+	Jobs            []string       `json:"jobs,omitempty"`        // [] = all jobs; listed = restriction
+	Level           int            `json:"level,omitempty"`
+	Stats           map[string]int `json:"stats,omitempty"`
+	StackSize       int            `json:"stack_size"`
+	FlagsRaw        []string       `json:"flags,omitempty"` // ["rare","ex",...]
+	ModelID         string         `json:"model_id,omitempty"`
+	IconID          int            `json:"icon_id,omitempty"`
+	DisguiseFaction string         `json:"disguise_faction,omitempty"` // non-empty = disguise item
 
 	// Computed at load time — not in JSON.
 	jobMask  JobMask
 	flags    ItemFlags
 }
+
+// IsDisguise reports whether this item grants a stealth identity when worn.
+func (d *ItemDef) IsDisguise() bool { return d.DisguiseFaction != "" }
 
 // JobMask returns the computed job restriction mask.
 func (d *ItemDef) JobMask() JobMask { return d.jobMask }
