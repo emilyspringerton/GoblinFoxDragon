@@ -68,6 +68,7 @@ import (
 	"dragonsnshit/server/timeline"
 	"dragonsnshit/server/autotranslate"
 	"dragonsnshit/server/factionwar"
+	"dragonsnshit/server/itemdef"
 	"dragonsnshit/server/moghouse"
 	"dragonsnshit/server/schedule"
 )
@@ -605,6 +606,10 @@ type world struct {
 var gw *world
 
 // ── TRAPX city simulation state ───────────────────────────────────────────────
+
+// itemdefReg is the server-authoritative item definition registry, loaded from
+// data/items.json at startup. Used by cmdEquip for CanEquip + stat delta.
+var itemdefReg = itemdef.NewRegistry()
 
 var (
 	foReg      = fieldoffice.NewRegistry()
@@ -3515,19 +3520,40 @@ func cmdEquip(p *player, slotName, itemID string) {
 		p.prompt()
 		return
 	}
-	il, ok := itemIL[itemID]
-	if !ok {
-		il = 1
+
+	// Job/level restriction enforcement via itemdef.Registry.
+	// If the registry has no entry for this item, restrictions are skipped (legacy items).
+	il := 1
+	defID := 0
+	if def, ok := itemdefReg.ByName(itemID); ok {
+		if err := p.equip.CanEquip(slotName, def, p.jobID, p.charXP.Level); err != nil {
+			p.sendf("Cannot equip %s: %v", itemID, err)
+			p.prompt()
+			return
+		}
+		if def.Stats != nil {
+			if v, ok2 := def.Stats["item_level"]; ok2 {
+				il = v
+			}
+		}
+		defID = def.ID
+	} else if v, ok2 := itemIL[itemID]; ok2 {
+		il = v
 	}
+
+	// Snapshot stats before to compute delta.
+	statsBefore := p.equip.ComputeStats(itemdefReg)
+
 	// Move old item back to inventory if slot occupied.
 	if old, err := p.equip.Unequip(slotName); err == nil {
 		p.inventory[old.ItemID]++
 	}
-	_ = p.equip.Equip(slotName, gear.ItemEntry{ItemID: itemID, IL: il})
+	_ = p.equip.Equip(slotName, gear.ItemEntry{ItemID: itemID, IL: il, DefID: defID})
 	p.inventory[itemID]--
 	if p.inventory[itemID] == 0 {
 		delete(p.inventory, itemID)
 	}
+
 	dispName := itemID
 	if dn, ok := itemDisplayName[itemID]; ok {
 		dispName = dn
@@ -3536,7 +3562,44 @@ func cmdEquip(p *player, slotName, itemID string) {
 	if eIL, err := p.equip.EffectiveIL(); err == nil {
 		p.sendf("  Effective IL: %d", eIL)
 	}
+
+	// Stat delta broadcast: show stats that changed.
+	statsAfter := p.equip.ComputeStats(itemdefReg)
+	changed := statDelta(statsBefore, statsAfter)
+	if len(changed) > 0 {
+		p.send("  Stat changes:")
+		for _, s := range changed {
+			p.send("    " + s)
+		}
+	}
 	p.prompt()
+}
+
+// statDelta returns human-readable delta lines for stats that changed.
+func statDelta(before, after map[string]int) []string {
+	seen := make(map[string]bool)
+	for k := range before {
+		seen[k] = true
+	}
+	for k := range after {
+		seen[k] = true
+	}
+	var lines []string
+	for stat := range seen {
+		b := before[stat]
+		a := after[stat]
+		if a == b {
+			continue
+		}
+		delta := a - b
+		sign := "+"
+		if delta < 0 {
+			sign = ""
+		}
+		lines = append(lines, fmt.Sprintf("%s: %d → %d (%s%d)", stat, b, a, sign, delta))
+	}
+	sort.Strings(lines)
+	return lines
 }
 
 func cmdUnequip(p *player, slotName string) {
@@ -3560,17 +3623,30 @@ func cmdGear(p *player) {
 	for _, slotName := range gear.AllSlots {
 		item, err := p.equip.ItemAt(slotName)
 		if err != nil {
-			p.sendf("  %-8s: (empty)", slotName)
+			p.sendf("  %-10s: (empty)", slotName)
 			continue
 		}
 		dispName := item.ItemID
 		if dn, ok := itemDisplayName[item.ItemID]; ok {
 			dispName = dn
 		}
-		p.sendf("  %-8s: %s (IL %d)", slotName, dispName, item.IL)
+		p.sendf("  %-10s: %s (IL %d)", slotName, dispName, item.IL)
 	}
 	if eIL, err := p.equip.EffectiveIL(); err == nil {
 		p.sendf("  Effective IL: %d", eIL)
+	}
+	// Stat totals from registry.
+	stats := p.equip.ComputeStats(itemdefReg)
+	if len(stats) > 0 {
+		p.send("  Stat totals:")
+		statKeys := make([]string, 0, len(stats))
+		for k := range stats {
+			statKeys = append(statKeys, k)
+		}
+		sort.Strings(statKeys)
+		for _, k := range statKeys {
+			p.sendf("    %s: %+d", k, stats[k])
+		}
 	}
 	p.prompt()
 }
@@ -6987,6 +7063,11 @@ func main() {
 	port    := flag.Int("port", mudPort, "MUD TCP port")
 	apiPort := flag.Int("api-port", 7171, "world-events HTTP API port (0 = disabled)")
 	flag.Parse()
+
+	// Load item definitions (non-fatal: equip restrictions skipped if missing).
+	if err := itemdefReg.LoadFile("data/items.json"); err != nil {
+		fmt.Printf("warn: itemdef load: %v (equip restrictions disabled)\n", err)
+	}
 
 	gw = initWorld()
 	initTRAPXCity()
