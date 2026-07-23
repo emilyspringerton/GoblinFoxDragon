@@ -1,3 +1,6 @@
+## 2026-07-23
+- docs2/EDUCATION_CURRICULUM_NORTHSTAR.md: scoping pass for teaching CS algorithms (sorting, knapsack) via the existing EduScript VM (packages/education) and its Architect's Orb terminal (apps/lobby, F7 compile/F8 run). Confirmed the VM/world-object binding (switches, gates, crates, bridges, portals) is real and live, but has no array/indexed-memory opcode and no user-defined functions — the one prerequisite every algorithm module needs, scoped as Phase 0. Also corrected a founder claim: the education system was never actually merged into SHANKPIT's apps2/lobby despite the "yolo" commit that created that folder — verified directly, zero education/VM code there; it lives only in GFD today. Golden-indexed as GFD-EDU-CURRICULUM. Design only, no code yet.
+
 ## 2026-06-27
 - S129-10: Art direction reference sheets at docs2/art_direction_tiers.md — 5-tier palette guide (Initiate→Endgame), per-armor poly budgets + UV spec + shader rules
 - S130-02/03/04: npcattention tick wired; disguise items (Guard/Civilian/Merchant); WEAR + REMOVE DISGUISE commands; sneak feeds attention state
