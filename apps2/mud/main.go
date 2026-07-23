@@ -6409,6 +6409,21 @@ func cmdJobs(p *player) {
 }
 
 func cmdHelp(p *player) {
+	// Found live 2026-07-23, playing as a real new character: shop, bazaar,
+	// bank, quests, npcs/talk, equip/gear, and craft are all real, working
+	// commands (confirmed live -- bought an Echo Drop, accepted a real quest
+	// from a real NPC, checked bank/inventory) that this help text never
+	// mentioned. A new player had no way to discover any of them short of
+	// reading the source. The Echo Drop specifically cures Poison for 50 of
+	// a starting 500 gil -- the exact cure that would have prevented an
+	// earlier death tonight, and nothing told the player it existed.
+	// Deliberately still not listing every command (100+ exist, including
+	// job-specific spells and FIELDOFFICE/TRAPX faction-war systems like
+	// k9-deploy/district/enforcement/integrity/tech-pressure) -- those are
+	// advanced/endgame surface, and listing all of them here would trade one
+	// discoverability problem for an unreadable wall of text. This adds the
+	// core early-game RPG loop a new player actually needs in their first
+	// session: buying a cure, taking a quest, checking a shop.
 	p.send(`
 Commands:
   look / l            — describe current zone, mobs, players
@@ -6444,7 +6459,31 @@ Commands:
   accept              — accept a pending party invitation
   party / pt          — show party members and XP chain
   leave-party / lp    — leave your current party
-  help / ?            — this list
+
+Economy & items:
+  shop                — list this zone's vendor stock and prices
+  shop buy <item-id>  — buy an item (see 'shop' for IDs and prices)
+  shop sell <item-id> — sell an item back at 50% of its price
+  bank                — show gil in bank vs. wallet
+  bazaar list         — browse your own bazaar listing
+  bazaar buy <player> <item> — buy from another player's bazaar
+  inv / inventory / i — show your inventory and gil
+  equip <slot> <item> — equip an item; unequip <slot> to remove
+  gear                — show equipped items + stat totals
+  craft <recipe-id>   — craft an item (see 'recipes' for what you can make)
+  removedebuffs / erase — remove a debuff (requires an Echo Drop)
+
+Quests & NPCs:
+  npcs                — list NPCs in this zone
+  talk <npc-id>       — speak to an NPC; quest-givers show quests here
+  quest-accept / qa <id>   — accept a quest an NPC offered
+  quest-turn-in / qti <id> — turn in a completed quest for its reward
+  quests / qlog       — show your active quest log
+  explore / atlas     — your personal zone-discovery map
+
+  duel <player>       — challenge another player to a non-lethal PvP duel
+  leaderboard / lb     — show top players
+  help / ?            — this list (see the source for job spells + faction-war commands)
   quit                — disconnect`)
 	p.prompt()
 }
