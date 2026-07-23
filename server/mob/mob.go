@@ -34,6 +34,11 @@ func dist(a, b Pos) float64 {
 	return math.Sqrt(dx*dx + dy*dy + dz*dz)
 }
 
+// Dist is the exported form of dist, for callers outside this package (e.g.
+// apps2/mud's cmdAttack, which needs to know whether a player is in melee
+// range before committing to an approach).
+func Dist(a, b Pos) float64 { return dist(a, b) }
+
 func moveToward(from, to Pos, speed float64) Pos {
 	d := dist(from, to)
 	if d <= speed || d == 0 {

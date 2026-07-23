@@ -1364,6 +1364,17 @@ func tickAll() {
 				p.combat.TargetMobID = ""
 				p.send("\r\n[Your target is gone.]")
 				p.prompt()
+			} else if err == mob.ErrOutOfRange {
+				// Defense in depth: cmdAttack's auto-approach handles the
+				// common case (spawn-to-mob-ring distance), but a mob can
+				// still wander out of melee range mid-fight (leash/aggro
+				// movement). This used to fail perfectly silently -- no
+				// damage, no message, indistinguishable from a hung
+				// connection. Now it at least tells the player why nothing
+				// is happening, gated by SwingDelay so it can't spam faster
+				// than an attack would have landed anyway.
+				p.send("\r\n[Your target moved out of range -- 'attack' it again to close the distance.]")
+				p.prompt()
 			}
 			continue
 		}
@@ -2851,6 +2862,20 @@ func cmdAttack(p *player, target string) {
 		p.send("Your target is underground — wait for it to surface.")
 		p.prompt()
 		return
+	}
+	// Auto-approach: mob spawn rings are deliberately placed away from a
+	// zone's town-centre spawn point (see MeadowWormSpawns' own comment),
+	// which is 25-35 units from (0,2,0) -- well outside DefaultPlayerMeleeRange
+	// (3.0). Before this fix, 'attack' silently set a target that could never
+	// land a hit from spawn: TickPlayer's out-of-range check returned
+	// ErrOutOfRange every tick, and tickAll's error handling only messaged on
+	// ErrMobDead/ErrMobNotFound, so combat failed with zero player-visible
+	// feedback. Closing the distance here, at the moment of targeting, is the
+	// minimal fix that doesn't require a whole new intra-zone movement system
+	// (none exists today -- n/s/e/w already means zone-to-zone travel).
+	if mob.Dist(p.pos, found.Pos) > mob.DefaultPlayerMeleeRange {
+		p.pos = found.Pos
+		p.sendf("You close the distance to %s.", found.ID)
 	}
 	p.combat.TargetMobID = found.ID
 	p.sendf("You target %s (%s). Auto-attacking.", found.ID, found.Kind)

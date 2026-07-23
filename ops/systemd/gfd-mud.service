@@ -1,0 +1,37 @@
+# DragonsNShit MUD — user-level systemd unit (no sudo required)
+#
+# Deploy:
+#   mkdir -p ~/.config/systemd/user
+#   cp ops/systemd/gfd-mud.service ~/.config/systemd/user/
+#   GOWORK=off go build -o /home/fatbaby/GoblinFoxDragon/mud ./apps2/mud
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now gfd-mud.service
+#
+# Added 2026-07-23 — founder asked to start playing the MUD; the binary
+# existed (built 2026-06-27) but had never been run under supervision, only
+# ever built and left on disk. GOWORK=off is required: this repo is not a
+# workspace module (see /home/fatbaby/CLAUDE.md's Non-Workspace Repos table),
+# and the root monorepo's go.work being visible via $GOWORK breaks the build
+# otherwise ("directory ... is contained in a module that is not one of the
+# workspace modules").
+#
+# Connect: telnet <host> 2323  (or nc <host> 2323) — plain-text MUD protocol,
+# no special client needed. World-event HTTP API (Emily Prime injection +
+# recent-events feed) on :7171, used by the status-page check below.
+
+[Unit]
+Description=DragonsNShit MUD (GoblinFoxDragon apps2/mud)
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/fatbaby/GoblinFoxDragon
+ExecStart=/home/fatbaby/GoblinFoxDragon/mud -port 2323 -api-port 7171
+Restart=on-failure
+RestartSec=10s
+StandardOutput=append:/home/fatbaby/GoblinFoxDragon/var/logs/mud.log
+StandardError=append:/home/fatbaby/GoblinFoxDragon/var/logs/mud.log
+MemoryMax=512M
+
+[Install]
+WantedBy=default.target

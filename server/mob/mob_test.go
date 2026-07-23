@@ -420,6 +420,40 @@ func TestTickPlayerWrongSceneErrors(t *testing.T) {
 	}
 }
 
+// --- Dist (exported wrapper) ---
+
+func TestDist(t *testing.T) {
+	a := Pos{X: 0, Y: 0, Z: 0}
+	b := Pos{X: 3, Y: 4, Z: 0}
+	if got := Dist(a, b); got != 5 {
+		t.Errorf("Dist(%v, %v) = %v, want 5 (3-4-5 triangle)", a, b, got)
+	}
+	if got := Dist(a, a); got != 0 {
+		t.Errorf("Dist(a, a) = %v, want 0", got)
+	}
+}
+
+// TestMeadowWormSpawnsOutsideDefaultMeleeRange documents the real bug this
+// was written to catch: MeadowWormSpawns places every worm 25-35 units from
+// the zone's town-centre spawn point (0,2,0) -- see MeadowWormSpawns' own
+// comment, "away from the town centre" -- which is far outside
+// DefaultPlayerMeleeRange (3.0). Before apps2/mud's cmdAttack gained an
+// auto-approach step, a brand-new player typing "attack worm" from spawn
+// could never land a single hit: TickPlayer's range check silently returned
+// ErrOutOfRange every tick with no player-visible feedback. This test pins
+// the geometry fact that made the bug real, so a future spawn-layout change
+// can't silently reintroduce it without a test failure flagging the gap.
+func TestMeadowWormSpawnsOutsideDefaultMeleeRange(t *testing.T) {
+	spawnPoint := Pos{X: 0, Y: 2, Z: 0}
+	for _, w := range MeadowWormSpawns() {
+		if d := Dist(spawnPoint, w.Pos); d <= DefaultPlayerMeleeRange {
+			t.Errorf("worm %s at %v is within DefaultPlayerMeleeRange (%v) of spawn %v (dist=%v) -- "+
+				"the real-world bug this suite guards against assumes every worm spawns OUTSIDE melee range",
+				w.ID, w.Pos, DefaultPlayerMeleeRange, spawnPoint, d)
+		}
+	}
+}
+
 // --- MobState.String ---
 
 func TestMobStateString(t *testing.T) {
