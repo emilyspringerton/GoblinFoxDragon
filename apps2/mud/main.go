@@ -5179,13 +5179,25 @@ func cmdRecasts(p *player) {
 }
 
 // mobSpellPool maps mob kind prefix → debuffs it might cast.
+//
+// Worm is deliberately Slow-only, not Poison -- found live 2026-07-23: every
+// debuff cast by mobSpellcast uses a flat Potency=10 applied once per game
+// tick (1s) for up to 30s, i.e. up to 300 total damage from a single 20%-
+// chance proc. Worm is this game's own starting-zone tutorial mob (worm.go's
+// own doc comment: "short sight; mostly passive"), with only 90-150 max HP
+// on a level 1-5 character -- a single proc could solo-kill a brand-new
+// player from the very first mob they ever fight, on a mob explicitly
+// designed to be safe. Slow fits a worm's flavor at least as well as Poison
+// did and carries none of that lethality; Poison stays on Slime/Chaos/Leech,
+// which aren't the zone-0 tutorial mob and can reasonably ask more of a
+// player who's already progressed past Meadow.
 var mobSpellPool = map[string][]status.Kind{
 	"Slime":  {status.Poison, status.Slow},
 	"Lizard": {status.Paralyze, status.Slow},
 	"Zombie": {status.Bind, status.Silence},
 	"Chaos":  {status.Paralyze, status.Bind, status.Silence, status.Poison},
 	"Leech":  {status.Bind, status.Poison},
-	"Worm":   {status.Slow, status.Poison},
+	"Worm":   {status.Slow},
 }
 
 // mobSpellNames maps status.Kind to display names.
