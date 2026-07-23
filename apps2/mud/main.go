@@ -5191,13 +5191,19 @@ func cmdRecasts(p *player) {
 // did and carries none of that lethality; Poison stays on Slime/Chaos/Leech,
 // which aren't the zone-0 tutorial mob and can reasonably ask more of a
 // player who's already progressed past Meadow.
+// Keys are lowercase to match real mob IDs (e.g. "worm-meadow-4", "slime-swamp-2")
+// -- mobID is never capitalized, so a capitalized key here would silently never
+// match and fall through to the generic fallback pool below. Found live
+// 2026-07-23: this exact mismatch was why the Worm-is-Slow-only fix never took
+// effect at runtime -- "Worm" never matched "worm-meadow-4", so every mob kept
+// falling through to the fallback pool, which still includes Poison.
 var mobSpellPool = map[string][]status.Kind{
-	"Slime":  {status.Poison, status.Slow},
-	"Lizard": {status.Paralyze, status.Slow},
-	"Zombie": {status.Bind, status.Silence},
-	"Chaos":  {status.Paralyze, status.Bind, status.Silence, status.Poison},
-	"Leech":  {status.Bind, status.Poison},
-	"Worm":   {status.Slow},
+	"slime":  {status.Poison, status.Slow},
+	"lizard": {status.Paralyze, status.Slow},
+	"zombie": {status.Bind, status.Silence},
+	"chaos":  {status.Paralyze, status.Bind, status.Silence, status.Poison},
+	"leech":  {status.Bind, status.Poison},
+	"worm":   {status.Slow},
 }
 
 // mobSpellNames maps status.Kind to display names.
