@@ -30,6 +30,7 @@ static EduTokenType kw(const char *s, int n) {
     if (n == 5 && strncmp(s, "false", 5) == 0) return EDU_TOK_FALSE;
     if (n == 5 && strncmp(s, "while", 5) == 0) return EDU_TOK_WHILE;
     if (n == 6 && strncmp(s, "return", 6) == 0) return EDU_TOK_RETURN;
+    if (n == 5 && strncmp(s, "array", 5) == 0) return EDU_TOK_ARRAY;
     return EDU_TOK_IDENT;
 }
 
@@ -72,6 +73,8 @@ int edu_lexer_next(EduLexer *lex) {
         case ')': t.type = EDU_TOK_RPAREN; break;
         case '{': t.type = EDU_TOK_LBRACE; break;
         case '}': t.type = EDU_TOK_RBRACE; break;
+        case '[': t.type = EDU_TOK_LBRACKET; break;
+        case ']': t.type = EDU_TOK_RBRACKET; break;
         case ';': t.type = EDU_TOK_SEMI; break;
         case ',': t.type = EDU_TOK_COMMA; break;
         case '+': t.type = EDU_TOK_PLUS; break;

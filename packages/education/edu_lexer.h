@@ -10,6 +10,8 @@ typedef enum {
     EDU_TOK_RPAREN,
     EDU_TOK_LBRACE,
     EDU_TOK_RBRACE,
+    EDU_TOK_LBRACKET,
+    EDU_TOK_RBRACKET,
     EDU_TOK_SEMI,
     EDU_TOK_COMMA,
     EDU_TOK_PLUS,
@@ -26,7 +28,8 @@ typedef enum {
     EDU_TOK_TRUE,
     EDU_TOK_FALSE,
     EDU_TOK_WHILE,
-    EDU_TOK_RETURN
+    EDU_TOK_RETURN,
+    EDU_TOK_ARRAY
 } EduTokenType;
 
 typedef struct {

@@ -23,8 +23,17 @@ typedef enum {
     EDU_OP_JMP_IF_FALSE,
     EDU_OP_CALL_BUILTIN,
     EDU_OP_RETURN,
-    EDU_OP_HALT
+    EDU_OP_HALT,
+    EDU_OP_LOAD_ARR,  // operands: base:i32, len:i32; pops index, pushes arr_mem[base+index]
+    EDU_OP_STORE_ARR  // operands: base:i32, len:i32; pops value then index, arr_mem[base+index]=value
 } EduOpcode;
+
+// EDU_VM_ARR_MEM_MAX is the total shared int-slot pool every array() declaration
+// draws from, across all arrays in a single compiled program -- not a per-array
+// cap. Shared between the parser (compile-time allocation + bounds checking on
+// array() declarations) and the VM (runtime storage), so it lives here rather
+// than in either edu_parser.h or edu_vm.h alone.
+#define EDU_VM_ARR_MEM_MAX 256
 
 typedef struct {
     unsigned char *data;

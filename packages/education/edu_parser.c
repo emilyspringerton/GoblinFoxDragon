@@ -30,9 +30,15 @@ static int expect(Parser *p, EduTokenType t, const char *msg) {
     return next(p);
 }
 
+// find_var returns the entry's index into p->out->vars[] -- for scalars this
+// is numerically identical to .slot (add_var sets both to the same idx), but
+// array entries never set .slot, so callers must use this index (not .slot)
+// to work for both kinds. Callers that need vars[]-indexing for LOAD_VAR/
+// STORE_VAR rely on that scalar/idx equivalence; callers that need
+// .is_array/.arr_base/.arr_len index p->out->vars[] directly with this value.
 static int find_var(Parser *p, const char *s, int n) {
     for (int i = 0; i < p->out->var_count; i++) {
-        if ((int)strlen(p->out->vars[i].name) == n && strncmp(p->out->vars[i].name, s, n) == 0) return p->out->vars[i].slot;
+        if ((int)strlen(p->out->vars[i].name) == n && strncmp(p->out->vars[i].name, s, n) == 0) return i;
     }
     return -1;
 }
@@ -42,6 +48,24 @@ static int add_var(Parser *p, const char *s, int n) {
     int idx = p->out->var_count++;
     snprintf(p->out->vars[idx].name, sizeof(p->out->vars[idx].name), "%.*s", n, s);
     p->out->vars[idx].slot = idx;
+    return idx;
+}
+
+// add_array_var registers 'name' as an array of length 'len', claiming 'len'
+// slots from the shared arr_mem[] pool (see EDU_VM_ARR_MEM_MAX in
+// edu_bytecode.h). Shares the same EduVarEntry table as scalars so a single
+// find_var(name) lookup works for both -- callers check .is_array to tell
+// them apart.
+static int add_array_var(Parser *p, const char *s, int n, int len) {
+    if (p->out->var_count >= EDU_MAX_VARS) { set_error(p, "too many variables"); return -1; }
+    if (len <= 0) { set_error(p, "array length must be positive"); return -1; }
+    if (p->out->arr_mem_used + len > EDU_VM_ARR_MEM_MAX) { set_error(p, "array memory exhausted"); return -1; }
+    int idx = p->out->var_count++;
+    snprintf(p->out->vars[idx].name, sizeof(p->out->vars[idx].name), "%.*s", n, s);
+    p->out->vars[idx].is_array = 1;
+    p->out->vars[idx].arr_base = p->out->arr_mem_used;
+    p->out->vars[idx].arr_len = len;
+    p->out->arr_mem_used += len;
     return idx;
 }
 
@@ -103,6 +127,14 @@ static int parse_primary(Parser *p) {
         }
         int vid = find_var(p, name, n);
         if (vid < 0) { set_error(p, "unknown variable"); return 0; }
+        if (p->out->vars[vid].is_array) {
+            if (p->lex.current.type != EDU_TOK_LBRACKET) { set_error(p, "expected '[' after array name"); return 0; }
+            if (!next(p)) return 0; // consume '['
+            if (!parse_expr(p)) return 0; // index expr -> pushes idx
+            if (!expect(p, EDU_TOK_RBRACKET, "expected ']'")) return 0;
+            emit_u8(p, EDU_OP_LOAD_ARR); emit_i32(p, p->out->vars[vid].arr_base); emit_i32(p, p->out->vars[vid].arr_len);
+            return 1;
+        }
         emit_u8(p, EDU_OP_LOAD_VAR); emit_i32(p, vid);
         return 1;
     }
@@ -173,9 +205,24 @@ static int parse_stmt(Parser *p) {
         if (!next(p)) return 0;
         if (p->lex.current.type != EDU_TOK_IDENT) { set_error(p, "expected identifier"); return 0; }
         EduToken id = p->lex.current;
+        if (!next(p) || !expect(p, EDU_TOK_ASSIGN, "expected '='")) return 0;
+        // 'let name = array(N);' is a compile-time-only declaration -- it
+        // claims N slots from the shared arr_mem[] pool and emits no
+        // bytecode at all (arr_mem starts zero-initialized, same as vars[]).
+        // Checked here, before falling through to the normal scalar path,
+        // because 'array' parses identically to a function call otherwise
+        // and would hit parse_primary's "unknown function" error.
+        if (p->lex.current.type == EDU_TOK_ARRAY) {
+            if (!next(p) || !expect(p, EDU_TOK_LPAREN, "expected '(' after 'array'")) return 0;
+            if (p->lex.current.type != EDU_TOK_NUMBER) { set_error(p, "expected array length"); return 0; }
+            int len = p->lex.current.int_value;
+            if (!next(p) || !expect(p, EDU_TOK_RPAREN, "expected ')'")) return 0;
+            if (add_array_var(p, id.start, id.length, len) < 0) return 0;
+            return expect(p, EDU_TOK_SEMI, "expected ';'");
+        }
         int var = add_var(p, id.start, id.length);
         if (var < 0) return 0;
-        if (!next(p) || !expect(p, EDU_TOK_ASSIGN, "expected '='") || !parse_expr(p)) return 0;
+        if (!parse_expr(p)) return 0;
         emit_u8(p, EDU_OP_STORE_VAR); emit_i32(p, var);
         return expect(p, EDU_TOK_SEMI, "expected ';'");
     }
@@ -222,9 +269,22 @@ static int parse_stmt(Parser *p) {
     if (p->lex.current.type == EDU_TOK_IDENT) {
         EduToken id = p->lex.current;
         if (!next(p)) return 0;
+        if (p->lex.current.type == EDU_TOK_LBRACKET) {
+            int vid = find_var(p, id.start, id.length);
+            if (vid < 0 || !p->out->vars[vid].is_array) { set_error(p, "not an array"); return 0; }
+            int base = p->out->vars[vid].arr_base, len = p->out->vars[vid].arr_len;
+            if (!next(p)) return 0; // consume '['
+            if (!parse_expr(p)) return 0; // index expr -> pushes idx
+            if (!expect(p, EDU_TOK_RBRACKET, "expected ']'")) return 0;
+            if (!expect(p, EDU_TOK_ASSIGN, "expected '=' after array index")) return 0;
+            if (!parse_expr(p)) return 0; // value expr -> pushes val (on top of idx)
+            emit_u8(p, EDU_OP_STORE_ARR); emit_i32(p, base); emit_i32(p, len);
+            return expect(p, EDU_TOK_SEMI, "expected ';'");
+        }
         if (p->lex.current.type == EDU_TOK_ASSIGN) {
             int vid = find_var(p, id.start, id.length);
             if (vid < 0) { set_error(p, "unknown variable in assignment"); return 0; }
+            if (p->out->vars[vid].is_array) { set_error(p, "cannot assign directly to an array (use name[i] = ...)"); return 0; }
             if (!next(p) || !parse_expr(p)) return 0;
             emit_u8(p, EDU_OP_STORE_VAR); emit_i32(p, vid);
             return expect(p, EDU_TOK_SEMI, "expected ';'");
@@ -241,7 +301,21 @@ static int parse_stmt(Parser *p) {
 }
 
 int edu_compile_source(const char *source, EduCompileOutput *out) {
+    // Found live 2026-07-23 while testing new array support: the caller
+    // convention (edu_script_compile_active, and every caller since) sets
+    // out->bytecode/out->bytecode_cap BEFORE calling this function -- but
+    // the memset(out, 0, ...) below wiped both back to NULL/0 first, so
+    // edu_bc_init below always received a NULL buffer and zero capacity.
+    // Every edu_bc_emit_u8/i32 call after that hits "len+1 > cap" (0+1 > 0)
+    // immediately, so this function could never actually emit a single byte
+    // of bytecode -- every real compile has been failing with "bytecode
+    // overflow" on its very first statement. Preserve the caller's
+    // buffer/cap across the reset instead of discarding them.
+    unsigned char *caller_bytecode = out->bytecode;
+    int caller_bytecode_cap = out->bytecode_cap;
     memset(out, 0, sizeof(*out));
+    out->bytecode = caller_bytecode;
+    out->bytecode_cap = caller_bytecode_cap;
     Parser p;
     memset(&p, 0, sizeof(p));
     p.out = out;

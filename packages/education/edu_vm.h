@@ -2,6 +2,7 @@
 #define EDU_VM_H
 
 #include "edu_bindings.h"
+#include "edu_bytecode.h" // for EDU_VM_ARR_MEM_MAX
 
 #define EDU_VM_STACK_MAX 256
 #define EDU_VM_VAR_MAX 64
@@ -18,6 +19,7 @@ typedef struct {
     int stack[EDU_VM_STACK_MAX];
     int sp;
     int vars[EDU_VM_VAR_MAX];
+    int arr_mem[EDU_VM_ARR_MEM_MAX]; // shared pool every array() declaration draws from
     const unsigned char *code;
     int code_len;
     int ip;

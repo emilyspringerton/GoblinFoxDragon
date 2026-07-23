@@ -11,7 +11,8 @@ enum {
     EDU_VM_ERR_OPCODE = 4,
     EDU_VM_ERR_LIMIT = 5,
     EDU_VM_ERR_BUILTIN = 6,
-    EDU_VM_ERR_DIVZERO = 7
+    EDU_VM_ERR_DIVZERO = 7,
+    EDU_VM_ERR_ARR_BOUNDS = 8
 };
 
 static int read_i32(const unsigned char *code, int *ip, int code_len, int *out_v) {
@@ -135,6 +136,37 @@ int edu_vm_exec(EduVm *vm, const unsigned char *code, int code_len,
                     break;
                 }
                 if (!push(vm, call_ret, limits)) vm->last_error = EDU_VM_ERR_STACK;
+                break;
+            }
+            case EDU_OP_LOAD_ARR: {
+                int base = 0, len = 0, idx = 0;
+                if (!read_i32(vm->code, &vm->ip, vm->code_len, &base) ||
+                    !read_i32(vm->code, &vm->ip, vm->code_len, &len)) {
+                    vm->last_error = EDU_VM_ERR_IP;
+                    break;
+                }
+                if (!pop(vm, &idx)) { vm->last_error = EDU_VM_ERR_STACK; break; }
+                if (idx < 0 || idx >= len || base + idx >= EDU_VM_ARR_MEM_MAX) {
+                    vm->last_error = EDU_VM_ERR_ARR_BOUNDS;
+                    break;
+                }
+                if (!push(vm, vm->arr_mem[base + idx], limits)) vm->last_error = EDU_VM_ERR_STACK;
+                break;
+            }
+            case EDU_OP_STORE_ARR: {
+                int base = 0, len = 0, idx = 0, val = 0;
+                if (!read_i32(vm->code, &vm->ip, vm->code_len, &base) ||
+                    !read_i32(vm->code, &vm->ip, vm->code_len, &len)) {
+                    vm->last_error = EDU_VM_ERR_IP;
+                    break;
+                }
+                // Parser emits index expr then value expr, so value is on top.
+                if (!pop(vm, &val) || !pop(vm, &idx)) { vm->last_error = EDU_VM_ERR_STACK; break; }
+                if (idx < 0 || idx >= len || base + idx >= EDU_VM_ARR_MEM_MAX) {
+                    vm->last_error = EDU_VM_ERR_ARR_BOUNDS;
+                    break;
+                }
+                vm->arr_mem[base + idx] = val;
                 break;
             }
             case EDU_OP_RETURN:
