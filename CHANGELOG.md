@@ -1,5 +1,28 @@
 ## 2026-07-31
 
+- docs: DragonsNShit has two non-unified backends — audit + bridge-target correction. Founder:
+  "continue dragons n shit" (continuing "do the docs first"). New
+  `docs2/DRAGONSNSHIT_TWO_BACKENDS_AUDIT.md`, correcting a real, load-bearing wrong assumption in
+  both of today's earlier docs (`REDGARDEN_GUI_NORTHSTAR.md`, `REDGARDEN_MUD_BRIDGE_SPEC.md`),
+  both written as if `apps2/mud` were the only DragonsNShit backend. It isn't: found
+  `apps2/server-go`, a real UDP server on `:6969` with a real IDUNA-JWT-authenticated protocol
+  (`PacketConnect`/`PacketUserCmd`/`PacketChat`, real Telecrystal travel + crafting + skill-XP,
+  all actually calling IDUNA) -- `apps2/mud`'s own `idunaclient` is imported and instantiated but
+  never once actually called (confirmed via repo-wide grep), a dead field, not real integration.
+  `apps2/server-go`'s combat is SHANKPIT-shaped hitscan (`HandleShankFire`), not `apps2/mud`'s
+  RPG job/skillchain/enmity depth -- the two backends don't share state at all. Also found
+  `apps2/lobby`, an existing 884-line C client already targeting `apps2/server-go`'s protocol,
+  smaller than REDGARDEN and blocked by the same `GL/glu.h` dependency issue that's hit this
+  monorepo repeatedly -- reinforces REDGARDEN as the stronger client foundation, not a reason to
+  abandon the direction. Revised recommendation: port `apps2/mud`'s RPG logic to run inside
+  `apps2/server-go`'s authoritative loop, backed by IDUNA's already-existing
+  `characters`/`character_skills`/`character_equipment`/`character_inventory` schema, before
+  REDGARDEN's own bridge work lands -- REDGARDEN then targets `apps2/server-go` directly as a
+  peer of `apps2/lobby`, no new listener needed (superseding `REDGARDEN_MUD_BRIDGE_SPEC.md`'s own
+  "bolt a listener onto the text MUD" design, marked superseded in place, kept for its still-real
+  movement/targeting gap-finding). `REDGARDEN_GUI_NORTHSTAR.md`'s milestone table rewritten in
+  place to reflect this. Registered in golden-docs-index.
+
 - docs: REDGARDEN ↔ apps2/mud packet-level bridge spec. Founder: "continue dragons n shit do the
   docs first." New `docs2/specs/REDGARDEN_MUD_BRIDGE_SPEC.md`, the concrete next layer under
   today's earlier `REDGARDEN_GUI_NORTHSTAR.md`, written against the real code on both sides

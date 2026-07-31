@@ -1,5 +1,14 @@
 # The Bridge: REDGARDEN ↔ apps2/mud
 
+**SUPERSEDED 2026-07-31, same day this was written.** `docs2/DRAGONSNSHIT_TWO_BACKENDS_AUDIT.md`
+found a second, real, IDUNA-backed UDP protocol server (`apps2/server-go`) that this doc didn't
+know about when it was written — that's the correct bridge target, not a new listener bolted onto
+`apps2/mud`'s text telnet server. Kept here, not deleted: the gap-finding below (no continuous
+movement server-side, hero-slot-vs-string-ID targeting mismatch) is still real and still relevant
+once the RPG/protocol unification the audit doc names actually lands. Read the audit doc first.
+
+---
+
 Wire-protocol spec for `docs2/REDGARDEN_GUI_NORTHSTAR.md` (the product-level design; read that
 first). This doc is the concrete packet-level layer, same role `THE_BRIDGE_SPEC.md` plays for
 SHANKPIT ↔ Bedrock, written against the real code on both sides — `REDGARDEN/packages/common/

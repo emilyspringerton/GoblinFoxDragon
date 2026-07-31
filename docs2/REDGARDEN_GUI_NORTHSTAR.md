@@ -7,12 +7,19 @@ gui" → "like old school runescape."*
 
 **Status:** Spec only, no code yet — milestone 0 of this doc's own table.
 
-**Update 2026-07-31 (same day):** the packet-level bridge spec this doc's own §6 Milestone 1
-needs is written — `docs2/specs/REDGARDEN_MUD_BRIDGE_SPEC.md`. It grounds §8's open transport
-question (UDP, matching REDGARDEN's own choice) and names one real gap this doc's own §4.3 didn't
-go far enough on: `apps2/mud` has no continuous intra-zone movement server-side at all today
-(`cmdGo` only teleports between zones on `n/s/e/w`) — Milestone 3 ("input bridge") needs real new
-server-side steering logic, not just a packet decode, before it can be called done.
+**Update 2026-07-31 (same day, superseded by a second update below):** wrote a packet-level
+bridge spec, `docs2/specs/REDGARDEN_MUD_BRIDGE_SPEC.md`, designing a new listener bolted onto
+`apps2/mud`.
+
+**Update 2026-07-31 (later same day, corrects the update above):** found a second real
+backend, `apps2/server-go` — a UDP server with a real IDUNA-JWT-authenticated protocol
+(`PacketConnect`/`PacketUserCmd`/`PacketChat`/Telecrystal travel/crafting, all actually wired to
+IDUNA, unlike `apps2/mud`'s own dead, never-called `idunaclient`) that REDGARDEN's bridge should
+target instead — full audit in `docs2/DRAGONSNSHIT_TWO_BACKENDS_AUDIT.md`. The real, harder
+finding: `apps2/server-go` has the right protocol shape but FPS-hitscan combat, not
+`apps2/mud`'s RPG depth; the two backends don't share state. Milestone 1 below is rewritten to
+reflect this — the bridge spec above is superseded, not deleted (its gap-finding on movement/
+targeting is still real).
 
 **Relationship to `docs2/MMO_NORTHSTAR.md`:** amends it, doesn't replace it. Every system that
 doc already specs — IDUNA-backed character/item/guild schema, item provenance chains, the
@@ -185,12 +192,13 @@ draft a hero once per match — it exists persistently, per §4.2).
 | # | Milestone | Acceptance | Status |
 |---|---|---|---|
 | 0 | This NORTHSTAR | Written, registered in golden-docs-index, MMO_NORTHSTAR's frontend line updated to point here | DONE |
-| 1 | Protocol bridge spike | `apps2/mud` gains a second listener speaking REDGARDEN's connect-ticket handshake + a minimal read-only snapshot packet (own character position/HP/zone + nearby mobs) | NOT STARTED |
-| 2 | Fork the client shell | REDGARDEN's `apps/arena` client forked into `GoblinFoxDragon/apps2/` (new app dir); MOBA-specific match/lobby/draft-pick concepts stripped; camera/hero-rendering/HUD/ability-slot-UI machinery kept | NOT STARTED |
-| 3 | Input bridge | Click-to-move and Q/W/R slot presses from the forked client decode into `apps2/mud`'s existing action dispatch (the same calls telnet's `move`/`attack`/`cast` commands already make) | NOT STARTED |
+| 0.5 | Two-backends audit | Found `apps2/server-go` is the real bridge target, not `apps2/mud` directly — `docs2/DRAGONSNSHIT_TWO_BACKENDS_AUDIT.md` | DONE |
+| 1 | RPG/protocol unification (revised, was "protocol bridge spike") | `apps2/mud`'s combat/job/skillchain/craft logic ported to run inside `apps2/server-go`'s authoritative loop, backed by IDUNA's already-existing `characters`/`character_skills`/`character_equipment`/`character_inventory` schema — a DragonsNShit-internal prerequisite, not REDGARDEN-specific work | NOT STARTED |
+| 2 | Fork the client shell | REDGARDEN's `apps/arena` client forked into `GoblinFoxDragon/apps2/` (new app dir), targeting `apps2/server-go`'s real protocol (`packages2/common`) as a peer of `apps2/lobby`; MOBA-specific match/lobby/draft-pick concepts stripped; camera/hero-rendering/HUD/ability-slot-UI machinery kept | NOT STARTED |
+| 3 | Input bridge | Click-to-move and Q/W/R slot presses decode into `apps2/server-go`'s `PacketUserCmd`-shaped dispatch, extended (post-Milestone-1) with the ported RPG action calls | NOT STARTED |
 | 4 | First real zone rendered | Meadow rendered as a flat plane + box-obstacle placeholders (§4.3's scoped-down terrain approach), not REDGARDEN's fixed arena | NOT STARTED |
-| 5 | One job's abilities wired to the slot UI | A single real FFXI job's abilities (proposal: Warrior — the simplest kit) drive REDGARDEN's cast-ring/cooldown/projectile rendering end-to-end, proving the "REDGARDEN renders, MUD simulates" seam on one real, non-placeholder case | NOT STARTED |
-| 6 | CLI/GUI coexistence validated | One player on telnet, one on the GUI client, same zone: each sees the other's chat, movement, and combat in real time | NOT STARTED |
+| 5 | One job's abilities wired to the slot UI | A single real FFXI job's abilities (proposal: Warrior — the simplest kit) drive REDGARDEN's cast-ring/cooldown/projectile rendering end-to-end, proving the "REDGARDEN renders, DragonsNShit simulates" seam on one real, non-placeholder case | NOT STARTED |
+| 6 | CLI/GUI coexistence validated | One player on telnet, one on the GUI client, same zone: each sees the other's chat, movement, and combat in real time — requires Milestone 1's unification first, since telnet and the GUI read different backends today | NOT STARTED |
 | 7 | IDUNA-backed persistent character shared correctly | MMO_NORTHSTAR's own already-speced `characters`/`items`/`guilds` IDUNA schema (§2 of that doc) is the source of truth for both client surfaces — no state exists only on one side | NOT STARTED |
 
 ---
@@ -236,7 +244,8 @@ truth this doc builds on top of.
 | GFD engine/studio northstar | `GoblinFoxDragon/docs/NORTHSTAR.md` |
 | Zone-authoring gap (unrelated prerequisite, worth knowing) | `GoblinFoxDragon/docs2/HERO_BRIDGE_PREREQUISITES.md` |
 | Hero/lore content process | `GoblinFoxDragon/docs2/HERO_CONTENT_FRAMEWORK.md` |
-| Packet-level bridge spec (this doc's own Milestone 1) | `GoblinFoxDragon/docs2/specs/REDGARDEN_MUD_BRIDGE_SPEC.md` |
+| Two-backends audit (corrects the bridge target, read first) | `GoblinFoxDragon/docs2/DRAGONSNSHIT_TWO_BACKENDS_AUDIT.md` |
+| Packet-level bridge spec (superseded by the audit above, kept for its gap-finding) | `GoblinFoxDragon/docs2/specs/REDGARDEN_MUD_BRIDGE_SPEC.md` |
 | REDGARDEN's own current architecture and client history | `REDGARDEN/NORTHSTAR.md` §3.5 |
 | REDGARDEN wire protocol (fork source) | `REDGARDEN/packages/common/protocol.h` |
 | REDGARDEN connect-ticket auth (fork source) | `REDGARDEN/packages/common/hmac_sha256.h` |
