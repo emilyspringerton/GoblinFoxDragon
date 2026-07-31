@@ -17,3 +17,6 @@ __pycache__/
 
 # Ignore local config
 .ssh/
+
+# Runtime-generated (logs, MUD server state) -- not source
+var/
