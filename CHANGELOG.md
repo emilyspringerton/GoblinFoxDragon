@@ -1,5 +1,17 @@
 ## 2026-07-31
 
+- docs(redgarden-gui-northstar): Milestone 1 shipped -- Warrior, the first DragonsNShit job
+  ported into REDGARDEN's Battlegrounds as real ability content. Founder redirect this session,
+  after "can i log into gfd gui yet?": "ok i asked for the mmorpg i provided the inputs continue
+  to work on that." Real code landed in the sibling REDGARDEN repo (`cbcd4ed`) -- Q Hard Slash/W
+  Power Slash/R Frostbite, real Great Sword weapon skills from this repo's own
+  `server/skillchain.CanonicalWeaponSkills`, matching `server/job.jobStats[WAR]`'s real stat
+  block. REDGARDEN has no TP resource, so MP substitutes for `server/combat.TPWSThreshold`'s 100
+  TP -- an honest amendment, not a literal port, per founder direction ("we want our old systems
+  like skillchains etc [to] work with redgarden affordances"). `docs2/REDGARDEN_GUI_NORTHSTAR.md`
+  milestone table + status line updated to match. Milestones 2-5 (skillchain detection in
+  `arena_game.c`, entry-point hook, reward-credit hook, end-to-end validation) still ahead.
+
 - feat(idunaclient, mud): `apps2/mud`'s Flow (gold) is finally synced back to IDUNA on
   disconnect. Backend-unification follow-up, closing the real gap the previous correction found:
   `p.flow` was read from IDUNA on connect but never written back, because IDUNA had no way to
