@@ -1,5 +1,17 @@
 ## 2026-07-31
 
+- feat(server-go): respawn packet closes the KO loop the previous change opened. Backend-
+  unification follow-up (EMILY/BACKLOG.md item 2). New `PacketRespawn`/`PacketRespawnResult`
+  (`packages2/common/protocol.go`) -- a KO'd player's only way back on this backend, `apps2/mud`'s
+  own real "type home" flow (`knockOut()` + `HPState.Raise`, 8% XP penalty) reduced to its core
+  mechanic: `RaiseDefault(0)`, always against 0 XP since real per-player XP tracking doesn't
+  exist in `apps2/server-go` yet (unlike `apps2/mud`'s own `p.charXP.CurrentXP`) -- a real,
+  already-tested degenerate case (`server/combat`'s own `TestRaise_ZeroXPNoPanic`), not a crash
+  risk, just an honestly-incomplete penalty number until real XP tracking lands here too, named
+  in the code rather than silently wrong. No new tests -- `RaiseDefault`'s own behavior is
+  already covered by 5+ existing tests upstream, same reasoning the KO-state change just used.
+  `GOWORK=off go build ./...`/`go test ./...` clean.
+
 - feat(server-go): real KO state via `server/combat.HPState`, gates further weapon-skill casting.
   Backend-unification follow-up (EMILY/BACKLOG.md item 2). `clientInfo.hp`/`maxHP` (raw ints)
   replaced with `hpState *combatTp.HPState` -- `apps2/mud` itself drives KO through its own

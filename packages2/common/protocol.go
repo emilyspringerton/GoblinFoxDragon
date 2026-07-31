@@ -34,6 +34,13 @@ const (
 	// apps2/server-go has no mob registry yet, unlike apps2/mud).
 	PacketWSCast   = 17 // client→server: JSON {ws_name,target_client_id}
 	PacketWSResult = 18 // server→broadcast (caster+target): JSON {caster_id,target_id,ws_name,damage,chained,resonance,tier,error}
+	// Respawn (backend-unification follow-up, 2026-07-31): a KO'd player's only way back --
+	// apps2/mud's own real flow (type "home", 8% XP penalty via HPState.Raise) reduced to its
+	// core mechanic; real XP-penalty tracking for apps2/server-go's own players doesn't exist
+	// yet, so the penalty this backend computes is always against 0 XP (named, not hidden -- see
+	// the handler's own comment).
+	PacketRespawn       = 19 // client→server: no payload
+	PacketRespawnResult = 20 // server→client: JSON {hp,max_hp,xp_penalty,error}
 )
 
 // Chat channel IDs (byte 1 of PacketChat).

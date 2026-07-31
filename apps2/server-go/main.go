@@ -585,6 +585,36 @@ func main() {
 			}
 			fmt.Printf("[weaponskill] %s -> %s: %s dmg=%d chained=%v\n", slot, targetSlot, result.WSName, result.Damage, result.Chained)
 
+		case common.PacketRespawn:
+			// Backend-unification follow-up (2026-07-31): the only way back from KO on this
+			// backend so far -- apps2/mud's own real "type home" flow (knockOut() +
+			// HPState.Raise, 8% XP penalty) reduced to its core mechanic. Real per-player XP
+			// tracking doesn't exist in apps2/server-go yet (unlike apps2/mud's own
+			// p.charXP.CurrentXP), so the penalty computed here is always against 0 XP --
+			// RaiseDefault(0) is a real, already-tested degenerate case (server/combat's own
+			// TestRaise_ZeroXPNoPanic), not a crash risk, just an honestly-incomplete number
+			// until real XP tracking lands for this backend too.
+			slot := remote.String()
+			info, ok := clients[slot]
+			if !ok || info.playerID == "" {
+				sendRespawnResult(conn, remote, respawnResultPayload{Error: "unauthenticated"})
+				continue
+			}
+			if info.hpState == nil || !info.hpState.IsKO {
+				sendRespawnResult(conn, remote, respawnResultPayload{Error: "not KO'd"})
+				continue
+			}
+			penalty, err := info.hpState.RaiseDefault(0)
+			if err != nil {
+				sendRespawnResult(conn, remote, respawnResultPayload{Error: err.Error()})
+				continue
+			}
+			clients[slot] = info
+			sendRespawnResult(conn, remote, respawnResultPayload{
+				HP: info.hpState.Current, MaxHP: info.hpState.Max, XPPenalty: penalty,
+			})
+			fmt.Printf("[respawn] %s revived at %d/%d HP\n", slot, info.hpState.Current, info.hpState.Max)
+
 		case common.PacketChat:
 			if n < 4 {
 				continue
@@ -645,6 +675,20 @@ type wsResultPayload struct {
 func sendWSResult(conn *net.UDPConn, remote *net.UDPAddr, result wsResultPayload) {
 	b, _ := json.Marshal(result)
 	pkt := append([]byte{common.PacketWSResult}, b...)
+	conn.WriteToUDP(pkt, remote)
+}
+
+// respawnResultPayload is PacketRespawnResult's JSON body (backend-unification follow-up).
+type respawnResultPayload struct {
+	HP        int    `json:"hp,omitempty"`
+	MaxHP     int    `json:"max_hp,omitempty"`
+	XPPenalty int    `json:"xp_penalty,omitempty"`
+	Error     string `json:"error,omitempty"`
+}
+
+func sendRespawnResult(conn *net.UDPConn, remote *net.UDPAddr, result respawnResultPayload) {
+	b, _ := json.Marshal(result)
+	pkt := append([]byte{common.PacketRespawnResult}, b...)
 	conn.WriteToUDP(pkt, remote)
 }
 
