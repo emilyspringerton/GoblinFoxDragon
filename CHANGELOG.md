@@ -1,3 +1,24 @@
+## 2026-07-31
+
+- docs: REDGARDEN-as-GUI northstar. Founder, real-time: "can we graft redgarden frontend onto GFD
+  mud as a gui to make our mmorpg?" → "i dont care how you do it fork redgarden into GFD write the
+  northstar this is the mmo. this is dragonsnshit" → "cli will continue to work" → "redgarden as a
+  gui" → "like old school runescape." New `docs2/REDGARDEN_GUI_NORTHSTAR.md`: forks REDGARDEN's
+  real-time SDL2/OpenGL client (rendering/input machinery only -- click-to-move, hero-silhouette
+  rendering, Q/W/R cast-ring/projectile/zone-circle UI, item-shop chrome, connect-ticket auth; not
+  its MOBA hero-kit combat sim) onto `apps2/mud`'s real, already-shipped FFXI-parity Go MMORPG
+  backend (22 jobs, skillchains/magic bursts, enmity, conquest, NM spawns/treasure pool, crafting
+  guilds, parties/linkshells -- telnet `:2323` today) as a second, parallel client protocol
+  alongside a new binary listener; telnet keeps working unchanged, per founder direction. Design
+  call: REDGARDEN contributes the rendering grammar, `apps2/mud` keeps owning the RPG mechanics
+  underneath -- no REDGARDEN hero identity carries over, only its UI vocabulary. Amends
+  `docs2/MMO_NORTHSTAR.md`'s "Integration Architecture" section (frontend line updated from
+  "SHANKPIT runtime, extended" to point at the new doc) and flags that MMO_NORTHSTAR's own
+  milestone table (last updated 2026-06-21) is stale against `apps2/mud`'s real shipped state --
+  a large body of FFXI-parity systems work (S76-S87) landed since without that table being
+  updated. 7-milestone table, spec only, all NOT STARTED past this doc itself. Registered in
+  `EMILY/context/golden-docs-index.md`.
+
 ## 2026-07-23 (8)
 - fix(mud): found live, playing again after redeploy -- worm Poison was still lethal despite tonight's earlier "Worm is Slow-only, not Poison" fix. Root cause: `mobSpellPool`'s map keys were capitalized ("Worm", "Slime", "Lizard"...) but real mob IDs are always lowercase ("worm-meadow-4", "slime-swamp-2"...); `strings.Contains(mobID, prefix)` is case-sensitive, so the lookup never matched anything for *any* mob kind and every single mob silently fell through to the generic fallback pool, which still includes Poison. The earlier fix was correct in intent but never executed at runtime. Fixed by lowercasing every key in `mobSpellPool` to match real mob IDs. `go test ./server/...` clean, rebuilt, redeployed live, re-verified in person: killed a full worm (5 hits) with zero Poison procs, leveled Lv.1 to Lv.3.
 

@@ -167,11 +167,18 @@ per season; season reset is configurable (soft reset = partial rollback; hard re
 
 ## Integration Architecture
 
+**Frontend updated 2026-07-31** — founder: "graft redgarden frontend onto GFD mud as a gui...
+this is the mmo, this is dragonsnshit." The frontend is now REDGARDEN's client (forked, MOBA
+match/lobby concepts stripped, rendering/input machinery kept), grafted onto `apps2/mud`'s real
+Go server as a second client protocol alongside its existing telnet interface — telnet keeps
+working unchanged. Full design in `docs2/REDGARDEN_GUI_NORTHSTAR.md`; this section's diagram
+below is kept for the systems-integration shape (IDUNA, Apples) which is unchanged.
+
 ```
-C/SDL2 Client (SHANKPIT runtime, extended)
-  │   UDP UserCmd packets
+REDGARDEN Client (forked, see REDGARDEN_GUI_NORTHSTAR.md) + telnet (unchanged, coexists)
+  │   UDP snapshot/UserCmd packets (GUI) or text lines (telnet)
   ▼
-Go Game Server (GFD server-go)
+Go Game Server (apps2/mud, extended with a second listener)
   │   validates via IDUNA JWT on connect
   │   all game state mutations → IDUNA API
   │   World Crisis phases → IDUNA event records
@@ -251,3 +258,4 @@ These belong in a new IDUNA migration: `IDUNA/cmd/migrate/migrations/YYYYMMDD_mm
 | Scene registry | `GoblinFoxDragon/docs2/specs/SCENE_REGISTRY_SPEC.md` |
 | Systems bridge spec | `GoblinFoxDragon/docs2/specs/SHANKPIT_DRAGONSNSHIT_SYSTEMS_SPEC.md` |
 | IDUNA auth model | `IDUNA/CLAUDE.md` |
+| REDGARDEN-as-GUI frontend (2026-07-31, current frontend plan) | `GoblinFoxDragon/docs2/REDGARDEN_GUI_NORTHSTAR.md` |
