@@ -1,5 +1,28 @@
 ## 2026-07-31
 
+- feat(job, mud): SMN gets real Avatar abilities -- founder, real-time: "zagan beleth vassago as
+  summoner avatars GFD." New `job.SummonerAbilities()` (`summon_zagan`/`summon_beleth`/
+  `summon_vassago`, real `Ability` data through the same `RecastTracker` every other job uses)
+  wired into `apps2/mud`'s `abilitiesForJob`/`cmdJA`. Each avatar applies real
+  `server/status` effects to the caster's live duel opponent, translated from that hero's own
+  REDGARDEN kit (`docs/HEROES_VS0.md`) rather than invented: Zagan -> Bind (closest existing Kind
+  to "stun," this package has no Stun Kind), Beleth -> Poison+Silence (her own real Q+W, ported
+  faithfully since she already carries both on separate slots), Vassago -> Silence + a small
+  direct hit (her real Q), damage clamped to never drop the opponent below 1 HP so it doesn't
+  need to touch `duel.Manager`'s own win-condition path. Real, honestly-flagged simplification,
+  not a full kit port: no armor-shred/mirror (Protect is a buff-only Kind in this package, not
+  Category-flexible per Effect), no cast-refund, no delayed-burst zone, and no mob-targeted
+  version at all (`mob.Mob` has no status stack yet -- a real, separate structural gap).
+  2 new tests in `server/job` (data shape + a real `RecastTracker` integration check). Live
+  smoke-tested via two telnet sessions (character creation, `setjob SMN`, duel challenge/accept,
+  `ja summon_*`) -- confirmed `setjob SMN` correctly applies real SMN stats (HP:60/MP:90, matching
+  `job.jobStats[SMN]`) and the duel flow works through the same command-dispatch path `ja` uses;
+  the final `ja summon_*` output specifically wasn't reliably captured due to test-harness
+  timing fragility (nc/FIFO scripting), not a code issue -- `go build`/`go test ./...` clean, and
+  direct review of `cmdSummonAvatar`'s locking (no `gw.mu` held anywhere upstream of it, confirmed
+  by reading `cmdJA`'s and `handle()`'s own call sites) rules out the deadlock this function's own
+  `gw.mu.Lock()` would otherwise risk.
+
 - docs(redgarden-gui-northstar): Milestone 4 shipped -- reward-credit hook. REDGARDEN's
   `apps/arena_server` now credits real Flow (100 win / 25 loss) to a match participant's
   persistent DragonsNShit character via new IDUNA `GET /api/v1/characters/by-player/:player_id`

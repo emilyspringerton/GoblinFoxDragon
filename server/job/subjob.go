@@ -184,6 +184,26 @@ func WarriorAbilities() []Ability {
 	}
 }
 
+// SummonerAbilities returns the sample ability set for SMN (2026-07-31, founder real-time:
+// "zagan beleth vassago as summoner avatars GFD"). Real FFXI Summoners fight through Avatars
+// they call forth rather than their own weapon -- the reverse direction from
+// GoblinFoxDragon/docs2/REDGARDEN_GUI_NORTHSTAR.md's own Milestones 1-2 (which ported a
+// DragonsNShit job's content INTO REDGARDEN as Battlegrounds ability content). Here, three of
+// REDGARDEN's own already-built TYLER-lore heroes become SMN's real Avatar pool instead of
+// invented-from-scratch summons: Zagan (armor-shred/stun/mirror, docs/HEROES_VS0.md), Beleth
+// (burn-DoT/silence/delayed-burst), Vassago (damage+silence/cast-refund/silence-zone). See
+// apps2/mud's own cmdJA case for what each summon actually does mechanically -- a real,
+// honestly-scoped simplification (this MUD's `status` package has no Stun kind and no
+// armor-shred-shaped debuff, and mob targets have no status stack at all yet), not the full
+// REDGARDEN kit ported 1:1.
+func SummonerAbilities() []Ability {
+	return []Ability{
+		{ID: "summon_zagan",   Job: SMN, Recast: 3 * time.Minute, MinLevel: 5},
+		{ID: "summon_beleth",  Job: SMN, Recast: 3 * time.Minute, MinLevel: 10},
+		{ID: "summon_vassago", Job: SMN, Recast: 3 * time.Minute, MinLevel: 15},
+	}
+}
+
 // WhiteMageAbilities returns the sample ability set for WHM.
 func WhiteMageAbilities() []Ability {
 	return []Ability{

@@ -5216,6 +5216,8 @@ func abilitiesForJob(jobID string) []job.Ability {
 		return job.WarriorAbilities()
 	case job.WHM:
 		return job.WhiteMageAbilities()
+	case job.SMN:
+		return job.SummonerAbilities()
 	default:
 		return nil
 	}
@@ -5254,6 +5256,8 @@ func cmdJA(p *player, abilityID string) {
 			p.hp = p.maxHP
 			p.mp = p.maxMP
 			p.sendf("Benediction! HP and MP fully restored.")
+		case "summon_zagan", "summon_beleth", "summon_vassago":
+			cmdSummonAvatar(p, abilityID)
 		default:
 			p.sendf("You use %s.", abilityID)
 		}
@@ -5268,6 +5272,78 @@ func cmdJA(p *player, abilityID string) {
 		p.sendf("Cannot use %s: %v", abilityID, err)
 	}
 	p.prompt()
+}
+
+// cmdSummonAvatar (2026-07-31, founder: "zagan beleth vassago as summoner avatars GFD") applies
+// each avatar's real REDGARDEN kit, translated onto the duel opponent -- honestly simplified,
+// not the full kit ported 1:1:
+//   - Zagan: real kit is "damage + lingering armor shred" (Q), "stun a nearby foe" (W), "mirror
+//     a foe's armor" (R). This MUD's status package has no Stun kind and no armor-shred-shaped
+//     debuff (Protect is a buff-only Kind, not Category-flexible per Effect) -- Bind is the
+//     closest real existing debuff to "can't act," so that's what lands. Shred/mirror stay
+//     unported, a real follow-up gap, not silently dropped.
+//   - Beleth: real kit is "damage + burn DoT" (Q), "silence, no damage" (W), "delayed burst"
+//     (R). Poison (this package's only real DoT Kind) + Silence port faithfully -- the actual
+//     two effects her own kit already carries on two different slots, not a stretch. Delayed
+//     burst has no real analog here yet.
+//   - Vassago: real kit is "damage + silence nearest foe" (Q), "refund an ally's next cast"
+//     (W), "zone: silence only" (R). Silence + a direct hit port her Q faithfully; cast-refund
+//     and the zone-only R stay unported.
+//
+// Only fires against a live duel opponent -- mob targets have no status stack at all yet (a
+// real, structural gap in the `mob` package, not attempted here), so "no PvP target" is an
+// honest message, not a silent no-op. Direct damage (Vassago) is clamped to never drop the
+// opponent below 1 HP, deliberately not routed through duel.Manager's own win-condition check
+// (ReportHP) -- this keeps the win/loss state machine untouched rather than half-wiring a second
+// path into it.
+func cmdSummonAvatar(p *player, abilityID string) {
+	activeDuel := gw.duelMgr.ActiveDuel(p.slot)
+	if activeDuel == nil {
+		p.send("No PvP target -- Avatars channel their power against rivals, not monsters, in this pass.")
+		return
+	}
+	oppSlot := activeDuel.Defender
+	if oppSlot == p.slot {
+		oppSlot = activeDuel.Challenger
+	}
+	gw.mu.Lock()
+	opp, ok := gw.players[oppSlot]
+	gw.mu.Unlock()
+	if !ok {
+		p.send("Your duel opponent is no longer here.")
+		return
+	}
+
+	now := time.Now()
+	applyDebuff := func(kind status.Kind) string {
+		result := opp.statFX.Apply(status.Effect{Kind: kind, Potency: 10, ExpiresAt: now.Add(30 * time.Second)})
+		if result == status.ApplyRejected {
+			return fmt.Sprintf(" (%s already resists a stronger %s)", opp.name, kind)
+		}
+		return fmt.Sprintf(" %s is afflicted with %s!", opp.name, kind)
+	}
+
+	switch abilityID {
+	case "summon_zagan":
+		p.sendf("You summon Zagan, the Standstill's Confessor!%s", applyDebuff(status.Bind))
+		opp.sendf("\r\n%s summons Zagan! You are bound in place!", p.name)
+	case "summon_beleth":
+		msg := applyDebuff(status.Poison)
+		msg += applyDebuff(status.Silence)
+		p.sendf("You summon Beleth, the Detonation!%s", msg)
+		opp.sendf("\r\n%s summons Beleth! Fire licks at you as your voice fails!", p.name)
+	case "summon_vassago":
+		dmg := 10
+		if opp.hp-dmg < 1 {
+			dmg = opp.hp - 1
+		}
+		if dmg > 0 {
+			opp.hp -= dmg
+		}
+		p.sendf("You summon Vassago, the Soft Foresight! %s takes %d damage.%s", opp.name, dmg, applyDebuff(status.Silence))
+		opp.sendf("\r\n%s summons Vassago! You take %d damage and your voice fails!", p.name, dmg)
+	}
+	opp.prompt()
 }
 
 func cmdRecasts(p *player) {

@@ -179,3 +179,40 @@ func TestTraitPassive_NoRecast(t *testing.T) {
 		t.Error("trait slice should have entries")
 	}
 }
+
+// SummonerAbilities (2026-07-31, founder: "zagan beleth vassago as summoner avatars GFD").
+
+func TestSummonerAbilities_HasAllThreeAvatars(t *testing.T) {
+	want := map[string]bool{"summon_zagan": false, "summon_beleth": false, "summon_vassago": false}
+	for _, a := range SummonerAbilities() {
+		if a.Job != SMN {
+			t.Errorf("ability %s has Job=%s, want SMN", a.ID, a.Job)
+		}
+		if _, ok := want[a.ID]; !ok {
+			t.Errorf("unexpected ability ID %q in SummonerAbilities", a.ID)
+			continue
+		}
+		want[a.ID] = true
+	}
+	for id, found := range want {
+		if !found {
+			t.Errorf("SummonerAbilities is missing %q", id)
+		}
+	}
+}
+
+func TestSummonerAbilities_UsableThroughRecastTracker(t *testing.T) {
+	// Real integration check, not just a data shape check -- confirms SummonerAbilities()
+	// actually works through the same RecastTracker every other job's abilities do.
+	rt := NewRecastTracker(SummonerAbilities())
+	if err := rt.Use("summon_zagan", baseTime, 10); err != nil {
+		t.Fatalf("Use(summon_zagan): unexpected error %v", err)
+	}
+	ready, err := rt.Ready("summon_zagan", baseTime)
+	if err != nil {
+		t.Fatalf("Ready: unexpected error %v", err)
+	}
+	if ready {
+		t.Error("summon_zagan should still be on its own 3-minute recast immediately after use")
+	}
+}
