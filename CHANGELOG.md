@@ -1,5 +1,23 @@
 ## 2026-07-31
 
+- feat(server-go): real IDUNA job/level fetch on connect + real HP tracking, closing two of
+  Sprint 3's own named gaps. Backend-unification follow-up (EMILY/BACKLOG.md item 2). New
+  `fetchCharacterCombatStats` -- calls `idunaClient.GetCharacter` on `PacketConnect` (same
+  best-effort tone `PacketTelecrystalUse` already uses toward IDUNA lookups: falls back to
+  WAR/level 1, not a hard connection reject, if IDUNA has no character row yet or the fetch
+  fails outright), computes starting HP via `jobpkg.HPAtLevel` -- the same formula `apps2/mud`'s
+  own character sheet already uses, not reinvented. `clientInfo` gained real `jobMain`/`level`/
+  `hp`/`maxHP` fields (HP itself in-memory only, same as `apps2/mud`'s own `p.hp` -- not
+  persisted to IDUNA, matching every MMORPG's own "a life's current HP isn't durable state"
+  convention). `PacketWSCast` now actually subtracts `result.Damage` from the target's real HP
+  and reports `target_hp`/`target_max_hp`/`killed` in `PacketWSResult` -- Sprint 3 only ever
+  reported a damage number without touching anything; this is the first slice where a weapon
+  skill actually hurts someone. 1 new test (`fetchCharacterCombatStats`'s WAR/level-1 fallback,
+  verified deterministically by pointing at an unreachable IDUNA URL rather than a live server).
+  `GOWORK=off go build ./...`/`go test ./...` clean. Still not done: no death/respawn handling
+  once `killed=true` fires (the target just sits at 0 HP), enmity untouched, `apps2/mud`'s telnet
+  players still don't share this state.
+
 - feat(server-go): real weapon-skill casting + skillchain resonance wired into `apps2/server-go`'s
   UDP loop. Founder: "yes unify the backends" -> "whatever makes sense" -> "clean builds first"
   (backlog dump + sprint plan, Sprint 3 -- EMILY/BACKLOG.md). First real slice of

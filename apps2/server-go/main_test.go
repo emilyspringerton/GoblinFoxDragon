@@ -3,10 +3,13 @@ package main
 import (
 	"encoding/binary"
 	"math"
+	"os"
 	"testing"
 	"time"
 
 	"dragonsnshit/packages2/common"
+	"dragonsnshit/server/idunaclient"
+	jobpkg "dragonsnshit/server/job"
 	"dragonsnshit/server/skillchain"
 )
 
@@ -117,6 +120,32 @@ func TestResolveWSCastFormsSkillchain(t *testing.T) {
 	wantDamage := baseDamage + int(float64(baseDamage)*0.35)
 	if result.Damage != wantDamage {
 		t.Fatalf("expected chained damage %d, got %d", wantDamage, result.Damage)
+	}
+}
+
+// Backend-unification follow-up (2026-07-31): fetchCharacterCombatStats falls back to WAR/level
+// 1 when IDUNA is unreachable or has no character row -- a real, deterministic path to test
+// without a live IDUNA server (point the client at a port nothing is listening on).
+func TestFetchCharacterCombatStatsFallsBackOnUnreachableIDUNA(t *testing.T) {
+	oldURL := os.Getenv("IDUNA_BASE_URL")
+	defer os.Setenv("IDUNA_BASE_URL", oldURL)
+	os.Setenv("IDUNA_BASE_URL", "http://127.0.0.1:1") // nothing listens here
+
+	client := idunaclient.New()
+	jobMain, level, maxHP := fetchCharacterCombatStats(client, "some-character-id")
+
+	if jobMain != jobpkg.WAR {
+		t.Fatalf("expected fallback job %q, got %q", jobpkg.WAR, jobMain)
+	}
+	if level != 1 {
+		t.Fatalf("expected fallback level 1, got %d", level)
+	}
+	wantHP, err := jobpkg.HPAtLevel(jobpkg.WAR, 1)
+	if err != nil {
+		t.Fatalf("jobpkg.HPAtLevel(WAR, 1) unexpectedly errored: %v", err)
+	}
+	if maxHP != wantHP {
+		t.Fatalf("expected fallback HP %d (WAR level 1), got %d", wantHP, maxHP)
 	}
 }
 

@@ -23,6 +23,7 @@ import (
 	"dragonsnshit/server/idunaauth"
 	"dragonsnshit/server/idunaclient"
 	"dragonsnshit/server/integrity"
+	jobpkg "dragonsnshit/server/job"
 	"dragonsnshit/server/ledger"
 	"dragonsnshit/server/player"
 	"dragonsnshit/server/skillchain"
@@ -80,6 +81,15 @@ type clientInfo struct {
 	lastVoxelSent time.Time
 	chunkIndex    int
 	tp            *combatTp.TPState // backend-unification Sprint 3: real TP, apps2/mud's own combat.TPState
+	// backend-unification follow-up (2026-07-31): real job/level fetched from IDUNA on connect
+	// (jobpkg.WAR/level 1 fallback if IDUNA has no character row yet), real HP seeded via
+	// jobpkg.HPAtLevel -- same formula apps2/mud's own character sheet uses. HP itself is
+	// in-memory only, same as apps2/mud's own p.hp -- not persisted to IDUNA (a life's current
+	// HP isn't durable character state, matching every other MMORPG's own convention).
+	jobMain string
+	level   int
+	hp      int
+	maxHP   int
 }
 
 // wsChainState mirrors apps2/mud's own gw.mobChains, keyed by the TARGET client's slot
@@ -238,7 +248,11 @@ func main() {
 					sendAuthReject(conn, remote)
 					continue
 				}
-				info := clientInfo{id: nextClientID, playerID: claims.Subject, tp: &combatTp.TPState{}}
+				jobMain, level, maxHP := fetchCharacterCombatStats(idunaClient, claims.Subject)
+				info := clientInfo{
+					id: nextClientID, playerID: claims.Subject, tp: &combatTp.TPState{},
+					jobMain: jobMain, level: level, hp: maxHP, maxHP: maxHP,
+				}
 				if nextClientID < 255 {
 					nextClientID++
 				}
@@ -250,7 +264,7 @@ func main() {
 					GuildID: "",
 					Pos:     chat.Pos{},
 				})
-				fmt.Printf("[auth] accept %s playerID=%s id=%d\n", slot, claims.Subject, info.id)
+				fmt.Printf("[auth] accept %s playerID=%s id=%d job=%s lvl=%d hp=%d\n", slot, claims.Subject, info.id, jobMain, level, maxHP)
 			}
 			info := clients[slot]
 			sendWelcome(conn, remote, info.id)
@@ -530,6 +544,20 @@ func main() {
 			clients[slot] = info
 			wsChains[targetSlot] = newChainState
 
+			// Apply the damage to the target's real, in-memory HP (backend-unification
+			// follow-up, 2026-07-31) -- Sprint 3 only ever reported a damage number without
+			// touching anything; this is the first real slice where a weapon skill actually
+			// hurts someone. Same "collapses" idiom apps2/mud's own cmdWS uses on a kill.
+			targetInfo := clients[targetSlot]
+			targetInfo.hp -= result.Damage
+			if targetInfo.hp < 0 {
+				targetInfo.hp = 0
+			}
+			result.Killed = targetInfo.hp == 0
+			clients[targetSlot] = targetInfo
+			result.TargetHP = targetInfo.hp
+			result.TargetMaxHP = targetInfo.maxHP
+
 			payload, _ := json.Marshal(result)
 			pkt := append([]byte{common.PacketWSResult}, payload...)
 			conn.WriteToUDP(pkt, remote)
@@ -582,14 +610,17 @@ func sendCraftResult(conn *net.UDPConn, remote *net.UDPAddr, success bool, hqTie
 
 // wsResultPayload is PacketWSResult's JSON body (backend-unification Sprint 3).
 type wsResultPayload struct {
-	CasterID  int    `json:"caster_id,omitempty"`
-	TargetID  int    `json:"target_id,omitempty"`
-	WSName    string `json:"ws_name,omitempty"`
-	Damage    int    `json:"damage,omitempty"`
-	Chained   bool   `json:"chained,omitempty"`
-	Resonance string `json:"resonance,omitempty"`
-	Tier      int    `json:"tier,omitempty"`
-	Error     string `json:"error,omitempty"`
+	CasterID    int    `json:"caster_id,omitempty"`
+	TargetID    int    `json:"target_id,omitempty"`
+	WSName      string `json:"ws_name,omitempty"`
+	Damage      int    `json:"damage,omitempty"`
+	Chained     bool   `json:"chained,omitempty"`
+	Resonance   string `json:"resonance,omitempty"`
+	Tier        int    `json:"tier,omitempty"`
+	TargetHP    int    `json:"target_hp,omitempty"`
+	TargetMaxHP int    `json:"target_max_hp,omitempty"`
+	Killed      bool   `json:"killed,omitempty"`
+	Error       string `json:"error,omitempty"`
 }
 
 func sendWSResult(conn *net.UDPConn, remote *net.UDPAddr, result wsResultPayload) {
@@ -613,6 +644,28 @@ const placeholderPlayerDamage = 10
 // Returns (result, newState, true) on a real cast; (result{Error: ...}, wsChainState{}, false)
 // if wsName is unknown -- the caller is responsible for every other precondition (auth, TP,
 // target existence) before calling this.
+// fetchCharacterCombatStats resolves the connecting player's real job/level from IDUNA and
+// computes their starting HP via jobpkg.HPAtLevel -- the same formula apps2/mud's own character
+// sheet already uses (server/job's own HPAtLevel, not reinvented here). Falls back to WAR/level
+// 1 if IDUNA has no character row yet (a legitimately new player) or the fetch fails outright --
+// a missing character shouldn't hard-reject the connection, matching PacketTelecrystalUse's own
+// best-effort tone toward IDUNA lookups elsewhere in this file.
+func fetchCharacterCombatStats(idunaClient *idunaclient.Client, characterID string) (jobMain string, level, maxHP int) {
+	jobMain, level = jobpkg.WAR, 1
+	if ch, err := idunaClient.GetCharacter(characterID); err == nil && ch.JobMain != "" {
+		jobMain = ch.JobMain
+		if ch.Level >= 1 {
+			level = ch.Level
+		}
+	}
+	hp, err := jobpkg.HPAtLevel(jobMain, level)
+	if err != nil {
+		jobMain, level = jobpkg.WAR, 1
+		hp, _ = jobpkg.HPAtLevel(jobpkg.WAR, 1)
+	}
+	return jobMain, level, hp
+}
+
 func resolveWSCast(wsName string, wsChains map[string]wsChainState, targetSlot string, casterID, targetID int, now time.Time) (wsResultPayload, wsChainState, bool) {
 	ws, ok := skillchain.CanonicalWeaponSkills[wsName]
 	if !ok {
