@@ -82,14 +82,16 @@ type clientInfo struct {
 	chunkIndex    int
 	tp            *combatTp.TPState // backend-unification Sprint 3: real TP, apps2/mud's own combat.TPState
 	// backend-unification follow-up (2026-07-31): real job/level fetched from IDUNA on connect
-	// (jobpkg.WAR/level 1 fallback if IDUNA has no character row yet), real HP seeded via
-	// jobpkg.HPAtLevel -- same formula apps2/mud's own character sheet uses. HP itself is
-	// in-memory only, same as apps2/mud's own p.hp -- not persisted to IDUNA (a life's current
-	// HP isn't durable character state, matching every other MMORPG's own convention).
+	// (jobpkg.WAR/level 1 fallback if IDUNA has no character row yet). hpState uses
+	// combatTp.HPState (server/combat's own real KO state machine, NewHPState/TakeDamage/IsKO)
+	// rather than raw ints -- apps2/mud itself doesn't call this type directly (it drives KO
+	// through its own separate homepoint.State.IsKO field instead), but the mechanics are the
+	// same shape and reusing the tested type here avoids re-deriving KO/damage-floor logic by
+	// hand. In-memory only, same as apps2/mud's own p.hp -- not persisted to IDUNA (a life's
+	// current HP isn't durable character state, matching every MMORPG's own convention).
 	jobMain string
 	level   int
-	hp      int
-	maxHP   int
+	hpState *combatTp.HPState
 }
 
 // wsChainState mirrors apps2/mud's own gw.mobChains, keyed by the TARGET client's slot
@@ -251,7 +253,7 @@ func main() {
 				jobMain, level, maxHP := fetchCharacterCombatStats(idunaClient, claims.Subject)
 				info := clientInfo{
 					id: nextClientID, playerID: claims.Subject, tp: &combatTp.TPState{},
-					jobMain: jobMain, level: level, hp: maxHP, maxHP: maxHP,
+					jobMain: jobMain, level: level, hpState: combatTp.NewHPState(maxHP),
 				}
 				if nextClientID < 255 {
 					nextClientID++
@@ -509,6 +511,10 @@ func main() {
 			if info.tp == nil {
 				info.tp = &combatTp.TPState{}
 			}
+			if info.hpState != nil && info.hpState.IsKO {
+				sendWSResult(conn, remote, wsResultPayload{Error: "you are KO'd"})
+				continue
+			}
 			if n < 2 {
 				continue
 			}
@@ -535,6 +541,11 @@ func main() {
 				sendWSResult(conn, remote, wsResultPayload{Error: "target not found"})
 				continue
 			}
+			targetInfo := clients[targetSlot]
+			if targetInfo.hpState != nil && targetInfo.hpState.IsKO {
+				sendWSResult(conn, remote, wsResultPayload{Error: "target is already KO'd"})
+				continue
+			}
 			result, newChainState, ok2 := resolveWSCast(wsReq.WSName, wsChains, targetSlot, int(info.id), wsReq.TargetClientID, time.Now())
 			if !ok2 {
 				sendWSResult(conn, remote, result)
@@ -544,19 +555,27 @@ func main() {
 			clients[slot] = info
 			wsChains[targetSlot] = newChainState
 
-			// Apply the damage to the target's real, in-memory HP (backend-unification
-			// follow-up, 2026-07-31) -- Sprint 3 only ever reported a damage number without
-			// touching anything; this is the first real slice where a weapon skill actually
-			// hurts someone. Same "collapses" idiom apps2/mud's own cmdWS uses on a kill.
-			targetInfo := clients[targetSlot]
-			targetInfo.hp -= result.Damage
-			if targetInfo.hp < 0 {
-				targetInfo.hp = 0
+			// Apply the damage to the target's real HPState (backend-unification follow-up,
+			// 2026-07-31) -- Sprint 3 only ever reported a damage number without touching
+			// anything; this is the first real slice where a weapon skill actually hurts
+			// someone. TakeKO is intentionally not followed by any respawn/home-point flow here
+			// -- apps2/mud's own knockOut() leaves a KO'd player waiting until they actively
+			// type 'home' (8% XP penalty) or find another Raise; a real respawn flow for this
+			// backend is a separate, larger follow-up, not attempted in this slice. A KO'd
+			// player just can't act (see the caster/target IsKO guards above) until something
+			// external (not built yet) revives them.
+			if targetInfo.hpState == nil {
+				// Defensive fallback -- every real client gets a real hpState via
+				// PacketConnect's own fetchCharacterCombatStats; this only guards against a
+				// theoretical WSCast reaching a client record that skipped that path.
+				fallbackHP, _ := jobpkg.HPAtLevel(jobpkg.WAR, 1)
+				targetInfo.hpState = combatTp.NewHPState(fallbackHP)
 			}
-			result.Killed = targetInfo.hp == 0
+			killed, _ := targetInfo.hpState.TakeDamage(result.Damage)
+			result.Killed = killed
 			clients[targetSlot] = targetInfo
-			result.TargetHP = targetInfo.hp
-			result.TargetMaxHP = targetInfo.maxHP
+			result.TargetHP = targetInfo.hpState.Current
+			result.TargetMaxHP = targetInfo.hpState.Max
 
 			payload, _ := json.Marshal(result)
 			pkt := append([]byte{common.PacketWSResult}, payload...)

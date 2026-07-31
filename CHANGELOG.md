@@ -1,5 +1,20 @@
 ## 2026-07-31
 
+- feat(server-go): real KO state via `server/combat.HPState`, gates further weapon-skill casting.
+  Backend-unification follow-up (EMILY/BACKLOG.md item 2). `clientInfo.hp`/`maxHP` (raw ints)
+  replaced with `hpState *combatTp.HPState` -- `apps2/mud` itself drives KO through its own
+  separate `homepoint.State.IsKO` field rather than calling `HPState` directly, but the mechanics
+  are the same shape, and reusing the already-tested type (`NewHPState`/`TakeDamage`/`IsKO`, 17
+  existing tests in `server/combat/death_test.go`) beats re-deriving damage-floor/KO logic by
+  hand. `PacketWSCast` now rejects casting from a KO'd caster and casting *at* an already-KO'd
+  target (`ErrAlreadyKO`'s own failure mode, guarded before it can fire). Deliberately NOT
+  implemented: any respawn/home-point flow once `killed=true` -- `apps2/mud`'s own `knockOut()`
+  leaves a KO'd player waiting until they actively type `home` (8% XP penalty) or get Raised;
+  porting that full flow is separate, larger follow-up work, not attempted in this slice, so a
+  KO'd player on this backend currently just... stays KO'd forever. Named honestly, not hidden.
+  `GOWORK=off go build ./...`/`go test ./...` clean (existing 6 tests, no new ones needed --  the
+  underlying `HPState` behavior this wiring calls is already covered upstream).
+
 - feat(server-go): real IDUNA job/level fetch on connect + real HP tracking, closing two of
   Sprint 3's own named gaps. Backend-unification follow-up (EMILY/BACKLOG.md item 2). New
   `fetchCharacterCombatStats` -- calls `idunaClient.GetCharacter` on `PacketConnect` (same
