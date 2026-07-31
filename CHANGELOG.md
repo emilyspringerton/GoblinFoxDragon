@@ -1,5 +1,26 @@
 ## 2026-07-31
 
+- docs: REDGARDEN_GUI_NORTHSTAR.md, two real-time corrections in a row on the Battlegrounds
+  design. Founder #1: "some of the docs say we arent bringing redgardens gameplay just the ui
+  thats not right i want dragonsnshit mmo to feel like redgarden like battlegrounds for
+  dragonsnshit is redgarden." Corrected the doc's original thesis (REDGARDEN as rendering-only
+  skin, DragonsNShit's own systems replace REDGARDEN's gameplay underneath) -- wrong. REDGARDEN's
+  full real-time combat framework (`arena_server`/`apps/matchmaker`, Q/W/R slot UI, item shop,
+  node-capture map) becomes DragonsNShit's Battlegrounds, an instanced PvP mode, same relationship
+  WoW Battlegrounds/FFXI's own minigames have to their main games. Founder #2, immediately after:
+  "like not the same literal game loop maybe but we want to amend our ould systems like
+  skillchains etc work with redgarden affordances." Refined further: the process/loop separation
+  stays (Battlegrounds is still its own spawned-per-match process, not merged into the persistent
+  world's own loop), but the *ability content* cast through REDGARDEN's Q/W/R slots is
+  `apps2/mud`'s real job/weapon-skill/skillchain system ported into `arena_game.c`'s slot
+  machinery -- a Battleground combatant picks a job (Warrior, Black Mage, ...), not one of
+  REDGARDEN's 28 fixed heroes, and that job's real abilities render through REDGARDEN's existing
+  cast-ring/projectile/zone-circle vocabulary, with real skillchain resonance between players'
+  casts. §§1/4.1/4.2/5/6 rewritten in place across both corrections, each labeled and dated so
+  the doc's own reasoning history stays legible. Milestone table now: port Warrior's real kit
+  into `arena_game.c` first, then skillchain resonance, then the entry-point/reward-credit hooks,
+  then end-to-end validation.
+
 - docs: DragonsNShit has two non-unified backends — audit + bridge-target correction. Founder:
   "continue dragons n shit" (continuing "do the docs first"). New
   `docs2/DRAGONSNSHIT_TWO_BACKENDS_AUDIT.md`, correcting a real, load-bearing wrong assumption in

@@ -1,4 +1,4 @@
-# REDGARDEN-as-GUI — Northstar
+# REDGARDEN = DragonsNShit's Battlegrounds — Northstar
 
 *Written 2026-07-31. Founder, real-time, verbatim: "can we graft redgarden frontend onto GFD mud
 as a gui to make our mmorpg?" → "i dont care how you do it fork redgarden into GFD write the
@@ -7,24 +7,52 @@ gui" → "like old school runescape."*
 
 **Status:** Spec only, no code yet — milestone 0 of this doc's own table.
 
-**Update 2026-07-31 (same day, superseded by a second update below):** wrote a packet-level
-bridge spec, `docs2/specs/REDGARDEN_MUD_BRIDGE_SPEC.md`, designing a new listener bolted onto
-`apps2/mud`.
+**CORRECTION 2026-07-31 (major, supersedes §§1/4/5/6 below as they originally read):**
+founder: *"some of the docs say we arent bringing redgardens gameplay just the ui thats not right
+i want dragonsnshit mmo to feel like redgarden like battlegrounds for dragonsnshit is redgarden."*
+The original version of this doc got the core call backwards — it said REDGARDEN contributes only
+"rendering grammar" and DragonsNShit's own systems replace REDGARDEN's actual gameplay
+underneath. Wrong. **REDGARDEN's full gameplay — heroes, abilities, items, node-capture map, the
+whole `arena_server` simulation, not just its renderer — ships essentially as-is, as DragonsNShit's
+Battlegrounds: an instanced PvP mode reachable from the persistent world**, the same relationship
+WoW's Battlegrounds/Arena have to WoW's open world, or FFXI's own self-contained minigames
+(Chocobo Racing, Triple Triad) have to FFXI's main game. This is a **simpler** architecture than
+the original version of this doc, not a more complex one — REDGARDEN needs no gameplay changes at
+all, `arena_server`/`apps/matchmaker`/`apps/arena` work as-is; the only new work is a portal/queue
+entry point in the persistent world and reward-crediting back to the player's persistent
+character via IDUNA. §§1, 4, 5, and 6 below are rewritten to reflect this. The two-backends
+finding (`docs2/DRAGONSNSHIT_TWO_BACKENDS_AUDIT.md`) is still real and still worth fixing for the
+persistent-world layer itself, but REDGARDEN's own bridge no longer waits on it — see §4.
 
-**Update 2026-07-31 (later same day, corrects the update above):** found a second real
-backend, `apps2/server-go` — a UDP server with a real IDUNA-JWT-authenticated protocol
-(`PacketConnect`/`PacketUserCmd`/`PacketChat`/Telecrystal travel/crafting, all actually wired to
-IDUNA, unlike `apps2/mud`'s own dead, never-called `idunaclient`) that REDGARDEN's bridge should
-target instead — full audit in `docs2/DRAGONSNSHIT_TWO_BACKENDS_AUDIT.md`. The real, harder
-finding: `apps2/server-go` has the right protocol shape but FPS-hitscan combat, not
-`apps2/mud`'s RPG depth; the two backends don't share state. Milestone 1 below is rewritten to
-reflect this — the bridge spec above is superseded, not deleted (its gap-finding on movement/
-targeting is still real).
+**CORRECTION 2, 2026-07-31 (refines the correction above — read this one last):** founder:
+*"like not the same literal game loop maybe but we want to amend our ould systems like
+skillchains etc work with redgarden affordances."* The correction above over-corrected into full
+decoupling — two rosters, two ability systems, connected only by identity+rewards. Refined: **the
+process/loop separation stays** (Battlegrounds is still its own spawned-per-match `arena_server`
+process, not merged into `apps2/mud`'s or `apps2/server-go`'s own tick loop) — but the **ability
+content** cast through REDGARDEN's own Q/W/R slots is `apps2/mud`'s real job/weapon-skill/
+skillchain system, ported into `arena_game.c`'s own slot machinery, not REDGARDEN's fixed
+28-hero kit roster left untouched. A Battleground combatant picks a **job** (Warrior, Black Mage,
+...), that job's real weapon skills/spells are what's bound to Q/W/R, rendered through
+REDGARDEN's own real cast-ring/projectile/zone-circle vocabulary, and skillchain resonance
+genuinely triggers between two players' casts — shown with REDGARDEN's own visual language (a
+real skillchain flash, not a generic hit). REDGARDEN's real-time tick loop, node-capture map,
+item shop, and match structure all stay exactly as built. §§4.1/4.2 and §5 and the milestone
+table below are rewritten again to reflect this — this is now the load-bearing version, not the
+correction above it.
+
+**Update 2026-07-31 (earlier, now superseded by both corrections above):** wrote a packet-level
+bridge spec, `docs2/specs/REDGARDEN_MUD_BRIDGE_SPEC.md`, designing a new listener bolted onto
+`apps2/mud` that would translate REDGARDEN input into `apps2/mud`'s own RPG action calls. No
+longer the plan — REDGARDEN doesn't need translating into anything; it runs its own combat
+directly. Kept for its still-real gap-finding (`apps2/mud` has no continuous movement server-side,
+`cmdAttack`/`cmdGo` details), not deleted.
 
 **Relationship to `docs2/MMO_NORTHSTAR.md`:** amends it, doesn't replace it. Every system that
 doc already specs — IDUNA-backed character/item/guild schema, item provenance chains, the
 economy, World Crisis phases, Telecrystal scene travel, EduScript VM scripting — stays exactly
-as designed. This doc changes one thing: **who renders it.** MMO_NORTHSTAR's own "Integration
+as designed and governs the *persistent world* half of the product. This doc adds the other half:
+**REDGARDEN, wholesale, is the Battlegrounds half.** MMO_NORTHSTAR's own "Integration
 Architecture" diagram named "C/SDL2 Client (SHANKPIT runtime, extended)" as the frontend; that
 line is superseded by this doc. See §7 for the exact edit made to that file.
 
@@ -32,57 +60,75 @@ line is superseded by this doc. See §7 for the exact edit made to that file.
 
 ## 1. Three-sentence version
 
-DragonsNShit already has a real, deep MMORPG backend — 22 FFXI-parity jobs, skillchains and
-magic bursts, enmity, conquest, NM spawns and treasure pools, crafting guilds, parties and
-linkshells, all live in `apps2/mud`'s 7,300-line Go server — but the only way to play it today
-is a text telnet session on `:2323`. REDGARDEN is a separate, working, real-time 3D SDL2/OpenGL
-MOBA client with exactly the rendering and input machinery a visual MMO client needs (click-to-
-move, hero silhouettes, cast rings, HP bars, item-shop UI, a minimap) and none of a from-scratch
-build's cost. Fork REDGARDEN's *client* — not its combat sim — into GFD as a second, parallel
-frontend to the same MUD server: the telnet interface keeps working unchanged, and a REDGARDEN-
-shaped GUI client renders the exact same characters, zones, and combat, OSRS-style (click-to-move
-third-person, chunky legible geometry, skill-training loop) instead of FPS/instanced-MOBA-style.
+DragonsNShit's persistent world (`apps2/mud`'s real, deep FFXI-parity RPG systems — 22 jobs,
+skillchains, enmity, conquest, crafting guilds, all live today, telnet-only, `:2323`) is one half
+of the product; REDGARDEN's real-time combat framework — its own `arena_server`/`apps/matchmaker`
+process, click-to-move, Q/W/R ability-slot UI with cast rings, dodgeable projectiles, ground-AoE
+zone circles, item shop, and node-capture map — becomes **DragonsNShit's Battlegrounds**: an
+instanced PvP mode a persistent-world character queues into, the same relationship WoW
+Battlegrounds or FFXI's own self-contained minigames have to their respective main games, spawned
+as its own separate process per match, same as REDGARDEN already does today — not merged into the
+persistent world's own game loop. What's different from REDGARDEN's own current build: the
+abilities cast through those Q/W/R slots are `apps2/mud`'s real job weapon-skills and spells
+(Warrior, Black Mage, ...) ported into REDGARDEN's slot machinery, with real skillchain resonance
+between players' casts, rendered through REDGARDEN's own visual language — not REDGARDEN's
+existing 28 fixed hero kits left untouched, and not a from-scratch reinvention of `apps2/mud`'s
+own real skillchain math either. The persistent world stays OSRS-flavored (click-to-move, chunky
+legible geometry, skill-training loop, per the founder's own reference); Battlegrounds stays
+REDGARDEN's own real-time feel, carrying real DragonsNShit mechanics through it — two distinct
+feels on purpose, connected by shared systems where it counts, the same way WoW's own overworld
+and Battlegrounds don't pretend to be the same game mode but still share the same class kit.
 
 ---
 
 ## 2. What actually exists today, checked directly (not assumed)
 
-**`apps2/mud` (DragonsNShit's real server, `GoblinFoxDragon/apps2/mud/main.go`, 7,310 lines):**
-telnet/TCP on `:2323` (`nc localhost 2323` or `telnet localhost 2323`), one Go process, all
-server packages wired into a single 1Hz game loop. Real, shipped systems (per this repo's own
-CHANGELOG, not the MMO_NORTHSTAR milestone table below — see §2.1 on why those disagree): 22 FFXI
-jobs + sub-jobs with combined stats, level/XP to L99, enmity (hate table, AoE cure, overaggro),
-death/raise with XP penalty, status effects (Poison/Paralyze/Slow/Silence/Bind/Haste/Regen/
-Refresh/Protect/Shell), skillchains + magic bursts (14 resonances, 3 tiers), TP weapon skill
-points, auto-attack + mob AI state machine, NM spawn conditions/aggro types/treasure pool
-(lot/pass/resolve), crafting guilds (8 types) + HQ synthesis, conquest (3 nations, weekly tick),
-parties/alliances/XP chains, linkshell guilds, chat (say/tell/yell/guild), mining skill, home
-point, field manuals, IDUNA JWT auth already gating `PacketConnect` (S76-01). Four zones exist
-today: Meadow, Hills, Caves, Swampville — each hand-authored as a block of Go inside
+**`apps2/mud` (DragonsNShit's persistent-world server, `GoblinFoxDragon/apps2/mud/main.go`,
+7,310 lines):** telnet/TCP on `:2323` (`nc localhost 2323` or `telnet localhost 2323`), one Go
+process, all server packages wired into a single 1Hz game loop. Real, shipped systems (per this
+repo's own CHANGELOG, not the MMO_NORTHSTAR milestone table below — see §2.1 on why those
+disagree): 22 FFXI jobs + sub-jobs with combined stats, level/XP to L99, enmity (hate table, AoE
+cure, overaggro), death/raise with XP penalty, status effects (Poison/Paralyze/Slow/Silence/Bind/
+Haste/Regen/Refresh/Protect/Shell), skillchains + magic bursts (14 resonances, 3 tiers), TP
+weapon skill points, auto-attack + mob AI state machine, NM spawn conditions/aggro types/treasure
+pool (lot/pass/resolve), crafting guilds (8 types) + HQ synthesis, conquest (3 nations, weekly
+tick), parties/alliances/XP chains, linkshell guilds, chat (say/tell/yell/guild), mining skill,
+home point, field manuals, IDUNA JWT auth already gating `PacketConnect` (S76-01, though its own
+`idunaclient` field is otherwise dead — see `DRAGONSNSHIT_TWO_BACKENDS_AUDIT.md`). Four zones
+exist today: Meadow, Hills, Caves, Swampville — each hand-authored as a block of Go inside
 `initWorld()` (`docs2/HERO_BRIDGE_PREREQUISITES.md` already named externalizing this into a data
 format as the real prerequisite for adding more zones/lore content; unrelated to this doc's own
 scope but worth knowing before assuming zones are cheap to add).
 
-**REDGARDEN (`/home/fatbaby/REDGARDEN`, sibling repo, this session's own primary focus):** a
-working C99/SDL2 real-time client-server MOBA. `apps/arena` is the relevant piece — a
-**shader-based modern-GL client** (`GL/gl.h` + `SDL_GL_GetProcAddress`, deliberately no GLU
-dependency, confirmed via `ldd`: no `libGLU` linked at all — this matters because it's the one
-REDGARDEN build target that's actually portable without the GLU packaging problems the rest of
-this monorepo's SDL2/OpenGL apps have hit repeatedly). It already has, real and working: click-
-to-move with an animated target-ring marker; a full hero-silhouette-from-boxes rendering system
-(28 heroes, each visually distinct, `draw_hero_model`/`draw_hero_box_facing`); HP bars, HUD,
-minimap; a Q/W/R ability-slot system with cast rings, dodgeable skill-shot projectiles, and
-ground-AoE zone circles; a 27-item shop panel with pagination and an active-item hotkey; a real
-click-to-pick draft/character-select screen; connect-ticket HMAC-SHA256 auth (`packages/common/
-hmac_sha256.h`, same scheme as shankpit-460) over a custom UDP wire protocol
-(`packages/common/protocol.h`). None of this is placeholder or spec-only — it's the actual client
-built and iterated on this whole session.
+**`apps2/server-go` (found 2026-07-31, `DRAGONSNSHIT_TWO_BACKENDS_AUDIT.md`):** a second,
+separate real backend — UDP on `:6969`, real IDUNA-JWT-authenticated `PacketConnect`, real
+IDUNA-backed Telecrystal travel/crafting/skill-XP, FPS-shaped (SHANKPIT-derived) hitscan combat.
+Not this doc's concern directly — it's part of the persistent-world side's own internal split,
+not something REDGARDEN's Battlegrounds bridge needs to touch. See that doc for the full finding.
 
-**The fit:** DragonsNShit has the RPG simulation depth and no real-time visual client; REDGARDEN
-has a proven real-time visual client and no RPG simulation depth (its own combat sim,
-`arena_game.c`, is a MOBA hero-kit balance engine, not an MMO job/skill system, and isn't what
-this doc proposes reusing — see §4). Grafting one onto the other is cheaper than building either
-half from scratch a second time.
+**REDGARDEN (`/home/fatbaby/REDGARDEN`, sibling repo, this session's own primary focus):** a
+complete, working C99/SDL2 real-time client-server MOBA — not just a client, the whole stack.
+`apps/arena_server` is the authoritative combat simulation (28 heroes' real kits — Q/W/R
+abilities, dodgeable skill-shot projectiles, ground-AoE zone abilities, towers gating node
+capture, a 27-item shop economy, real draft/pick phase); `apps/matchmaker` pairs queued clients
+and spawns a dedicated `arena_server` per match (`fork`+`exec`, one match per process); `apps/
+arena` is the **shader-based modern-GL client** (`GL/gl.h` + `SDL_GL_GetProcAddress`, no GLU
+dependency — confirmed via `ldd`, the one build target in this monorepo that's actually portable
+without the GLU packaging problems every other SDL2/OpenGL app here has hit) with real click-to-
+move, hero-silhouette rendering (`draw_hero_model`/`draw_hero_box_facing`), HP bars/HUD/minimap,
+the Q/W/R ability-slot UI with cast rings, a shop panel with pagination, and the draft/pick
+screen; connect-ticket HMAC-SHA256 auth (`packages/common/hmac_sha256.h`, same scheme as
+shankpit-460) over `packages/common/protocol.h`'s UDP wire protocol. None of this is placeholder
+— it's the actual, complete system built and iterated on this whole session, and **all of it
+ships to Battlegrounds unchanged.**
+
+**The fit:** two complete, working systems that don't need to be merged into one — they need a
+door between them. REDGARDEN doesn't need DragonsNShit's RPG depth (it has its own real
+combat/economy/progression, scoped to a match); DragonsNShit's persistent world doesn't need
+REDGARDEN's combat model grafted into its own job/skillchain system (that would flatten
+`apps2/mud`'s real depth into something worse than either system alone). The door is IDUNA:
+shared player identity, and a reward-crediting call after a Battleground match ends, same shape
+`arena_server`'s own `report_match_result`/WOTAN reporting already is.
 
 ### 2.1 A stale-doc note, found while writing this
 
@@ -97,93 +143,104 @@ that's its own follow-up, named honestly rather than silently built on top of.
 
 ## 3. What this is not
 
-Not a live network bridge between two already-running, separately-maintained servers. Not
-Minecraft/Bedrock protocol support in REDGARDEN's client, and not a requirement that players run
-Minecraft — `apps2/mud` is a telnet server, not a Bedrock server, and Dragonfly's own Bedrock
-protocol machinery (the base this repo forks) is not the transport this doc proposes using at
-all. Not a replacement for the telnet interface — per founder direction ("cli will continue to
-work"), telnet stays a fully-supported first-class client for this server, forever, alongside the
-new GUI, the same way a MUD and a rendered client can both be real interfaces to one authoritative
-game.
+Not a live network bridge translating REDGARDEN's input into DragonsNShit's own RPG action calls
+(the original version of this doc's plan) — REDGARDEN's own simulation stays authoritative for
+Battlegrounds matches, full stop. Not Minecraft/Bedrock protocol support in REDGARDEN's client,
+and not a requirement that players run Minecraft. Not a replacement for the telnet interface —
+per founder direction ("cli will continue to work"), telnet stays a fully-supported first-class
+way to play the persistent world, forever; Battlegrounds is an additional mode reachable from it,
+not a replacement for it. Not a merge of REDGARDEN's hero roster into `apps2/mud`'s own
+multiverse-lore hero content pipeline (`HERO_CONTENT_FRAMEWORK.md`) — those stay two separate
+rosters serving two separate modes, same as a persistent-world MMO character and their
+Battleground loadout are conventionally decoupled identities in the genre this doc is modeling.
 
 ---
 
 ## 4. Architecture
 
 ```
-                    ┌─────────────────────────────────────────────┐
-                    │           apps2/mud (Go, :2323 + new)        │
-                    │  single authoritative game loop (1Hz tick)   │
-                    │                                               │
-   telnet/nc  ──────┼──▶ text listener (:2323, UNCHANGED)          │
-   (CLI players)     │       │                                      │
-                    │       ▼                                      │
-                    │  ┌─────────────────────────────────────┐    │
-                    │  │   shared internal action dispatch    │    │
-                    │  │   (move, attack, cast, craft, chat,  │    │
-                    │  │    party, trade, pool/lot/pass...)   │    │
-                    │  └─────────────────────────────────────┘    │
-                    │       ▲                                      │
-   REDGARDEN  ───────┼──▶ new binary listener (:PORT, new)         │
-   GUI client         │   forked from packages/common/protocol.h    │
-   (this doc)         │   (connect-ticket HMAC auth, UDP snapshot   │
-                    │    cadence) — decodes UserCmd-style input    │
-                    │    into the SAME dispatch calls telnet uses  │
-                    └─────────────────────────────────────────────┘
+DragonsNShit persistent world (apps2/mud, telnet :2323 — unchanged)
+  │
+  │  player reaches a Battlegrounds entry point (portal / queue NPC / command —
+  │  exact UX not designed here, matches SHANKPIT's own portal_resolve_destination
+  │  precedent, THE_BRIDGE_SPEC.md)
+  ▼
+IDUNA (:8080) — shared identity layer
+  │  mints a REDGARDEN connect-ticket for this player's own IDUNA identity,
+  │  same HMAC scheme REDGARDEN/shankpit-460 already use
+  ▼
+REDGARDEN's own real, unchanged stack
+  apps/matchmaker  →  spawns a dedicated apps/arena_server per match (existing behavior)
+  apps/arena client →  connects with the minted ticket, plays a real, unchanged REDGARDEN match
+  │
+  │  match ends — arena_server's own report_match_result / WOTAN reporting,
+  │  extended to also credit the player's persistent DragonsNShit character
+  ▼
+IDUNA — credits rewards (gil, faction/conquest points, cosmetics — not designed here) to the
+        persistent character row
 ```
 
-One authoritative Go process, one game-state, two client protocols in front of it. A telnet
-player and a REDGARDEN-GUI player can occupy the same zone, fight the same NM, and see each
-other's chat — because they're both just clients of the same dispatch layer, not two different
-games that happen to share a name.
+Two complete, separately-authoritative systems, connected only at the identity/reward seam. No
+shared game loop, no packet-translation layer, no combat-system unification — the thing the
+original version of this doc spent most of its length designing turns out not to be needed at
+all once Battlegrounds is the right frame.
 
-### 4.1 What forks over from REDGARDEN largely as-is
+### 4.1 What forks over from REDGARDEN unchanged
 
-The **rendering and input machinery**, not the combat sim: `apps/arena/src/main.c`'s SDL2/OpenGL
-pipeline (camera orbit/zoom, hero-silhouette-from-boxes system, HUD/HP-bar/minimap text drawing,
-the Q/W/R ability-slot UI with cast rings/projectiles/zone circles, the item-shop panel
-chrome, the click-to-pick screen shell), `packages/common/protocol.h`'s packet shape and
-connect-ticket handshake, `packages/common/hmac_sha256.h` verbatim.
+The **process/loop, the real-time framework, and the affordances**: `apps/arena_server`'s tick
+loop and match structure, `apps/matchmaker`'s spawn-per-match pattern, `apps/arena`'s rendering
+(camera, hero-silhouette system, HUD/HP bars/minimap), the Q/W/R ability-slot UI with its cast
+rings, the dodgeable-projectile and ground-AoE-zone-circle rendering, the item-shop panel, the
+node-capture map/objective structure, `packages/common/protocol.h`'s packet shape, `packages/
+common/hmac_sha256.h`'s connect-ticket auth. Battlegrounds is still its own separately-spawned
+process per match — **not** merged into `apps2/mud`'s or `apps2/server-go`'s own 1Hz/UDP loop
+(founder: "not the same literal game loop maybe").
 
-### 4.2 What does not fork over, and gets rewritten against apps2/mud's own systems instead
+### 4.2 What gets amended: the ability content itself
 
-`arena_game.c` itself — REDGARDEN's hero-kit balance sim (28 heroes' Q/W/R numbers, MOBA-specific
-concepts like a fixed 20-slot lobby, a match/draft/winner lifecycle) is not what an MMO character
-needs; a MUD character doesn't have a "match end." What replaces it: `apps2/mud`'s own real,
-shipped combat/job/skillchain/enmity system stays fully authoritative. REDGARDEN's Q/W/R
-slot-and-cast-ring vocabulary becomes the **visual grammar** a job's real abilities render through
-— e.g. a Warrior's weapon skill fires the same "cast ring + cooldown sweep" UI REDGARDEN already
-draws for Ghost's Q, but the number and effect come from `apps2/mud`'s own weapon-skill system,
-not from any REDGARDEN hero's stat block. This is the single most important design call this doc
-makes: **REDGARDEN contributes the rendering grammar; DragonsNShit contributes the RPG mechanics
-underneath it.** No REDGARDEN hero identity (Ghost, Tyler, Gunnr, etc.) is intended to appear in
-DragonsNShit at all — the MUD has its own multiverse-lore hero content pipeline already
-(`docs2/HERO_CONTENT_FRAMEWORK.md`, `HERO_BRIDGE_PREREQUISITES.md`), separate from REDGARDEN's own
-roster.
+**Correction 2's actual content, not just a process boundary**: the specific Q/W/R abilities a
+Battleground combatant casts are not REDGARDEN's own 28 fixed hero kits left untouched —
+`apps2/mud`'s real job/weapon-skill/skillchain system (§2's own inventory: 22 jobs, TP weapon
+skills, 14 skillchain resonances across 3 tiers, magic bursts) is ported into `arena_game.c`'s
+own ability-slot machinery as new content, replacing what a "hero" means in this mode: you pick a
+**job**, not a REDGARDEN hero, and that job's real abilities render through REDGARDEN's existing
+cast-ring/projectile/zone-circle vocabulary — a Warrior's real weapon skill fires the same visual
+language Ghost's Q already uses, but the number, cooldown, and TP cost come from `apps2/mud`'s
+own real weapon-skill system, not a REDGARDEN hero stat block. Skillchains are the one genuinely
+new mechanic this requires in `arena_game.c`: two players' ability casts on the same target within
+a resonance window need to detect and score a chain, same math `apps2/mud`'s own
+`skillchain.Chain` already implements — ported, not reinvented — and rendered as a real, distinct
+visual event (not folded into the generic `attack_flash` every other REDGARDEN hit already uses).
+REDGARDEN's own 28-hero roster and `apps2/mud`'s own multiverse-lore hero content pipeline
+(`HERO_CONTENT_FRAMEWORK.md`) stay separate from this — this doc isn't claiming Ghost or Tyler
+become jobs, or that a job becomes a REDGARDEN hero; it's the *ability system* that ports, not
+either roster.
 
-### 4.3 The world-rendering gap (the honest biggest unknown)
+### 4.3 The Battlegrounds-entry UX (not designed here)
 
-REDGARDEN's client draws a small, flat, bounded arena (`ARENA_HALF_EXTENT`) with a handful of box
-obstacles — it has never rendered real terrain, a multi-zone world, or anything resembling
-Meadow/Hills/Caves/Swampville's actual layout. Making REDGARDEN's renderer show a real MMO zone is
-new engine work, not a port. The recommended starting scope (see Milestone 4) is deliberately
-small: render one zone (Meadow) as a flat plane with box-obstacle placeholders for its real
-terrain features, matching REDGARDEN's own established "boxes for now" convention (the same one
-every hero silhouette and every piece of jungle terrain in REDGARDEN already uses) rather than
-attempting real heightfield/voxel terrain on day one.
+Portal, NPC, queue command, or something else — `apps2/mud`'s own zone-transfer mechanism
+(`cmdGo`) is the closest existing precedent (a discrete transition point, not continuous
+movement), but the exact player-facing flow for "leave the persistent world, enter a
+Battleground" isn't designed in this pass.
 
 ---
 
-## 5. What it should feel like to play — "like old school runescape" (founder's own reference)
+## 5. What each mode should feel like to play
 
-Third-person, click-to-move (REDGARDEN already has this exactly), chunky/legible low-poly-ish
-geometry (REDGARDEN's box-silhouette hero system is stylistically already close to this, not a
-mismatch to bridge), a skill-training progression loop (matches `apps2/mud`'s own real 22-job,
-L99, mining/crafting/skillchain systems far better than it would ever match a MOBA's match-based
-kit-power loop), inventory/equipment panels and a persistent chat log rather than a lobby/draft
-flow. Concretely: keep REDGARDEN's camera/click-to-move/HUD-chrome/item-panel conventions:
-replace REDGARDEN's draft-pick screen and match/lobby concepts entirely (an MMO character doesn't
-draft a hero once per match — it exists persistently, per §4.2).
+**Persistent world** — "like old school runescape" (founder's own reference): third-person,
+click-to-move, chunky/legible low-poly-ish geometry, a skill-training progression loop
+(`apps2/mud`'s own real 22-job/L99/mining/crafting/skillchain depth already matches this far
+better than a match-based kit-power loop would), inventory/equipment panels, a persistent chat
+log. This is `apps2/mud`'s (eventually `apps2/server-go`-unified, per the two-backends audit)
+own domain, not REDGARDEN's.
+
+**Battlegrounds** — REDGARDEN's exact real-time feel: click-to-move, buy items, cast Q/W/R, dodge
+skill-shots, fight over nodes, win or lose a real match, chain skillchains for bonus damage — but
+what you pick going in is a **job** (Warrior, Black Mage, ...), not one of REDGARDEN's 28 named
+heroes, and what fires through those Q/W/R slots is that job's real weapon skills and spells
+(§4.2). No OSRS-ification of this half — the founder's own words are the spec here: *"i want
+dragonsnshit mmo to feel like redgarden... battlegrounds for dragonsnshit is redgarden"* — and
+*"we want our old systems like skillchains etc [to] work with redgarden affordances."*
 
 ---
 
@@ -192,14 +249,15 @@ draft a hero once per match — it exists persistently, per §4.2).
 | # | Milestone | Acceptance | Status |
 |---|---|---|---|
 | 0 | This NORTHSTAR | Written, registered in golden-docs-index, MMO_NORTHSTAR's frontend line updated to point here | DONE |
-| 0.5 | Two-backends audit | Found `apps2/server-go` is the real bridge target, not `apps2/mud` directly — `docs2/DRAGONSNSHIT_TWO_BACKENDS_AUDIT.md` | DONE |
-| 1 | RPG/protocol unification (revised, was "protocol bridge spike") | `apps2/mud`'s combat/job/skillchain/craft logic ported to run inside `apps2/server-go`'s authoritative loop, backed by IDUNA's already-existing `characters`/`character_skills`/`character_equipment`/`character_inventory` schema — a DragonsNShit-internal prerequisite, not REDGARDEN-specific work | NOT STARTED |
-| 2 | Fork the client shell | REDGARDEN's `apps/arena` client forked into `GoblinFoxDragon/apps2/` (new app dir), targeting `apps2/server-go`'s real protocol (`packages2/common`) as a peer of `apps2/lobby`; MOBA-specific match/lobby/draft-pick concepts stripped; camera/hero-rendering/HUD/ability-slot-UI machinery kept | NOT STARTED |
-| 3 | Input bridge | Click-to-move and Q/W/R slot presses decode into `apps2/server-go`'s `PacketUserCmd`-shaped dispatch, extended (post-Milestone-1) with the ported RPG action calls | NOT STARTED |
-| 4 | First real zone rendered | Meadow rendered as a flat plane + box-obstacle placeholders (§4.3's scoped-down terrain approach), not REDGARDEN's fixed arena | NOT STARTED |
-| 5 | One job's abilities wired to the slot UI | A single real FFXI job's abilities (proposal: Warrior — the simplest kit) drive REDGARDEN's cast-ring/cooldown/projectile rendering end-to-end, proving the "REDGARDEN renders, DragonsNShit simulates" seam on one real, non-placeholder case | NOT STARTED |
-| 6 | CLI/GUI coexistence validated | One player on telnet, one on the GUI client, same zone: each sees the other's chat, movement, and combat in real time — requires Milestone 1's unification first, since telnet and the GUI read different backends today | NOT STARTED |
-| 7 | IDUNA-backed persistent character shared correctly | MMO_NORTHSTAR's own already-speced `characters`/`items`/`guilds` IDUNA schema (§2 of that doc) is the source of truth for both client surfaces — no state exists only on one side | NOT STARTED |
+| 0.5 | Two-backends audit | Found `apps2/server-go` alongside `apps2/mud` — real for the persistent-world layer, decoupled from REDGARDEN's own bridge (see §4) — `docs2/DRAGONSNSHIT_TWO_BACKENDS_AUDIT.md` | DONE |
+| 0.75 | Battlegrounds correction | Found REDGARDEN's own full gameplay, not just its renderer, is the right thing to ship — this doc rewritten §§1/4/5/6 | DONE |
+| 0.8 | Job/skillchain-affordance correction | Refined 0.75: process stays separate, but ability *content* is `apps2/mud`'s real job/skillchain system ported into `arena_game.c`'s slot machinery, not REDGARDEN's fixed hero kits untouched — §§4.1/4.2/5 rewritten again | DONE |
+| 1 | One job ported as real REDGARDEN ability content | Warrior (proposal: simplest real kit in `apps2/mud`'s job system) — its real weapon skills wired into `arena_game.c`'s Q/W/R slots, rendered through REDGARDEN's existing cast-ring/projectile UI, numbers/cooldowns/TP cost sourced from `apps2/mud`'s own `skillchain`/job packages, not invented | NOT STARTED |
+| 2 | Skillchain resonance in `arena_game.c` | Port `apps2/mud`'s own `skillchain.Chain` detection/scoring into REDGARDEN's tick loop; new, distinct visual event (not folded into the generic `attack_flash`) when two players' casts chain | NOT STARTED |
+| 3 | Entry-point hook | Persistent world gains a Battlegrounds entry point (portal/NPC/command, §4.3) that mints a real REDGARDEN connect-ticket via IDUNA for the player's own identity, lets them pick a job (not a REDGARDEN hero), and hands off to `apps/matchmaker` | NOT STARTED |
+| 4 | Reward-credit hook | `arena_server`'s match-end reporting extended to also credit the player's persistent DragonsNShit character via IDUNA (gil/faction points/cosmetics — exact reward shape not designed here) | NOT STARTED |
+| 5 | End-to-end validated | A real persistent-world character queues, picks Warrior, plays a real match casting real weapon skills through REDGARDEN's UI, chains a real skillchain, and returns to the persistent world with a real credited reward | NOT STARTED |
+| 6 | (Optional, separate track) Persistent-world backend unification | `docs2/DRAGONSNSHIT_TWO_BACKENDS_AUDIT.md`'s own recommendation — unify `apps2/mud`'s RPG logic into `apps2/server-go`'s loop. Valuable for the persistent-world half on its own merits; not a blocker for Milestones 1-5 above | NOT STARTED |
 
 ---
 
@@ -209,30 +267,23 @@ That doc's "Integration Architecture" section named the frontend as "C/SDL2 Clie
 runtime, extended)." Updated to point at this doc instead — see that file's own diff for the
 exact wording. Every other section of MMO_NORTHSTAR (IDUNA schema, item provenance, guild system,
 economy, World Crisis, Telecrystal travel) is unchanged and still the systems-design source of
-truth this doc builds on top of.
+truth for the persistent-world half of the product.
 
 ---
 
 ## 8. Open questions, not resolved here
 
-- ~~Which transport for the new listener~~ — **resolved in `REDGARDEN_MUD_BRIDGE_SPEC.md`: UDP**,
-  proposed port `2324` alongside telnet's `2323`.
-- ~~How does REDGARDEN's HP-delta-driven visual-effect idiom map onto apps2/mud's richer combat
-  semantics~~ — **named, not fully resolved, in `REDGARDEN_MUD_BRIDGE_SPEC.md`'s "Snapshot
-  format" section**: needs a genuine event list (`MudEvent{event_type, actor_id, target_id,
-  amount, label}`), not a flat state diff. The `event_type` enum itself is still open.
-- **New, found while writing the bridge spec**: `apps2/mud` has no continuous intra-zone movement
-  server-side at all — `cmdGo` only teleports between zones, `cmdAttack`'s auto-approach snaps
-  position directly onto the target. `PACKET_ARENA_MOVE` (a real, continuous click-to-move target
-  REDGARDEN's server steers toward every tick) has nothing to bridge onto without new server code.
-  This is now Milestone 3's actual scope, not assumed solvable by a packet decode alone.
-- **New, found while writing the bridge spec**: `PACKET_ARENA_ATTACK`'s `target_owner` is a
-  hero-slot index in REDGARDEN (fixed 2-hero 1v1 arena); `apps2/mud` targets mobs/players by
-  string ID. Real shape mismatch, not a rename — needs its own design pass.
-- Zone-authoring format (`HERO_BRIDGE_PREREQUISITES.md`'s own named gap) is a prerequisite for
-  rendering *more than* Meadow, but not for Milestone 4's scoped-down single-zone proof.
-- Which REDGARDEN systems besides ability-slot UI are worth reusing — the shop-panel chrome maps
-  naturally onto DragonsNShit's own crafting/AH systems, but that mapping isn't designed here.
+- Exact Battlegrounds-entry UX (§4.3) — portal, NPC, or command.
+- Exact reward shape credited back to the persistent character (gil? faction/conquest points?
+  cosmetic unlocks tied to Battleground performance?) — a real design pass, not named here.
+- Does Battleground participation ever need to be gated by persistent-world state (level
+  minimums, faction standing, an unlock quest), or is it open to any character from the start?
+  Founder call, not a technical question.
+- Whether `apps2/mud`'s telnet players and REDGARDEN's Battleground players are ever meant to see
+  each other's *presence* (e.g. a persistent-world "so-and-so just won a Battleground" broadcast)
+  — a nice-to-have social hook, not designed here.
+- `docs2/DRAGONSNSHIT_TWO_BACKENDS_AUDIT.md`'s own unification recommendation (Milestone 4 above)
+  — real, valuable, and entirely independent of this doc's own critical path now.
 
 ---
 
@@ -240,12 +291,12 @@ truth this doc builds on top of.
 
 | Doc | Location |
 |---|---|
-| DragonsNShit product systems design (source of truth this doc builds on) | `GoblinFoxDragon/docs2/MMO_NORTHSTAR.md` |
+| DragonsNShit product systems design (persistent-world source of truth) | `GoblinFoxDragon/docs2/MMO_NORTHSTAR.md` |
 | GFD engine/studio northstar | `GoblinFoxDragon/docs/NORTHSTAR.md` |
+| Two-backends audit (persistent-world internal split, decoupled from this doc's critical path) | `GoblinFoxDragon/docs2/DRAGONSNSHIT_TWO_BACKENDS_AUDIT.md` |
+| Original packet-bridge design (superseded by the Battlegrounds correction above, kept for its gap-finding) | `GoblinFoxDragon/docs2/specs/REDGARDEN_MUD_BRIDGE_SPEC.md` |
 | Zone-authoring gap (unrelated prerequisite, worth knowing) | `GoblinFoxDragon/docs2/HERO_BRIDGE_PREREQUISITES.md` |
-| Hero/lore content process | `GoblinFoxDragon/docs2/HERO_CONTENT_FRAMEWORK.md` |
-| Two-backends audit (corrects the bridge target, read first) | `GoblinFoxDragon/docs2/DRAGONSNSHIT_TWO_BACKENDS_AUDIT.md` |
-| Packet-level bridge spec (superseded by the audit above, kept for its gap-finding) | `GoblinFoxDragon/docs2/specs/REDGARDEN_MUD_BRIDGE_SPEC.md` |
-| REDGARDEN's own current architecture and client history | `REDGARDEN/NORTHSTAR.md` §3.5 |
-| REDGARDEN wire protocol (fork source) | `REDGARDEN/packages/common/protocol.h` |
-| REDGARDEN connect-ticket auth (fork source) | `REDGARDEN/packages/common/hmac_sha256.h` |
+| Hero/lore content process (persistent-world's own separate roster) | `GoblinFoxDragon/docs2/HERO_CONTENT_FRAMEWORK.md` |
+| REDGARDEN's own current architecture and match/matchmaker history | `REDGARDEN/NORTHSTAR.md` §3.5, §13 |
+| REDGARDEN wire protocol (used as-is) | `REDGARDEN/packages/common/protocol.h` |
+| REDGARDEN connect-ticket auth (used as-is) | `REDGARDEN/packages/common/hmac_sha256.h` |
