@@ -19,9 +19,10 @@ Telnet on `:2323`, 7,310-line single file. Real, deep RPG simulation: 22 FFXI jo
 enmity, conquest, NM spawns, crafting guilds, parties/linkshells (full list in
 `REDGARDEN_GUI_NORTHSTAR.md` §2). **No real IDUNA persistence** — an `idunaclient.Client` is
 imported and instantiated (`main.go:603,808`) but never actually called anywhere in the file
-(grep confirms zero method calls beyond construction). `player.hp/mp/tp/inventory/gil/jobID` are
-plain in-memory Go struct fields, gone on restart. **No binary/UDP protocol at all** — text lines
-only.
+(grep confirms zero method calls beyond construction). `player.hp/mp/tp/inventory/flow/jobID`
+(field named `gil` at the time this audit was written, renamed to `flow` same day per founder:
+"convert gil to flow") are plain in-memory Go struct fields, gone on restart. **No binary/UDP
+protocol at all** — text lines only.
 
 ### `apps2/server-go` (found today, not in either earlier doc)
 Real UDP server on `:6969` (`packages2/common`'s own wire protocol — `PacketConnect`,
@@ -72,7 +73,7 @@ Grafting REDGARDEN onto either one alone gets you a GUI with half the game missi
 IDUNA `characters`/`character_skills`/`character_equipment`/`character_inventory` schema
 (`IDUNA/migrations/truestore/202606230001_mmo_schema.sql`, `...0002_mmo_inventory.sql`) already
 exists and is already what `apps2/server-go` writes to — checked directly, this schema has real
-room for `apps2/mud`'s own job/skill/gil/equipment concepts, which is why the recommendation
+room for `apps2/mud`'s own job/skill/Flow/equipment concepts, which is why the recommendation
 below is "port the RPG logic," not "invent a new schema."
 
 **Revised recommendation**: the actual prerequisite ahead of REDGARDEN's own bridge work is a

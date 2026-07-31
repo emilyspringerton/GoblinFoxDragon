@@ -1,7 +1,7 @@
 // Package quest implements the NPC quest system for DragonsNShit MUD.
 //
 // NPCs offer quests. Players accept quests, progress through kill/item requirements,
-// then turn in for gil and item rewards.
+// then turn in for flow and item rewards.
 package quest
 
 import "errors"
@@ -14,7 +14,7 @@ type Quest struct {
 	GiverNPCID   string
 	RequireItems map[string]int // itemID → quantity
 	RequireKills map[string]int // mob kind → count
-	RewardGil    int
+	RewardFlow    int
 	RewardItem   string // "" if no item reward
 	RewardFame   int    // fame points granted on completion (0 = no fame)
 	FameNation   int    // nation receiving fame (matches fame.Nation values; 0 = Neutral/none)
@@ -49,7 +49,7 @@ var StarterQuests = []*Quest{
 		GiverNPCID:   "guildmaster",
 		RequireItems: map[string]int{"iron-ore": 3},
 		RequireKills: map[string]int{},
-		RewardGil:    100,
+		RewardFlow:    100,
 		RewardItem:   "",
 		RewardFame:   30,
 		FameNation:   1, // Sandoria
@@ -61,7 +61,7 @@ var StarterQuests = []*Quest{
 		GiverNPCID:   "guildmaster",
 		RequireItems: map[string]int{},
 		RequireKills: map[string]int{"king-worm": 1},
-		RewardGil:    500,
+		RewardFlow:    500,
 		RewardItem:   "iron-sword",
 		RewardFame:   75,
 		FameNation:   1, // Sandoria
@@ -73,7 +73,7 @@ var StarterQuests = []*Quest{
 		GiverNPCID:   "merchant",
 		RequireItems: map[string]int{"fire-crystal": 5},
 		RequireKills: map[string]int{},
-		RewardGil:    200,
+		RewardFlow:    200,
 		RewardItem:   "",
 		RewardFame:   40,
 		FameNation:   2, // Bastok
@@ -85,7 +85,7 @@ var StarterQuests = []*Quest{
 		GiverNPCID:   "scout",
 		RequireItems: map[string]int{},
 		RequireKills: map[string]int{"leech": 5},
-		RewardGil:    300,
+		RewardFlow:    300,
 		RewardItem:   "leather-belt",
 		RewardFame:   50,
 		FameNation:   3, // Windurst
@@ -97,7 +97,7 @@ var StarterQuests = []*Quest{
 		GiverNPCID:   "scout",
 		RequireItems: map[string]int{"crisis-shard": 1},
 		RequireKills: map[string]int{},
-		RewardGil:    400,
+		RewardFlow:    400,
 		RewardItem:   "echo-drop",
 		RewardFame:   60,
 		FameNation:   3, // Windurst
@@ -240,7 +240,7 @@ func (j *Journal) IsMet(questID string, inventory map[string]int) (bool, error) 
 
 // TurnInResult holds all rewards from a completed quest.
 type TurnInResult struct {
-	Gil        int
+	Flow        int
 	Item       string
 	RewardFame int
 	FameNation int
@@ -272,7 +272,7 @@ func (j *Journal) TurnIn(b *Bank, questID string, inventory map[string]int) (Tur
 	j.Completed[questID] = true
 	delete(j.Active, questID)
 	return TurnInResult{
-		Gil:        q.RewardGil,
+		Flow:        q.RewardFlow,
 		Item:       q.RewardItem,
 		RewardFame: q.RewardFame,
 		FameNation: q.FameNation,

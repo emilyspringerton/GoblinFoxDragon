@@ -153,7 +153,7 @@ var itemDisplayName = map[string]string{
 	"marsh-blood":      "Marsh Leech Blood",
 	"nm-leech-fang":    "Marsh Leech Fang",
 	"water-crystal-hq": "Water Crystal (HQ)",
-	"gil-drop":         "100 Gil",
+	"flow-drop":         "100 Flow",
 	"crisis-shard":     "Crisis Shard",
 	"echo-drop":        "Echo Drop",
 	"antidote":         "Antidote",
@@ -217,7 +217,7 @@ var itemCategory = map[string]market.Category{
 // VendorItem is one line in an NPC vendor catalog.
 type VendorItem struct {
 	ID    string
-	Price int // gil to buy; sell back = Price/2 (rounded down)
+	Price int // flow to buy; sell back = Price/2 (rounded down)
 }
 
 // npcVendorCatalog maps NPC ID → items for sale.
@@ -591,7 +591,7 @@ type world struct {
 	playerNation   map[string]conquest.Nation // slot → declared nation
 	lastConquestTick time.Time
 	bazaars        map[string]map[string]int // slot → { itemID: price }
-	bankBySlot     map[string]int            // slot → bank balance (gil)
+	bankBySlot     map[string]int            // slot → bank balance (flow)
 	weatherByZone  map[int]string            // zoneID → current weather (legacy, replaced below)
 	lastWeatherTick time.Time
 	weatherEngine  *weather.Engine           // global weather engine (replaces weatherByZone)
@@ -713,7 +713,7 @@ type player struct {
 	jobID       string // current job (job.JobID, default "WAR")
 	inventory   map[string]int // itemID → quantity
 	craftSkill  *craft.CraftSkill
-	gil         int
+	flow         int
 	guildID      string // linkshell guild ID ("" = none)
 	equip        *gear.Equipment
 	isInvisible  bool
@@ -1093,7 +1093,7 @@ func dropsForMob(kind string) []loot.Item {
 			{ID: "water-crystal-hq", Name: "Water Crystal (HQ)"},
 		}
 	default:
-		return []loot.Item{{ID: "gil-drop", Name: "100 Gil"}}
+		return []loot.Item{{ID: "flow-drop", Name: "100 Flow"}}
 	}
 }
 
@@ -1158,9 +1158,9 @@ func openLootPool(killer *player, m *mob.Mob, now time.Time) {
 	if len(eligible) == 0 {
 		// Solo: auto-award all drops to the killer.
 		for _, it := range drops {
-			if it.ID == "gil-drop" {
-				killer.gil += 100
-				killer.sendf("  You obtain: 100 Gil.")
+			if it.ID == "flow-drop" {
+				killer.flow += 100
+				killer.sendf("  You obtain: 100 Flow.")
 			} else {
 				killer.inventory[it.ID]++
 				killer.sendf("  You obtain: %s.", it.Name)
@@ -1207,8 +1207,8 @@ func resolvePool(alp *activeLootPool) {
 		if award.Slot == "" {
 			broadcastZoneNoLock(alp.zoneID, fmt.Sprintf("[Loot] %s — no one claimed it.", name), "")
 		} else if op, ok := gw.players[award.Slot]; ok {
-			if award.ItemID == "gil-drop" {
-				op.gil += 100
+			if award.ItemID == "flow-drop" {
+				op.flow += 100
 			} else {
 				op.inventory[award.ItemID]++
 			}
@@ -2618,8 +2618,8 @@ func cmdQuestTurnIn(p *player, questID string) {
 		p.prompt()
 		return
 	}
-	p.gil += res.Gil
-	p.sendf("Quest complete! +%d gil.", res.Gil)
+	p.flow += res.Flow
+	p.sendf("Quest complete! +%d flow.", res.Flow)
 	if res.Item != "" {
 		p.inventory[res.Item]++
 		p.sendf("  You received: %s", res.Item)
@@ -4050,7 +4050,7 @@ func cmdShopList(p *player) {
 	}
 	for _, vi := range items {
 		price := scaledPrice(vi.Price, mult)
-		p.sendf("  %-22s  %4d gil  (shop buy %s)", itemName(vi.ID), price, vi.ID)
+		p.sendf("  %-22s  %4d flow  (shop buy %s)", itemName(vi.ID), price, vi.ID)
 	}
 	p.sendf("  Sell items back at 50%% price: shop sell <item-id>")
 	p.prompt()
@@ -4076,14 +4076,14 @@ func cmdShopBuy(p *player, itemID string) {
 		return
 	}
 	price := scaledPrice(entry.Price, shopPriceMult(p.zoneID))
-	if p.gil < price {
-		p.sendf("You need %d gil but only have %d.", price, p.gil)
+	if p.flow < price {
+		p.sendf("You need %d flow but only have %d.", price, p.flow)
 		p.prompt()
 		return
 	}
-	p.gil -= price
+	p.flow -= price
 	p.inventory[itemID]++
-	p.sendf("You buy %s for %d gil. (Gil remaining: %d)", itemName(itemID), price, p.gil)
+	p.sendf("You buy %s for %d flow. (Flow remaining: %d)", itemName(itemID), price, p.flow)
 	p.prompt()
 }
 
@@ -4119,8 +4119,8 @@ func cmdShopSell(p *player, itemID string) {
 		sellPrice = 1
 	}
 	p.inventory[itemID]--
-	p.gil += sellPrice
-	p.sendf("You sell %s to %s for %d gil. (Gil: %d)", itemName(itemID), npc.Name, sellPrice, p.gil)
+	p.flow += sellPrice
+	p.sendf("You sell %s to %s for %d flow. (Flow: %d)", itemName(itemID), npc.Name, sellPrice, p.flow)
 	p.prompt()
 }
 
@@ -4557,7 +4557,7 @@ func ahBrowse(p *player, args []string) {
 		p.send("  (no listings)")
 	}
 	for _, it := range items {
-		p.sendf("  %-24s  x%d listing(s)  lowest: %d gil  last: %d gil",
+		p.sendf("  %-24s  x%d listing(s)  lowest: %d flow  last: %d flow",
 			it.ItemName, it.ListingCount, it.LowestPrice, it.LastPrice)
 	}
 	p.prompt()
@@ -4583,7 +4583,7 @@ func ahSell(p *player, itemID string, price int64) {
 	if p.inventory[itemID] == 0 {
 		delete(p.inventory, itemID)
 	}
-	p.sendf("Listed %s for %d gil. (ID: %s)", itemName(itemID), price, l.ID)
+	p.sendf("Listed %s for %d flow. (ID: %s)", itemName(itemID), price, l.ID)
 	p.prompt()
 }
 
@@ -4626,8 +4626,8 @@ func ahBuy(p *player, listingID string) {
 		p.prompt()
 		return
 	}
-	if int64(p.gil) < listing.Price {
-		p.sendf("Not enough gil. Need %d, have %d.", listing.Price, p.gil)
+	if int64(p.flow) < listing.Price {
+		p.sendf("Not enough flow. Need %d, have %d.", listing.Price, p.flow)
 		p.prompt()
 		return
 	}
@@ -4637,9 +4637,9 @@ func ahBuy(p *player, listingID string) {
 		p.prompt()
 		return
 	}
-	p.gil -= int(rec.Price)
+	p.flow -= int(rec.Price)
 	p.inventory[rec.ItemID] += rec.Qty
-	p.sendf("You purchase %dx %s for %d gil. (gil remaining: %d)", rec.Qty, rec.ItemName, rec.Price, p.gil)
+	p.sendf("You purchase %dx %s for %d flow. (flow remaining: %d)", rec.Qty, rec.ItemName, rec.Price, p.flow)
 	p.prompt()
 }
 
@@ -4652,19 +4652,19 @@ func ahHistory(p *player, itemID string) {
 		return
 	}
 	for _, r := range history {
-		p.sendf("  %s  %dx %s  %d gil", r.SoldAt.Format("01/02 15:04"), r.Qty, r.ItemName, r.Price)
+		p.sendf("  %s  %dx %s  %d flow", r.SoldAt.Format("01/02 15:04"), r.Qty, r.ItemName, r.Price)
 	}
 	p.prompt()
 }
 
 func ahStatus(p *player) {
 	listings := gw.ah.SellerListings(p.slot)
-	p.sendf("\r\n=== Your AH Listings (gil: %d) ===", p.gil)
+	p.sendf("\r\n=== Your AH Listings (flow: %d) ===", p.flow)
 	if len(listings) == 0 {
 		p.send("  (none)")
 	}
 	for _, l := range listings {
-		p.sendf("  [%s]  %-24s  %d gil  (listed %s)", l.ID, l.ItemName, l.Price, l.ListedAt.Format("01/02 15:04"))
+		p.sendf("  [%s]  %-24s  %d flow  (listed %s)", l.ID, l.ItemName, l.Price, l.ListedAt.Format("01/02 15:04"))
 	}
 	p.prompt()
 }
@@ -4770,7 +4770,7 @@ func cmdDeclare(p *player, input string) {
 }
 
 func cmdInventory(p *player) {
-	p.sendf("\r\n=== Inventory (Gil: %d) ===", p.gil)
+	p.sendf("\r\n=== Inventory (Flow: %d) ===", p.flow)
 	if len(p.inventory) == 0 {
 		p.send("  (empty)")
 		p.prompt()
@@ -5031,14 +5031,14 @@ func cmdCrystals(p *player) {
 		if c.InRange(ppos) {
 			inRange = " [IN RANGE]"
 		}
-		p.sendf("  %-40s → %-12s  dist: %.0f  cost: %d Gil%s",
+		p.sendf("  %-40s → %-12s  dist: %.0f  cost: %d Flow%s",
 			c.ID, c.TargetName, dist, c.CastCost, inRange)
 	}
 	p.prompt()
 }
 
 func cmdTravel(p *player, crystalID string) {
-	c, err := telecrystal.Validate(crystalID, p.zoneID, crystalPos(p), p.gil)
+	c, err := telecrystal.Validate(crystalID, p.zoneID, crystalPos(p), p.flow)
 	switch err {
 	case telecrystal.ErrUnknownCrystal:
 		p.sendf("Unknown crystal %q.", crystalID)
@@ -5049,7 +5049,7 @@ func cmdTravel(p *player, crystalID string) {
 		p.prompt()
 		return
 	case telecrystal.ErrInsufficientGold:
-		p.sendf("Need %d Gil to travel. You have %d.", c.CastCost, p.gil)
+		p.sendf("Need %d Flow to travel. You have %d.", c.CastCost, p.flow)
 		p.prompt()
 		return
 	}
@@ -5059,8 +5059,8 @@ func cmdTravel(p *player, crystalID string) {
 		return
 	}
 	// Deduct cost and teleport.
-	p.gil -= c.CastCost
-	p.sendf("The crystal resonates... you are transported to %s! (-%d Gil)", c.TargetName, c.CastCost)
+	p.flow -= c.CastCost
+	p.sendf("The crystal resonates... you are transported to %s! (-%d Flow)", c.TargetName, c.CastCost)
 	gw.mu.Lock()
 	broadcastZoneNoLock(p.zoneID, fmt.Sprintf("%s vanishes into a telecrystal.", p.name), p.slot)
 	_ = gw.zoneMgr.Transfer(p.slot, c.TargetScene)
@@ -5088,7 +5088,7 @@ func cmdTouchCrystal(p *player) {
 		p.prompt()
 		return
 	}
-	p.sendf("You touch the crystal. [%s] (→ %s, cost %d Gil)", touched.ID, touched.TargetName, touched.CastCost)
+	p.sendf("You touch the crystal. [%s] (→ %s, cost %d Flow)", touched.ID, touched.TargetName, touched.CastCost)
 	p.sendf("Use 'travel %s' to teleport.", touched.ID)
 	p.prompt()
 }
@@ -6148,14 +6148,14 @@ func hpBar(pct, width int) string {
 func cmdBank(p *player, args []string) {
 	if len(args) == 0 {
 		balance := gw.bankBySlot[p.slot]
-		p.sendf("Bank balance: %d gil  (wallet: %d gil)", balance, p.gil)
+		p.sendf("Bank balance: %d flow  (wallet: %d flow)", balance, p.flow)
 		p.prompt()
 		return
 	}
 	switch args[0] {
 	case "balance":
 		balance := gw.bankBySlot[p.slot]
-		p.sendf("Bank balance: %d gil  (wallet: %d gil)", balance, p.gil)
+		p.sendf("Bank balance: %d flow  (wallet: %d flow)", balance, p.flow)
 	case "deposit":
 		if len(args) < 2 {
 			p.send("Usage: bank deposit <amount>")
@@ -6164,14 +6164,14 @@ func cmdBank(p *player, args []string) {
 		}
 		amount := 0
 		fmt.Sscanf(args[1], "%d", &amount)
-		if amount <= 0 || amount > p.gil {
-			p.sendf("Cannot deposit %d gil (wallet: %d gil).", amount, p.gil)
+		if amount <= 0 || amount > p.flow {
+			p.sendf("Cannot deposit %d flow (wallet: %d flow).", amount, p.flow)
 			p.prompt()
 			return
 		}
-		p.gil -= amount
+		p.flow -= amount
 		gw.bankBySlot[p.slot] += amount
-		p.sendf("Deposited %d gil. (bank: %d  wallet: %d)", amount, gw.bankBySlot[p.slot], p.gil)
+		p.sendf("Deposited %d flow. (bank: %d  wallet: %d)", amount, gw.bankBySlot[p.slot], p.flow)
 	case "withdraw":
 		if len(args) < 2 {
 			p.send("Usage: bank withdraw <amount>")
@@ -6182,13 +6182,13 @@ func cmdBank(p *player, args []string) {
 		fmt.Sscanf(args[1], "%d", &amount)
 		balance := gw.bankBySlot[p.slot]
 		if amount <= 0 || amount > balance {
-			p.sendf("Cannot withdraw %d gil (bank: %d gil).", amount, balance)
+			p.sendf("Cannot withdraw %d flow (bank: %d flow).", amount, balance)
 			p.prompt()
 			return
 		}
 		gw.bankBySlot[p.slot] -= amount
-		p.gil += amount
-		p.sendf("Withdrew %d gil. (bank: %d  wallet: %d)", amount, gw.bankBySlot[p.slot], p.gil)
+		p.flow += amount
+		p.sendf("Withdrew %d flow. (bank: %d  wallet: %d)", amount, gw.bankBySlot[p.slot], p.flow)
 	default:
 		p.send("Usage: bank balance | bank deposit <amount> | bank withdraw <amount>")
 	}
@@ -6267,7 +6267,7 @@ func cmdBazaar(p *player, args []string) {
 			gw.bazaars[p.slot] = make(map[string]int)
 		}
 		gw.bazaars[p.slot][itemID] = price
-		p.sendf("Bazaar: %s listed at %d gil.", itemName(itemID), price)
+		p.sendf("Bazaar: %s listed at %d flow.", itemName(itemID), price)
 
 	case "list":
 		if len(args) >= 2 {
@@ -6293,7 +6293,7 @@ func cmdBazaar(p *player, args []string) {
 			}
 			p.sendf("\r\n=== %s's Bazaar ===", gw.players[targetSlot].name)
 			for itemID, price := range baz {
-				p.sendf("  %-20s %d gil", itemName(itemID), price)
+				p.sendf("  %-20s %d flow", itemName(itemID), price)
 			}
 		} else {
 			// Your own bazaar.
@@ -6305,7 +6305,7 @@ func cmdBazaar(p *player, args []string) {
 			}
 			p.send("\r\n=== Your Bazaar ===")
 			for itemID, price := range baz {
-				p.sendf("  %-20s %d gil", itemName(itemID), price)
+				p.sendf("  %-20s %d flow", itemName(itemID), price)
 			}
 		}
 
@@ -6342,20 +6342,20 @@ func cmdBazaar(p *player, args []string) {
 			p.prompt()
 			return
 		}
-		if p.gil < price {
-			p.sendf("Not enough gil. (need %d, have %d)", price, p.gil)
+		if p.flow < price {
+			p.sendf("Not enough flow. (need %d, have %d)", price, p.flow)
 			p.prompt()
 			return
 		}
-		p.gil -= price
-		seller.gil += price
+		p.flow -= price
+		seller.flow += price
 		p.inventory[itemID]++
 		seller.inventory[itemID]--
 		if seller.inventory[itemID] == 0 {
 			delete(baz, itemID)
 		}
-		p.sendf("Bought %s from %s for %d gil. (gil: %d)", itemName(itemID), seller.name, price, p.gil)
-		seller.sendf("\r\n[Bazaar] %s bought your %s for %d gil. (gil: %d)", p.name, itemName(itemID), price, seller.gil)
+		p.sendf("Bought %s from %s for %d flow. (flow: %d)", itemName(itemID), seller.name, price, p.flow)
+		seller.sendf("\r\n[Bazaar] %s bought your %s for %d flow. (flow: %d)", p.name, itemName(itemID), price, seller.flow)
 		seller.prompt()
 
 	default:
@@ -6421,7 +6421,7 @@ func cmdHelp(p *player) {
 	// from a real NPC, checked bank/inventory) that this help text never
 	// mentioned. A new player had no way to discover any of them short of
 	// reading the source. The Echo Drop specifically cures Poison for 50 of
-	// a starting 500 gil -- the exact cure that would have prevented an
+	// a starting 500 flow -- the exact cure that would have prevented an
 	// earlier death tonight, and nothing told the player it existed.
 	// Deliberately still not listing every command (100+ exist, including
 	// job-specific spells and FIELDOFFICE/TRAPX faction-war systems like
@@ -6470,10 +6470,10 @@ Economy & items:
   shop                — list this zone's vendor stock and prices
   shop buy <item-id>  — buy an item (see 'shop' for IDs and prices)
   shop sell <item-id> — sell an item back at 50% of its price
-  bank                — show gil in bank vs. wallet
+  bank                — show flow in bank vs. wallet
   bazaar list         — browse your own bazaar listing
   bazaar buy <player> <item> — buy from another player's bazaar
-  inv / inventory / i — show your inventory and gil
+  inv / inventory / i — show your inventory and flow
   equip <slot> <item> — equip an item; unequip <slot> to remove
   gear                — show equipped items + stat totals
   craft <recipe-id>   — craft an item (see 'recipes' for what you can make)
@@ -6561,7 +6561,7 @@ func handleConn(conn net.Conn) {
 		fameStore:     fame.NewStore(),
 		inventory:  make(map[string]int),
 		craftSkill: craft.NewCraftSkill(),
-		gil:        500, // starting gil
+		flow:        500, // starting flow
 		equip:      gear.NewEquipment(),
 		conn:       conn,
 		w:           w,
@@ -6579,7 +6579,7 @@ func handleConn(conn net.Conn) {
 				p.charXP.CurrentXP = ch.CurrentXP
 			}
 			if ch.GoldBalance > 0 {
-				p.gil = ch.GoldBalance
+				p.flow = ch.GoldBalance
 			}
 		}
 	} else {

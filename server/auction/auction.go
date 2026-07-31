@@ -27,7 +27,7 @@ var (
 	ErrListingExpired   = errors.New("listing has expired")
 	ErrListingNotActive = errors.New("listing is not active")
 	ErrInvalidPrice     = errors.New("ask price must be > 0")
-	ErrInsufficientGil  = errors.New("insufficient gil")
+	ErrInsufficientFlow  = errors.New("insufficient flow")
 )
 
 // Status tracks a listing's lifecycle.
@@ -94,8 +94,8 @@ func (h *House) List(sellerID string, item loot.Item, ask int) (string, *Listing
 }
 
 // Buy purchases the listing for buyer, returning (fee, net_to_seller, error).
-// The caller is responsible for adjusting player gil balances.
-func (h *House) Buy(listingID, buyerID string, buyerGil int) (fee int, netToSeller int, l *Listing, err error) {
+// The caller is responsible for adjusting player flow balances.
+func (h *House) Buy(listingID, buyerID string, buyerFlow int) (fee int, netToSeller int, l *Listing, err error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	l, ok := h.listings[listingID]
@@ -113,8 +113,8 @@ func (h *House) Buy(listingID, buyerID string, buyerGil int) (fee int, netToSell
 		l.Status = StatusExpired
 		return 0, 0, l, ErrListingExpired
 	}
-	if buyerGil < l.Ask {
-		return 0, 0, l, ErrInsufficientGil
+	if buyerFlow < l.Ask {
+		return 0, 0, l, ErrInsufficientFlow
 	}
 	fee = l.Ask * FeePercent / 100
 	netToSeller = l.Ask - fee

@@ -21,8 +21,8 @@ func TestBankGetKnown(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if q.RewardGil != 100 {
-		t.Errorf("expected 100 gil reward, got %d", q.RewardGil)
+	if q.RewardFlow != 100 {
+		t.Errorf("expected 100 flow reward, got %d", q.RewardFlow)
 	}
 }
 
@@ -184,8 +184,8 @@ func TestTurnInSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if res.Gil != 100 {
-		t.Errorf("expected 100 gil, got %d", res.Gil)
+	if res.Flow != 100 {
+		t.Errorf("expected 100 flow, got %d", res.Flow)
 	}
 	if res.Item != "" {
 		t.Errorf("expected no item reward, got %q", res.Item)

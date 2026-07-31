@@ -87,7 +87,7 @@ func AllCategories() []Category {
 }
 
 // AHFeePct is the percentage of the sale price charged as the AH listing fee.
-// Callers apply this when transferring gil between buyer and seller.
+// Callers apply this when transferring flow between buyer and seller.
 const AHFeePct = 4
 
 // HistoryCap is the number of recent sale records retained per item (FFXI shows 12).
@@ -99,7 +99,7 @@ type Listing struct {
 	ItemID   string
 	ItemName string
 	Category Category
-	Price    int64     // gil (must be > 0)
+	Price    int64     // flow (must be > 0)
 	Qty      int       // units in this listing (1 = single; > 1 = stack)
 	SellerID string
 	ListedAt time.Time

@@ -176,7 +176,7 @@ REDGARDEN's own real, unchanged stack
   │  match ends — arena_server's own report_match_result / WOTAN reporting,
   │  extended to also credit the player's persistent DragonsNShit character
   ▼
-IDUNA — credits rewards (gil, faction/conquest points, cosmetics — not designed here) to the
+IDUNA — credits rewards (Flow, faction/conquest points, cosmetics — not designed here) to the
         persistent character row
 ```
 
@@ -255,7 +255,7 @@ dragonsnshit mmo to feel like redgarden... battlegrounds for dragonsnshit is red
 | 1 | One job ported as real REDGARDEN ability content | Warrior (proposal: simplest real kit in `apps2/mud`'s job system) — its real weapon skills wired into `arena_game.c`'s Q/W/R slots, rendered through REDGARDEN's existing cast-ring/projectile UI, numbers/cooldowns/TP cost sourced from `apps2/mud`'s own `skillchain`/job packages, not invented | NOT STARTED |
 | 2 | Skillchain resonance in `arena_game.c` | Port `apps2/mud`'s own `skillchain.Chain` detection/scoring into REDGARDEN's tick loop; new, distinct visual event (not folded into the generic `attack_flash`) when two players' casts chain | NOT STARTED |
 | 3 | Entry-point hook | Persistent world gains a Battlegrounds entry point (portal/NPC/command, §4.3) that mints a real REDGARDEN connect-ticket via IDUNA for the player's own identity, lets them pick a job (not a REDGARDEN hero), and hands off to `apps/matchmaker` | NOT STARTED |
-| 4 | Reward-credit hook | `arena_server`'s match-end reporting extended to also credit the player's persistent DragonsNShit character via IDUNA (gil/faction points/cosmetics — exact reward shape not designed here) | NOT STARTED |
+| 4 | Reward-credit hook | `arena_server`'s match-end reporting extended to also credit the player's persistent DragonsNShit character via IDUNA (Flow/faction points/cosmetics — exact reward shape not designed here) | NOT STARTED |
 | 5 | End-to-end validated | A real persistent-world character queues, picks Warrior, plays a real match casting real weapon skills through REDGARDEN's UI, chains a real skillchain, and returns to the persistent world with a real credited reward | NOT STARTED |
 | 6 | (Optional, separate track) Persistent-world backend unification | `docs2/DRAGONSNSHIT_TWO_BACKENDS_AUDIT.md`'s own recommendation — unify `apps2/mud`'s RPG logic into `apps2/server-go`'s loop. Valuable for the persistent-world half on its own merits; not a blocker for Milestones 1-5 above | NOT STARTED |
 
@@ -274,8 +274,13 @@ truth for the persistent-world half of the product.
 ## 8. Open questions, not resolved here
 
 - Exact Battlegrounds-entry UX (§4.3) — portal, NPC, or command.
-- Exact reward shape credited back to the persistent character (gil? faction/conquest points?
+- Exact reward shape credited back to the persistent character (Flow? faction/conquest points?
   cosmetic unlocks tied to Battleground performance?) — a real design pass, not named here.
+- ~~Founder: "convert gil to flow"~~ — **done, same day**: `apps2/mud`'s real `gil int` field
+  (and `server/quest`/`server/auction`/`server/market`'s own `Gil`/`RewardGil`/`buyerGil`
+  identifiers) renamed to `flow`/`Flow` throughout, matching REDGARDEN's own already-shipped
+  "Flow" terminology (`ARENA_ITEMS`' `cost` field, S170-175). `GOWORK=off go build ./...`/`go
+  test ./...` clean across the whole `dragonsnshit` module.
 - Does Battleground participation ever need to be gated by persistent-world state (level
   minimums, faction standing, an unlock quest), or is it open to any character from the start?
   Founder call, not a technical question.

@@ -79,12 +79,12 @@ func TestBuySellerCannotBuyOwnListing(t *testing.T) {
 	}
 }
 
-func TestBuyInsufficientGil(t *testing.T) {
+func TestBuyInsufficientFlow(t *testing.T) {
 	h := newHouse()
 	id, _, _ := h.List("alice", testItem, 1000)
 	_, _, _, err := h.Buy(id, "bob", 500)
 	if err == nil {
-		t.Error("expected error for insufficient gil")
+		t.Error("expected error for insufficient flow")
 	}
 }
 

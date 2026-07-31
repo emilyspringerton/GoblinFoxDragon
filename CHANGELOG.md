@@ -1,5 +1,18 @@
 ## 2026-07-31
 
+- refactor: `gil` -> `flow`/`Flow` across the whole `dragonsnshit` module. Founder: "convert gil
+  to flow" (backlog dump + sprint plan, Sprint 2 -- EMILY/BACKLOG.md). REDGARDEN already has
+  real, shipped "Flow" economy terminology (S170-175); DragonsNShit's own currency naming now
+  matches instead of keeping FFXI's "gil". Renamed: `apps2/mud/main.go`'s `player.gil` field (all
+  call sites, all in-game command output text), the `"gil-drop"` loot item ID and its "100 Gil"
+  display name (-> `"flow-drop"`/"100 Flow"), `server/quest`'s `RewardGil`/`Result.Gil` fields (+
+  `trapx_chains.go`'s 20-odd `RewardGil:` literals), `server/auction`'s `ErrInsufficientGil`/
+  `buyerGil` (+ `TestBuyInsufficientGil` -> `TestBuyInsufficientFlow`), `server/market/ah.go`'s
+  own comments. `GOWORK=off go build ./...` and `go test ./...` clean across the whole module
+  before and after. Two docs from earlier today (`REDGARDEN_GUI_NORTHSTAR.md`,
+  `DRAGONSNSHIT_TWO_BACKENDS_AUDIT.md`) updated to reflect the completed rename rather than left
+  silently stale.
+
 - docs: REDGARDEN_GUI_NORTHSTAR.md, two real-time corrections in a row on the Battlegrounds
   design. Founder #1: "some of the docs say we arent bringing redgardens gameplay just the ui
   thats not right i want dragonsnshit mmo to feel like redgarden like battlegrounds for
