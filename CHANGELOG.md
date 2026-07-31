@@ -1,5 +1,11 @@
 ## 2026-07-31
 
+- docs(redgarden-gui-northstar): Milestone 4 shipped -- reward-credit hook. REDGARDEN's
+  `apps/arena_server` now credits real Flow (100 win / 25 loss) to a match participant's
+  persistent DragonsNShit character via new IDUNA `GET /api/v1/characters/by-player/:player_id`
+  + the existing `gold/credit` endpoint. REDGARDEN `1fcf09e`, IDUNA `33b7a0d`. Milestone table +
+  status line updated -- only Milestone 5 (end-to-end validation) left.
+
 - fix(idunaclient): real IDUNA login exchange -- a genuine, previously-undiscovered production
   bug found while wiring REDGARDEN_GUI_NORTHSTAR.md Milestone 3. `Client.do()` used to send
   `IDUNA_AGENT_SECRET` directly as the Bearer token; IDUNA's real `jwt.Verify`-based
