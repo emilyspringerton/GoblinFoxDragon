@@ -1,5 +1,15 @@
 ## 2026-07-31
 
+- feat(server-go): respawn's XP penalty now persists back to IDUNA. Backend-unification
+  follow-up, closing the "XP earned isn't written back to IDUNA yet" gap named in
+  EMILY/BACKLOG.md's own unification item. `idunaclient.Client` already had a real,
+  ready-to-use `UpdateCharacterLevel(characterID, level, currentXP)` method (PATCHes
+  `/api/v1/characters/:id`) -- not built here, just not wired into this handler yet. The respawn
+  handler now calls it after computing the new post-penalty `currentXP`, fire-and-forget via a
+  goroutine + log-on-error, same pattern `PacketSkillXP`'s own `IncrementSkill` call already
+  uses just above it (never blocks the UDP read loop on an HTTP round trip).
+  `GOWORK=off go build ./...`/`go test ./...` clean.
+
 - fix(server-go): respawn XP penalty was using the wrong percentage (10% instead of the real,
   live 8%). Backend-unification follow-up, same-day correction to the respawn-packet change
   right below. Found while trying to wire real per-player XP in: `HPState.RaiseDefault`

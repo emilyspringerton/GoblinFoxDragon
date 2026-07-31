@@ -624,6 +624,17 @@ func main() {
 				info.currentXP = 0
 			}
 			clients[slot] = info
+
+			// Persist the penalty back to IDUNA -- same fire-and-forget, log-on-error pattern
+			// PacketSkillXP's own IncrementSkill call already uses just above, not blocking the
+			// UDP read loop on an HTTP round trip. Closes the "XP earned isn't written back to
+			// IDUNA yet" gap named in EMILY/BACKLOG.md's own unification item.
+			go func(cid string, level, currentXP int) {
+				if err := idunaClient.UpdateCharacterLevel(cid, level, currentXP); err != nil {
+					fmt.Printf("[respawn] UpdateCharacterLevel %s: %v\n", cid, err)
+				}
+			}(info.playerID, info.level, info.currentXP)
+
 			sendRespawnResult(conn, remote, respawnResultPayload{
 				HP: info.hpState.Current, MaxHP: info.hpState.Max, XPPenalty: penalty,
 			})
