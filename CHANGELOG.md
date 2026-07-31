@@ -1,5 +1,21 @@
 ## 2026-07-31
 
+- docs: corrected a real, load-bearing wrong claim in `docs2/DRAGONSNSHIT_TWO_BACKENDS_AUDIT.md`
+  ("apps2/mud has no real IDUNA persistence"). Found while investigating what "share live state"
+  actually requires: that claim's own grep searched for the literal strings `idunaclient`/
+  `idunaClient` and found nothing beyond construction -- but the real field is `gw.iduna`
+  (different name, different grep target) and it genuinely is called: `gw.iduna.GetCharacter`/
+  `CreateCharacter` on connect (seeding level/XP/gold from a real IDUNA row, via a local
+  name→ID cache persisted to `var/mud-chars.json`), `gw.iduna.UpdateCharacterLevel`/
+  `UpdatePosition` on disconnect. What's still true: only synced at connect/disconnect, not
+  continuously like `apps2/server-go`; and `p.flow` (gold) is read on connect but never written
+  back -- traced why: IDUNA's own `/characters/:id/gold` endpoint only accepts deducting gold
+  server-side, no credit/add endpoint exists at all, so completing this needs new IDUNA API
+  surface, real cross-repo work not attempted here. A partial fix covering only the decrease
+  direction was considered and deliberately rejected (silently wrong for the increase case is
+  worse than clearly not-done). Corrected in place in the audit doc's own §1 and §4, not
+  silently overwritten.
+
 - feat(server-go): respawn's XP penalty now persists back to IDUNA. Backend-unification
   follow-up, closing the "XP earned isn't written back to IDUNA yet" gap named in
   EMILY/BACKLOG.md's own unification item. `idunaclient.Client` already had a real,

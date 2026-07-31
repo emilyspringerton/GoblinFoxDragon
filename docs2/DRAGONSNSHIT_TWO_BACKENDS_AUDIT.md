@@ -17,12 +17,28 @@ the two don't talk to each other.
 ### `apps2/mud` (what both earlier docs were written against)
 Telnet on `:2323`, 7,310-line single file. Real, deep RPG simulation: 22 FFXI jobs, skillchains,
 enmity, conquest, NM spawns, crafting guilds, parties/linkshells (full list in
-`REDGARDEN_GUI_NORTHSTAR.md` §2). **No real IDUNA persistence** — an `idunaclient.Client` is
-imported and instantiated (`main.go:603,808`) but never actually called anywhere in the file
-(grep confirms zero method calls beyond construction). `player.hp/mp/tp/inventory/flow/jobID`
-(field named `gil` at the time this audit was written, renamed to `flow` same day per founder:
-"convert gil to flow") are plain in-memory Go struct fields, gone on restart. **No binary/UDP
-protocol at all** — text lines only.
+`REDGARDEN_GUI_NORTHSTAR.md` §2).
+
+**CORRECTION 2026-07-31 (later same day): the "no real IDUNA persistence" claim below was wrong.**
+Found while investigating the respawn-XP-persistence work (EMILY/BACKLOG.md item 2) — the earlier
+grep here searched for the literal strings `idunaclient`/`idunaClient` and found nothing beyond
+construction, but the real field is `gw.iduna` (world-level, not per-player, and not spelled
+either of those searched strings) and it **is** genuinely called: on connect, `gw.iduna.
+GetCharacter` fetches an existing character by a local name→ID cache (`mudCharCache`, persisted
+to `var/mud-chars.json`) or `gw.iduna.CreateCharacter` makes a new one, seeding `p.charXP.Level`/
+`CurrentXP` and `p.flow` from the real IDUNA row; on disconnect, a deferred block calls
+`gw.iduna.UpdateCharacterLevel` and `gw.iduna.UpdatePosition` to sync level/XP/position back.
+**What's still real and true**: this only syncs at connect/disconnect, not continuously during
+play (unlike `apps2/server-go`, which persists immediately on most real actions) — and **`p.flow`
+(gold) is never synced back on disconnect at all**, only read on connect. Checked why: IDUNA's
+own `/api/v1/characters/:id/gold` endpoint (`IDUNA/internal/http/handlers/mmo.go`
+`handleDeductGold`) only accepts a positive `deduct` amount server-side (`400` if `<= 0`) — there
+is no credit/add-gold endpoint at all today, so even a correct apps2/mud disconnect handler
+couldn't persist a Flow *increase* without a new IDUNA endpoint, a real, separate, cross-repo gap.
+`player.hp/mp/tp/inventory` remain plain in-memory fields with no IDUNA equivalent at all (IDUNA's
+schema has no live-combat-HP concept, matching every MMORPG's own "current HP isn't durable
+state" convention already noted elsewhere in this doc). **No binary/UDP protocol at all** — text
+lines only, still accurate.
 
 ### `apps2/server-go` (found today, not in either earlier doc)
 Real UDP server on `:6969` (`packages2/common`'s own wire protocol — `PacketConnect`,
@@ -114,7 +130,15 @@ doc's job is naming the real shape of the problem, not solving it.
   state), or do they stay genuinely separate servers reading/writing the same IDUNA rows
   independently? The former is architecturally cleaner (one game loop, matching
   `REDGARDEN_GUI_NORTHSTAR.md` §4's own "one authoritative process" diagram) but is real
-  server-merge work, not named further here.
+  server-merge work, not named further here. **Update, later same day**: the "separate servers
+  converging on shared IDUNA rows" path is closer to reality than assumed above — `apps2/mud`
+  already does this for level/XP/position (connect + disconnect only, not continuous). The one
+  concrete, well-scoped gap found in that path: `p.flow` (gold) is read from IDUNA on connect but
+  never written back, and IDUNA's own `/characters/:id/gold` endpoint only supports deducting
+  gold server-side (no credit/add endpoint exists) — so completing this specific sync needs a new
+  IDUNA endpoint first, real cross-repo work, not attempted in this pass (a partial fix that only
+  handled the decrease direction was considered and rejected — silently wrong for the increase
+  case is worse than clearly not-done).
 - `apps2/lobby`'s own fate — retired in favor of REDGARDEN, kept as a second GUI option, or
   something else? Not a technical question, a founder call.
 
