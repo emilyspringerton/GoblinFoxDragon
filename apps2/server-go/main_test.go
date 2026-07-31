@@ -132,13 +132,16 @@ func TestFetchCharacterCombatStatsFallsBackOnUnreachableIDUNA(t *testing.T) {
 	os.Setenv("IDUNA_BASE_URL", "http://127.0.0.1:1") // nothing listens here
 
 	client := idunaclient.New()
-	jobMain, level, maxHP := fetchCharacterCombatStats(client, "some-character-id")
+	jobMain, level, maxHP, currentXP := fetchCharacterCombatStats(client, "some-character-id")
 
 	if jobMain != jobpkg.WAR {
 		t.Fatalf("expected fallback job %q, got %q", jobpkg.WAR, jobMain)
 	}
 	if level != 1 {
 		t.Fatalf("expected fallback level 1, got %d", level)
+	}
+	if currentXP != 0 {
+		t.Fatalf("expected fallback currentXP 0, got %d", currentXP)
 	}
 	wantHP, err := jobpkg.HPAtLevel(jobpkg.WAR, 1)
 	if err != nil {

@@ -20,6 +20,7 @@ import (
 	combatTp "dragonsnshit/server/combat"
 	"dragonsnshit/server/craft"
 	"dragonsnshit/server/fieldoffice"
+	"dragonsnshit/server/homepoint"
 	"dragonsnshit/server/idunaauth"
 	"dragonsnshit/server/idunaclient"
 	"dragonsnshit/server/integrity"
@@ -92,6 +93,10 @@ type clientInfo struct {
 	jobMain string
 	level   int
 	hpState *combatTp.HPState
+	// currentXP is fetched from IDUNA's real Character.CurrentXP on connect and mutated locally
+	// on respawn (see PacketRespawn's own handler) -- not written back to IDUNA yet, a further
+	// gap named there, not silently hidden.
+	currentXP int
 }
 
 // wsChainState mirrors apps2/mud's own gw.mobChains, keyed by the TARGET client's slot
@@ -250,10 +255,10 @@ func main() {
 					sendAuthReject(conn, remote)
 					continue
 				}
-				jobMain, level, maxHP := fetchCharacterCombatStats(idunaClient, claims.Subject)
+				jobMain, level, maxHP, currentXP := fetchCharacterCombatStats(idunaClient, claims.Subject)
 				info := clientInfo{
 					id: nextClientID, playerID: claims.Subject, tp: &combatTp.TPState{},
-					jobMain: jobMain, level: level, hpState: combatTp.NewHPState(maxHP),
+					jobMain: jobMain, level: level, hpState: combatTp.NewHPState(maxHP), currentXP: currentXP,
 				}
 				if nextClientID < 255 {
 					nextClientID++
@@ -587,13 +592,18 @@ func main() {
 
 		case common.PacketRespawn:
 			// Backend-unification follow-up (2026-07-31): the only way back from KO on this
-			// backend so far -- apps2/mud's own real "type home" flow (knockOut() +
-			// HPState.Raise, 8% XP penalty) reduced to its core mechanic. Real per-player XP
-			// tracking doesn't exist in apps2/server-go yet (unlike apps2/mud's own
-			// p.charXP.CurrentXP), so the penalty computed here is always against 0 XP --
-			// RaiseDefault(0) is a real, already-tested degenerate case (server/combat's own
-			// TestRaise_ZeroXPNoPanic), not a crash risk, just an honestly-incomplete number
-			// until real XP tracking lands for this backend too.
+			// backend so far. Correction, same day: this originally called
+			// HPState.RaiseDefault, which applies combat.DefaultRaisePenaltyPct (10%) -- checked
+			// against apps2/mud's own actual live behavior and that's the wrong number.
+			// apps2/mud's real cmdHome hand-computes an 8% penalty (homepoint.
+			// DefaultXPPenaltyPct) and doesn't call HPState.Raise at all; server/homepoint's own
+			// ReturnHome() implements that exact 8% mechanic too but apps2/mud's cmdHome
+			// duplicates it by hand instead of calling it (pre-existing, unrelated to this
+			// change). Fixed here by passing homepoint.DefaultXPPenaltyPct explicitly to
+			// HPState.Raise (which does accept an arbitrary pct) instead of trusting its own
+			// unrelated 10% default -- still reuses Raise's real HP-reset/IsKO-clear behavior,
+			// just with the correct, actually-live percentage. Real per-player XP now comes from
+			// IDUNA (currentXP, fetched on connect) instead of a hardcoded 0.
 			slot := remote.String()
 			info, ok := clients[slot]
 			if !ok || info.playerID == "" {
@@ -604,10 +614,14 @@ func main() {
 				sendRespawnResult(conn, remote, respawnResultPayload{Error: "not KO'd"})
 				continue
 			}
-			penalty, err := info.hpState.RaiseDefault(0)
+			penalty, err := info.hpState.Raise(info.currentXP, float64(homepoint.DefaultXPPenaltyPct))
 			if err != nil {
 				sendRespawnResult(conn, remote, respawnResultPayload{Error: err.Error()})
 				continue
+			}
+			info.currentXP -= penalty
+			if info.currentXP < 0 {
+				info.currentXP = 0
 			}
 			clients[slot] = info
 			sendRespawnResult(conn, remote, respawnResultPayload{
@@ -713,12 +727,15 @@ const placeholderPlayerDamage = 10
 // 1 if IDUNA has no character row yet (a legitimately new player) or the fetch fails outright --
 // a missing character shouldn't hard-reject the connection, matching PacketTelecrystalUse's own
 // best-effort tone toward IDUNA lookups elsewhere in this file.
-func fetchCharacterCombatStats(idunaClient *idunaclient.Client, characterID string) (jobMain string, level, maxHP int) {
+func fetchCharacterCombatStats(idunaClient *idunaclient.Client, characterID string) (jobMain string, level, maxHP, currentXP int) {
 	jobMain, level = jobpkg.WAR, 1
 	if ch, err := idunaClient.GetCharacter(characterID); err == nil && ch.JobMain != "" {
 		jobMain = ch.JobMain
 		if ch.Level >= 1 {
 			level = ch.Level
+		}
+		if ch.CurrentXP >= 0 {
+			currentXP = ch.CurrentXP
 		}
 	}
 	hp, err := jobpkg.HPAtLevel(jobMain, level)
@@ -726,7 +743,7 @@ func fetchCharacterCombatStats(idunaClient *idunaclient.Client, characterID stri
 		jobMain, level = jobpkg.WAR, 1
 		hp, _ = jobpkg.HPAtLevel(jobpkg.WAR, 1)
 	}
-	return jobMain, level, hp
+	return jobMain, level, hp, currentXP
 }
 
 func resolveWSCast(wsName string, wsChains map[string]wsChainState, targetSlot string, casterID, targetID int, now time.Time) (wsResultPayload, wsChainState, bool) {

@@ -1,5 +1,24 @@
 ## 2026-07-31
 
+- fix(server-go): respawn XP penalty was using the wrong percentage (10% instead of the real,
+  live 8%). Backend-unification follow-up, same-day correction to the respawn-packet change
+  right below. Found while trying to wire real per-player XP in: `HPState.RaiseDefault`
+  (what the respawn handler called) applies `combat.DefaultRaisePenaltyPct` (10%) -- checked
+  against `apps2/mud`'s own actual live behavior and that's not the real number. `apps2/mud`'s
+  real `cmdHome` hand-computes an 8% penalty (`homepoint.DefaultXPPenaltyPct`) and doesn't call
+  `HPState.Raise` at all -- a claim the respawn-packet CHANGELOG entry below got wrong ("apps2/
+  mud's own real 'type home' flow... HPState.Raise" -- it doesn't). `server/homepoint`'s own
+  `ReturnHome()` implements that real 8% mechanic too, but `cmdHome` duplicates it by hand
+  instead of calling it (pre-existing in `apps2/mud`, unrelated to this fix, not touched). Fixed
+  by passing `homepoint.DefaultXPPenaltyPct` explicitly into `HPState.Raise` (which does accept
+  an arbitrary percentage) instead of trusting its own unrelated 10% default -- still reuses
+  `Raise`'s real HP-reset/`IsKO`-clear behavior, just with the actually-live percentage. Also
+  wired real per-player XP: `fetchCharacterCombatStats` now also returns IDUNA's real
+  `Character.CurrentXP`, stored on `clientInfo` and mutated locally on respawn (not written back
+  to IDUNA yet -- a further, named gap). 1 existing test updated for the new return signature,
+  no new test needed for the percentage fix itself (`Raise`'s own arbitrary-percentage behavior
+  is already covered upstream). `GOWORK=off go build ./...`/`go test ./...` clean.
+
 - feat(server-go): respawn packet closes the KO loop the previous change opened. Backend-
   unification follow-up (EMILY/BACKLOG.md item 2). New `PacketRespawn`/`PacketRespawnResult`
   (`packages2/common/protocol.go`) -- a KO'd player's only way back on this backend, `apps2/mud`'s
