@@ -8,14 +8,14 @@ const (
 )
 
 const (
-	PacketConnect     = 0
-	PacketUserCmd     = 1
-	PacketSnapshot    = 2
-	PacketWelcome     = 3
-	PacketVoxelData   = 4
-	PacketImpact      = 5
-	PacketChat        = 6
-	PacketSceneChange = 7 // server→client: zone transfer; payload: zoneID uint8 + spawnXYZ float32×3
+	PacketConnect        = 0
+	PacketUserCmd        = 1
+	PacketSnapshot       = 2
+	PacketWelcome        = 3
+	PacketVoxelData      = 4
+	PacketImpact         = 5
+	PacketChat           = 6
+	PacketSceneChange    = 7  // server→client: zone transfer; payload: zoneID uint8 + spawnXYZ float32×3
 	PacketAuthReject     = 8  // server→client: PACKET_CONNECT rejected (bad/missing JWT); no payload
 	PacketTelecrystalUse = 9  // client→server: use telecrystal; payload: crystal_id string (null-terminated)
 	PacketTelecrystalAck = 10 // server→client: telecrystal travel approved; payload = PacketSceneChange body
@@ -28,6 +28,12 @@ const (
 	PacketObjectiveComplete = 15 // client→server: JSON {character_id,objective_type,stabilize_amount}
 	// Skill XP (S76-06)
 	PacketSkillXP = 16 // client→server: JSON {character_id,skill_name,delta} — server validates + calls IDUNA
+	// Weapon skills + skillchains (backend-unification Sprint 3, EMILY/BACKLOG.md 2026-07-31):
+	// real apps2/mud combat mechanics (server/combat TP, server/skillchain resonance) wired into
+	// apps2/server-go's own UDP loop, PvP-shaped (targets another connected client, not a mob --
+	// apps2/server-go has no mob registry yet, unlike apps2/mud).
+	PacketWSCast   = 17 // client→server: JSON {ws_name,target_client_id}
+	PacketWSResult = 18 // server→broadcast (caster+target): JSON {caster_id,target_id,ws_name,damage,chained,resonance,tier,error}
 )
 
 // Chat channel IDs (byte 1 of PacketChat).
@@ -39,9 +45,9 @@ const (
 )
 
 const (
-	SayRadius  = 50.0  // units
-	MaxChatMsg = 200   // bytes
-	MaxName    = 32    // bytes
+	SayRadius  = 50.0 // units
+	MaxChatMsg = 200  // bytes
+	MaxName    = 32   // bytes
 )
 
 const (

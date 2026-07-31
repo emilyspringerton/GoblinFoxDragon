@@ -15,22 +15,24 @@ import (
 	"sync"
 
 	"dragonsnshit/packages2/common"
+	"dragonsnshit/server/attention"
 	"dragonsnshit/server/chat"
+	combatTp "dragonsnshit/server/combat"
 	"dragonsnshit/server/craft"
-	"dragonsnshit/server/idunaclient"
+	"dragonsnshit/server/fieldoffice"
 	"dragonsnshit/server/idunaauth"
+	"dragonsnshit/server/idunaclient"
+	"dragonsnshit/server/integrity"
+	"dragonsnshit/server/ledger"
 	"dragonsnshit/server/player"
+	"dragonsnshit/server/skillchain"
 	"dragonsnshit/server/store"
 	"dragonsnshit/server/system"
-	"dragonsnshit/server/telecrystal"
-	"dragonsnshit/server/worldcrisis"
-	"dragonsnshit/server/worldapi"
-	"dragonsnshit/server/trapxapi"
-	"dragonsnshit/server/fieldoffice"
-	"dragonsnshit/server/attention"
-	"dragonsnshit/server/integrity"
 	"dragonsnshit/server/techpressure"
-	"dragonsnshit/server/ledger"
+	"dragonsnshit/server/telecrystal"
+	"dragonsnshit/server/trapxapi"
+	"dragonsnshit/server/worldapi"
+	"dragonsnshit/server/worldcrisis"
 )
 
 type world struct{}
@@ -77,15 +79,26 @@ type clientInfo struct {
 	playerID      string // IDUNA subject ("sub") from JWT — empty until authenticated
 	lastVoxelSent time.Time
 	chunkIndex    int
+	tp            *combatTp.TPState // backend-unification Sprint 3: real TP, apps2/mud's own combat.TPState
+}
+
+// wsChainState mirrors apps2/mud's own gw.mobChains, keyed by the TARGET client's slot
+// (remote.String()) instead of a mob ID -- apps2/server-go has no mob registry, so weapon
+// skills here are PvP-shaped: chain windows are per-victim, same "does the next WS on this
+// target land inside the resonance window" logic, just scored against another player instead
+// of a mob.
+type wsChainState struct {
+	Attrs []skillchain.Resonance
+	At    time.Time
 }
 
 // TRAPX city simulation state (shared across server tick and trapxapi HTTP handler).
 var (
-	cityFOReg    = fieldoffice.NewRegistry()
-	cityAttnReg  = attention.NewRegistry()
-	cityIntReg   = integrity.NewRegistry()
+	cityFOReg     = fieldoffice.NewRegistry()
+	cityAttnReg   = attention.NewRegistry()
+	cityIntReg    = integrity.NewRegistry()
 	cityTechClock = techpressure.NewClock()
-	cityLedger   = ledger.NewLedger()
+	cityLedger    = ledger.NewLedger()
 )
 
 func initCityState() {
@@ -149,6 +162,7 @@ func main() {
 	nextClientID := uint8(0)
 	chatRouter := chat.New()
 	clientAddrs := make(map[string]*net.UDPAddr) // slot → addr for chat delivery
+	wsChains := make(map[string]wsChainState)    // target slot → last weapon skill landed on them (backend-unification Sprint 3)
 
 	// World Crisis state machine (S76-05).
 	crisis := worldcrisis.New()
@@ -224,7 +238,7 @@ func main() {
 					sendAuthReject(conn, remote)
 					continue
 				}
-				info := clientInfo{id: nextClientID, playerID: claims.Subject}
+				info := clientInfo{id: nextClientID, playerID: claims.Subject, tp: &combatTp.TPState{}}
 				if nextClientID < 255 {
 					nextClientID++
 				}
@@ -253,6 +267,9 @@ func main() {
 					nextClientID++
 				}
 			}
+			if info.tp == nil {
+				info.tp = &combatTp.TPState{}
+			}
 			info = sendVoxelPacket(conn, remote, info)
 			clients[slot] = info
 			count := int(buf[netHeaderSize])
@@ -266,6 +283,12 @@ func main() {
 				if hit {
 					sendImpact(conn, remote, pos, hitEntity, 0)
 				}
+				// Backend-unification Sprint 3: every attack also feeds real TP, same
+				// server/combat.TPState apps2/mud's own auto-attack loop uses -- alongside
+				// HandleShankFire's existing hitscan, not replacing it. Flat 1H-sword delay
+				// assumed for this slice (no real weapon/gear system wired into
+				// apps2/server-go yet, unlike apps2/mud's own gear.Equipment).
+				info.tp.AddTP(combatTp.Delay1HSword, 0)
 			}
 
 		case common.PacketTelecrystalUse:
@@ -457,6 +480,64 @@ func main() {
 			s := crisis.Status()
 			fmt.Printf("[worldcrisis] objective %s completed (ley=%d)\n", objType, s.LeyIntegrity)
 
+		case common.PacketWSCast:
+			// Backend-unification Sprint 3 (EMILY/BACKLOG.md, 2026-07-31): real weapon-skill
+			// casting + skillchain resonance, using the same apps2/mud-tested server/combat and
+			// server/skillchain packages, wired into apps2/server-go's own UDP loop. PvP-shaped
+			// (targets another connected client) rather than PvE -- this backend has no mob
+			// registry the way apps2/mud does.
+			slot := remote.String()
+			info, ok := clients[slot]
+			if !ok || info.playerID == "" {
+				sendWSResult(conn, remote, wsResultPayload{Error: "unauthenticated"})
+				continue
+			}
+			if info.tp == nil {
+				info.tp = &combatTp.TPState{}
+			}
+			if n < 2 {
+				continue
+			}
+			var wsReq struct {
+				WSName         string `json:"ws_name"`
+				TargetClientID int    `json:"target_client_id"`
+			}
+			if err := json.Unmarshal(buf[1:n], &wsReq); err != nil {
+				sendWSResult(conn, remote, wsResultPayload{Error: "invalid JSON"})
+				continue
+			}
+			if !info.tp.CanWeaponSkill() {
+				sendWSResult(conn, remote, wsResultPayload{Error: "not enough TP"})
+				continue
+			}
+			targetSlot := ""
+			for s, ci := range clients {
+				if int(ci.id) == wsReq.TargetClientID {
+					targetSlot = s
+					break
+				}
+			}
+			if targetSlot == "" {
+				sendWSResult(conn, remote, wsResultPayload{Error: "target not found"})
+				continue
+			}
+			result, newChainState, ok2 := resolveWSCast(wsReq.WSName, wsChains, targetSlot, int(info.id), wsReq.TargetClientID, time.Now())
+			if !ok2 {
+				sendWSResult(conn, remote, result)
+				continue
+			}
+			info.tp.UseWeaponSkill()
+			clients[slot] = info
+			wsChains[targetSlot] = newChainState
+
+			payload, _ := json.Marshal(result)
+			pkt := append([]byte{common.PacketWSResult}, payload...)
+			conn.WriteToUDP(pkt, remote)
+			if targetAddr, ok := clientAddrs[targetSlot]; ok {
+				conn.WriteToUDP(pkt, targetAddr)
+			}
+			fmt.Printf("[weaponskill] %s -> %s: %s dmg=%d chained=%v\n", slot, targetSlot, result.WSName, result.Damage, result.Chained)
+
 		case common.PacketChat:
 			if n < 4 {
 				continue
@@ -499,12 +580,67 @@ func sendCraftResult(conn *net.UDPConn, remote *net.UDPAddr, success bool, hqTie
 	conn.WriteToUDP(pkt, remote)
 }
 
+// wsResultPayload is PacketWSResult's JSON body (backend-unification Sprint 3).
+type wsResultPayload struct {
+	CasterID  int    `json:"caster_id,omitempty"`
+	TargetID  int    `json:"target_id,omitempty"`
+	WSName    string `json:"ws_name,omitempty"`
+	Damage    int    `json:"damage,omitempty"`
+	Chained   bool   `json:"chained,omitempty"`
+	Resonance string `json:"resonance,omitempty"`
+	Tier      int    `json:"tier,omitempty"`
+	Error     string `json:"error,omitempty"`
+}
+
+func sendWSResult(conn *net.UDPConn, remote *net.UDPAddr, result wsResultPayload) {
+	b, _ := json.Marshal(result)
+	pkt := append([]byte{common.PacketWSResult}, b...)
+	conn.WriteToUDP(pkt, remote)
+}
+
+// placeholderPlayerDamage matches apps2/mud's own cmdWS shape (baseDamage := playerDamage*3) --
+// real HP/death tracking for apps2/server-go's own connected players doesn't exist yet at all
+// (clientInfo has no HP field), a separate, larger follow-up not attempted in this slice.
+const placeholderPlayerDamage = 10
+
+// resolveWSCast is the pure decision core of PacketWSCast handling, split out from the switch
+// case (same "extract for testability" reasoning main_test.go's own TestParseUserCmd already
+// established for parseUserCmd): validates wsName against server/skillchain's real weapon-skill
+// registry, computes damage, and checks whether it closes a skillchain against whatever last
+// landed on targetSlot (wsChains is read-only here -- the caller commits the returned newState
+// to the map, and only on a successful cast).
+//
+// Returns (result, newState, true) on a real cast; (result{Error: ...}, wsChainState{}, false)
+// if wsName is unknown -- the caller is responsible for every other precondition (auth, TP,
+// target existence) before calling this.
+func resolveWSCast(wsName string, wsChains map[string]wsChainState, targetSlot string, casterID, targetID int, now time.Time) (wsResultPayload, wsChainState, bool) {
+	ws, ok := skillchain.CanonicalWeaponSkills[wsName]
+	if !ok {
+		return wsResultPayload{Error: "unknown weapon skill"}, wsChainState{}, false
+	}
+
+	damage := placeholderPlayerDamage * 3
+	result := wsResultPayload{CasterID: casterID, TargetID: targetID, WSName: ws.Name}
+
+	if prev, exists := wsChains[targetSlot]; exists {
+		if r, formed := skillchain.Chain(prev.Attrs, ws.Attrs, now.Sub(prev.At), skillchain.DefaultChainWindow); formed {
+			damage += int(float64(damage) * r.Multiplier)
+			result.Chained = true
+			result.Resonance = r.Resonance.String()
+			result.Tier = int(r.Tier)
+		}
+	}
+	result.Damage = damage
+
+	return result, wsChainState{Attrs: ws.Attrs, At: now}, true
+}
+
 func buildWorldCrisisPacket(s worldcrisis.Status) []byte {
 	payload := map[string]interface{}{
-		"phase":                string(s.Phase),
-		"ley_integrity":        s.LeyIntegrity,
-		"phase_deadline_unix":  s.PhaseDeadline.Unix(),
-		"outcome":              string(s.Outcome),
+		"phase":               string(s.Phase),
+		"ley_integrity":       s.LeyIntegrity,
+		"phase_deadline_unix": s.PhaseDeadline.Unix(),
+		"outcome":             string(s.Outcome),
 	}
 	b, _ := json.Marshal(payload)
 	return append([]byte{common.PacketWorldCrisisUpdate}, b...)

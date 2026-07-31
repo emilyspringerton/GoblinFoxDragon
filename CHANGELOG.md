@@ -1,5 +1,27 @@
 ## 2026-07-31
 
+- feat(server-go): real weapon-skill casting + skillchain resonance wired into `apps2/server-go`'s
+  UDP loop. Founder: "yes unify the backends" -> "whatever makes sense" -> "clean builds first"
+  (backlog dump + sprint plan, Sprint 3 -- EMILY/BACKLOG.md). First real slice of
+  `docs2/DRAGONSNSHIT_TWO_BACKENDS_AUDIT.md`'s own unification recommendation: rather than
+  rewriting `apps2/mud`'s RPG logic, `apps2/server-go` now directly imports the same tested
+  `server/combat`/`server/skillchain` packages `apps2/mud`'s own `cmdAttack`/`cmdWS` already use.
+  New wire packets `PacketWSCast`/`PacketWSResult` (`packages2/common/protocol.go`). Every
+  `BtnAttack` now feeds real TP (`combatTp.TPState.AddTP`, flat 1H-sword delay assumed -- no real
+  weapon/gear system wired into this backend yet) alongside the existing `HandleShankFire`
+  hitscan, not replacing it. `PacketWSCast` validates against `server/skillchain`'s real weapon-
+  skill registry, checks real TP via `CanWeaponSkill`, and scores a real skillchain against
+  whatever last landed on the target (`server/skillchain.Chain`, PvP-shaped -- targets another
+  connected client, not a mob, since this backend has no mob registry the way `apps2/mud` does).
+  Decision logic extracted into a standalone `resolveWSCast` (same "extract for testability"
+  reasoning `main_test.go`'s pre-existing `TestParseUserCmd` already established for
+  `parseUserCmd`) -- 4 new tests (unknown skill, no-chain damage, a real Shining Blade -> Burning
+  Blade Tier-2 Fusion closure, chain-window-expiry). Named, not silently skipped: no real HP/
+  death tracking exists for `apps2/server-go`'s own connected players yet (`clientInfo` has no HP
+  field at all), so damage is a placeholder number reported in the result packet, not applied to
+  anything -- a separate, larger follow-up. `GOWORK=off go build ./...`/`go test ./...` clean
+  across the whole module throughout ("clean builds first" taken as a continuous constraint).
+
 - refactor: `gil` -> `flow`/`Flow` across the whole `dragonsnshit` module. Founder: "convert gil
   to flow" (backlog dump + sprint plan, Sprint 2 -- EMILY/BACKLOG.md). REDGARDEN already has
   real, shipped "Flow" economy terminology (S170-175); DragonsNShit's own currency naming now

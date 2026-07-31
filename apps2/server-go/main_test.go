@@ -4,8 +4,10 @@ import (
 	"encoding/binary"
 	"math"
 	"testing"
+	"time"
 
 	"dragonsnshit/packages2/common"
+	"dragonsnshit/server/skillchain"
 )
 
 func TestParseUserCmd(t *testing.T) {
@@ -61,5 +63,74 @@ func TestParseUserCmd(t *testing.T) {
 	}
 	if cmd.WeaponIdx != 1 {
 		t.Fatalf("expected weapon 1, got %d", cmd.WeaponIdx)
+	}
+}
+
+// Backend-unification Sprint 3 (EMILY/BACKLOG.md, 2026-07-31): resolveWSCast is the pure
+// decision core of PacketWSCast handling, extracted for the same reason parseUserCmd was
+// (TestParseUserCmd above) -- unit-testable without a live UDP loop.
+
+func TestResolveWSCastUnknownSkill(t *testing.T) {
+	_, _, ok := resolveWSCast("Not A Real Weapon Skill", map[string]wsChainState{}, "target-1", 1, 2, time.Now())
+	if ok {
+		t.Fatal("expected ok=false for an unknown weapon skill")
+	}
+}
+
+func TestResolveWSCastNoChain(t *testing.T) {
+	result, newState, ok := resolveWSCast("Fast Blade", map[string]wsChainState{}, "target-1", 1, 2, time.Now())
+	if !ok {
+		t.Fatal("expected a real weapon skill to resolve successfully")
+	}
+	if result.Chained {
+		t.Fatal("expected no chain with no prior weapon skill on this target")
+	}
+	if result.Damage != placeholderPlayerDamage*3 {
+		t.Fatalf("expected unchained damage %d, got %d", placeholderPlayerDamage*3, result.Damage)
+	}
+	if len(newState.Attrs) == 0 {
+		t.Fatal("expected newState to carry Fast Blade's real resonance attributes")
+	}
+}
+
+func TestResolveWSCastFormsSkillchain(t *testing.T) {
+	// Shining Blade (Transfixion) -> Burning Blade (Liquefaction) is a real Tier-2 Fusion
+	// closure per server/skillchain's own combinationTable.
+	now := time.Now()
+	wsChains := map[string]wsChainState{
+		"target-1": {Attrs: skillchain.CanonicalWeaponSkills["Shining Blade"].Attrs, At: now},
+	}
+	result, _, ok := resolveWSCast("Burning Blade", wsChains, "target-1", 1, 2, now.Add(2*time.Second))
+	if !ok {
+		t.Fatal("expected Burning Blade to resolve successfully")
+	}
+	if !result.Chained {
+		t.Fatal("expected Shining Blade -> Burning Blade to form a real skillchain")
+	}
+	if result.Resonance != "Fusion" {
+		t.Fatalf("expected Fusion resonance, got %q", result.Resonance)
+	}
+	if result.Tier != 2 {
+		t.Fatalf("expected Tier 2, got %d", result.Tier)
+	}
+	baseDamage := placeholderPlayerDamage * 3
+	wantDamage := baseDamage + int(float64(baseDamage)*0.35)
+	if result.Damage != wantDamage {
+		t.Fatalf("expected chained damage %d, got %d", wantDamage, result.Damage)
+	}
+}
+
+func TestResolveWSCastChainWindowExpired(t *testing.T) {
+	now := time.Now()
+	wsChains := map[string]wsChainState{
+		"target-1": {Attrs: skillchain.CanonicalWeaponSkills["Shining Blade"].Attrs, At: now},
+	}
+	// Well outside skillchain.DefaultChainWindow (8s).
+	result, _, ok := resolveWSCast("Burning Blade", wsChains, "target-1", 1, 2, now.Add(30*time.Second))
+	if !ok {
+		t.Fatal("expected Burning Blade to still resolve, just unchained")
+	}
+	if result.Chained {
+		t.Fatal("expected no chain once the window has expired")
 	}
 }
