@@ -134,6 +134,31 @@ func (c *Client) DeductGold(characterID string, amount int) error {
 	}
 }
 
+// CreditGold adds gold to a character's balance -- the symmetric counterpart DeductGold never
+// had (IDUNA/internal/http/handlers/mmo.go's own new handleCreditGold, 2026-07-31, EMILY/
+// BACKLOG.md "unify the backends" follow-up). IDUNA bounds a single credit call (currently
+// 10,000) as a sanity cap against unbounded minting; ErrServer wraps that rejection same as any
+// other non-2xx/404 response, callers don't need a distinct case for it.
+func (c *Client) CreditGold(characterID string, amount int) error {
+	body, _ := json.Marshal(map[string]interface{}{"credit": amount})
+	req, _ := http.NewRequest(http.MethodPatch,
+		c.baseURL+"/api/v1/characters/"+characterID+"/gold/credit",
+		bytes.NewReader(body))
+	resp, err := c.do(req)
+	if err != nil {
+		return fmt.Errorf("idunaclient: CreditGold: %w", err)
+	}
+	defer resp.Body.Close()
+	switch resp.StatusCode {
+	case http.StatusNoContent, http.StatusOK:
+		return nil
+	case http.StatusNotFound:
+		return ErrNotFound
+	default:
+		return fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+}
+
 // Item is one row from GET /api/v1/characters/:id/items.
 type Item struct {
 	ItemID   string `json:"item_id"`
@@ -169,11 +194,11 @@ func (c *Client) ListItems(characterID string) ([]Item, error) {
 func (c *Client) CreateItem(ownerID, crafterID, itemType, name string, il int) (string, error) {
 	body, _ := json.Marshal(map[string]interface{}{
 		"owner_character_id": ownerID,
-		"crafter_id":        crafterID,
-		"item_type":         itemType,
-		"name":              name,
-		"item_level":        il,
-		"quantity":          1,
+		"crafter_id":         crafterID,
+		"item_type":          itemType,
+		"name":               name,
+		"item_level":         il,
+		"quantity":           1,
 	})
 	req, _ := http.NewRequest(http.MethodPost, c.baseURL+"/api/v1/items", bytes.NewReader(body))
 	resp, err := c.do(req)

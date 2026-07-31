@@ -1,5 +1,19 @@
 ## 2026-07-31
 
+- feat(idunaclient, mud): `apps2/mud`'s Flow (gold) is finally synced back to IDUNA on
+  disconnect. Backend-unification follow-up, closing the real gap the previous correction found:
+  `p.flow` was read from IDUNA on connect but never written back, because IDUNA had no way to
+  credit gold at all -- only deduct. Now that IDUNA's own new `PATCH .../gold/credit` exists
+  (`IDUNA` commit `1b7f43d`), added the symmetric client method `idunaclient.CreditGold`
+  (3 new tests, `server/idunaclient/idunaclient_test.go` -- this package's first test file at
+  all, DeductGold and every other existing method shipped with zero coverage; backfilling those
+  is separate, larger work, not attempted here). Wired into `apps2/mud`'s own connect/disconnect
+  flow: `startingFlow` captures the real balance right after the existing fetch-or-create IDUNA
+  call, and the disconnect handler now computes the session's net Flow delta and calls
+  `CreditGold`/`DeductGold` accordingly -- same silent-discard, best-effort convention the
+  adjacent level/XP/position sync calls already use. `GOWORK=off go build ./...`/`go test ./...`
+  clean.
+
 - docs: corrected a real, load-bearing wrong claim in `docs2/DRAGONSNSHIT_TWO_BACKENDS_AUDIT.md`
   ("apps2/mud has no real IDUNA persistence"). Found while investigating what "share live state"
   actually requires: that claim's own grep searched for the literal strings `idunaclient`/

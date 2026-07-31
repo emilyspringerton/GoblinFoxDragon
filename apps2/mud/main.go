@@ -23,55 +23,55 @@ import (
 	"sync"
 	"time"
 
-	"dragonsnshit/server/chat"
+	"dragonsnshit/server/attention"
+	"dragonsnshit/server/autotranslate"
 	"dragonsnshit/server/campaign"
+	"dragonsnshit/server/cartography"
+	"dragonsnshit/server/chat"
+	combatTp "dragonsnshit/server/combat"
 	"dragonsnshit/server/conquest"
 	"dragonsnshit/server/craft"
+	"dragonsnshit/server/duel"
+	"dragonsnshit/server/enforcement"
 	"dragonsnshit/server/enmity"
+	"dragonsnshit/server/factionwar"
+	"dragonsnshit/server/fame"
+	"dragonsnshit/server/field"
+	"dragonsnshit/server/fieldoffice"
+	"dragonsnshit/server/food"
+	"dragonsnshit/server/gather"
 	"dragonsnshit/server/gear"
 	"dragonsnshit/server/guild"
-	"dragonsnshit/server/merit"
-	"dragonsnshit/server/telecrystal"
-	"dragonsnshit/server/worldcrisis"
-	"dragonsnshit/server/worldevent"
-	"dragonsnshit/server/market"
-	"dragonsnshit/server/field"
-	"dragonsnshit/server/gather"
 	"dragonsnshit/server/homepoint"
+	"dragonsnshit/server/idunaclient"
+	"dragonsnshit/server/integrity"
+	"dragonsnshit/server/itemdef"
 	"dragonsnshit/server/job"
+	"dragonsnshit/server/k9"
+	"dragonsnshit/server/ledger"
 	"dragonsnshit/server/loot"
+	"dragonsnshit/server/market"
+	"dragonsnshit/server/merit"
 	"dragonsnshit/server/mob"
+	"dragonsnshit/server/moghouse"
+	"dragonsnshit/server/neighborhood"
 	"dragonsnshit/server/nm"
+	"dragonsnshit/server/npcattention"
 	"dragonsnshit/server/party"
-	"dragonsnshit/server/cartography"
-	"dragonsnshit/server/duel"
 	"dragonsnshit/server/pet"
 	"dragonsnshit/server/quest"
+	"dragonsnshit/server/schedule"
 	"dragonsnshit/server/skillchain"
-	"dragonsnshit/server/weather"
 	"dragonsnshit/server/status"
+	"dragonsnshit/server/techpressure"
+	"dragonsnshit/server/telecrystal"
+	"dragonsnshit/server/timeline"
+	"dragonsnshit/server/watcher"
+	"dragonsnshit/server/weather"
+	"dragonsnshit/server/worldcrisis"
+	"dragonsnshit/server/worldevent"
 	"dragonsnshit/server/xp"
 	"dragonsnshit/server/zone"
-	"dragonsnshit/server/idunaclient"
-	"dragonsnshit/server/food"
-	"dragonsnshit/server/fame"
-	combatTp "dragonsnshit/server/combat"
-	"dragonsnshit/server/fieldoffice"
-	"dragonsnshit/server/k9"
-	"dragonsnshit/server/attention"
-	"dragonsnshit/server/integrity"
-	"dragonsnshit/server/techpressure"
-	"dragonsnshit/server/ledger"
-	"dragonsnshit/server/watcher"
-	"dragonsnshit/server/enforcement"
-	"dragonsnshit/server/neighborhood"
-	"dragonsnshit/server/timeline"
-	"dragonsnshit/server/autotranslate"
-	"dragonsnshit/server/factionwar"
-	"dragonsnshit/server/itemdef"
-	"dragonsnshit/server/moghouse"
-	"dragonsnshit/server/npcattention"
-	"dragonsnshit/server/schedule"
 )
 
 // ── constants ──────────────────────────────────────────────────────────────────
@@ -89,9 +89,9 @@ const (
 	mudPort = 2323
 
 	// XP awarded per kill = mob.MaxHP * xpPerHP.
-	xpPerHP       = 10
+	xpPerHP = 10
 	// Range within which party members receive XP (same zone = always in range).
-	partyXPRange  = 99999.0
+	partyXPRange = 99999.0
 )
 
 // mudCharCache is a lightweight name→character_id persistence layer backed by var/mud-chars.json.
@@ -153,7 +153,7 @@ var itemDisplayName = map[string]string{
 	"marsh-blood":      "Marsh Leech Blood",
 	"nm-leech-fang":    "Marsh Leech Fang",
 	"water-crystal-hq": "Water Crystal (HQ)",
-	"flow-drop":         "100 Flow",
+	"flow-drop":        "100 Flow",
 	"crisis-shard":     "Crisis Shard",
 	"echo-drop":        "Echo Drop",
 	"antidote":         "Antidote",
@@ -167,19 +167,19 @@ var itemDisplayName = map[string]string{
 	"herbal-remedy+2":  "Herbal Remedy +2",
 	"herbal-remedy+3":  "Herbal Remedy +3",
 	// TRAPX economy consumables (S125-04):
-	"ramen-bowl":       "Ramen Bowl",
-	"burner-phone":     "Burner Phone",
+	"ramen-bowl":   "Ramen Bowl",
+	"burner-phone": "Burner Phone",
 	// TRAPX items and craft results (S126-15):
-	"mini-bike-key":    "Mini Bike Key",
-	"faction-patch":    "Faction Patch",
-	"city-map":         "City Map",
-	"wind-crystal":     "Wind Crystal",
-	"repaired-bike":    "Repaired Bike",
-	"repaired-bike+1":  "Repaired Bike +1",
-	"faction-gear":     "Faction Gear",
-	"faction-gear+1":   "Faction Gear +1",
-	"atlas-page":       "Atlas Page",
-	"atlas-page+1":     "Atlas Page +1",
+	"mini-bike-key":   "Mini Bike Key",
+	"faction-patch":   "Faction Patch",
+	"city-map":        "City Map",
+	"wind-crystal":    "Wind Crystal",
+	"repaired-bike":   "Repaired Bike",
+	"repaired-bike+1": "Repaired Bike +1",
+	"faction-gear":    "Faction Gear",
+	"faction-gear+1":  "Faction Gear +1",
+	"atlas-page":      "Atlas Page",
+	"atlas-page+1":    "Atlas Page +1",
 }
 
 func itemName(id string) string {
@@ -191,23 +191,23 @@ func itemName(id string) string {
 
 // itemCategory maps item IDs to AH categories for listing.
 var itemCategory = map[string]market.Category{
-	"worm-sinew":    market.CatMaterials,
-	"earth-crystal": market.CatCrystals,
-	"leech-blood":   market.CatMaterials,
-	"water-crystal": market.CatCrystals,
-	"slime-oil":     market.CatMaterials,
-	"lizard-tail":   market.CatMaterials,
-	"fire-crystal":  market.CatCrystals,
-	"king-sinew":    market.CatMaterials,
-	"nm-worm-shell": market.CatMaterials,
-	"marsh-blood":   market.CatMaterials,
-	"nm-leech-fang": market.CatMaterials,
-	"crisis-shard":  market.CatMaterials,
-	"echo-drop":     market.CatMaterials,
-	"iron-ingot":    market.CatCraftItems,
-	"iron-ingot+1":  market.CatCraftItems,
-	"iron-ingot+2":  market.CatCraftItems,
-	"iron-ingot+3":  market.CatCraftItems,
+	"worm-sinew":      market.CatMaterials,
+	"earth-crystal":   market.CatCrystals,
+	"leech-blood":     market.CatMaterials,
+	"water-crystal":   market.CatCrystals,
+	"slime-oil":       market.CatMaterials,
+	"lizard-tail":     market.CatMaterials,
+	"fire-crystal":    market.CatCrystals,
+	"king-sinew":      market.CatMaterials,
+	"nm-worm-shell":   market.CatMaterials,
+	"marsh-blood":     market.CatMaterials,
+	"nm-leech-fang":   market.CatMaterials,
+	"crisis-shard":    market.CatMaterials,
+	"echo-drop":       market.CatMaterials,
+	"iron-ingot":      market.CatCraftItems,
+	"iron-ingot+1":    market.CatCraftItems,
+	"iron-ingot+2":    market.CatCraftItems,
+	"iron-ingot+3":    market.CatCraftItems,
 	"herbal-remedy":   market.CatCraftItems,
 	"herbal-remedy+1": market.CatCraftItems,
 	"herbal-remedy+2": market.CatCraftItems,
@@ -286,13 +286,13 @@ var exits = map[int]map[string]int{
 	2: {"north": 0},
 	3: {"west": 0},
 	// TRAPX city districts — scenes 200–207 (S123-01 TYLER layer)
-	200: {"south": 201, "east": 202, "down": 203},             // Detroit Apartment → School, Osaka, Underground
-	201: {"north": 200, "west": 204},                          // Detroit School → Apartment, Vatican
+	200: {"south": 201, "east": 202, "down": 203},              // Detroit Apartment → School, Osaka, Underground
+	201: {"north": 200, "west": 204},                           // Detroit School → Apartment, Vatican
 	202: {"west": 200, "south": 204, "down": 203, "east": 206}, // Osaka → Apartment, Vatican, Underground, Coastal
-	203: {"up": 200, "east": 204, "south": 205},               // Cairngorms → Apartment, Vatican, Underport
-	204: {"east": 201, "west": 202, "up": 203, "south": 205}, // Vatican → School, Osaka, Cairngorms, Underport
-	205: {"north": 203, "up": 204, "east": 206},               // Osaka Underport → Cairngorms, Vatican, Coastal
-	206: {"west": 202, "south": 207, "down": 205},             // Kuroshio → Osaka, Bacon's Table, Underport
+	203: {"up": 200, "east": 204, "south": 205},                // Cairngorms → Apartment, Vatican, Underport
+	204: {"east": 201, "west": 202, "up": 203, "south": 205},   // Vatican → School, Osaka, Cairngorms, Underport
+	205: {"north": 203, "up": 204, "east": 206},                // Osaka Underport → Cairngorms, Vatican, Coastal
+	206: {"west": 202, "south": 207, "down": 205},              // Kuroshio → Osaka, Bacon's Table, Underport
 	207: {"north": 206},                                        // Bacon's Table → Kuroshio
 }
 
@@ -396,63 +396,63 @@ var npcs = []npcDef{
 	},
 	// ── TRAPX city district NPCs (S122-01) ───────────────────────────────────
 	{
-		ID:      "minibike-rider",
-		Name:    "Mini Bike Rider",
-		ZoneID:  200, // Residential
+		ID:     "minibike-rider",
+		Name:   "Mini Bike Rider",
+		ZoneID: 200, // Residential
 		Greeting: "Yo. You new around here? Keep it movin' if you ain't got business. " +
 			"Field Office three blocks north flipped last night — whole block was watchin'.",
 		MinFameRank: 0,
 		FameNation:  fame.Neutral,
 	},
 	{
-		ID:      "corner-kid",
-		Name:    "Corner Kid",
-		ZoneID:  200, // Residential
+		ID:     "corner-kid",
+		Name:   "Corner Kid",
+		ZoneID: 200, // Residential
 		Greeting: "Heard the dogs were out on Gratiot last night. Four of 'em, at least. " +
 			"CI was already weak on this block. Now it's in the red.",
 		MinFameRank: 0,
 		FameNation:  fame.Neutral,
 	},
 	{
-		ID:      "pawn-shop-runner",
-		Name:    "Pawn Shop Runner",
-		ZoneID:  201, // Commercial
+		ID:     "pawn-shop-runner",
+		Name:   "Pawn Shop Runner",
+		ZoneID: 201, // Commercial
 		Greeting: "Coverage drone clocked you coming in. You on the roll or what? " +
 			"I run receipts for The Frequency. They pay better than the Bloc right now.",
 		MinFameRank: 0,
 		FameNation:  fame.Neutral,
 	},
 	{
-		ID:      "broadcast-operator",
-		Name:    "Broadcast Operator",
-		ZoneID:  201, // Commercial
+		ID:     "broadcast-operator",
+		Name:   "Broadcast Operator",
+		ZoneID: 201, // Commercial
 		Greeting: "Channel 11 going live in four. You want screen time? Control a Field Office " +
 			"when the heat is high — the cameras follow the attention.",
 		MinFameRank: 0,
 		FameNation:  fame.Neutral,
 	},
 	{
-		ID:      "warehouse-contact",
-		Name:    "Warehouse Contact",
-		ZoneID:  202, // Industrial
+		ID:     "warehouse-contact",
+		Name:   "Warehouse Contact",
+		ZoneID: 202, // Industrial
 		Greeting: "Don't make eye contact with the drones up there. They got LIDAR now. " +
 			"The Procurement Houses run this quadrant. Pay your dues or flip the FO and take it.",
 		MinFameRank: 0,
 		FameNation:  fame.Neutral,
 	},
 	{
-		ID:      "frequency-runner",
-		Name:    "Frequency Runner",
-		ZoneID:  203, // Underground
+		ID:     "frequency-runner",
+		Name:   "Frequency Runner",
+		ZoneID: 203, // Underground
 		Greeting: "CAST terminal is live if you got the access code. " +
 			"The Dragon put something in the stream last cycle — three districts went amber at once.",
 		MinFameRank: 0,
 		FameNation:  fame.Neutral,
 	},
 	{
-		ID:      "scar-keeper",
-		Name:    "Scar Keeper",
-		ZoneID:  204, // Vatican Corridors (Abandoned)
+		ID:     "scar-keeper",
+		Name:   "Scar Keeper",
+		ZoneID: 204, // Vatican Corridors (Abandoned)
 		Greeting: "Count the scars on that column. Each one is a Rogue Swarm that burned through here. " +
 			"Baphomet was the first. She always comes back when the CI drops below the floor.",
 		MinFameRank: 0,
@@ -553,9 +553,9 @@ type deadMob struct {
 
 // mobChainState records the last weapon skill that hit a mob (for skillchain detection).
 type mobChainState struct {
-	Attrs  []skillchain.Resonance
-	At     time.Time
-	Slot   string // who threw the WS
+	Attrs []skillchain.Resonance
+	At    time.Time
+	Slot  string // who threw the WS
 }
 
 // activeLootPool is a pending treasure pool after a mob kill.
@@ -566,43 +566,43 @@ type activeLootPool struct {
 }
 
 type world struct {
-	mu             sync.Mutex
-	zoneMgr        *zone.Manager
-	mobRegs        map[int]*mob.Registry
-	minePoints     map[int][]*gather.MiningPoint
-	fishPts        map[int][]*gather.FishingPoint
-	foodReg        *food.Registry
-	deadQueue      []deadMob
-	players        map[string]*player // slot → player
-	rng            *rand.Rand
-	fieldManuals   map[int]*field.Manual // zoneID → active manual (nil if none)
-	parties        map[string]*party.Party // partyID (leader slot) → party
-	playerParty    map[string]string // slot → partyID
-	xpChains       map[string]*party.XPChain // partyID → chain
-	pendingInvites map[string]string // invitee slot → inviter slot
-	mobChains      map[string]*mobChainState // mobID → last WS chain state
-	lootPools      map[string]*activeLootPool // poolID → pool
-	nmSpawns       map[int][]*nm.NMSpawn // zoneID → NM spawn definitions
-	nmReg          *nm.Registry            // all NMs keyed by ID
-	nmSched        *nm.NMRespawnScheduler  // S126-13 respawn scheduler
-	conquestMap    *conquest.Map
-	campaignBattle *campaign.Battle // S126-14 weekly campaign battle
-	ah             *market.AuctionHouse
-	playerNation   map[string]conquest.Nation // slot → declared nation
+	mu               sync.Mutex
+	zoneMgr          *zone.Manager
+	mobRegs          map[int]*mob.Registry
+	minePoints       map[int][]*gather.MiningPoint
+	fishPts          map[int][]*gather.FishingPoint
+	foodReg          *food.Registry
+	deadQueue        []deadMob
+	players          map[string]*player // slot → player
+	rng              *rand.Rand
+	fieldManuals     map[int]*field.Manual      // zoneID → active manual (nil if none)
+	parties          map[string]*party.Party    // partyID (leader slot) → party
+	playerParty      map[string]string          // slot → partyID
+	xpChains         map[string]*party.XPChain  // partyID → chain
+	pendingInvites   map[string]string          // invitee slot → inviter slot
+	mobChains        map[string]*mobChainState  // mobID → last WS chain state
+	lootPools        map[string]*activeLootPool // poolID → pool
+	nmSpawns         map[int][]*nm.NMSpawn      // zoneID → NM spawn definitions
+	nmReg            *nm.Registry               // all NMs keyed by ID
+	nmSched          *nm.NMRespawnScheduler     // S126-13 respawn scheduler
+	conquestMap      *conquest.Map
+	campaignBattle   *campaign.Battle // S126-14 weekly campaign battle
+	ah               *market.AuctionHouse
+	playerNation     map[string]conquest.Nation // slot → declared nation
 	lastConquestTick time.Time
-	bazaars        map[string]map[string]int // slot → { itemID: price }
-	bankBySlot     map[string]int            // slot → bank balance (flow)
-	weatherByZone  map[int]string            // zoneID → current weather (legacy, replaced below)
-	lastWeatherTick time.Time
-	weatherEngine  *weather.Engine           // global weather engine (replaces weatherByZone)
-	duelMgr        *duel.Manager             // PvP duel state
-	mobEnmity      map[string]*enmity.Table // mobID → enmity table
-	chatRouter     *chat.Router
-	guildReg       *guild.Registry
-	wcrisis        *worldcrisis.Crisis
-	iduna          *idunaclient.Client
-	charIDBySlot   map[string]string // slot → IDUNA character_id
-	npcAttnScenes  map[int]*npcattention.Scene // zoneID → NPC awareness scene (S130-02)
+	bazaars          map[string]map[string]int // slot → { itemID: price }
+	bankBySlot       map[string]int            // slot → bank balance (flow)
+	weatherByZone    map[int]string            // zoneID → current weather (legacy, replaced below)
+	lastWeatherTick  time.Time
+	weatherEngine    *weather.Engine          // global weather engine (replaces weatherByZone)
+	duelMgr          *duel.Manager            // PvP duel state
+	mobEnmity        map[string]*enmity.Table // mobID → enmity table
+	chatRouter       *chat.Router
+	guildReg         *guild.Registry
+	wcrisis          *worldcrisis.Crisis
+	iduna            *idunaclient.Client
+	charIDBySlot     map[string]string           // slot → IDUNA character_id
+	npcAttnScenes    map[int]*npcattention.Scene // zoneID → NPC awareness scene (S130-02)
 }
 
 var gw *world
@@ -614,11 +614,11 @@ var gw *world
 var itemdefReg = itemdef.NewRegistry()
 
 var (
-	foReg      = fieldoffice.NewRegistry()
-	attnReg    = attention.NewRegistry()
-	intReg     = integrity.NewRegistry()
-	techClock  = techpressure.NewClock()
-	cityLedger = ledger.NewLedger()
+	foReg             = fieldoffice.NewRegistry()
+	attnReg           = attention.NewRegistry()
+	intReg            = integrity.NewRegistry()
+	techClock         = techpressure.NewClock()
+	cityLedger        = ledger.NewLedger()
 	watchReg          = watcher.NewRegistry()
 	enforceReg        = enforcement.NewRegistry()
 	nbhdReg           = neighborhood.NewRegistry()
@@ -632,14 +632,14 @@ var (
 		})
 		return reg
 	}()
-	npcScheduleReg    = func() *schedule.Registry {
+	npcScheduleReg = func() *schedule.Registry {
 		reg := schedule.NewRegistry()
 		for _, s := range schedule.DefaultSchedules() {
 			reg.Register(s)
 		}
 		return reg
 	}()
-	warEngine         = factionwar.NewEngine([]string{
+	warEngine = factionwar.NewEngine([]string{
 		"district-residential", "district-commercial", "district-industrial",
 		"district-underground", "district-abandoned",
 	})
@@ -694,46 +694,46 @@ func initTRAPXCity() {
 // ── player ────────────────────────────────────────────────────────────────────
 
 type player struct {
-	slot        string
-	name        string
-	zoneID      int
-	pos         mob.Pos
-	hp, maxHP   int
-	mp, maxMP   int
-	tp          *combatTp.TPState
-	statFX      *status.Stack
-	combat      *mob.PlayerCombat
-	miningSkill  float64
-	fishingSkill float64
-	foodEffect   *food.FoodEffect
-	fameStore    *fame.Store
-	charXP      *xp.CharXP
-	homePoint   *homepoint.State
-	wsSkill     string // current weapon skill name (from CanonicalWeaponSkills)
-	jobID       string // current job (job.JobID, default "WAR")
-	inventory   map[string]int // itemID → quantity
-	craftSkill  *craft.CraftSkill
-	flow         int
-	guildID      string // linkshell guild ID ("" = none)
-	equip        *gear.Equipment
-	isInvisible  bool
-	invisExpires time.Time
-	isSneaking   bool
-	sneakExpires time.Time
-	isResting    bool
-	charJob      *job.CharJob // main+sub job pairing (nil until initialized)
-	meritBank    *merit.MeritBank
+	slot          string
+	name          string
+	zoneID        int
+	pos           mob.Pos
+	hp, maxHP     int
+	mp, maxMP     int
+	tp            *combatTp.TPState
+	statFX        *status.Stack
+	combat        *mob.PlayerCombat
+	miningSkill   float64
+	fishingSkill  float64
+	foodEffect    *food.FoodEffect
+	fameStore     *fame.Store
+	charXP        *xp.CharXP
+	homePoint     *homepoint.State
+	wsSkill       string         // current weapon skill name (from CanonicalWeaponSkills)
+	jobID         string         // current job (job.JobID, default "WAR")
+	inventory     map[string]int // itemID → quantity
+	craftSkill    *craft.CraftSkill
+	flow          int
+	guildID       string // linkshell guild ID ("" = none)
+	equip         *gear.Equipment
+	isInvisible   bool
+	invisExpires  time.Time
+	isSneaking    bool
+	sneakExpires  time.Time
+	isResting     bool
+	charJob       *job.CharJob // main+sub job pairing (nil until initialized)
+	meritBank     *merit.MeritBank
 	recastTracker *job.RecastTracker
-	petSlot      *pet.Slot       // BST pet companion (non-nil always; pet.IsAlive() = has pet)
-	petHeel      bool            // true = pet does not attack (heel mode)
-	k9Swarm      *k9.Swarm      // TRAPX: active K9 swarm (nil if none deployed)
-	disguise     npcattention.Disguise // stealth identity (S130-02); default = no disguise
-	questJournal *quest.Journal        // NPC quest progress
-	atlas        *cartography.Atlas   // explored zone map
-	chatLang    autotranslate.Lang // preferred chat language; default EN
-	conn        net.Conn
-	w           *bufio.Writer
-	inbox       chan string
+	petSlot       *pet.Slot             // BST pet companion (non-nil always; pet.IsAlive() = has pet)
+	petHeel       bool                  // true = pet does not attack (heel mode)
+	k9Swarm       *k9.Swarm             // TRAPX: active K9 swarm (nil if none deployed)
+	disguise      npcattention.Disguise // stealth identity (S130-02); default = no disguise
+	questJournal  *quest.Journal        // NPC quest progress
+	atlas         *cartography.Atlas    // explored zone map
+	chatLang      autotranslate.Lang    // preferred chat language; default EN
+	conn          net.Conn
+	w             *bufio.Writer
+	inbox         chan string
 }
 
 func (p *player) send(msg string) {
@@ -782,32 +782,32 @@ func nextWeeklyReset(now time.Time) time.Time {
 
 func initWorld() *world {
 	w := &world{
-		mobRegs:        make(map[int]*mob.Registry),
-		minePoints:     make(map[int][]*gather.MiningPoint),
-		players:        make(map[string]*player),
-		rng:            rand.New(rand.NewSource(time.Now().UnixNano())),
-		fieldManuals:   make(map[int]*field.Manual),
-		parties:        make(map[string]*party.Party),
-		playerParty:    make(map[string]string),
-		xpChains:       make(map[string]*party.XPChain),
-		pendingInvites: make(map[string]string),
-		mobChains:      make(map[string]*mobChainState),
-		lootPools:      make(map[string]*activeLootPool),
-		playerNation:   make(map[string]conquest.Nation),
+		mobRegs:          make(map[int]*mob.Registry),
+		minePoints:       make(map[int][]*gather.MiningPoint),
+		players:          make(map[string]*player),
+		rng:              rand.New(rand.NewSource(time.Now().UnixNano())),
+		fieldManuals:     make(map[int]*field.Manual),
+		parties:          make(map[string]*party.Party),
+		playerParty:      make(map[string]string),
+		xpChains:         make(map[string]*party.XPChain),
+		pendingInvites:   make(map[string]string),
+		mobChains:        make(map[string]*mobChainState),
+		lootPools:        make(map[string]*activeLootPool),
+		playerNation:     make(map[string]conquest.Nation),
 		lastConquestTick: time.Now(),
-		bazaars:       make(map[string]map[string]int),
-		bankBySlot:    make(map[string]int),
-		weatherByZone:   map[int]string{0: "Clear", 1: "Clear", 2: "Clear", 3: "Clear"},
-		lastWeatherTick: time.Now(),
-		weatherEngine:   weather.New(),
-		duelMgr:         duel.NewManager(),
-		mobEnmity:      make(map[string]*enmity.Table),
-		chatRouter:     chat.New(),
-		guildReg:       guild.New(),
-		wcrisis:        worldcrisis.New(),
-		iduna:          idunaclient.New(),
-		charIDBySlot:   make(map[string]string),
-		npcAttnScenes:  make(map[int]*npcattention.Scene),
+		bazaars:          make(map[string]map[string]int),
+		bankBySlot:       make(map[string]int),
+		weatherByZone:    map[int]string{0: "Clear", 1: "Clear", 2: "Clear", 3: "Clear"},
+		lastWeatherTick:  time.Now(),
+		weatherEngine:    weather.New(),
+		duelMgr:          duel.NewManager(),
+		mobEnmity:        make(map[string]*enmity.Table),
+		chatRouter:       chat.New(),
+		guildReg:         guild.New(),
+		wcrisis:          worldcrisis.New(),
+		iduna:            idunaclient.New(),
+		charIDBySlot:     make(map[string]string),
+		npcAttnScenes:    make(map[int]*npcattention.Scene),
 		nmSpawns: map[int][]*nm.NMSpawn{
 			0: nm.MeadowNMs(),
 			3: nm.SwampNMs(),
@@ -1338,16 +1338,28 @@ func tickAll() {
 					opp.prompt()
 					p.prompt()
 					if winner, done := gw.duelMgr.ReportHP(activeDuel, func() int {
-						if p.slot == activeDuel.Challenger { return p.hp }; return opp.hp
+						if p.slot == activeDuel.Challenger {
+							return p.hp
+						}
+						return opp.hp
 					}(), func() int {
-						if p.slot == activeDuel.Defender { return p.hp }; return opp.hp
+						if p.slot == activeDuel.Defender {
+							return p.hp
+						}
+						return opp.hp
 					}()); done {
 						winName, loseName := p.name, opp.name
-						if winner == opp.slot { winName, loseName = opp.name, p.name }
+						if winner == opp.slot {
+							winName, loseName = opp.name, p.name
+						}
 						broadcastZoneNoLock(p.zoneID, fmt.Sprintf("[Duel] %s defeats %s! (+%d rating)", winName, loseName, duel.WinRating), "")
 						// Restore both players to 1 HP (non-lethal duel).
-						if p.hp < 1 { p.hp = 1 }
-						if opp.hp < 1 { opp.hp = 1 }
+						if p.hp < 1 {
+							p.hp = 1
+						}
+						if opp.hp < 1 {
+							opp.hp = 1
+						}
 					}
 				}
 			}
@@ -1569,11 +1581,11 @@ func tickAll() {
 		if phaseChanged {
 			phaseMsgs := map[worldcrisis.Phase]string{
 				worldcrisis.PhaseOmens:       "[Crisis] Omens spread across the land...",
-				worldcrisis.PhaseBurrow:       "[Crisis] The threat burrows deeper — prepare yourselves!",
-				worldcrisis.PhaseEmergence:    "[Crisis] Combat window open — strike now! Chaos Elementals emerge in the Swamp!",
-				worldcrisis.PhaseSplitWar:     "[Crisis] The enemy splits — two fronts detected!",
-				worldcrisis.PhaseFinalWindow:  "[Crisis] Final Window! Complete objectives NOW!",
-				worldcrisis.PhaseResolution:   "",
+				worldcrisis.PhaseBurrow:      "[Crisis] The threat burrows deeper — prepare yourselves!",
+				worldcrisis.PhaseEmergence:   "[Crisis] Combat window open — strike now! Chaos Elementals emerge in the Swamp!",
+				worldcrisis.PhaseSplitWar:    "[Crisis] The enemy splits — two fronts detected!",
+				worldcrisis.PhaseFinalWindow: "[Crisis] Final Window! Complete objectives NOW!",
+				worldcrisis.PhaseResolution:  "",
 			}
 			_ = oldPhase
 			if msg, ok := phaseMsgs[newPhase]; ok && msg != "" {
@@ -1589,15 +1601,15 @@ func tickAll() {
 					for i := 1; i <= 3; i++ {
 						nmID := fmt.Sprintf("nm-chaos-elemental-%d", i)
 						spawnPos := mob.Pos{X: float64(-15 + i*12), Y: 0, Z: float64(-40 + i*10)}
-					_ = reg3.Spawn(mob.Mob{
-						ID: nmID, Kind: "Chaos Elemental",
-						HP: 1200, MaxHP: 1200,
-						SceneID:     3,
-						AggroRange:  18, LeashRange: 45, MeleeRange: 3,
-						MoveSpeed:   6, MeleeDamage: 80, SwingDelay: 2 * time.Second,
-						Pos:     spawnPos,
-						HomePos: spawnPos,
-					})
+						_ = reg3.Spawn(mob.Mob{
+							ID: nmID, Kind: "Chaos Elemental",
+							HP: 1200, MaxHP: 1200,
+							SceneID:    3,
+							AggroRange: 18, LeashRange: 45, MeleeRange: 3,
+							MoveSpeed: 6, MeleeDamage: 80, SwingDelay: 2 * time.Second,
+							Pos:     spawnPos,
+							HomePos: spawnPos,
+						})
 					}
 				}
 			}
@@ -3588,20 +3600,20 @@ func lsAnnounce(guildID, msg string) {
 
 // itemIL maps known equippable item IDs to their item level.
 var itemIL = map[string]int{
-	"bronze-sword":    1,
-	"iron-sword":      10,
-	"bronze-shield":   1,
-	"iron-shield":     10,
-	"leather-helm":    5,
-	"leather-body":    5,
-	"leather-legs":    5,
-	"leather-feet":    5,
-	"leather-hands":   5,
-	"bone-earring":    3,
-	"iron-earring":    8,
-	"cotton-cape":     4,
-	"leather-belt":    4,
-	"bronze-ring":     2,
+	"bronze-sword":  1,
+	"iron-sword":    10,
+	"bronze-shield": 1,
+	"iron-shield":   10,
+	"leather-helm":  5,
+	"leather-body":  5,
+	"leather-legs":  5,
+	"leather-feet":  5,
+	"leather-hands": 5,
+	"bone-earring":  3,
+	"iron-earring":  8,
+	"cotton-cape":   4,
+	"leather-belt":  4,
+	"bronze-ring":   2,
 }
 
 func cmdEquip(p *player, slotName, itemID string) {
@@ -5233,8 +5245,8 @@ func mobSpellcast(p *player, mobID string, now time.Time) {
 	}
 	kind := pool[gw.rng.Intn(len(pool))]
 	effect := status.Effect{
-		Kind:     kind,
-		Potency:  10,
+		Kind:      kind,
+		Potency:   10,
 		ExpiresAt: now.Add(30 * time.Second),
 	}
 	result := p.statFX.Apply(effect)
@@ -5917,9 +5929,9 @@ func cmdCastDarkMagic(p *player, spell string) {
 
 var teleportSpells = map[string]int{
 	"teleport-meadow": 0, "tele-meadow": 0,
-	"teleport-hills":  1, "tele-hills": 1,
-	"teleport-caves":  2, "tele-caves": 2,
-	"teleport-swamp":  3, "tele-swamp": 3,
+	"teleport-hills": 1, "tele-hills": 1,
+	"teleport-caves": 2, "tele-caves": 2,
+	"teleport-swamp": 3, "tele-swamp": 3,
 }
 
 func cmdCastTeleport(p *player, spell string) {
@@ -6025,24 +6037,24 @@ type blmSpellDef struct {
 }
 
 var blmSpells = map[string]blmSpellDef{
-	"fire":       {MPCost: 30, BaseDmg: 50, Element: "Fire"},
-	"fire2":      {MPCost: 65, BaseDmg: 130, Element: "Fire"},
-	"fire3":      {MPCost: 120, BaseDmg: 260, Element: "Fire"},
-	"blizzard":   {MPCost: 30, BaseDmg: 45, Element: "Ice"},
-	"blizzard2":  {MPCost: 65, BaseDmg: 115, Element: "Ice"},
-	"blizzard3":  {MPCost: 120, BaseDmg: 230, Element: "Ice"},
-	"thunder":    {MPCost: 35, BaseDmg: 60, Element: "Lightning"},
-	"thunder2":   {MPCost: 75, BaseDmg: 155, Element: "Lightning"},
-	"thunder3":   {MPCost: 140, BaseDmg: 310, Element: "Lightning"},
-	"stone":      {MPCost: 25, BaseDmg: 40, Element: "Earth"},
-	"stone2":     {MPCost: 55, BaseDmg: 100, Element: "Earth"},
-	"stone3":     {MPCost: 100, BaseDmg: 200, Element: "Earth"},
-	"water":      {MPCost: 28, BaseDmg: 42, Element: "Water"},
-	"water2":     {MPCost: 60, BaseDmg: 110, Element: "Water"},
-	"water3":     {MPCost: 110, BaseDmg: 220, Element: "Water"},
-	"aero":       {MPCost: 27, BaseDmg: 38, Element: "Wind"},
-	"aero2":      {MPCost: 58, BaseDmg: 105, Element: "Wind"},
-	"aero3":      {MPCost: 105, BaseDmg: 210, Element: "Wind"},
+	"fire":      {MPCost: 30, BaseDmg: 50, Element: "Fire"},
+	"fire2":     {MPCost: 65, BaseDmg: 130, Element: "Fire"},
+	"fire3":     {MPCost: 120, BaseDmg: 260, Element: "Fire"},
+	"blizzard":  {MPCost: 30, BaseDmg: 45, Element: "Ice"},
+	"blizzard2": {MPCost: 65, BaseDmg: 115, Element: "Ice"},
+	"blizzard3": {MPCost: 120, BaseDmg: 230, Element: "Ice"},
+	"thunder":   {MPCost: 35, BaseDmg: 60, Element: "Lightning"},
+	"thunder2":  {MPCost: 75, BaseDmg: 155, Element: "Lightning"},
+	"thunder3":  {MPCost: 140, BaseDmg: 310, Element: "Lightning"},
+	"stone":     {MPCost: 25, BaseDmg: 40, Element: "Earth"},
+	"stone2":    {MPCost: 55, BaseDmg: 100, Element: "Earth"},
+	"stone3":    {MPCost: 100, BaseDmg: 200, Element: "Earth"},
+	"water":     {MPCost: 28, BaseDmg: 42, Element: "Water"},
+	"water2":    {MPCost: 60, BaseDmg: 110, Element: "Water"},
+	"water3":    {MPCost: 110, BaseDmg: 220, Element: "Water"},
+	"aero":      {MPCost: 27, BaseDmg: 38, Element: "Wind"},
+	"aero2":     {MPCost: 58, BaseDmg: 105, Element: "Wind"},
+	"aero3":     {MPCost: 105, BaseDmg: 210, Element: "Wind"},
 }
 
 func cmdCastBlackMagic(p *player, spell string) {
@@ -6536,22 +6548,22 @@ func handleConn(conn net.Conn) {
 		startHP = defaultHP
 	}
 	p := &player{
-		slot:        slot,
-		name:        name,
-		zoneID:      0,
-		pos:         mob.Pos{X: 0, Y: 2, Z: 0},
-		hp:          startHP,
-		maxHP:       startHP,
-		mp:          startMP,
-		maxMP:       startMP,
-		tp:          &combatTp.TPState{},
-		statFX:      status.New(),
-		combat:      &mob.PlayerCombat{BaseDamage: playerDamage, MeleeRange: playerMeleeRng},
-		miningSkill: 0,
-		charXP:      xp.NewCharXP(),
-		homePoint:   homepoint.NewState(0),
-		wsSkill:    "Fast Blade",
-		jobID:      job.WAR,
+		slot:          slot,
+		name:          name,
+		zoneID:        0,
+		pos:           mob.Pos{X: 0, Y: 2, Z: 0},
+		hp:            startHP,
+		maxHP:         startHP,
+		mp:            startMP,
+		maxMP:         startMP,
+		tp:            &combatTp.TPState{},
+		statFX:        status.New(),
+		combat:        &mob.PlayerCombat{BaseDamage: playerDamage, MeleeRange: playerMeleeRng},
+		miningSkill:   0,
+		charXP:        xp.NewCharXP(),
+		homePoint:     homepoint.NewState(0),
+		wsSkill:       "Fast Blade",
+		jobID:         job.WAR,
 		charJob:       func() *job.CharJob { cj, _ := job.NewCharJob(job.WAR, "", 1, 0); return cj }(),
 		meritBank:     merit.NewMeritBank(),
 		recastTracker: job.NewRecastTracker(job.WarriorAbilities()),
@@ -6559,12 +6571,12 @@ func handleConn(conn net.Conn) {
 		questJournal:  quest.NewJournal(),
 		atlas:         cartography.NewAtlas(),
 		fameStore:     fame.NewStore(),
-		inventory:  make(map[string]int),
-		craftSkill: craft.NewCraftSkill(),
-		flow:        500, // starting flow
-		equip:      gear.NewEquipment(),
-		conn:       conn,
-		w:           w,
+		inventory:     make(map[string]int),
+		craftSkill:    craft.NewCraftSkill(),
+		flow:          500, // starting flow
+		equip:         gear.NewEquipment(),
+		conn:          conn,
+		w:             w,
 	}
 
 	// IDUNA character fetch-or-create (best-effort; non-blocking).
@@ -6590,6 +6602,14 @@ func handleConn(conn net.Conn) {
 			gw.mu.Unlock()
 		}
 	}
+	// Backend-unification follow-up (2026-07-31, EMILY/BACKLOG.md "unify the backends"): p.flow
+	// was read from IDUNA above but never written back on disconnect, unlike level/XP/position
+	// just below -- IDUNA had no way to credit gold at all until today's new
+	// idunaclient.CreditGold (IDUNA/internal/http/handlers/mmo.go's own new handleCreditGold).
+	// startingFlow captures whatever p.flow ended up at after the fetch-or-create above (a real
+	// IDUNA balance, or the 500-starting-flow default for a brand-new character), so the
+	// disconnect handler can compute the real net change for this session.
+	startingFlow := p.flow
 
 	gw.mu.Lock()
 	gw.players[slot] = p
@@ -6604,10 +6624,19 @@ func handleConn(conn net.Conn) {
 		gw.mu.Lock()
 		charID, hasChar := gw.charIDBySlot[slot]
 		lvl, cxp := p.charXP.Level, p.charXP.CurrentXP
+		flowDelta := p.flow - startingFlow
 		gw.mu.Unlock()
 		if hasChar {
 			_ = gw.iduna.UpdateCharacterLevel(charID, lvl, cxp)
 			_ = gw.iduna.UpdatePosition(charID, p.zoneID, p.pos.X, p.pos.Y, float64(p.zoneID)*1000)
+			// Sync this session's net Flow change (2026-07-31 follow-up, see startingFlow's own
+			// comment above). Best-effort, same silent-discard convention the two calls just
+			// above already use -- a sync failure shouldn't block a player's disconnect.
+			if flowDelta > 0 {
+				_ = gw.iduna.CreditGold(charID, flowDelta)
+			} else if flowDelta < 0 {
+				_ = gw.iduna.DeductGold(charID, -flowDelta)
+			}
 		}
 
 		gw.mu.Lock()
@@ -7231,8 +7260,8 @@ func startWorldEventAPI(port int) {
 		switch r.Method {
 		case http.MethodPost:
 			var req struct {
-				Type    string `json:"type"`
-				Message string `json:"message"`
+				Type     string `json:"type"`
+				Message  string `json:"message"`
 				District string `json:"district"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -7272,7 +7301,7 @@ func startWorldEventAPI(port int) {
 // ── main ──────────────────────────────────────────────────────────────────────
 
 func main() {
-	port    := flag.Int("port", mudPort, "MUD TCP port")
+	port := flag.Int("port", mudPort, "MUD TCP port")
 	apiPort := flag.Int("api-port", 7171, "world-events HTTP API port (0 = disabled)")
 	flag.Parse()
 
