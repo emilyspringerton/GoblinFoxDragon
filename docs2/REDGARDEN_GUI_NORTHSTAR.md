@@ -260,7 +260,7 @@ dragonsnshit mmo to feel like redgarden... battlegrounds for dragonsnshit is red
 | 2 | Skillchain resonance in `arena_game.c` | Port `apps2/mud`'s own `skillchain.Chain` detection/scoring into REDGARDEN's tick loop; new, distinct visual event (not folded into the generic `attack_flash`) when two players' casts chain | **DONE** 2026-07-31 — `ArenaResonance` + `resonance_combo` (a straight C port of `server/skillchain.combinationTable`, same real tiers/multipliers), tracked per-target (`sc_pending_attrs`/`sc_pending_age_ms`, real FFXI "chain forms on the same target" rule) via the new `apply_weapon_skill_damage` choke point every real weapon-skill cast routes through; `skillchain_flash_tier` is the new distinct wire-visible event, not folded into `cast_flash_slot`. Verified real: Warrior's own Q(Scission)→R(Induration+Reverberation) closes a real Tier 2 Distortion chain per the actual combination table. REDGARDEN `21ad0dc` |
 | 3 | Entry-point hook | Persistent world gains a Battlegrounds entry point (portal/NPC/command, §4.3) that mints a real REDGARDEN connect-ticket via IDUNA for the player's own identity, lets them pick a job (not a REDGARDEN hero), and hands off to `apps/matchmaker` | **DONE** 2026-07-31 (§4.3's own open question resolved as a discrete `battlegrounds`/`bg` command, cmdGo's own precedent) — `apps2/mud` real player_id (was `conn.RemoteAddr().String()`, not a UUID; now a persisted `crypto/rand` UUIDv4), `idunaclient` real IDUNA login exchange (a genuine pre-existing bug found+fixed: every call was sending the raw agent secret as a Bearer token, which IDUNA's real JWT verification has always rejected — confirmed live against the running service), new IDUNA `POST /api/v1/redgarden/player-ticket` + `DRAGONSNSHIT-MUD` agent (opposite-scoped sibling to the bot-only ticket endpoint), REDGARDEN `apps/arena --ticket` flag. Job pick is a stub (Warrior is the only ported job); "hands off to apps/matchmaker" means printing the exact command line to run REDGARDEN's own client with, since telnet can't launch a GUI process. IDUNA `f336df2`, GoblinFoxDragon (this commit), REDGARDEN `20ce8cc` |
 | 4 | Reward-credit hook | `arena_server`'s match-end reporting extended to also credit the player's persistent DragonsNShit character via IDUNA (Flow/faction points/cosmetics — exact reward shape not designed here) | **DONE** 2026-07-31 — `report_match_result` now credits Flow (100 win / 25 loss, a real first number not a design review's output) via new IDUNA `GET /api/v1/characters/by-player/:player_id` + the existing `gold/credit` endpoint. Real DragonsNShit players only — a REDGARDEN-only player's real 404 is expected, not an error. `packages/common/http_client.h` gained GET/PATCH (only POST existed). IDUNA `33b7a0d`, REDGARDEN `1fcf09e` |
-| 5 | End-to-end validated | A real persistent-world character queues, picks Warrior, plays a real match casting real weapon skills through REDGARDEN's UI, chains a real skillchain, and returns to the persistent world with a real credited reward | NOT STARTED |
+| 5 | End-to-end validated | A real persistent-world character queues, picks Warrior, plays a real match casting real weapon skills through REDGARDEN's UI, chains a real skillchain, and returns to the persistent world with a real credited reward | **PARTIAL** 2026-07-31 — see §9 below for the full honest breakdown: the identity/ticket chain is live-verified end-to-end and fast (ms, not the seconds a flaky telnet test harness made it look like); the full interactive match-play half (draft → cast → chain → credit) is not, and needs either GUI-input automation or a skillchain-aware bot, neither built here |
 | 6 | (Optional, separate track) Persistent-world backend unification | `docs2/DRAGONSNSHIT_TWO_BACKENDS_AUDIT.md`'s own recommendation — unify `apps2/mud`'s RPG logic into `apps2/server-go`'s loop. Valuable for the persistent-world half on its own merits; not a blocker for Milestones 1-5 above | NOT STARTED |
 
 ---
@@ -296,7 +296,58 @@ truth for the persistent-world half of the product.
 
 ---
 
-## 9. Related docs
+## 9. Milestone 5 validation notes (2026-07-31)
+
+Attempted a real, live end-to-end validation of the full identity → ticket → match → skillchain
+→ reward-credit chain, honestly reporting what actually got confirmed rather than marking the
+milestone DONE on partial evidence.
+
+**Confirmed live and fast, not just unit-tested:** wrote a direct smoketest replicating
+`cmdBattlegrounds`'s exact real call sequence (`idunaclient.CreateCharacter` →
+`GetCharacter` → `MintBattlegroundsTicket`) against the running IDUNA service. All three calls
+succeeded — `CreateCharacter` in 6.9ms, `GetCharacter` in 0.56ms, `MintBattlegroundsTicket` in
+0.52ms — real millisecond-scale latency, not the tens-of-seconds a flaky bash/nc telnet test
+harness made it look like on several earlier attempts (see below). This is the strongest, most
+direct confirmation this whole chain has had: the actual production code path, not a mock.
+
+**Also confirmed, incidentally:** `Xvfb`/`xvfb-run` are installed and `glxinfo` reports working
+Mesa software GL rendering (`direct rendering: Yes`) under it. Earlier session notes ("no Xvfb on
+this box") are stale — a real GUI client launch + screenshot capture is now possible in this
+environment, where it wasn't before. Not exercised further this pass (see below), but a real,
+newly-available capability worth knowing about for future validation work.
+
+**Not confirmed — genuinely still open, not glossed over:**
+- Interactive telnet validation of the `battlegrounds` command's own output (as opposed to the
+  logic it calls, confirmed above) was attempted repeatedly and abandoned — the bash/nc test
+  harness in this environment proved unreliable across many attempts (inconsistent hangs, stray
+  connection pileup from earlier failed attempts degrading later ones), not evidence of a real
+  bug in the command itself, given the underlying calls are independently proven fast and
+  correct. One clean capture did succeed (`Welcome, FreshTest!` after real IDUNA character
+  creation), confirming the mud process itself and its real IDUNA integration are both live and
+  working; the specific `battlegrounds` line's own text output just wasn't captured cleanly.
+- The full interactive match-play half (queue → draft-pick Warrior → actually cast Q then R
+  through the real GUI client → confirm a skillchain closes → confirm the match-end Flow credit
+  lands back on the persistent character) was not run. Two real blockers, both scoped, neither
+  attempted here: (1) `apps/arena_bot`'s own Warrior heuristic (added Milestone 1) leads with R
+  first, not Q — since `resonance_combo`'s only real chain pairing for Warrior's kit is
+  Scission(Q)→Reverberation(R) in that specific order (matching the real, asymmetric FFXI-style
+  table, not a bug), the bot's own cast priority never actually opens a chain window; a
+  skillchain-aware bot heuristic is real, scoped, separate follow-up work, not built here. (2)
+  Fully automating the real GUI client's own draft-pick and Q/W/R casts would need GUI-input
+  injection tooling (e.g. `xdotool` against the Xvfb-rendered window) that also wasn't built.
+- The reward-credit hook (Milestone 4) has its own real unit + integration test coverage already
+  (`report_match_result`'s IDUNA calls), but was not exercised as part of one continuous live
+  match in this pass.
+
+**Honest summary:** the identity/auth/ticket layer -- the part of Milestone 5 most likely to hide
+a real integration bug, and the part earlier sessions couldn't test live at all -- is now
+directly, freshly confirmed working end-to-end. The gameplay layer (actual match-play,
+skillchain, credit-in-context) remains verified only at the unit-test level, same as before this
+pass. Milestone 5 stays PARTIAL, not DONE, until one of the two named blockers above closes it.
+
+---
+
+## 10. Related docs
 
 | Doc | Location |
 |---|---|

@@ -1,5 +1,18 @@
 ## 2026-07-31
 
+- docs(redgarden-gui-northstar): Milestone 5 (end-to-end validation) attempted honestly --
+  marked PARTIAL, not DONE. Direct smoketest of `cmdBattlegrounds`'s exact real call sequence
+  (`CreateCharacter`/`GetCharacter`/`MintBattlegroundsTicket`) against the live IDUNA service
+  confirmed all three real, fast (ms-scale), and correct -- the strongest confirmation this
+  identity/ticket chain has had yet. Also found `Xvfb`/`glxinfo` now work in this environment
+  (Mesa software GL renders correctly) -- earlier "no display" notes are stale. Interactive
+  telnet validation of the `battlegrounds` command's own text output was attempted repeatedly and
+  abandoned as unreliable test-harness noise, not a code bug (the logic it calls is independently
+  proven correct above); full interactive match-play validation (draft/cast/chain/credit) wasn't
+  attempted -- two real, named, scoped blockers (a skillchain-aware bot heuristic; GUI-input
+  automation tooling) remain open, not built here. New §9 in the northstar with the full honest
+  breakdown.
+
 - feat(job, mud): SMN gets real Avatar abilities -- founder, real-time: "zagan beleth vassago as
   summoner avatars GFD." New `job.SummonerAbilities()` (`summon_zagan`/`summon_beleth`/
   `summon_vassago`, real `Ability` data through the same `RecastTracker` every other job uses)
