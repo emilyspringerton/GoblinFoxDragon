@@ -10,6 +10,8 @@ package main
 
 import (
 	"bufio"
+	crand "crypto/rand"
+	"encoding/binary"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -125,6 +127,51 @@ func (c *charCacheStore) set(name, charID string) {
 	if raw, err := json.Marshal(c.data); err == nil {
 		_ = os.WriteFile(c.path, raw, 0644)
 	}
+}
+
+// mudPlayerIDCache (REDGARDEN_GUI_NORTHSTAR.md Milestone 3, 2026-07-31): a real, honest fix
+// found while wiring the Battlegrounds entry point -- gw.iduna.CreateCharacter's own player_id
+// argument was `conn.RemoteAddr().String()` (the TCP socket address), not a real, stable
+// identity. That's fine for character lookup (name-keyed, via mudCharCache above) but it means
+// IDUNA's own `characters.player_id` column held a value that changes every reconnect and isn't
+// a valid UUID -- exactly what a real connect-ticket mint needs (IDUNA's ticket handlers all
+// `uuid.Parse` the player_id). This does NOT solve real player identity (OAuth/email login for a
+// telnet interface is a genuinely separate, larger, undesigned question -- see
+// REDGARDEN_GUI_NORTHSTAR.md's own new note on this) -- it only makes the existing anonymous,
+// name-keyed identity model STABLE and UUID-shaped instead of an ephemeral socket address, same
+// "amend what's honestly amendable, flag the rest" discipline as the MP-for-TP substitution.
+// Same load/persist shape as charCacheStore just above, kept as a separate store rather than
+// overloading that one's own documented "name→character_id" semantics.
+var mudPlayerIDCache = newCharCache("var/mud-player-ids.json")
+
+// mudGenerateUUIDv4 is a minimal, stdlib-only RFC 4122 UUIDv4 generator (crypto/rand + manual
+// version/variant bits) -- this module has no google/uuid dependency (IDUNA's Go side does, but
+// pulling that in here for one random ID was judged not worth a new build dependency, same
+// reasoning packages/common/hmac_sha256.h's own doc comment already gives for not linking a
+// crypto library over there).
+func mudGenerateUUIDv4() string {
+	b := make([]byte, 16)
+	if _, err := crand.Read(b); err != nil {
+		// crypto/rand failing is effectively unrecoverable (no entropy source) -- fall back to a
+		// time-seeded value rather than crashing the whole mud server over one player's ticket.
+		binary.BigEndian.PutUint64(b[0:8], uint64(time.Now().UnixNano()))
+		binary.BigEndian.PutUint64(b[8:16], uint64(time.Now().UnixNano()^0x5DEECE66D))
+	}
+	b[6] = (b[6] & 0x0f) | 0x40 // version 4
+	b[8] = (b[8] & 0x3f) | 0x80 // variant 10
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+}
+
+// mudPlayerIDFor returns the stable, real-random (UUIDv4) player_id for this character name,
+// minting and persisting one on first use. See mudPlayerIDCache's own doc comment for why this
+// exists instead of reusing the socket address CreateCharacter is still called with.
+func mudPlayerIDFor(name string) string {
+	if id := mudPlayerIDCache.get(name); id != "" {
+		return id
+	}
+	id := mudGenerateUUIDv4()
+	mudPlayerIDCache.set(name, id)
+	return id
 }
 
 // recipeIngredients maps recipe ID → { itemID: quantity required }.
@@ -1907,6 +1954,8 @@ func handle(p *player, line string) {
 			return
 		}
 		cmdGo(p, strings.ToLower(args[0]))
+	case "battlegrounds", "bg":
+		cmdBattlegrounds(p)
 	case "target":
 		if len(args) == 0 {
 			if p.combat.TargetMobID != "" {
@@ -2852,6 +2901,61 @@ func cmdGo(p *player, dir string) {
 
 	broadcastZoneNoLock(p.zoneID, fmt.Sprintf("%s arrives.", p.name), p.slot)
 	cmdLook(p)
+}
+
+// redgardenMatchmakerHost/Port are where cmdBattlegrounds sends a player -- REDGARDEN's own
+// apps/matchmaker default (docs/NORTHSTAR.md's own "--matchmaker-port default 7778"). Overridable
+// via REDGARDEN_MATCHMAKER_HOST for a non-same-box deployment; the port isn't currently
+// configurable here since apps/matchmaker's own default hasn't needed overriding in this repo yet.
+const redgardenMatchmakerPort = 7778
+
+// cmdBattlegrounds (REDGARDEN_GUI_NORTHSTAR.md Milestone 3, 2026-07-31): the persistent world's
+// Battlegrounds entry point -- "portal, NPC, queue command, or something else" per §4.3's own
+// open question, resolved here as a discrete command, same shape as cmdGo's own zone-transfer
+// precedent (§4.3 named cmdGo as the closest existing precedent for a reason).
+//
+// Cannot literally hand off a live connection the way cmdGo hands off between two zones in the
+// same process -- Battlegrounds is a separately-spawned REDGARDEN process on the player's own
+// machine (§4.1: "not merged into apps2/mud's own 1Hz loop"), which a telnet session has no
+// way to launch. The real, honest "hand off" a text interface CAN do: mint the real ticket and
+// print the exact command line to run REDGARDEN's own client with it.
+//
+// Job pick is a stub, not a menu -- Warrior is the only job Milestone 1 ported, so there is
+// nothing to choose between yet. Wire a real picker here once a second job lands.
+func cmdBattlegrounds(p *player) {
+	if p.homePoint.IsKO {
+		p.send("You are KO'd — type 'home' to return to your Home Point first.")
+		return
+	}
+	gw.mu.Lock()
+	charID, hasChar := gw.charIDBySlot[p.slot]
+	gw.mu.Unlock()
+	if !hasChar {
+		p.send("Battlegrounds needs a real IDUNA character on file — try reconnecting.")
+		return
+	}
+
+	ch, err := gw.iduna.GetCharacter(charID)
+	if err != nil {
+		p.sendf("Couldn't reach IDUNA to confirm your character (%v) — Battlegrounds entry needs it. Try again shortly.", err)
+		return
+	}
+
+	ticket, err := gw.iduna.MintBattlegroundsTicket(ch.PlayerID)
+	if err != nil {
+		p.sendf("Couldn't mint a Battlegrounds ticket (%v). This is a real IDUNA-side failure, not something retrying blindly fixes.", err)
+		return
+	}
+
+	matchmakerHost := os.Getenv("REDGARDEN_MATCHMAKER_HOST")
+	if matchmakerHost == "" {
+		matchmakerHost = "127.0.0.1"
+	}
+	p.send("Entering the Battlegrounds as Warrior (the only job ported so far — 'Hard Slash'/'Power Slash'/'Frostbite' on Q/W/R).")
+	p.send("Your persistent character stays here; Battlegrounds runs as its own REDGARDEN match on your own machine.")
+	p.sendf("Run this from your REDGARDEN client to join: red_garden_arena --queue %s --matchmaker-port %d --ticket %s",
+		matchmakerHost, redgardenMatchmakerPort, ticket.Ticket)
+	p.sendf("This ticket expires in %d seconds.", ticket.ExpiresAt-time.Now().Unix())
 }
 
 func cmdAttack(p *player, target string) {
@@ -6595,7 +6699,7 @@ func handleConn(conn net.Conn) {
 			}
 		}
 	} else {
-		if newID, err := gw.iduna.CreateCharacter(slot, name, job.WAR); err == nil {
+		if newID, err := gw.iduna.CreateCharacter(mudPlayerIDFor(name), name, job.WAR); err == nil {
 			mudCharCache.set(name, newID)
 			gw.mu.Lock()
 			gw.charIDBySlot[slot] = newID

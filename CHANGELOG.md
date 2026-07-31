@@ -1,5 +1,45 @@
 ## 2026-07-31
 
+- fix(idunaclient): real IDUNA login exchange -- a genuine, previously-undiscovered production
+  bug found while wiring REDGARDEN_GUI_NORTHSTAR.md Milestone 3. `Client.do()` used to send
+  `IDUNA_AGENT_SECRET` directly as the Bearer token; IDUNA's real `jwt.Verify`-based
+  `RequireAuth` middleware has always rejected that with 401 (confirmed live against the running
+  service, not just theorized from reading the code) -- every call this package has ever made
+  (`GetCharacter`/`CreateCharacter`/`CreditGold`/etc., shared by both `apps2/mud` and
+  `apps2/server-go`) has been silently failing, masked by "best-effort, non-blocking" error
+  handling at every call site. `characters` table on the live IDUNA instance was empty; this is
+  why. Fixed: `New()` now also reads `IDUNA_AGENT_NAME`; a new `ensureToken()` performs the real
+  `POST /api/v1/auth/agent` exchange and caches the resulting JWT (refreshed within 60s of its
+  real 1-hour expiry), used by every existing method for free since they all route through
+  `do()`. Verified live end-to-end: a real character now creates successfully against the
+  running IDUNA service (previously 401). 4 new tests. Backward-compatible with every existing
+  test in this package (none set `IDUNA_AGENT_NAME`/`IDUNA_AGENT_SECRET`, so `do()` skips the
+  login step exactly as before for those).
+
+- fix(mud): real, stable player_id for IDUNA character creation -- another real gap found in the
+  same pass. `gw.iduna.CreateCharacter`'s `player_id` argument was `conn.RemoteAddr().String()`
+  (a TCP socket address) -- not a valid UUID, and different every reconnect. IDUNA's own ticket
+  endpoints `uuid.Parse` the player_id and would reject it outright. New `mudPlayerIDCache`
+  (`var/mud-player-ids.json`, same load/persist shape as the existing `mudCharCache`) mints and
+  persists a real `crypto/rand` UUIDv4 per character name on first use -- stdlib-only, no new
+  dependency (same reasoning `packages/common/hmac_sha256.h`'s own doc comment already gives for
+  not linking a crypto library). Does NOT solve real player identity (OAuth/email login for a
+  telnet interface is a genuinely separate, larger, undesigned question) -- only makes the
+  existing anonymous, name-keyed identity model stable and UUID-shaped instead of an ephemeral
+  socket address, flagged honestly rather than oversold.
+
+- feat(mud): `battlegrounds`/`bg` command -- REDGARDEN_GUI_NORTHSTAR.md Milestone 3, the
+  Battlegrounds entry point (§4.3's own open question, resolved as a discrete command, same
+  shape as `cmdGo`'s own zone-transfer precedent, which §4.3 named as the closest existing one).
+  Fetches the player's real character via IDUNA, mints a real REDGARDEN connect ticket via the
+  new `idunaclient.MintBattlegroundsTicket` (IDUNA's new `POST /api/v1/redgarden/player-ticket`,
+  see that repo's own CHANGELOG), and prints the exact `red_garden_arena --queue <host>
+  --matchmaker-port 7778 --ticket <hex>` command line to run -- a telnet session can't launch a
+  GUI process itself, so this is the honest, real "hand off" a text interface can do (REDGARDEN's
+  own new `--ticket` flag, see that repo's own CHANGELOG, is what makes the printed command
+  actionable). Job pick is a stub, not a menu -- Warrior is the only job Milestone 1 ported, so
+  there's nothing to choose between yet.
+
 - docs(redgarden-gui-northstar): Milestone 2 shipped, same session as Milestone 1 below -- real
   skillchain resonance detection in REDGARDEN's `arena_game.c`. A straight C port of this repo's
   own `server/skillchain.go` combination table (same real tiers/multipliers), tracked per-target

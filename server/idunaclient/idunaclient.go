@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -40,27 +41,89 @@ type Character struct {
 
 // Client calls the IDUNA MMO API.
 type Client struct {
-	baseURL string
-	token   string
-	http    *http.Client
+	baseURL     string
+	agentName   string
+	agentSecret string
+	http        *http.Client
+
+	// jwt/jwtExpiry cache the real signed JWT obtained from POST /api/v1/auth/agent -- see
+	// ensureToken's own doc comment for why this exists (a real, previously-undiscovered bug:
+	// every call this package makes used to send agentSecret itself as the Bearer token, which
+	// IDUNA's RequireAuth middleware rejects outright since it isn't a signed JWT).
+	mu        sync.Mutex
+	jwt       string
+	jwtExpiry time.Time
 }
 
-// New returns a Client reading IDUNA_BASE_URL and IDUNA_AGENT_SECRET from env.
+// New returns a Client reading IDUNA_BASE_URL, IDUNA_AGENT_NAME, and IDUNA_AGENT_SECRET from env.
 func New() *Client {
 	base := os.Getenv("IDUNA_BASE_URL")
 	if base == "" {
 		base = "http://localhost:8080"
 	}
 	return &Client{
-		baseURL: base,
-		token:   os.Getenv("IDUNA_AGENT_SECRET"),
-		http:    &http.Client{Timeout: 5 * time.Second},
+		baseURL:     base,
+		agentName:   os.Getenv("IDUNA_AGENT_NAME"),
+		agentSecret: os.Getenv("IDUNA_AGENT_SECRET"),
+		http:        &http.Client{Timeout: 5 * time.Second},
 	}
 }
 
+// jwtRefreshMargin is how far ahead of a cached JWT's real expiry (1 hour, IDUNA's own
+// AgentAuthHandler) ensureToken treats it as due for renewal -- avoids a request racing an
+// expiry that lands mid-flight.
+const jwtRefreshMargin = 60 * time.Second
+
+// ensureToken performs the real POST /api/v1/auth/agent login exchange and caches the resulting
+// JWT, refreshing it once it's within jwtRefreshMargin of its real 1-hour expiry. This was
+// missing entirely before (2026-07-31, found while wiring REDGARDEN_GUI_NORTHSTAR.md Milestone
+// 3): do() used to send agentSecret directly as the Bearer token, which IDUNA's real
+// jwt.Verify-based RequireAuth middleware has always rejected with 401 -- every call this
+// package has ever made (GetCharacter/CreateCharacter/CreditGold/etc., from both apps2/mud and
+// apps2/server-go, which share this package) has been silently failing, masked by "best-effort,
+// non-blocking" error handling at every call site. Confirmed live against the running IDUNA
+// service, not just theorized from reading the code.
+func (c *Client) ensureToken() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.jwt != "" && time.Now().Before(c.jwtExpiry.Add(-jwtRefreshMargin)) {
+		return nil
+	}
+	if c.agentName == "" || c.agentSecret == "" {
+		return fmt.Errorf("idunaclient: IDUNA_AGENT_NAME/IDUNA_AGENT_SECRET not set")
+	}
+	body, _ := json.Marshal(map[string]string{"agent_name": c.agentName, "agent_secret": c.agentSecret})
+	req, _ := http.NewRequest(http.MethodPost, c.baseURL+"/api/v1/auth/agent", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("idunaclient: agent login: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("idunaclient: agent login: status %d", resp.StatusCode)
+	}
+	var res struct {
+		AccessToken string `json:"access_token"`
+		ExpiresIn   int    `json:"expires_in"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return fmt.Errorf("idunaclient: agent login decode: %w", err)
+	}
+	c.jwt = res.AccessToken
+	c.jwtExpiry = time.Now().Add(time.Duration(res.ExpiresIn) * time.Second)
+	return nil
+}
+
 func (c *Client) do(req *http.Request) (*http.Response, error) {
-	if c.token != "" {
-		req.Header.Set("Authorization", "Bearer "+c.token)
+	if c.agentSecret != "" {
+		if err := c.ensureToken(); err != nil {
+			return nil, err
+		}
+		c.mu.Lock()
+		token := c.jwt
+		c.mu.Unlock()
+		req.Header.Set("Authorization", "Bearer "+token)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	return c.http.Do(req)
@@ -157,6 +220,40 @@ func (c *Client) CreditGold(characterID string, amount int) error {
 	default:
 		return fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
 	}
+}
+
+// BattlegroundsTicket is the response from POST /api/v1/redgarden/player-ticket.
+type BattlegroundsTicket struct {
+	Ticket    string `json:"ticket"`     // hex-encoded, hand to the REDGARDEN client's --ticket flag
+	ExpiresAt int64  `json:"expires_at"` // unix seconds
+	PlayerID  string `json:"player_id"`
+}
+
+// MintBattlegroundsTicket mints a real REDGARDEN connect ticket for a real DragonsNShit
+// character's own player_id -- REDGARDEN_GUI_NORTHSTAR.md Milestone 3, the Battlegrounds entry
+// point (`battlegrounds`/`bg` command in apps2/mud). Requires the DRAGONSNSHIT-MUD agent's
+// redgarden.player-ticket.mint permission (IDUNA_AGENT_NAME/IDUNA_AGENT_SECRET env), a
+// deliberately separate grant from REDGARDEN-BOTS' own redgarden.ticket.mint -- see
+// IDUNA/internal/http/handlers/redgarden_player_ticket.go's own doc comment for the trust model.
+func (c *Client) MintBattlegroundsTicket(playerID string) (*BattlegroundsTicket, error) {
+	body, _ := json.Marshal(map[string]string{"player_id": playerID})
+	req, _ := http.NewRequest(http.MethodPost, c.baseURL+"/api/v1/redgarden/player-ticket", bytes.NewReader(body))
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, fmt.Errorf("idunaclient: MintBattlegroundsTicket: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+	var t BattlegroundsTicket
+	if err := json.NewDecoder(resp.Body).Decode(&t); err != nil {
+		return nil, fmt.Errorf("idunaclient: MintBattlegroundsTicket decode: %w", err)
+	}
+	return &t, nil
 }
 
 // Item is one row from GET /api/v1/characters/:id/items.

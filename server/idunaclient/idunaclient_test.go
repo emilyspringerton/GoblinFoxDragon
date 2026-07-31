@@ -1,6 +1,7 @@
 package idunaclient
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -64,6 +65,91 @@ func TestCreditGoldNotFound(t *testing.T) {
 	}
 }
 
+// TestDoPerformsRealLoginExchangeNotRawSecret (2026-07-31, REDGARDEN_GUI_NORTHSTAR.md Milestone
+// 3): confirms the real bug fix -- do() used to send agentSecret itself as the Bearer token,
+// which IDUNA's real jwt.Verify-based RequireAuth middleware has always rejected with 401
+// (confirmed live against the running IDUNA service, not just theorized). It must now POST
+// /api/v1/auth/agent first and send the resulting access_token instead.
+func TestDoPerformsRealLoginExchangeNotRawSecret(t *testing.T) {
+	var loginCalled bool
+	var gotAuthHeaderOnRealCall string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/auth/agent" {
+			loginCalled = true
+			var body struct {
+				AgentName   string `json:"agent_name"`
+				AgentSecret string `json:"agent_secret"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			if body.AgentName != "DRAGONSNSHIT-MUD" || body.AgentSecret != "shh-its-a-secret" {
+				t.Errorf("login body = %+v, want real agent_name/agent_secret", body)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"access_token": "a-real-signed-jwt-not-the-raw-secret",
+				"expires_in":   3600,
+			})
+			return
+		}
+		gotAuthHeaderOnRealCall = r.Header.Get("Authorization")
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	oldURL, oldName, oldSecret := os.Getenv("IDUNA_BASE_URL"), os.Getenv("IDUNA_AGENT_NAME"), os.Getenv("IDUNA_AGENT_SECRET")
+	t.Cleanup(func() {
+		os.Setenv("IDUNA_BASE_URL", oldURL)
+		os.Setenv("IDUNA_AGENT_NAME", oldName)
+		os.Setenv("IDUNA_AGENT_SECRET", oldSecret)
+	})
+	os.Setenv("IDUNA_BASE_URL", srv.URL)
+	os.Setenv("IDUNA_AGENT_NAME", "DRAGONSNSHIT-MUD")
+	os.Setenv("IDUNA_AGENT_SECRET", "shh-its-a-secret")
+	c := New()
+
+	_, _ = c.GetCharacter("some-char-id") // 404 from the mock server, irrelevant -- we're checking the header it sent
+
+	if !loginCalled {
+		t.Fatal("expected a real POST /api/v1/auth/agent login call before the real request")
+	}
+	if gotAuthHeaderOnRealCall != "Bearer a-real-signed-jwt-not-the-raw-secret" {
+		t.Errorf("Authorization header on the real call = %q, want the JWT from login, not the raw agent secret", gotAuthHeaderOnRealCall)
+	}
+}
+
+// TestDoCachesTokenAcrossCalls confirms ensureToken doesn't re-login on every single request --
+// the JWT is cached and reused until it's within jwtRefreshMargin of its real expiry.
+func TestDoCachesTokenAcrossCalls(t *testing.T) {
+	loginCount := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/auth/agent" {
+			loginCount++
+			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "cached-jwt", "expires_in": 3600})
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	oldURL, oldName, oldSecret := os.Getenv("IDUNA_BASE_URL"), os.Getenv("IDUNA_AGENT_NAME"), os.Getenv("IDUNA_AGENT_SECRET")
+	t.Cleanup(func() {
+		os.Setenv("IDUNA_BASE_URL", oldURL)
+		os.Setenv("IDUNA_AGENT_NAME", oldName)
+		os.Setenv("IDUNA_AGENT_SECRET", oldSecret)
+	})
+	os.Setenv("IDUNA_BASE_URL", srv.URL)
+	os.Setenv("IDUNA_AGENT_NAME", "DRAGONSNSHIT-MUD")
+	os.Setenv("IDUNA_AGENT_SECRET", "shh-its-a-secret")
+	c := New()
+
+	_, _ = c.GetCharacter("char-1")
+	_, _ = c.GetCharacter("char-2")
+	_, _ = c.GetCharacter("char-3")
+
+	if loginCount != 1 {
+		t.Errorf("login called %d times across 3 requests, want exactly 1 (cached)", loginCount)
+	}
+}
+
 func TestCreditGoldServerError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest) // e.g. over the per-call cap
@@ -74,5 +160,53 @@ func TestCreditGoldServerError(t *testing.T) {
 	err := c.CreditGold("char-1", 99999)
 	if !errors.Is(err, ErrServer) {
 		t.Fatalf("expected an error wrapping ErrServer for a 400 response, got %v", err)
+	}
+}
+
+// MintBattlegroundsTicket is new (2026-07-31, REDGARDEN_GUI_NORTHSTAR.md Milestone 3).
+
+func TestMintBattlegroundsTicketSuccess(t *testing.T) {
+	var gotPath, gotMethod, gotBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotMethod = r.Method
+		b, _ := io.ReadAll(r.Body)
+		gotBody = string(b)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"ticket":     "deadbeef",
+			"expires_at": 1234567890,
+			"player_id":  "player-1",
+		})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	ticket, err := c.MintBattlegroundsTicket("player-1")
+	if err != nil {
+		t.Fatalf("MintBattlegroundsTicket: unexpected error: %v", err)
+	}
+	if gotMethod != http.MethodPost {
+		t.Errorf("expected POST, got %s", gotMethod)
+	}
+	if gotPath != "/api/v1/redgarden/player-ticket" {
+		t.Errorf("expected /api/v1/redgarden/player-ticket, got %s", gotPath)
+	}
+	if gotBody != `{"player_id":"player-1"}` {
+		t.Errorf(`expected body {"player_id":"player-1"}, got %s`, gotBody)
+	}
+	if ticket.Ticket != "deadbeef" || ticket.ExpiresAt != 1234567890 || ticket.PlayerID != "player-1" {
+		t.Errorf("ticket = %+v, unexpected fields", ticket)
+	}
+}
+
+func TestMintBattlegroundsTicketNotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	if _, err := c.MintBattlegroundsTicket("no-such-player"); err != ErrNotFound {
+		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
 }
