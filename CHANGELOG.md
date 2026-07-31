@@ -1,5 +1,14 @@
 ## 2026-07-31
 
+- docs(redgarden-gui-northstar): Milestone 2 shipped, same session as Milestone 1 below -- real
+  skillchain resonance detection in REDGARDEN's `arena_game.c`. A straight C port of this repo's
+  own `server/skillchain.go` combination table (same real tiers/multipliers), tracked per-target
+  and closed via a new `apply_weapon_skill_damage` choke point every real weapon-skill cast
+  routes through. Verified real: Warrior's own Q(Scission)->R(Induration+Reverberation) closes an
+  actual Tier 2 Distortion chain per the table. REDGARDEN `21ad0dc`. Milestone table + status
+  line updated to match. Milestones 3-5 (entry-point hook, reward-credit hook, end-to-end
+  validation) still ahead.
+
 - docs(redgarden-gui-northstar): Milestone 1 shipped -- Warrior, the first DragonsNShit job
   ported into REDGARDEN's Battlegrounds as real ability content. Founder redirect this session,
   after "can i log into gfd gui yet?": "ok i asked for the mmorpg i provided the inputs continue

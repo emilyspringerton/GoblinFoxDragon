@@ -5,8 +5,9 @@ as a gui to make our mmorpg?" → "i dont care how you do it fork redgarden into
 northstar this is the mmo. this is dragonsnshit" → "cli will continue to work" → "redgarden as a
 gui" → "like old school runescape."*
 
-**Status:** Milestone 1 shipped 2026-07-31 (Warrior's real weapon skills wired into `arena_game.c`'s
-Q/W/R slots) — first real code against this doc's own table, milestones 2-5 still ahead.
+**Status:** Milestones 1-2 shipped 2026-07-31 (Warrior's real weapon skills wired into
+`arena_game.c`'s Q/W/R slots, then real skillchain resonance detection between them) — milestones
+3-5 still ahead.
 
 **CORRECTION 2026-07-31 (major, supersedes §§1/4/5/6 below as they originally read):**
 founder: *"some of the docs say we arent bringing redgardens gameplay just the ui thats not right
@@ -254,7 +255,7 @@ dragonsnshit mmo to feel like redgarden... battlegrounds for dragonsnshit is red
 | 0.75 | Battlegrounds correction | Found REDGARDEN's own full gameplay, not just its renderer, is the right thing to ship — this doc rewritten §§1/4/5/6 | DONE |
 | 0.8 | Job/skillchain-affordance correction | Refined 0.75: process stays separate, but ability *content* is `apps2/mud`'s real job/skillchain system ported into `arena_game.c`'s slot machinery, not REDGARDEN's fixed hero kits untouched — §§4.1/4.2/5 rewritten again | DONE |
 | 1 | One job ported as real REDGARDEN ability content | Warrior (proposal: simplest real kit in `apps2/mud`'s job system) — its real weapon skills wired into `arena_game.c`'s Q/W/R slots, rendered through REDGARDEN's existing cast-ring/projectile UI, numbers/cooldowns/TP cost sourced from `apps2/mud`'s own `skillchain`/job packages, not invented | **DONE** 2026-07-31 — `ARENA_HERO_WARRIOR` (appended, not folded into the TYLER roster); Q Hard Slash/W Power Slash/R Frostbite from `server/skillchain.CanonicalWeaponSkills`, matching `server/job.jobStats[WAR]`; MP substitutes for `TPWSThreshold`'s 100 TP (REDGARDEN has no TP resource — an honest amendment, not a literal port); resonance attrs documented, not yet acted on (Milestone 2's job). REDGARDEN `cbcd4ed` |
-| 2 | Skillchain resonance in `arena_game.c` | Port `apps2/mud`'s own `skillchain.Chain` detection/scoring into REDGARDEN's tick loop; new, distinct visual event (not folded into the generic `attack_flash`) when two players' casts chain | NOT STARTED |
+| 2 | Skillchain resonance in `arena_game.c` | Port `apps2/mud`'s own `skillchain.Chain` detection/scoring into REDGARDEN's tick loop; new, distinct visual event (not folded into the generic `attack_flash`) when two players' casts chain | **DONE** 2026-07-31 — `ArenaResonance` + `resonance_combo` (a straight C port of `server/skillchain.combinationTable`, same real tiers/multipliers), tracked per-target (`sc_pending_attrs`/`sc_pending_age_ms`, real FFXI "chain forms on the same target" rule) via the new `apply_weapon_skill_damage` choke point every real weapon-skill cast routes through; `skillchain_flash_tier` is the new distinct wire-visible event, not folded into `cast_flash_slot`. Verified real: Warrior's own Q(Scission)→R(Induration+Reverberation) closes a real Tier 2 Distortion chain per the actual combination table. REDGARDEN `21ad0dc` |
 | 3 | Entry-point hook | Persistent world gains a Battlegrounds entry point (portal/NPC/command, §4.3) that mints a real REDGARDEN connect-ticket via IDUNA for the player's own identity, lets them pick a job (not a REDGARDEN hero), and hands off to `apps/matchmaker` | NOT STARTED |
 | 4 | Reward-credit hook | `arena_server`'s match-end reporting extended to also credit the player's persistent DragonsNShit character via IDUNA (Flow/faction points/cosmetics — exact reward shape not designed here) | NOT STARTED |
 | 5 | End-to-end validated | A real persistent-world character queues, picks Warrior, plays a real match casting real weapon skills through REDGARDEN's UI, chains a real skillchain, and returns to the persistent world with a real credited reward | NOT STARTED |
