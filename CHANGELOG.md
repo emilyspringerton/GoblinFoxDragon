@@ -1,5 +1,26 @@
 ## 2026-07-31
 
+- docs: REDGARDEN ↔ apps2/mud packet-level bridge spec. Founder: "continue dragons n shit do the
+  docs first." New `docs2/specs/REDGARDEN_MUD_BRIDGE_SPEC.md`, the concrete next layer under
+  today's earlier `REDGARDEN_GUI_NORTHSTAR.md`, written against the real code on both sides
+  (`REDGARDEN/packages/common/protocol.h`'s actual structs, `apps2/mud/main.go`'s actual `cmd*`
+  handlers) rather than assumed shapes. Reuses REDGARDEN's real HMAC connect-ticket handshake
+  verbatim (same scheme SHANKPIT/shankpit-460 already share). Maps REDGARDEN's real packets onto
+  apps2/mud's real functions (`ArenaAttackCmd`→`cmdAttack`, `ArenaCastCmd`→`cmdWS`,
+  `ArenaShopBuyCmd`→`cmdShopBuy`); drops `PACKET_ARENA_PICK` entirely (no hero draft in a
+  persistent-character MMO). Two real gaps found and named while writing this, not glossed over:
+  `apps2/mud` has zero continuous intra-zone movement server-side today (`cmdGo`'s own code
+  confirms `n/s/e/w` only ever teleports between zones; `cmdAttack`'s auto-approach snaps
+  position directly onto the target) -- `PACKET_ARENA_MOVE` has nothing to bridge onto without
+  real new server code, reframing the northstar's own Milestone 3 scope; and
+  `PACKET_ARENA_ATTACK`'s hero-slot-index targeting has no equivalent against apps2/mud's
+  string-ID mob/player targeting. Proposes a genuine `MudEvent` list to replace REDGARDEN's flat
+  HP-delta-driven visual-effect idiom (`attack_flash`/`heal_flash`), which can't carry
+  skillchain/status-effect semantics the way a flat HP diff can't. UDP, port 2324 proposed
+  (resolves one of the northstar's own open questions). `REDGARDEN_GUI_NORTHSTAR.md` updated
+  in place: 2 open questions resolved/refined, 2 new ones surfaced, Related Docs table updated.
+  Registered in golden-docs-index. Spec only, no code.
+
 - docs: REDGARDEN-as-GUI northstar. Founder, real-time: "can we graft redgarden frontend onto GFD
   mud as a gui to make our mmorpg?" → "i dont care how you do it fork redgarden into GFD write the
   northstar this is the mmo. this is dragonsnshit" → "cli will continue to work" → "redgarden as a

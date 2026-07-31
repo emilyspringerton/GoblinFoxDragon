@@ -7,6 +7,13 @@ gui" → "like old school runescape."*
 
 **Status:** Spec only, no code yet — milestone 0 of this doc's own table.
 
+**Update 2026-07-31 (same day):** the packet-level bridge spec this doc's own §6 Milestone 1
+needs is written — `docs2/specs/REDGARDEN_MUD_BRIDGE_SPEC.md`. It grounds §8's open transport
+question (UDP, matching REDGARDEN's own choice) and names one real gap this doc's own §4.3 didn't
+go far enough on: `apps2/mud` has no continuous intra-zone movement server-side at all today
+(`cmdGo` only teleports between zones on `n/s/e/w`) — Milestone 3 ("input bridge") needs real new
+server-side steering logic, not just a packet decode, before it can be called done.
+
 **Relationship to `docs2/MMO_NORTHSTAR.md`:** amends it, doesn't replace it. Every system that
 doc already specs — IDUNA-backed character/item/guild schema, item provenance chains, the
 economy, World Crisis phases, Telecrystal scene travel, EduScript VM scripting — stays exactly
@@ -200,17 +207,20 @@ truth this doc builds on top of.
 
 ## 8. Open questions, not resolved here
 
-- Which transport for the new listener — UDP (matching REDGARDEN's own current choice, better
-  fit for real-time position snapshots) or TCP (matching `apps2/mud`'s existing telnet listener,
-  simpler to reuse connection-handling code already in `main.go`)? Leaning UDP for parity with
-  REDGARDEN's own proven snapshot cadence, not decided here.
-- How does REDGARDEN's real-time HP-delta-driven `attack_flash`/`heal_flash` visual-effect idiom
-  (this whole session's own established pattern for "reconstruct a combat event from a state
-  delta, no explicit event packet needed") map onto `apps2/mud`'s skillchain/magic-burst system,
-  which has much richer real combat-event semantics than a flat HP delta can carry? Probably
-  needs the snapshot format to carry a genuine event list, not just position/HP, unlike
-  REDGARDEN's own deliberately-minimal wire protocol — a real protocol-design decision, not
-  resolved here.
+- ~~Which transport for the new listener~~ — **resolved in `REDGARDEN_MUD_BRIDGE_SPEC.md`: UDP**,
+  proposed port `2324` alongside telnet's `2323`.
+- ~~How does REDGARDEN's HP-delta-driven visual-effect idiom map onto apps2/mud's richer combat
+  semantics~~ — **named, not fully resolved, in `REDGARDEN_MUD_BRIDGE_SPEC.md`'s "Snapshot
+  format" section**: needs a genuine event list (`MudEvent{event_type, actor_id, target_id,
+  amount, label}`), not a flat state diff. The `event_type` enum itself is still open.
+- **New, found while writing the bridge spec**: `apps2/mud` has no continuous intra-zone movement
+  server-side at all — `cmdGo` only teleports between zones, `cmdAttack`'s auto-approach snaps
+  position directly onto the target. `PACKET_ARENA_MOVE` (a real, continuous click-to-move target
+  REDGARDEN's server steers toward every tick) has nothing to bridge onto without new server code.
+  This is now Milestone 3's actual scope, not assumed solvable by a packet decode alone.
+- **New, found while writing the bridge spec**: `PACKET_ARENA_ATTACK`'s `target_owner` is a
+  hero-slot index in REDGARDEN (fixed 2-hero 1v1 arena); `apps2/mud` targets mobs/players by
+  string ID. Real shape mismatch, not a rename — needs its own design pass.
 - Zone-authoring format (`HERO_BRIDGE_PREREQUISITES.md`'s own named gap) is a prerequisite for
   rendering *more than* Meadow, but not for Milestone 4's scoped-down single-zone proof.
 - Which REDGARDEN systems besides ability-slot UI are worth reusing — the shop-panel chrome maps
@@ -226,6 +236,7 @@ truth this doc builds on top of.
 | GFD engine/studio northstar | `GoblinFoxDragon/docs/NORTHSTAR.md` |
 | Zone-authoring gap (unrelated prerequisite, worth knowing) | `GoblinFoxDragon/docs2/HERO_BRIDGE_PREREQUISITES.md` |
 | Hero/lore content process | `GoblinFoxDragon/docs2/HERO_CONTENT_FRAMEWORK.md` |
+| Packet-level bridge spec (this doc's own Milestone 1) | `GoblinFoxDragon/docs2/specs/REDGARDEN_MUD_BRIDGE_SPEC.md` |
 | REDGARDEN's own current architecture and client history | `REDGARDEN/NORTHSTAR.md` §3.5 |
 | REDGARDEN wire protocol (fork source) | `REDGARDEN/packages/common/protocol.h` |
 | REDGARDEN connect-ticket auth (fork source) | `REDGARDEN/packages/common/hmac_sha256.h` |
