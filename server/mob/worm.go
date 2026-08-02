@@ -65,15 +65,28 @@ func wormID(i int) string {
 	return "worm-meadow-" + itoa(i)
 }
 
-// TownSquareWormSpawns returns the starter mob for zone 4 (Town Square, 2026-08-02 --
-// GoblinFoxDragon's Battlegrounds-GUI Town scene, founder: "implement the starter area worm").
-// A single worm, not Meadow's full ring of eight -- Town Square is a small starter area, not
-// Meadow's own open field. NewWorm defaults SceneID to 0 (Meadow); overridden to 4 here since
-// this is the one caller that isn't spawning into Meadow itself.
+// TownSquareWormSpawns returns the starter mobs for zone 4 (Town Square, 2026-08-02 --
+// GoblinFoxDragon's Battlegrounds-GUI Town scene, founder: "implement the starter area worm" ->
+// later, after playing it: "where's my starter zone outside of town with the worms?" -- a single
+// worm didn't read as "a starter zone," so this is now a small ring, same shape as
+// MeadowWormSpawns' own ring but with 4 worms instead of 8 (Town Square is still meant to be
+// smaller/denser than Meadow's own open field, just not a single decorative mob). NewWorm
+// defaults SceneID to 0 (Meadow); overridden to 4 here since this is the one caller that isn't
+// spawning into Meadow itself.
 func TownSquareWormSpawns() []Mob {
-	w := NewWorm("worm-town-0", Pos{X: 8, Y: 2, Z: 0})
-	w.SceneID = 4
-	return []Mob{w}
+	positions := []Pos{
+		{X: 8, Y: 2, Z: 0},
+		{X: -8, Y: 2, Z: 0},
+		{X: 0, Y: 2, Z: 8},
+		{X: 0, Y: 2, Z: -8},
+	}
+	worms := make([]Mob, len(positions))
+	for i, p := range positions {
+		w := NewWorm("worm-town-"+itoa(i), p)
+		w.SceneID = 4
+		worms[i] = w
+	}
+	return worms
 }
 
 func itoa(n int) string {

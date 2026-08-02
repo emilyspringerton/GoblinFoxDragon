@@ -7678,7 +7678,14 @@ func startWorldEventAPI(port int) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]string{"output": out})
+		// SetEscapeHTML(false): the real MUD output text uses ">>> LEVEL UP <<<"-style markers
+		// (cmdWS/awardXP's own real formatting) -- Go's default JSON encoder HTML-escapes
+		// <, >, & into </>/&, which the C client's own minimal JSON string
+		// extractor (http_client.h, "controlled shape, not a real parser") doesn't unescape.
+		// Found live wiring the client up to actually render this text.
+		enc := json.NewEncoder(w)
+		enc.SetEscapeHTML(false)
+		_ = enc.Encode(map[string]string{"output": out})
 	})
 	addr := fmt.Sprintf(":%d", port)
 	fmt.Printf("[WorldEvent API] listening on %s\n", addr)

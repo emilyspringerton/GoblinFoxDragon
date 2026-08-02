@@ -1,3 +1,45 @@
+## 2026-08-02 (13)
+
+- feat(town): chat + combat log panes, target cycling, real "1" attack, jump, worm ring expanded
+  to 4. Founder, several rapid follow-ups after killing the first worm: "where is my chat window
+  and combat log window in town? those are going to stay up during normal gameplay" -> "add tab
+  and shift tab to cycle through targets like wow" -> "to be clear we need to unify battlegrounds
+  combat with the mud combat on the dragonsnshit side dont touch our MOBA in REDGARDEN repo" ->
+  "where's my starter zone outside of town with the worms?" -> "add jump space bar".
+  - `chat_draw`/`combat_log_draw` (already built for Battlegrounds) now also render in Town, plus
+    full chat input handling (Enter to open/send, Escape to cancel) wired into Town's own event
+    loop -- same shape Battlegrounds' own chat handling already uses, checked first so it
+    consumes keystrokes before WASD/target-cycling/attack do.
+  - `server/mob/worm.go`'s `TownSquareWormSpawns` expanded from 1 worm to a real ring of 4 (same
+    shape as `MeadowWormSpawns`' own ring, smaller) -- "a single worm" didn't read as "a starter
+    zone." `town_draw_worms` (renamed from `town_draw_worm`) now draws all 4 at their real spawn
+    positions, matching mob IDs (`worm-town-0..3`).
+  - Tab/Shift+Tab cycle `g_town_target_index` through the 4 worms; the selected one renders with
+    an amber highlight, and the HUD shows `Target: worm-town-N`.
+  - Pressing "1" -- the same ability-slot keybind Battlegrounds already uses (Q/W/E rebound to
+    1/2/3 this fork) -- sends `attack <target>` to apps2/mud's real `/api/town/command`. This is
+    the concrete first step of "unify battlegrounds combat with the mud combat": the same keybind
+    language now drives the real MUD combat system, not a separate control scheme. REDGARDEN's
+    own repo untouched, as instructed.
+  - `town_poll_combat`: throttled (~1.5s) drain of the headless session's buffer, so background
+    auto-attack ticks show up in the combat log even without pressing anything. New
+    `town_send_command` shares the exact combat log pane Battlegrounds' own combat log already
+    uses (`combat_log_push`) -- filters out the bracketed status line and bare prompt so the pane
+    reads as combat events, not a raw MUD terminal dump.
+  - Real bug fixed on the server side while wiring this up: `/api/town/command`'s JSON response
+    used Go's default HTML-escaping, turning `>>> LEVEL UP <<<`-style real MUD text into
+    `>>>`-garbled output the client's minimal JSON extractor couldn't unescape.
+    Fixed with `Encoder.SetEscapeHTML(false)`.
+  - Space bar triggers a purely cosmetic vertical bounce (sine arc, `TOWN_JUMP_DURATION_MS`/
+    `TOWN_JUMP_HEIGHT`) -- Town has no verticality/collision system, so this doesn't interact
+    with anything, named honestly in its own doc comment. Applied via a local vp pre-multiplied
+    by a world-space Y translate for just the avatar's own draw call, not a change to
+    `draw_hero_model`'s shared signature (also used by the real match renderer).
+  Go build/vet + `server/mob` tests green. Native client build clean; visually verified under
+  Xvfb with synthetic input (Tab, "1", Space) against a real login: target highlight, real combat
+  text flowing into the pane ("worm-town-0 hits you for 8", "turns toward you"), real chat
+  history rendering, all confirmed live.
+
 ## 2026-08-02 (12)
 
 - feat(mud): real headless-session combat -- Town Square's worm is now genuinely fightable, not

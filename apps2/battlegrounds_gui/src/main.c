@@ -2818,14 +2818,22 @@ static void play_cast_tone(int slot) {
  * separate zone rather than reusing Meadow/zone 0). Position syncs (town_sync_position) tag
  * themselves with this scene_id. */
 #define TOWN_ZONE_ID 4
-/* TOWN_WORM_X/Z: the starter-area worm's real spawn position, mirrored by hand from
- * server/mob/worm.go's own TownSquareWormSpawns() -- same "kept in sync by hand" convention this
- * codebase already uses for static, never-moving positions (REDGARDEN's own fountain positions,
- * arena_bot's roster-size constant). Purely decorative here (see town_draw_worm's own doc
- * comment) -- not read from a live mob-state endpoint, since apps2/mud has no HTTP surface for
- * mob state at all yet. */
-#define TOWN_WORM_X 8.0f
-#define TOWN_WORM_Z 0.0f
+/* Town Square's real starter-area worms, mirrored by hand from server/mob/worm.go's own
+ * TownSquareWormSpawns() -- same "kept in sync by hand" convention this codebase already uses
+ * for static, never-moving positions (REDGARDEN's own fountain positions, arena_bot's
+ * roster-size constant). Real mob IDs, matching worm.go's own wormID("worm-town-"+i) exactly --
+ * these are what /api/town/command's "attack <name>" argument actually targets. Purely
+ * decorative on the render side (see town_draw_worms' own doc comment) -- not read from a live
+ * mob-state endpoint, since apps2/mud has no HTTP surface for mob position/HP at all yet. */
+#define TOWN_TARGET_COUNT 4
+static const char *TOWN_TARGET_NAMES[TOWN_TARGET_COUNT] = {
+    "worm-town-0", "worm-town-1", "worm-town-2", "worm-town-3"
+};
+static const float TOWN_TARGET_X[TOWN_TARGET_COUNT] = {8.0f, -8.0f, 0.0f, 0.0f};
+static const float TOWN_TARGET_Z[TOWN_TARGET_COUNT] = {0.0f, 0.0f, 8.0f, -8.0f};
+/* -1 = no target selected. Tab/Shift+Tab cycle (2026-08-02, founder: "add tab and shift tab to
+ * cycle through targets like wow"). */
+static int g_town_target_index = -1;
 
 /* g_town_char_loaded and the town_*_peak_ms trio are declared here (ahead of town_draw_hud,
  * which reads them) rather than down with the rest of Town's avatar/movement state below --
@@ -2865,20 +2873,31 @@ static void town_draw_ground(GLint loc_mvp, GLint loc_model, GLint loc_color, Ma
     }
 }
 
-/* town_draw_worm (2026-08-02, founder: "implement the starter area worm"): a small, static,
- * three-segment silhouette at TOWN_WORM_X/Z -- server/mob/worm.go's TownSquareWormSpawns() gives
- * zone 4 a real backend worm mob, but there is no HTTP surface for apps2/mud's mob state at all
- * (mobs are purely telnet-MUD-internal today), so this is a decorative placeholder, not a live
- * sync of the real mob's HP/position/AI. Same honest "inert for now" scope as M5's ability panes
- * -- named in the comment, not hidden behind a misleadingly "live" look. Reuses draw_hero_box,
- * the same stacked-box silhouette primitive every hero model already uses. */
-static void town_draw_worm(const Mat4 *vp, GLint loc_mvp, GLint loc_model, const Mesh *cube_mesh) {
-    draw_hero_box(TOWN_WORM_X, TOWN_WORM_Z, 0.5f, 0.18f, 0.0f, 0.35f, 0.18f, 0.22f, 1.0f,
-                  vp, loc_mvp, loc_model, cube_mesh);
-    draw_hero_box(TOWN_WORM_X, TOWN_WORM_Z, 0.0f, 0.16f, 0.0f, 0.3f, 0.16f, 0.2f, 1.0f,
-                  vp, loc_mvp, loc_model, cube_mesh);
-    draw_hero_box(TOWN_WORM_X, TOWN_WORM_Z, -0.45f, 0.14f, 0.0f, 0.22f, 0.14f, 0.16f, 1.0f,
-                  vp, loc_mvp, loc_model, cube_mesh);
+/* town_draw_worms (2026-08-02, founder: "implement the starter area worm" -> "where's my starter
+ * zone outside of town with the worms?" -> a ring of TOWN_TARGET_COUNT, not one): server/mob/
+ * worm.go's own TownSquareWormSpawns() gives zone 4 real backend worm mobs, but there is no HTTP
+ * surface for apps2/mud's mob position/HP at all (only combat text through
+ * /api/town/command's own output), so these are decorative placeholders at their real spawn
+ * positions, not a live sync of position/HP. Same honest "inert for now" scope as M5's ability
+ * panes -- named in the comment, not hidden behind a misleadingly "live" look. The currently
+ * Tab-selected target (g_town_target_index) is drawn brighter -- the one real visual affordance
+ * for "what am I about to attack." Reuses draw_hero_box, the same stacked-box silhouette
+ * primitive every hero model already uses. */
+static void town_draw_worms(const Mat4 *vp, GLint loc_mvp, GLint loc_model, GLint loc_color, const Mesh *cube_mesh) {
+    for (int i = 0; i < TOWN_TARGET_COUNT; i++) {
+        float wx = TOWN_TARGET_X[i], wz = TOWN_TARGET_Z[i];
+        if (i == g_town_target_index) {
+            glUniform4f_(loc_color, 0.85f, 0.65f, 0.15f, 1.0f); /* selected: amber highlight */
+        } else {
+            glUniform4f_(loc_color, 0.5f, 0.38f, 0.16f, 1.0f); /* earthy worm brown */
+        }
+        draw_hero_box(wx, wz, 0.5f, 0.18f, 0.0f, 0.35f, 0.18f, 0.22f, 1.0f,
+                      vp, loc_mvp, loc_model, cube_mesh);
+        draw_hero_box(wx, wz, 0.0f, 0.16f, 0.0f, 0.3f, 0.16f, 0.2f, 1.0f,
+                      vp, loc_mvp, loc_model, cube_mesh);
+        draw_hero_box(wx, wz, -0.45f, 0.14f, 0.0f, 0.22f, 0.14f, 0.16f, 1.0f,
+                      vp, loc_mvp, loc_model, cube_mesh);
+    }
 }
 
 /* town_queue_button_rect: shared by the draw call and the click hit-test below so the two can
@@ -2913,13 +2932,11 @@ static void town_draw_hud(int win_w, int win_h, int queue_available) {
     /* Ability panes (M5, 2026-08-02, founder: "i dont have an avatar or ability panes - we need
        to bring those over from the battlegrounds"). Same draw_ability_tile, layout, and
        bottom-center placement Battlegrounds' own ability bar uses, for visual continuity between
-       the two scenes. Deliberately inert, not faked as functional: Town has no cast/combat
-       system, no per-job skill data wired in from apps2/mud's real weapon-skill system, and no
-       mana -- every tile is permanently "ready" (cooldown_ms=0, not active, never mana-blocked)
-       and labeled generically rather than with a real ability name, since there isn't one yet.
-       Only shown once a real character has actually loaded (same "inert for bots/no-identity
-       launches" convention chat_draw already uses) -- an avatar-less Town has nothing for these
-       tiles to represent. */
+       the two scenes. Slot 1 is real now (founder: "unify battlegrounds combat with the mud
+       combat" -- pressing it sends the real MUD attack command, town_send_command); 2/3 stay
+       inert, no cast/combat system wired to them yet. Only shown once a real character has
+       actually loaded (same "inert for bots/no-identity launches" convention chat_draw already
+       uses) -- an avatar-less Town has nothing for these tiles to represent. */
     if (g_town_char_loaded) {
         float tile_size = 56.0f;
         float tile_pitch = 66.0f;
@@ -2927,11 +2944,26 @@ static void town_draw_hud(int win_w, int win_h, int queue_available) {
         float tiles_x0 = (float)win_w / 2.0f - tiles_total_w / 2.0f;
         float tiles_y = 90.0f;
         draw_ability_tile(tiles_x0, tiles_y, tile_size, 0, &town_q_peak_ms,
-                           0, 0, "1", "(unassigned)", 0.3f, 0.7f, 1.0f);
+                           0, 0, "1", "Attack", 0.3f, 0.7f, 1.0f);
         draw_ability_tile(tiles_x0 + tile_pitch, tiles_y, tile_size, 0, &town_w_peak_ms,
                            0, 0, "2", "(unassigned)", 0.7f, 0.3f, 1.0f);
         draw_ability_tile(tiles_x0 + tile_pitch * 2.0f, tiles_y, tile_size, 0, &town_r_peak_ms,
                            0, 0, "3", "(unassigned)", 1.0f, 0.85f, 0.2f);
+
+        /* Target readout + control hints (2026-08-02, "add tab and shift tab to cycle through
+           targets like wow"): directly above the ability bar, same "put the info near the thing
+           it explains" placement WoW's own target frame uses relative to the action bar. */
+        char target_line[64];
+        if (g_town_target_index >= 0) {
+            snprintf(target_line, sizeof(target_line), "Target: %s", TOWN_TARGET_NAMES[g_town_target_index]);
+            glColor3f(0.85f, 0.65f, 0.15f);
+        } else {
+            snprintf(target_line, sizeof(target_line), "Target: none");
+            glColor3f(0.6f, 0.6f, 0.6f);
+        }
+        draw_string(target_line, tiles_x0, tiles_y + tile_size + 10.0f, 10);
+        glColor3f(0.5f, 0.55f, 0.55f);
+        draw_string("TAB/SHIFT+TAB - cycle target   1 - attack   SPACE - jump", tiles_x0 - 40.0f, tiles_y + tile_size + 28.0f, 8);
     }
 
     if (!queue_available) return;
@@ -2973,6 +3005,23 @@ static int g_town_prev_facing_valid = 0;
  * once, on a successful town_fetch_character(). */
 static uint32_t g_town_last_sync_ms = 0;
 static float g_town_synced_x = 0.0f, g_town_synced_z = 0.0f;
+/* g_town_jump_y_offset: purely cosmetic vertical bounce (2026-08-02, founder: "add jump space
+ * bar") -- Town has no verticality/collision system at all yet, so this is a visual hop, not a
+ * real physics jump (no gravity, can't jump onto/over anything). Triggered once per press
+ * (SDL_KEYDOWN, not held), animates up and back down over JUMP_DURATION_MS. */
+static float g_town_jump_y_offset = 0.0f;
+static float g_town_jump_age_ms = 9999.0f; /* >= JUMP_DURATION_MS = not jumping */
+#define TOWN_JUMP_DURATION_MS 400.0f
+#define TOWN_JUMP_HEIGHT 1.3f
+
+/* Town's own MUD API port (2026-08-02, "the real MUD combat system" / founder: "unify
+ * battlegrounds combat with the mud combat on the dragonsnshit side" -- pressing "1", the same
+ * ability-slot keybind Battlegrounds already uses, triggers the real MUD attack command against
+ * the current target rather than a separate new control scheme). apps2/mud's /api/town/command
+ * lives on the same box as IDUNA in this deployment (:7171, apps2/mud's existing world-events
+ * API port) -- reuses iduna_host, just a different port, rather than a whole second
+ * host-config surface for a same-box service. */
+#define TOWN_MUD_API_PORT 7171
 
 /* town_hero_id_for_job: the one real, non-guessed correspondence in this mapping is
  * ARENA_HERO_WARRIOR (arena_game.h's own doc comment: "DragonsNShit's Warrior job, ported as
@@ -3045,6 +3094,54 @@ static void town_sync_position(uint32_t now, int force) {
     http_patch_json(iduna_host, iduna_port, path, g_chat_jwt, body, resp, sizeof(resp), &status);
     /* Best-effort, same silent-discard convention apps2/mud's own disconnect-time position sync
        already uses -- a sync failure shouldn't block Town's own local movement. */
+}
+
+/* town_send_command: POST to apps2/mud's own /api/town/command (real headless-session combat,
+ * GoblinFoxDragon `3a2940d`), parse the "output" field, and push meaningful lines into the
+ * SHARED combat log pane (combat_log_push -- the exact same ring buffer/pane Battlegrounds' own
+ * combat log already uses; founder: "unify battlegrounds combat with the mud combat on the
+ * dragonsnshit side" -- sharing the display surface, not just the "1/2/3" keybind language, is
+ * the concrete first step). Filters out pure noise (blank lines, the bracketed status line, the
+ * bare "> " prompt) so the log reads as combat events, not a raw MUD terminal dump. Best-effort,
+ * same convention as chat_poll -- a request failure just means nothing new shows up this poll. */
+static void town_send_command(const char *command) {
+    if (!g_town_char_id[0]) return;
+    char cmd_esc[128];
+    json_escape_into(command, cmd_esc, sizeof(cmd_esc));
+    char body[256];
+    snprintf(body, sizeof(body), "{\"character_id\":\"%s\",\"command\":\"%s\"}", g_town_char_id, cmd_esc);
+    char resp[4096];
+    int status = 0;
+    if (http_post_json(iduna_host, TOWN_MUD_API_PORT, "/api/town/command", NULL, body, resp, sizeof(resp), &status) != 0) return;
+    if (status != 200) return;
+    char out[4096];
+    if (!http_extract_json_string_field(resp, "output", out, sizeof(out))) return;
+
+    char *line = out;
+    while (line && *line) {
+        char *nl = strstr(line, "\r\n");
+        if (nl) *nl = '\0';
+        char *trimmed = line;
+        while (*trimmed == ' ' || *trimmed == '\t') trimmed++;
+        size_t tlen = strlen(trimmed);
+        while (tlen > 0 && (trimmed[tlen - 1] == ' ' || trimmed[tlen - 1] == '\t')) trimmed[--tlen] = '\0';
+        int is_status_line = (strncmp(trimmed, "[ Lv.", 5) == 0);
+        int is_prompt = (tlen == 1 && trimmed[0] == '>');
+        if (tlen > 0 && !is_status_line && !is_prompt) {
+            combat_log_push(trimmed);
+        }
+        line = nl ? nl + 2 : NULL;
+    }
+}
+
+/* town_poll_combat: throttled drain (empty command) so background auto-attack ticks -- "You hit
+ * for N damage," the worm's own retaliation, kill/XP/loot messages -- show up in the combat log
+ * even when the player isn't actively pressing anything. Same ~1.5s cadence as chat_poll. */
+static uint32_t g_town_last_combat_poll_ms = 0;
+static void town_poll_combat(uint32_t now) {
+    if (!g_town_char_id[0] || now - g_town_last_combat_poll_ms < 1500) return;
+    g_town_last_combat_poll_ms = now;
+    town_send_command("");
 }
 
 int main(int argc, char *argv[]) {
@@ -3227,9 +3324,67 @@ int main(int argc, char *argv[]) {
         if (in_town) {
             SDL_Event te;
             while (SDL_PollEvent(&te)) {
+                /* Chat input, checked first and unconditionally -- exact same shape/ordering as
+                   Battlegrounds' own chat handling further down in this file (see its own doc
+                   comment): while focused, this consumes every event itself so WASD/target-
+                   cycling/attack never also react to the same keystrokes a player is typing. */
+                if (chat_input_active) {
+                    if (te.type == SDL_QUIT) { running = 0; }
+                    else if (te.type == SDL_TEXTINPUT) {
+                        size_t len = strlen(chat_input_buf), add = strlen(te.text.text);
+                        if (len + add < CHAT_INPUT_MAX - 1) strcat(chat_input_buf, te.text.text);
+                    } else if (te.type == SDL_KEYDOWN) {
+                        if (te.key.keysym.sym == SDLK_RETURN || te.key.keysym.sym == SDLK_KP_ENTER) {
+                            chat_send(chat_input_buf);
+                            chat_input_buf[0] = '\0';
+                            chat_input_active = 0;
+                            SDL_StopTextInput();
+                        } else if (te.key.keysym.sym == SDLK_ESCAPE) {
+                            chat_input_buf[0] = '\0';
+                            chat_input_active = 0;
+                            SDL_StopTextInput();
+                        } else if (te.key.keysym.sym == SDLK_BACKSPACE) {
+                            size_t len = strlen(chat_input_buf);
+                            if (len > 0) chat_input_buf[len - 1] = '\0';
+                        }
+                    }
+                    continue;
+                }
+                if (te.type == SDL_KEYDOWN && (te.key.keysym.sym == SDLK_RETURN || te.key.keysym.sym == SDLK_KP_ENTER) && g_chat_jwt[0]) {
+                    chat_input_active = 1;
+                    chat_input_buf[0] = '\0';
+                    SDL_StartTextInput();
+                    continue;
+                }
                 if (te.type == SDL_QUIT) { running = 0; }
                 else if (te.type == SDL_WINDOWEVENT && te.window.event == SDL_WINDOWEVENT_RESIZED) {
                     win_w = te.window.data1; win_h = te.window.data2;
+                }
+                else if (te.type == SDL_KEYDOWN && te.key.keysym.sym == SDLK_TAB) {
+                    /* Target cycling (2026-08-02, founder: "add tab and shift tab to cycle
+                       through targets like wow"). SDL's own modifier-state flag, same idiom
+                       already used elsewhere in this file (KMOD_SHIFT checks). */
+                    int shift = (SDL_GetModState() & KMOD_SHIFT) != 0;
+                    if (g_town_target_index < 0) {
+                        g_town_target_index = shift ? TOWN_TARGET_COUNT - 1 : 0;
+                    } else if (shift) {
+                        g_town_target_index = (g_town_target_index - 1 + TOWN_TARGET_COUNT) % TOWN_TARGET_COUNT;
+                    } else {
+                        g_town_target_index = (g_town_target_index + 1) % TOWN_TARGET_COUNT;
+                    }
+                }
+                else if (te.type == SDL_KEYDOWN && te.key.keysym.sym == SDLK_1) {
+                    /* "1" -- same ability-slot keybind Battlegrounds already uses (Q/W/E rebound
+                       to 1/2/3 this same fork), founder: "unify battlegrounds combat with the
+                       mud combat" -- the real MUD attack command, not a separate control scheme. */
+                    if (g_town_target_index >= 0) {
+                        char cmd[80];
+                        snprintf(cmd, sizeof(cmd), "attack %s", TOWN_TARGET_NAMES[g_town_target_index]);
+                        town_send_command(cmd);
+                    }
+                }
+                else if (te.type == SDL_KEYDOWN && te.key.keysym.sym == SDLK_SPACE) {
+                    if (g_town_jump_age_ms >= TOWN_JUMP_DURATION_MS) g_town_jump_age_ms = 0.0f;
                 }
                 else if (te.type == SDL_MOUSEBUTTONDOWN && te.button.button == SDL_BUTTON_RIGHT) {
                     dragging_cam = 1; last_mx = te.button.x; last_my = te.button.y;
@@ -3322,6 +3477,21 @@ int main(int argc, char *argv[]) {
                                            &g_town_prev_facing_valid, &g_town_facing_rad);
                 town_sync_position(now, 0);
 
+                /* Jump (2026-08-02, founder: "add jump space bar") -- purely cosmetic vertical
+                   bounce, see g_town_jump_y_offset's own doc comment. Sine arc so it eases in/out
+                   rather than moving at a constant speed; g_town_jump_age_ms >= TOWN_JUMP_DURATION_MS
+                   is the "not jumping" resting state, offset pinned to 0. */
+                if (g_town_jump_age_ms < TOWN_JUMP_DURATION_MS) {
+                    g_town_jump_age_ms += (float)dt;
+                    float jt = g_town_jump_age_ms / TOWN_JUMP_DURATION_MS;
+                    g_town_jump_y_offset = (jt < 1.0f) ? sinf(jt * 3.14159265f) * TOWN_JUMP_HEIGHT : 0.0f;
+                } else {
+                    g_town_jump_y_offset = 0.0f;
+                }
+
+                chat_poll(now); /* rate-limited internally, safe to call every frame */
+                town_poll_combat(now); /* rate-limited internally, safe to call every frame */
+
                 glViewport(0, 0, win_w, win_h);
                 glClearColor(0.5f, 0.75f, 0.92f, 1.0f); /* open-sky blue, distinct from battlegrounds' dark-green backdrop */
                 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -3333,15 +3503,25 @@ int main(int argc, char *argv[]) {
                 glUseProgram_(prog);
                 glUniform3f_(loc_light, 0.4f, 0.8f, 0.3f);
                 town_draw_ground(loc_mvp, loc_model, loc_color, vp, &plane_mesh);
-                glUniform4f_(loc_color, 0.5f, 0.38f, 0.16f, 1.0f); /* earthy worm brown */
-                town_draw_worm(&vp, loc_mvp, loc_model, &cube_mesh);
+                town_draw_worms(&vp, loc_mvp, loc_model, loc_color, &cube_mesh);
                 if (g_town_char_loaded) {
+                    /* jump offset applied by pre-multiplying vp with a world-space Y translate --
+                       mat4_translate(0,Y,0) * (vp * model) = (vp * model) shifted by (0,Y,0) in
+                       world space, regardless of whatever squish/rotation is already baked into
+                       draw_hero_model's own internal model matrix. Scoped to just this one draw
+                       call (a local vp copy), not a change to draw_hero_model's shared signature
+                       -- that function is also called from the real match renderer further down
+                       in this file, untouched here. */
+                    Mat4 jump_t = mat4_translate(0.0f, g_town_jump_y_offset, 0.0f);
+                    Mat4 vp_avatar = mat4_multiply(&jump_t, &vp);
                     glUniform4f_(loc_color, 0.1f, 0.8f, 0.95f, 1.0f); /* same "my hero" cyan Battlegrounds uses */
                     draw_hero_model(town_hero_id_for_job(g_town_job), g_town_x, g_town_z,
-                                     g_town_facing_rad, 1.0f, &vp, loc_mvp, loc_model, &cube_mesh);
+                                     g_town_facing_rad, 1.0f, &vp_avatar, loc_mvp, loc_model, &cube_mesh);
                 }
 
                 town_draw_hud(win_w, win_h, queue_host != NULL);
+                chat_draw(win_w, win_h);
+                combat_log_draw(win_w, win_h);
 
                 SDL_GL_SwapWindow(win);
                 SDL_Delay(16);
