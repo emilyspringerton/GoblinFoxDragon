@@ -3478,7 +3478,23 @@ int main(int argc, char *argv[]) {
                     int reconnected = queue_host ? net_find_and_connect(queue_host, queue_port)
                                                   : net_connect(connect_host, connect_port);
                     if (!reconnected) {
-                        fprintf(stderr, "[arena client] requeue failed -- matchmaker/bot pool may be down\n");
+                        /* Real bug found live (2026-08-02, founder: "if i dont requeue fast
+                           enough in GFD when i requeue it is like an empty game it says
+                           matchmaking fail"): arena_state was already memset above, so falling
+                           through here with no further action left the player staring at a
+                           blank/empty arena forever -- no heroes, no nodes, no way back except
+                           force-quitting. Root cause is a REDGARDEN-side race (arena_server's own
+                           60s no-lobby-progress watchdog can kill a match before a slow requeue
+                           finishes connecting to it) that's explicitly out of scope to touch this
+                           session -- REDGARDEN's server/matchmaker stay exactly as they are. This
+                           is the client-side half of the fix: land back in Town instead of a dead
+                           blank scene, same real escape hatch the RETURN TO TOWN button already
+                           gives, so a failed requeue is recoverable (click QUEUE FOR
+                           BATTLEGROUNDS again) instead of a silent dead end. */
+                        fprintf(stderr, "[arena client] requeue failed -- matchmaker/bot pool may "
+                                        "be down, or the match timed out before connecting. "
+                                        "Returning to Town.\n");
+                        in_town = 1;
                     } else {
                         printf("[arena client] requeue connected -- hero slot %d\n", my_owner);
                     }

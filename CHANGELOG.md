@@ -1,3 +1,20 @@
+## 2026-08-02 (7)
+
+- fix(town): a failed requeue now lands back in Town instead of a dead blank arena. Founder,
+  live bug report: "if i dont requeue fast enough in GFD when i requeue it is like an empty game
+  it says matchmaking fail." Root cause: `arena_server`'s own 60s "no lobby progress" watchdog
+  (confirmed live in `var/logs/matchmaker-bots.log`: `No lobby progress in 60s (phase=0, 19/20
+  connected) -- shutting down.`) can kill a freshly-matched game before a slow requeue finishes
+  connecting to it -- `net_find_and_connect`/`net_connect` then correctly return failure, but the
+  requeue handler had already `memset` `arena_state` to zero and did nothing further on failure,
+  leaving the player staring at a blank arena (no heroes, no nodes) with no way back except
+  force-quitting. That's REDGARDEN's own server/matchmaker code, explicitly out of scope this
+  session (founder: "keep the battlegrounds working as is do not change that keep that server
+  and matchmaking as is") -- fixed on the client side instead: a failed requeue now sets
+  `in_town = 1`, landing the player back in a real, working Town scene where "QUEUE FOR
+  BATTLEGROUNDS" can just be clicked again, same escape hatch the RETURN TO TOWN button already
+  provides.
+
 ## 2026-08-02 (6)
 
 - feat(town): "RETURN TO TOWN" button on the post-match win/lose screen, alongside the existing
