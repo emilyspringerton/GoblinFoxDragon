@@ -1,4 +1,19 @@
-## 2026-07-31
+## 2026-08-02
+
+- ci: `GoblinFoxDragon Factory` now also cross-compiles REDGARDEN's `apps/arena` (the real MUD
+  GUI frontend, `REDGARDEN_GUI_NORTHSTAR.md`) as a Windows artifact. The existing
+  `GoblinFoxDragon.exe` build target is `apps/lobby`, a stale SHANKPIT-lobby fork (window title
+  still literally says "SHANKPIT", boots into SHANKPIT's own `SCENE_GARAGE_OSAKA`) -- not the
+  real MMO client. New steps check out REDGARDEN (public repo, no token needed) and cross-compile
+  its `apps/arena` with the same mingw/SDL2 toolchain this workflow already sets up, mirroring
+  REDGARDEN's own `ci.yml` Windows step verbatim so the two pipelines can't silently drift.
+  Bundled as `DragonsNShit_MUD_GUI_Client_*.zip` (exe + `SDL2.dll` + `PLAY.bat`, no
+  `REDGARDEN_TICKET_SECRET` needed -- the client's own real IDUNA login screen mints a real
+  ticket), uploaded alongside the existing artifacts.
+- docs(redgarden-gui-northstar): Milestone 5's "no GUI login path" gap closed -- real
+  email+password login screen shipped in REDGARDEN's `apps/arena` (`9c98342` + Winsock fix
+  `e6fb748`), backed by a new IDUNA endpoint (`POST /api/v1/redgarden/self-ticket`, `5cd0fd0`).
+  Working test account (`test@test.com`/`testtest`, character `TestWarrior`) verified end-to-end.
 
 - docs(redgarden-gui-northstar): Milestone 5 (end-to-end validation) attempted honestly --
   marked PARTIAL, not DONE. Direct smoketest of `cmdBattlegrounds`'s exact real call sequence

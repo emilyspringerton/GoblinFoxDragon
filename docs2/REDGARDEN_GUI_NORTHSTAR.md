@@ -8,8 +8,21 @@ gui" → "like old school runescape."*
 **Status:** Milestones 1-4 shipped 2026-07-31 (Warrior's real weapon skills, real skillchain
 resonance, a real Battlegrounds entry point minting real IDUNA tickets, and real Flow rewards
 credited back to the player's persistent character on match end) — only Milestone 5
-(end-to-end validation) left. No GUI login path exists yet end-to-end (a player still has to run
-REDGARDEN's client by hand with the printed command) — that's still an open, real gap.
+(end-to-end validation) left.
+
+**Update 2026-08-01/02:** the "no GUI login path" gap named above is closed. `apps/arena` now
+shows a real email+password login screen (IDUNA `POST /api/v1/auth/email/login` +
+`POST /api/v1/redgarden/self-ticket`, REDGARDEN `9c98342`) before connecting, when launched
+without `--ticket`/a bot-agent identity — a player no longer has to run the client by hand with a
+printed command. Also fixed the Windows build of `packages/common/http_client.h`, which was a
+stub that always failed — without it the login screen would render on the real distributed
+`RedGarden.exe` but never actually work (`e6fb748`). GFD's own CI (`GoblinFoxDragon Factory`)
+now also cross-compiles REDGARDEN's `apps/arena` as `DragonsNShit_MUD_GUI_Client_*.zip`, since
+that's the real MUD GUI frontend, not the stale SHANKPIT-lobby fork `apps/lobby` was building
+(GoblinFoxDragon `12f4122`). A working test account (`test@test.com`/`testtest`, character
+`TestWarrior`) exists for hands-on verification. Still open, not fixed here: no TLS on the
+login/ticket HTTP calls (a real concern once this is reachable over the open internet, not just
+same-LAN) and the interactive GUI-input-automation / skillchain-aware-bot gaps §9 already named.
 
 **CORRECTION 2026-07-31 (major, supersedes §§1/4/5/6 below as they originally read):**
 founder: *"some of the docs say we arent bringing redgardens gameplay just the ui thats not right
@@ -260,7 +273,7 @@ dragonsnshit mmo to feel like redgarden... battlegrounds for dragonsnshit is red
 | 2 | Skillchain resonance in `arena_game.c` | Port `apps2/mud`'s own `skillchain.Chain` detection/scoring into REDGARDEN's tick loop; new, distinct visual event (not folded into the generic `attack_flash`) when two players' casts chain | **DONE** 2026-07-31 — `ArenaResonance` + `resonance_combo` (a straight C port of `server/skillchain.combinationTable`, same real tiers/multipliers), tracked per-target (`sc_pending_attrs`/`sc_pending_age_ms`, real FFXI "chain forms on the same target" rule) via the new `apply_weapon_skill_damage` choke point every real weapon-skill cast routes through; `skillchain_flash_tier` is the new distinct wire-visible event, not folded into `cast_flash_slot`. Verified real: Warrior's own Q(Scission)→R(Induration+Reverberation) closes a real Tier 2 Distortion chain per the actual combination table. REDGARDEN `21ad0dc` |
 | 3 | Entry-point hook | Persistent world gains a Battlegrounds entry point (portal/NPC/command, §4.3) that mints a real REDGARDEN connect-ticket via IDUNA for the player's own identity, lets them pick a job (not a REDGARDEN hero), and hands off to `apps/matchmaker` | **DONE** 2026-07-31 (§4.3's own open question resolved as a discrete `battlegrounds`/`bg` command, cmdGo's own precedent) — `apps2/mud` real player_id (was `conn.RemoteAddr().String()`, not a UUID; now a persisted `crypto/rand` UUIDv4), `idunaclient` real IDUNA login exchange (a genuine pre-existing bug found+fixed: every call was sending the raw agent secret as a Bearer token, which IDUNA's real JWT verification has always rejected — confirmed live against the running service), new IDUNA `POST /api/v1/redgarden/player-ticket` + `DRAGONSNSHIT-MUD` agent (opposite-scoped sibling to the bot-only ticket endpoint), REDGARDEN `apps/arena --ticket` flag. Job pick is a stub (Warrior is the only ported job); "hands off to apps/matchmaker" means printing the exact command line to run REDGARDEN's own client with, since telnet can't launch a GUI process. IDUNA `f336df2`, GoblinFoxDragon (this commit), REDGARDEN `20ce8cc` |
 | 4 | Reward-credit hook | `arena_server`'s match-end reporting extended to also credit the player's persistent DragonsNShit character via IDUNA (Flow/faction points/cosmetics — exact reward shape not designed here) | **DONE** 2026-07-31 — `report_match_result` now credits Flow (100 win / 25 loss, a real first number not a design review's output) via new IDUNA `GET /api/v1/characters/by-player/:player_id` + the existing `gold/credit` endpoint. Real DragonsNShit players only — a REDGARDEN-only player's real 404 is expected, not an error. `packages/common/http_client.h` gained GET/PATCH (only POST existed). IDUNA `33b7a0d`, REDGARDEN `1fcf09e` |
-| 5 | End-to-end validated | A real persistent-world character queues, picks Warrior, plays a real match casting real weapon skills through REDGARDEN's UI, chains a real skillchain, and returns to the persistent world with a real credited reward | **PARTIAL** 2026-07-31 — see §9 below for the full honest breakdown: the identity/ticket chain is live-verified end-to-end and fast (ms, not the seconds a flaky telnet test harness made it look like); the full interactive match-play half (draft → cast → chain → credit) is not, and needs either GUI-input automation or a skillchain-aware bot, neither built here |
+| 5 | End-to-end validated | A real persistent-world character queues, picks Warrior, plays a real match casting real weapon skills through REDGARDEN's UI, chains a real skillchain, and returns to the persistent world with a real credited reward | **PARTIAL** 2026-08-02 — the identity/ticket chain is live-verified end-to-end and fast (ms). The manual "run REDGARDEN's client by hand with a printed command" step this milestone originally accepted is gone: a real GUI login screen (REDGARDEN `9c98342` + Winsock fix `e6fb748`) now does that step itself, verified with a real working test account (`test@test.com`/`testtest`) and confirmed rendering correctly under Xvfb. Still open: the full interactive match-play half (draft → cast → chain → credit) needs either GUI-input automation or a skillchain-aware bot, neither built here (see §9) |
 | 6 | (Optional, separate track) Persistent-world backend unification | `docs2/DRAGONSNSHIT_TWO_BACKENDS_AUDIT.md`'s own recommendation — unify `apps2/mud`'s RPG logic into `apps2/server-go`'s loop. Valuable for the persistent-world half on its own merits; not a blocker for Milestones 1-5 above | NOT STARTED |
 
 ---
