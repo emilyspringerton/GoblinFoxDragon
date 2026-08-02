@@ -4,9 +4,12 @@
 instanced (spawned per-group like a Battlegrounds match, ends when cleared/left, not a persistent
 walkable zone) and procedural (rooms/corridors reassembled from a tile set, different layout each
 visit, not a fixed hand-built map like Town) -> "use some of the arena heroes as dungeon mobs and
-bosses" -> "also the different minions whatever im uploading some art in a second." Art direction
-pending -- this doc covers the architecture; art/enemy-roster specifics land as a follow-up once
-shared, named as an open gap below rather than guessed at.*
+bosses" -> "also the different minions whatever im uploading some art in a second" -> "feel free
+to chunky 2 d sprites rendered in 3d if thats easier" -> two of three uploaded art files landed
+(GoblinFoxDragon commit b2266f6): `kikoryu.jpeg` (a detailed painted boss-tier creature -- fire/
+wing/claw dragon-wolf-goblin hybrid) and `art2.jpeg` (a full sheet of rough minion concept
+sketches -- small abstract eldritch creatures, big eyes, checkered/grid body textures, tentacles,
+spikes). Third file still pending as of this writing.*
 
 ---
 
@@ -52,8 +55,23 @@ arena's own movement/camera code rather than from nothing.
 ability/AI logic (`apps/arena_bot`, `apps/client/bot_main.c`) built for PvP. Using them as
 dungeon enemies means a dungeon encounter is "fight an AI-controlled hero kit," not a new enemy
 AI system built from scratch -- the real work is *driving* that existing AI as a hostile NPC
-inside a dungeon instance rather than as a bot-pool PvP participant, plus whatever minion/boss
-distinction the founder's pending art direction implies (not yet specified).
+inside a dungeon instance rather than as a bot-pool PvP participant. Art now landed for the two
+tiers this implies: `kikoryu.jpeg` reads as boss-tier (one detailed, dramatic creature per
+encounter, matching "a boss in the final room" in §3.3), `art2.jpeg`'s sheet reads as the minion
+roster (many smaller, simpler creature types populating regular rooms) -- exact mapping of which
+arena hero kit's AI drives which visual is not decided here, just that the two-tier split the art
+itself already suggests lines up with the boss/minion split already in this doc.
+
+**Rendering approach** (founder: "feel free to chunky 2 d sprites rendered in 3d if thats
+easier"): confirmed nothing in `apps2/battlegrounds_gui/src/main.c` loads textures or does
+billboard rendering today -- no `SDL_image`/`IMG_Load`, no `glTexImage2D`, nothing. Every existing
+model (heroes, worms, buildings) is stacked flat-colored boxes. This means billboarded sprites
+(camera-facing textured quads, Diablo 2's own actual original technique) and "real" 3D box-art
+models are BOTH genuinely new client infrastructure -- sprites aren't a shortcut around existing
+capability, they're the simpler of two things that don't exist yet. Chosen: chunky 2D sprites,
+per founder direction -- needs a texture-loading path (`SDL_image` or a raw-format loader) and a
+billboard quad (a single camera-facing quad per mob, not `upload_mesh`'s pos+normal-only
+triangle-mesh path) as new, separate additions to the render pipeline.
 
 ## 2. The mechanism
 
@@ -101,18 +119,22 @@ here.
 ### 3.4 Client render mode
 
 New mode in `apps2/battlegrounds_gui`: walk a generated 3D space (starting from the arena's own
-movement/camera/click-to-move code, Town's box-art style for geometry), fight hero-kit-driven
-mobs using Battlegrounds' existing combat rendering (health bars, ability slots, hit feedback --
-all already built, just pointed at PvE targets instead of PvP).
+movement/camera/click-to-move code; room/corridor geometry can stay Town's flat box-art style,
+no need to invent new geometry rendering). Mobs/bosses render as billboarded 2D sprites (§1's
+"Rendering approach") rather than box-stack models -- a genuinely new small subsystem (texture
+loading + camera-facing quad draw call per mob) sitting alongside, not replacing, the existing
+`upload_mesh`/`draw_mesh` geometry path. Combat itself reuses Battlegrounds' existing rendering
+(health bars, ability slots, hit feedback -- all already built, just pointed at PvE targets
+instead of PvP).
 
 ## 4. What this is not
 
 Not a persistent walkable zone -- ends and tears down like a Battlegrounds match, per founder
 direction. Not built on Caves' own generator -- that scene stays exactly as it is; a dungeon gets
 its own new, seeded, multi-room generator. Not a new enemy AI system -- mobs/bosses are REDGARDEN's
-existing hero kits repurposed as hostile NPCs, not new content built from scratch. Not
-art-directed yet -- minion/boss specifics wait on the founder's pending upload, named as an open
-gap rather than guessed at.
+existing hero kits repurposed as hostile NPCs, not new content built from scratch. Not fully
+art-directed yet -- two of three uploaded files landed (boss + minion-sheet direction, §1), the
+third still pending; not full 3D character models -- billboarded sprites, per founder direction.
 
 ## 5. Open questions (not resolved here)
 
@@ -131,7 +153,8 @@ gap rather than guessed at.
 | 2 | Seeded room/corridor generator | Multi-room layout, connected, reachable entrance-to-boss-room, regenerates differently per instance | NOT STARTED |
 | 3 | Mob/boss population from arena heroes | Seeded spawn table places hero-kit-driven hostile NPCs per room + a boss in the final room, using existing `apps/arena_bot` AI | NOT STARTED |
 | 4 | Client dungeon render mode | New mode walks the generated space, fights populated mobs, using Battlegrounds' existing combat HUD | NOT STARTED |
-| 5 | Art direction incorporated | Minion/boss roster and visual style from the founder's art drop, once shared | NOT STARTED |
+| 4.5 | Billboard sprite subsystem | New texture-loading + camera-facing quad rendering path (nothing like this exists today), mobs/bosses render as chunky 2D sprites in the 3D space | NOT STARTED |
+| 5 | Art direction incorporated | 2 of 3 files landed (`kikoryu.jpeg` boss, `art2.jpeg` minion sheet) -- sprite sheets cut from this art, third file still pending | IN PROGRESS |
 | 6 | Rewards + party queue flow | Resolves the open questions in §5 | NOT STARTED |
 
 ## 7. Related docs
