@@ -53,10 +53,10 @@ partly motivating one. Not resolved here -- flagged as a real open question, see
 ```
 4 jungle camps, one at each cardinal edge midpoint (N/S/E/W), between the 2 fountain corners
 and the 2 shop corners
-    -> each camp spawns regular minions on a wave timer (reusing the lane-creep wave/march
-       pattern) + one boss ("Heavenly King") per camp
-    -> killing a King grants a real timed buff to the killer/team (reusing the existing
-       powerup buff system, a new ArenaPowerupKind-shaped entry, not a parallel system)
+    -> each camp waves regular minions from 0:00 (reusing the lane-creep wave/march pattern)
+    -> at 1:00, one boss ("Heavenly King") spawns per camp -- North/Music, South/War, East/Hunt,
+       West/Stone, each granting a mechanically distinct buff on death (team-viral, individual-
+       stacking, team-flat, and proximity-aura respectively -- see §3.3)
     -> a camp left uncleared for [threshold] escalates -- its own minions eventually stop
        waiting and march toward the nearest node-tower/objective on their own, same
        waypoint-march idiom lane creeps already use, just neutral-aggressive instead of
@@ -74,18 +74,61 @@ every other fixed map landmark.
 
 ### 3.2 Camp minions
 
-New spawn-table entry per camp (kind, count, wave timer), built on the lane-creep wave/march
-primitives already in the codebase rather than a new movement system. Unlike lane creeps, camp
-minions have no owning team at spawn -- neutral-hostile until aggroed (same "neutral" framing
-`ArenaTower` already uses for node guards).
+**Wave-spawned, not a static pack** (founder, real-time: "minions should spawn from the camps in
+waves") -- confirms the §1 framing: this reuses the lane-creep wave-timer/waypoint-march
+primitives directly, not just "a similar pattern." New spawn-table entry per camp (kind, count,
+wave interval), same `ARENA_LANE_WAVE_INTERVAL_MS`-shaped timer. Unlike lane creeps, camp minions
+have no owning team at spawn -- neutral-hostile until aggroed (same "neutral" framing `ArenaTower`
+already uses for node guards). Live from the opening bell, same as lane creeps' own
+`ARENA_LANE_WAVE_INITIAL_DELAY_MS` -- only the King itself (§3.3) waits for 1:00.
 
 ### 3.3 The Four Heavenly Kings
 
 One boss per camp, real HP/damage (boss-scale, not a lane-creep reskin), killable by either team.
-Kill grants a real timed buff via the existing powerup-buff mechanism (§1) -- exact buff per King
-not designed here (4 Kings could each grant a different buff, matching the "Heavenly Kings" trope
-of four distinct guardians with distinct domains, or one shared buff type -- founder's call,
-flagged in §5).
+**Don't spawn until 1:00 into the match** (founder, real-time) -- camps are live and their regular
+minions are already waving (§3.2) from the opening bell, but the King itself is absent for the
+first minute, same "real MOBA precedent... a match's opening seconds breathing room" reasoning
+the lane-creep system's own `ARENA_LANE_WAVE_INITIAL_DELAY_MS` already uses, just a longer,
+boss-scale version of the same idea -- early game stays about lanes/nodes, jungle contests open
+up once the first minute's positioning has happened.
+
+Each King grants a genuinely distinct buff mechanic, not four reskins of the same timer (founder
+confirmed: give the four Kings different domains, not a shared buff type -- resolves §5's own
+open question). Designed here, one per cardinal camp:
+
+**North -- The God of Music.** Buff: *Catchy Song* (attack speed + move speed, a rhythm buff).
+Mechanic, founder's own design: **team-sticky, spreads on respawn.** Not a flat timer -- the buff
+persists on the TEAM as long as at least one living member currently carries it. A carrier who
+dies loses it personally, but if another teammate still holds it, the team keeps the buff; the
+moment ANY teammate respawns, they pick it up too ("the song reaches them"). Only truly ends once
+every carrier who ever held it is dead with no live relay left to spread it to -- effectively
+un-siegeable in a single teamfight, the opposite of every other timed buff in this game. Real new
+mechanic needed: a team-level buff-carrier set (not a single per-hero timer), checked on every
+respawn event.
+
+**South -- The God of War.** Buff: *Bloodroar* (stacking bonus damage). Mechanic: **individual,
+stacking, fragile.** Each takedown while holding it adds a stack (more damage) and refreshes the
+buff's duration -- but it is NOT team-shared and does not survive death: the instant the holder
+dies, the buff and every stack are gone, no drop, no relay. High-risk/high-reward, rewards
+continued aggression and punishes hesitation -- the deliberate opposite of Music's forgiving,
+un-losable persistence.
+
+**East -- The God of the Hunt.** Buff: *Farsight* (team-wide vision reveal near camps/objectives +
+bonus gold from monster kills). Mechanic: **team-wide, flat timer, utility not combat.** Everyone
+on the team gets it the instant it's claimed, it just counts down like the existing
+`ARENA_POWERUP_BUFF_MS` powerups already do -- deliberately the simplest of the four (not every
+King needs an exotic mechanic), an econ/scouting reward rather than a fight-winning one.
+
+**West -- The God of Stone.** Buff: *Bulwark* (damage reduction). Mechanic: **proximity aura, not
+a carried buff.** While active, any teammate NEAR the holder also gets the damage reduction, not
+just the holder -- a support/grouping incentive with a normal timer (no team-wide auto-spread like
+Music, no stacking like War), encouraging the team to physically cluster around whoever holds it
+rather than scatter.
+
+Four different persistence shapes on purpose: team-viral (Music), individual-fragile (War),
+team-flat (Hunt), proximity-aura (Stone) -- covers genuinely different strategic incentives
+(protect your carrier vs. play aggressive vs. just wait out the timer vs. group up) instead of
+four buffs that all just feel like different flavors of "+damage for 20 seconds."
 
 ### 3.4 Anti-stall escalation
 
@@ -107,11 +150,14 @@ objective system -- real open question, not guessed at (§5).
 
 ## 5. Open questions (not resolved here)
 
-- Do the 4 Kings each grant a distinct buff (matching the "Four Heavenly Kings" trope of four
-  guardians with different domains), or one shared buff type?
-- Camp respawn: once cleared, does the camp (minions + King) respawn on a timer, same as the
-  existing powerup pickups (`ARENA_POWERUP_RESPAWN_MS`)? Real MOBA precedent says yes; not
-  designed here.
+- ~~Do the 4 Kings each grant a distinct buff?~~ Resolved: yes, four distinct mechanics, designed
+  in §3.3 (Music/team-viral, War/individual-stacking, Hunt/team-flat, Stone/proximity-aura).
+- ~~When does the first King spawn?~~ Resolved: 1:00 into the match (founder). Camp minion waves
+  themselves start immediately, same as lane creeps.
+- King respawn after death: does a defeated King respawn later (like the existing powerup pickups'
+  `ARENA_POWERUP_RESPAWN_MS`), or is each King a one-time kill per match? Not specified yet --
+  real MOBA precedent (jungle bosses respawning) suggests yes, but the founder hasn't confirmed a
+  timer.
 - What "assaulting the towers" concretely means once a camp escalates -- do camp minions attack
   existing node-guard towers specifically, or does this motivate a new base/objective-tower
   system this doc doesn't otherwise require? §1's own open question.
@@ -122,10 +168,11 @@ objective system -- real open question, not guessed at (§5).
 | # | Milestone | Acceptance | Status |
 |---|---|---|---|
 | 0 | This northstar | Written, registered in golden-docs-index | DONE |
-| 1 | Camp placement + minion waves | 4 camps at real N/S/E/W positions spawn neutral-hostile minions on a wave timer, reusing the lane-creep wave/march primitives | NOT STARTED |
-| 2 | Four Heavenly Kings | One real boss per camp, killable, grants a timed buff via the existing powerup system on death | NOT STARTED |
+| 1 | Camp placement + minion waves | 4 camps at real N/S/E/W positions spawn neutral-hostile minions on a wave timer from the opening bell, reusing the lane-creep wave/march primitives | NOT STARTED |
+| 2 | Four Heavenly Kings | One real boss per camp, silent until 1:00, each granting its own distinct buff mechanic on death (§3.3: Music/War/Hunt/Stone) | NOT STARTED |
+| 2.5 | Team-viral buff carrier system | New mechanic Music's own design needs: a team-level buff-carrier set that persists across deaths and auto-grants on respawn -- the one King mechanic with no existing primitive to extend | NOT STARTED |
 | 3 | Anti-stall escalation | An uncleared camp's minions begin marching toward the nearest objective past a real time threshold | NOT STARTED |
-| 4 | Camp respawn | Cleared camps repopulate on a timer, resolving §5's open question | NOT STARTED |
+| 4 | King respawn | Resolves §5's open question -- does a defeated King return on a timer, or once per match | NOT STARTED |
 | 5 | Backport to REDGARDEN | Deliberate, separate later pass -- port the proven GFD-fork implementation into REDGARDEN's own `apps/arena_server`, per founder direction ("we will back port to the other one") | NOT STARTED |
 
 ## 7. Related docs
