@@ -844,7 +844,7 @@ func initWorld() *world {
 		lastConquestTick: time.Now(),
 		bazaars:          make(map[string]map[string]int),
 		bankBySlot:       make(map[string]int),
-		weatherByZone:    map[int]string{0: "Clear", 1: "Clear", 2: "Clear", 3: "Clear"},
+		weatherByZone:    map[int]string{0: "Clear", 1: "Clear", 2: "Clear", 3: "Clear", 4: "Clear"},
 		lastWeatherTick:  time.Now(),
 		weatherEngine:    weather.New(),
 		duelMgr:          duel.NewManager(),
@@ -886,7 +886,7 @@ func initWorld() *world {
 
 	w.ah = market.New()
 
-	for _, zoneID := range []int{0, 1, 2, 3} {
+	for _, zoneID := range []int{0, 1, 2, 3, 4} {
 		w.mobRegs[zoneID] = mob.New()
 	}
 	for _, m := range mob.MeadowWormSpawns() {
@@ -894,6 +894,12 @@ func initWorld() *world {
 	}
 	for _, m := range mob.SwampvilleSpawns() {
 		_ = w.mobRegs[3].Spawn(m)
+	}
+	// Zone 4 (Town Square, 2026-08-02): starter-area worm for GoblinFoxDragon's Battlegrounds-GUI
+	// Town scene. See zone.DefaultZones' own doc comment for why this is a real, separate zone
+	// rather than a reuse of Meadow.
+	for _, m := range mob.TownSquareWormSpawns() {
+		_ = w.mobRegs[4].Spawn(m)
 	}
 
 	w.minePoints[0] = gather.MeadowMiningPoints()

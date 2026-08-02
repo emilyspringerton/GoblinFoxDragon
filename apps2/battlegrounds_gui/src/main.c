@@ -2813,6 +2813,26 @@ static void play_cast_tone(int slot) {
 #define TOWN_GRID_N 12       /* tiles per side */
 #define TOWN_QUEUE_BTN_W 280.0f
 #define TOWN_QUEUE_BTN_H 44.0f
+/* TOWN_ZONE_ID (2026-08-02, founder: "you may need to add the next zone"): apps2/mud's own new
+ * zone 4, "Town Square" (server/zone/zone.go's own doc comment explains why this is a real,
+ * separate zone rather than reusing Meadow/zone 0). Position syncs (town_sync_position) tag
+ * themselves with this scene_id. */
+#define TOWN_ZONE_ID 4
+/* TOWN_WORM_X/Z: the starter-area worm's real spawn position, mirrored by hand from
+ * server/mob/worm.go's own TownSquareWormSpawns() -- same "kept in sync by hand" convention this
+ * codebase already uses for static, never-moving positions (REDGARDEN's own fountain positions,
+ * arena_bot's roster-size constant). Purely decorative here (see town_draw_worm's own doc
+ * comment) -- not read from a live mob-state endpoint, since apps2/mud has no HTTP surface for
+ * mob state at all yet. */
+#define TOWN_WORM_X 8.0f
+#define TOWN_WORM_Z 0.0f
+
+/* g_town_char_loaded and the town_*_peak_ms trio are declared here (ahead of town_draw_hud,
+ * which reads them) rather than down with the rest of Town's avatar/movement state below --
+ * that block is only reached once main() starts, after town_draw_hud is already defined. See
+ * g_town_char_loaded's fuller doc comment further down, next to where it's actually set. */
+static int g_town_char_loaded = 0;
+static float town_q_peak_ms = 0.0f, town_w_peak_ms = 0.0f, town_r_peak_ms = 0.0f;
 
 /* town_draw_ground: NxN alternating grey/brown tiles spanning the exact same total footprint
  * (ARENA_HALF_EXTENT * 2.2f) as battlegrounds' own single-color ground plane just below in
@@ -2845,6 +2865,22 @@ static void town_draw_ground(GLint loc_mvp, GLint loc_model, GLint loc_color, Ma
     }
 }
 
+/* town_draw_worm (2026-08-02, founder: "implement the starter area worm"): a small, static,
+ * three-segment silhouette at TOWN_WORM_X/Z -- server/mob/worm.go's TownSquareWormSpawns() gives
+ * zone 4 a real backend worm mob, but there is no HTTP surface for apps2/mud's mob state at all
+ * (mobs are purely telnet-MUD-internal today), so this is a decorative placeholder, not a live
+ * sync of the real mob's HP/position/AI. Same honest "inert for now" scope as M5's ability panes
+ * -- named in the comment, not hidden behind a misleadingly "live" look. Reuses draw_hero_box,
+ * the same stacked-box silhouette primitive every hero model already uses. */
+static void town_draw_worm(const Mat4 *vp, GLint loc_mvp, GLint loc_model, const Mesh *cube_mesh) {
+    draw_hero_box(TOWN_WORM_X, TOWN_WORM_Z, 0.5f, 0.18f, 0.0f, 0.35f, 0.18f, 0.22f, 1.0f,
+                  vp, loc_mvp, loc_model, cube_mesh);
+    draw_hero_box(TOWN_WORM_X, TOWN_WORM_Z, 0.0f, 0.16f, 0.0f, 0.3f, 0.16f, 0.2f, 1.0f,
+                  vp, loc_mvp, loc_model, cube_mesh);
+    draw_hero_box(TOWN_WORM_X, TOWN_WORM_Z, -0.45f, 0.14f, 0.0f, 0.22f, 0.14f, 0.16f, 1.0f,
+                  vp, loc_mvp, loc_model, cube_mesh);
+}
+
 /* town_queue_button_rect: shared by the draw call and the click hit-test below so the two can
  * never drift apart -- top-right, per the founder's own "button top right" placement. */
 static void town_queue_button_rect(int win_w, int win_h, float *x0, float *y0, float *x1, float *y1) {
@@ -2873,6 +2909,30 @@ static void town_draw_hud(int win_w, int win_h, int queue_available) {
 
     glColor3f(0.85f, 0.87f, 0.9f);
     draw_string("TOWN", 16.0f, (float)win_h - 34.0f, 16);
+
+    /* Ability panes (M5, 2026-08-02, founder: "i dont have an avatar or ability panes - we need
+       to bring those over from the battlegrounds"). Same draw_ability_tile, layout, and
+       bottom-center placement Battlegrounds' own ability bar uses, for visual continuity between
+       the two scenes. Deliberately inert, not faked as functional: Town has no cast/combat
+       system, no per-job skill data wired in from apps2/mud's real weapon-skill system, and no
+       mana -- every tile is permanently "ready" (cooldown_ms=0, not active, never mana-blocked)
+       and labeled generically rather than with a real ability name, since there isn't one yet.
+       Only shown once a real character has actually loaded (same "inert for bots/no-identity
+       launches" convention chat_draw already uses) -- an avatar-less Town has nothing for these
+       tiles to represent. */
+    if (g_town_char_loaded) {
+        float tile_size = 56.0f;
+        float tile_pitch = 66.0f;
+        float tiles_total_w = tile_pitch * 2.0f + tile_size;
+        float tiles_x0 = (float)win_w / 2.0f - tiles_total_w / 2.0f;
+        float tiles_y = 90.0f;
+        draw_ability_tile(tiles_x0, tiles_y, tile_size, 0, &town_q_peak_ms,
+                           0, 0, "1", "(unassigned)", 0.3f, 0.7f, 1.0f);
+        draw_ability_tile(tiles_x0 + tile_pitch, tiles_y, tile_size, 0, &town_w_peak_ms,
+                           0, 0, "2", "(unassigned)", 0.7f, 0.3f, 1.0f);
+        draw_ability_tile(tiles_x0 + tile_pitch * 2.0f, tiles_y, tile_size, 0, &town_r_peak_ms,
+                           0, 0, "3", "(unassigned)", 1.0f, 0.85f, 0.2f);
+    }
 
     if (!queue_available) return;
     float x0, y0, x1, y1;
@@ -2909,7 +2969,8 @@ static float g_town_target_x = 0.0f, g_town_target_z = 0.0f;
 static float g_town_facing_rad = 0.0f;
 static float g_town_prev_facing_x = 0.0f, g_town_prev_facing_z = 0.0f;
 static int g_town_prev_facing_valid = 0;
-static int g_town_char_loaded = 0;
+/* g_town_char_loaded is declared earlier in this file (ahead of town_draw_hud) -- set here,
+ * once, on a successful town_fetch_character(). */
 static uint32_t g_town_last_sync_ms = 0;
 static float g_town_synced_x = 0.0f, g_town_synced_z = 0.0f;
 
@@ -2967,8 +3028,8 @@ static void town_sync_position(uint32_t now) {
     g_town_synced_x = g_town_x;
     g_town_synced_z = g_town_z;
     char body[192];
-    snprintf(body, sizeof(body), "{\"scene_id\":0,\"pos_x\":%.3f,\"pos_y\":%.3f,\"pos_z\":%.3f}",
-             g_town_x, g_town_y, g_town_z);
+    snprintf(body, sizeof(body), "{\"scene_id\":%d,\"pos_x\":%.3f,\"pos_y\":%.3f,\"pos_z\":%.3f}",
+             TOWN_ZONE_ID, g_town_x, g_town_y, g_town_z);
     char path[128];
     snprintf(path, sizeof(path), "/api/v1/characters/%s/position", g_town_char_id);
     char resp[256];
@@ -3264,6 +3325,8 @@ int main(int argc, char *argv[]) {
                 glUseProgram_(prog);
                 glUniform3f_(loc_light, 0.4f, 0.8f, 0.3f);
                 town_draw_ground(loc_mvp, loc_model, loc_color, vp, &plane_mesh);
+                glUniform4f_(loc_color, 0.5f, 0.38f, 0.16f, 1.0f); /* earthy worm brown */
+                town_draw_worm(&vp, loc_mvp, loc_model, &cube_mesh);
                 if (g_town_char_loaded) {
                     glUniform4f_(loc_color, 0.1f, 0.8f, 0.95f, 1.0f); /* same "my hero" cyan Battlegrounds uses */
                     draw_hero_model(town_hero_id_for_job(g_town_job), g_town_x, g_town_z,

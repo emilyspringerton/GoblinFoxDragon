@@ -65,6 +65,17 @@ func wormID(i int) string {
 	return "worm-meadow-" + itoa(i)
 }
 
+// TownSquareWormSpawns returns the starter mob for zone 4 (Town Square, 2026-08-02 --
+// GoblinFoxDragon's Battlegrounds-GUI Town scene, founder: "implement the starter area worm").
+// A single worm, not Meadow's full ring of eight -- Town Square is a small starter area, not
+// Meadow's own open field. NewWorm defaults SceneID to 0 (Meadow); overridden to 4 here since
+// this is the one caller that isn't spawning into Meadow itself.
+func TownSquareWormSpawns() []Mob {
+	w := NewWorm("worm-town-0", Pos{X: 8, Y: 2, Z: 0})
+	w.SceneID = 4
+	return []Mob{w}
+}
+
 func itoa(n int) string {
 	if n == 0 {
 		return "0"

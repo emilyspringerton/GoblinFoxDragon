@@ -16,8 +16,8 @@ func defaultMgr() *Manager {
 
 func TestDefaultZones_ThreeZones(t *testing.T) {
 	zones := DefaultZones()
-	if len(zones) != 4 {
-		t.Fatalf("DefaultZones: want 4, got %d", len(zones))
+	if len(zones) != 5 {
+		t.Fatalf("DefaultZones: want 5, got %d", len(zones))
 	}
 }
 

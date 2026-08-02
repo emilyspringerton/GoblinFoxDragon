@@ -55,12 +55,25 @@ type Zone struct {
 }
 
 // DefaultZones returns the starter zones matching worldapi scene IDs.
+//
+// Zone 4 ("Town Square", 2026-08-02, founder: "you may need to add the next zone" while
+// building GoblinFoxDragon's Battlegrounds-GUI Town scene) is deliberately its own zone, not a
+// reuse of zone 0 (Meadow) -- Meadow already has a real, live telnet MUD presence (worm combat,
+// "X has entered the world" broadcasts, etc.); conflating it with the GUI's own local-only,
+// no-combat Town scene would be exactly the "gui and the mud play nice... might get weird"
+// tension the founder already named. Town Square gets a real zone identity of its own instead,
+// same shared 0-3 scene-ID convention worldapi/scenes.go's ProceduralWorldStore already follows
+// for its own voxel terrain -- not wired into that voxel generator yet (a real, separate,
+// larger undertaking: the GUI client would need a whole new UDP protocol client speaking
+// apps2/server-go's own wire format, packages2/common/protocol.h, to ever render it), flagged
+// here rather than guessed at.
 func DefaultZones() []*Zone {
 	return []*Zone{
 		{ID: 0, Name: "Meadow", SpawnX: 0, SpawnY: 2, SpawnZ: 0},
 		{ID: 1, Name: "Hills", SpawnX: 0, SpawnY: 8, SpawnZ: 0},
 		{ID: 2, Name: "Caves", SpawnX: 0, SpawnY: 4, SpawnZ: 0},
 		{ID: 3, Name: "Swampville", SpawnX: 0, SpawnY: 1, SpawnZ: 0},
+		{ID: 4, Name: "Town Square", SpawnX: 0, SpawnY: 2, SpawnZ: 0},
 	}
 }
 

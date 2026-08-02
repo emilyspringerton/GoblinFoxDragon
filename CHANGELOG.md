@@ -1,3 +1,35 @@
+## 2026-08-02 (9)
+
+- feat(town): M5 ability panes (inert) + new zone 4 "Town Square" + starter-area worm. Founder:
+  "and then implement the starter area worm" -> "you may need to add the next zone."
+  - **M5 (ability panes)**: same `draw_ability_tile`, bottom-center layout, and Q/W/R color
+    scheme Battlegrounds' own ability bar uses, ported into Town's HUD. Deliberately inert --
+    Town has no cast/combat system, no per-job skill data wired in from apps2/mud's real
+    weapon-skill system, and no mana; every tile is permanently ready and labeled
+    "(unassigned)" rather than faked as functional. Only shown once a real character has loaded.
+  - **New zone 4, "Town Square"** (`server/zone/zone.go`): a real, separate zone rather than
+    reusing zone 0 (Meadow) -- Meadow already has a live telnet MUD presence (worm combat, "X
+    has entered the world" broadcasts), and conflating it with the GUI's own local-only,
+    no-combat Town scene would be exactly the "gui and the mud play nice... might get weird"
+    tension named earlier today. `apps2/mud`'s `initWorld()` now spawns a mob registry + weather
+    entry for it. `town_sync_position`'s own scene_id changed from 0 to `TOWN_ZONE_ID` (4).
+  - **`server/mob/worm.go`'s new `TownSquareWormSpawns()`**: one real worm mob (not Meadow's full
+    ring of eight -- Town Square is a small starter area), scene_id 4, spawned into
+    `apps2/mud`'s real mob registry -- real backend content, not just client-side decoration.
+  - **`town_draw_worm()` (client-side)**: a small three-segment box silhouette at the worm's real
+    spawn position (mirrored by hand, same convention this codebase already uses for static
+    positions). Named honestly as decorative in its own doc comment: apps2/mud has no HTTP
+    surface for mob state at all yet, so this isn't a live sync of the real mob's HP/AI, just a
+    placeholder at the right spot.
+  - **Explicitly not built**: `apps2/server-go`'s own real voxel/chunk "Dragonfly" world
+    (`server/worldapi`'s `DragonflyChunkGenerator`/`ProceduralWorldStore`, which already reserves
+    the same 0-3 scene IDs for its own procedural terrain) -- wiring Town into that would mean a
+    whole new UDP protocol client speaking `packages2/common/protocol.h`, a real, separate,
+    much larger undertaking, flagged here rather than guessed at.
+  Go build + `server/zone`/`server/mob` tests green (`zone_test.go`'s own zone-count assertion
+  updated 4→5). Native Linux client build clean; visually verified under Xvfb with a real login --
+  avatar, worm, and all three ability tiles render correctly together.
+
 ## 2026-08-02 (8)
 
 - feat(town): real avatar, movement, and position sync in Town, backed by IDUNA's real
