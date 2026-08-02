@@ -5,11 +5,15 @@ instanced (spawned per-group like a Battlegrounds match, ends when cleared/left,
 walkable zone) and procedural (rooms/corridors reassembled from a tile set, different layout each
 visit, not a fixed hand-built map like Town) -> "use some of the arena heroes as dungeon mobs and
 bosses" -> "also the different minions whatever im uploading some art in a second" -> "feel free
-to chunky 2 d sprites rendered in 3d if thats easier" -> two of three uploaded art files landed
-(GoblinFoxDragon commit b2266f6): `kikoryu.jpeg` (a detailed painted boss-tier creature -- fire/
-wing/claw dragon-wolf-goblin hybrid) and `art2.jpeg` (a full sheet of rough minion concept
-sketches -- small abstract eldritch creatures, big eyes, checkered/grid body textures, tentacles,
-spikes). Third file still pending as of this writing.*
+to chunky 2 d sprites rendered in 3d if thats easier" -> "one more pull for art 1" -> all three
+uploaded art files landed (GoblinFoxDragon commits b2266f6, 6ad32fa): `kikoryu.jpeg` (a detailed
+painted boss-tier creature -- fire/wing/claw dragon-wolf-goblin hybrid), `art2.jpeg` (a full sheet
+of rough minion concept sketches -- small abstract eldritch creatures, big eyes, checkered/grid
+body textures, tentacles, spikes), and `art1.jpeg` (a sheet of ornate weapon/dagger concepts --
+jagged crossguards, star/pentagram sigils, a totem-pole-like staff object -- plus a couple more
+creature heads in `art2`'s style, and flavor text: "Deceiver," "Office Star," "E Pluribus Unum").
+`art1` reads as loot/item design more than mob design -- see §1's rendering-approach note and
+§5's rewards question.*
 
 ---
 
@@ -55,12 +59,15 @@ arena's own movement/camera code rather than from nothing.
 ability/AI logic (`apps/arena_bot`, `apps/client/bot_main.c`) built for PvP. Using them as
 dungeon enemies means a dungeon encounter is "fight an AI-controlled hero kit," not a new enemy
 AI system built from scratch -- the real work is *driving* that existing AI as a hostile NPC
-inside a dungeon instance rather than as a bot-pool PvP participant. Art now landed for the two
-tiers this implies: `kikoryu.jpeg` reads as boss-tier (one detailed, dramatic creature per
-encounter, matching "a boss in the final room" in §3.3), `art2.jpeg`'s sheet reads as the minion
-roster (many smaller, simpler creature types populating regular rooms) -- exact mapping of which
-arena hero kit's AI drives which visual is not decided here, just that the two-tier split the art
-itself already suggests lines up with the boss/minion split already in this doc.
+inside a dungeon instance rather than as a bot-pool PvP participant. Art now landed for the tiers
+this implies: `kikoryu.jpeg` reads as boss-tier (one detailed, dramatic creature per encounter,
+matching "a boss in the final room" in §3.3), `art2.jpeg`'s sheet reads as the minion roster
+(many smaller, simpler creature types populating regular rooms) -- exact mapping of which arena
+hero kit's AI drives which visual is not decided here, just that the two-tier split the art
+itself already suggests lines up with the boss/minion split already in this doc. `art1.jpeg`
+turned out to be a third category, not more mobs -- ornate weapon/dagger designs and a
+totem-staff object, reading as loot/item concept art rather than creature art; relevant to §5's
+"does clearing a dungeon grant real rewards" open question, not to mob/boss population.
 
 **Rendering approach** (founder: "feel free to chunky 2 d sprites rendered in 3d if thats
 easier"): confirmed nothing in `apps2/battlegrounds_gui/src/main.c` loads textures or does
@@ -132,9 +139,10 @@ instead of PvP).
 Not a persistent walkable zone -- ends and tears down like a Battlegrounds match, per founder
 direction. Not built on Caves' own generator -- that scene stays exactly as it is; a dungeon gets
 its own new, seeded, multi-room generator. Not a new enemy AI system -- mobs/bosses are REDGARDEN's
-existing hero kits repurposed as hostile NPCs, not new content built from scratch. Not fully
-art-directed yet -- two of three uploaded files landed (boss + minion-sheet direction, §1), the
-third still pending; not full 3D character models -- billboarded sprites, per founder direction.
+existing hero kits repurposed as hostile NPCs, not new content built from scratch. Mob/boss art is
+directed (boss + minion-sheet, §1); loot/item art exists (`art1.jpeg`) but isn't wired to any
+system yet since §5's rewards question is still open. Not full 3D character models -- billboarded
+sprites, per founder direction.
 
 ## 5. Open questions (not resolved here)
 
@@ -154,7 +162,7 @@ third still pending; not full 3D character models -- billboarded sprites, per fo
 | 3 | Mob/boss population from arena heroes | Seeded spawn table places hero-kit-driven hostile NPCs per room + a boss in the final room, using existing `apps/arena_bot` AI | NOT STARTED |
 | 4 | Client dungeon render mode | New mode walks the generated space, fights populated mobs, using Battlegrounds' existing combat HUD | NOT STARTED |
 | 4.5 | Billboard sprite subsystem | New texture-loading + camera-facing quad rendering path (nothing like this exists today), mobs/bosses render as chunky 2D sprites in the 3D space | NOT STARTED |
-| 5 | Art direction incorporated | 2 of 3 files landed (`kikoryu.jpeg` boss, `art2.jpeg` minion sheet) -- sprite sheets cut from this art, third file still pending | IN PROGRESS |
+| 5 | Art direction incorporated | All 3 files landed: `kikoryu.jpeg` (boss), `art2.jpeg` (minion sheet), `art1.jpeg` (loot/item concepts, not mob art) -- sprite sheets not yet cut from this source art | IN PROGRESS |
 | 6 | Rewards + party queue flow | Resolves the open questions in §5 | NOT STARTED |
 
 ## 7. Related docs

@@ -1,3 +1,35 @@
+## 2026-08-02 (22)
+
+- feat(mud): real Sunderworm boss content for World Crisis -- founder: "start working on the
+  sunderworm world event" -> "worm as the northstar" -> "build it on top of our starter zone on
+  top of dragonfly." Found the event already had a full spec (`docs2/specs/WORLD_CRISIS_VS0.md`)
+  and a real, tested phase machine (`server/worldcrisis`) wired into `apps2/mud`, but zero actual
+  Sunderworm content: the trigger auto-restarted with no cooldown (spec E2 violation), the
+  Anchor objective had no implementation anywhere, and "Chaos Elementals emerge in the Swamp"
+  was 3 generic reskinned mobs with no boss mechanics.
+  - `server/mob/sunderworm.go`: a real boss (15,000 HP) reusing `StateBurrowed` unchanged as its
+    invulnerable state -- the phase names OMENS/BURROW/EMERGENCE already describe that exact
+    cycle, no new mechanic needed. Two Sunderworm Head sub-bosses (4,000 HP) for Split War.
+    Scaled up from `KindWorm`, the exact mob already in the starter zone -- not a new creature.
+  - Wired into the crisis phase handler: spawns burrowed at the real Worm Hut position in zone 4
+    when Burrow begins; the crisis handler (not an autonomous per-mob timer) surfaces it at
+    Emergence alongside a 3-mob "Sunderworm Brood" add-wave in the same zone; two geo-separated
+    Heads spawn east/west of the hut at Split War; Resolution soft-despawns everything (marks
+    dead in place -- `Registry` has no removal API, a named gap).
+  - Real gap closed: killing a Head now completes the Anchor objective (+15 LEY) -- previously
+    the one of three required concurrent objectives with zero player-facing action, meaning
+    Final Window's own gate could never actually be met.
+  - Real bug fixed: added `crisisCooldown` (20 min) + `world.lastCrisisEndAt` so the event can't
+    immediately re-trigger the instant it resolves.
+  - Go build/vet/test green; redeployed `gfd-mud.service`; live-verified via a real telnet
+    session through Omens -> Burrow.
+  - Honestly still open per the spec's own DoD checklist: persistence (pure in-memory, IDUNA
+    `PatchWorldEvent` never actually fires), rewards/merit/tiering, real Builder/Ritualist
+    non-combat mechanics (Ritual is still just repurposed ore-mining), diminishing-returns
+    anti-zerg, weak-point/armor-break beyond burrow/surface, and all client-side rendering (no
+    GUI client consumes the crisis packet yet -- ties to `SMOOTH_TERRAIN_NORTHSTAR`'s still-
+    unstarted milestones for real dragonfly terrain, not done here).
+
 ## 2026-08-02 (21)
 
 - feat(town): C/Y/T also open chat, alongside Enter -- founder, after the Enter-key AH ordering

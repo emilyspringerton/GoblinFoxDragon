@@ -648,6 +648,7 @@ type world struct {
 	chatRouter       *chat.Router
 	guildReg         *guild.Registry
 	wcrisis          *worldcrisis.Crisis
+	lastCrisisEndAt  time.Time // WORLD_CRISIS_VS0.md E2: real cooldown, not instant re-trigger
 	iduna            *idunaclient.Client
 	charIDBySlot     map[string]string           // slot → IDUNA character_id
 	npcAttnScenes    map[int]*npcattention.Scene // zoneID → NPC awareness scene (S130-02)
@@ -1095,6 +1096,22 @@ func resolveKill(p *player, killedMob *mob.Mob, reg *mob.Registry, now time.Time
 		gw.nmSched.OnKill(killedMob.ID, p.zoneID, now)
 	}
 
+	// World Crisis: Sunderworm Head kills contribute to the Anchor objective (WORLD_CRISIS_VS0.md
+	// B1's "keep pylons alive" framing doesn't literally fit a boss fight, but ObjectiveAnchor
+	// had zero real implementation anywhere before this -- defined in the enum, only ever
+	// referenced by worldcrisis_test.go. Real bug found while scoping the Sunderworm work:
+	// Anchor was the one of the three required concurrent objectives with no player-facing
+	// action at all, meaning Final Window's own 3-objective gate could never actually be met in
+	// practice. Killing a Head is a real, on-theme "anchor" action -- collapsing one of the two
+	// fronts the Split War opened.
+	if strings.HasPrefix(killedMob.ID, "sunderworm-head-") {
+		_ = gw.wcrisis.CompleteObjective(worldcrisis.ObjectiveAnchor, 15, now)
+		for _, cp := range gw.players {
+			cp.sendf("\r\n[Crisis] %s collapses! Anchor objective advanced. (LEY +15)", killedMob.Kind)
+			cp.prompt()
+		}
+	}
+
 	// Campaign kill contribution (S126-14).
 	if gw.campaignBattle.IsActive() {
 		if changedNode := gw.campaignBattle.RecordKill(p.slot, p.zoneID); changedNode != "" {
@@ -1328,6 +1345,12 @@ func gameLoop() {
 		gw.mu.Unlock()
 	}
 }
+
+// crisisCooldown is the minimum real time between one World Crisis resolving and the next one
+// starting -- WORLD_CRISIS_VS0.md E2 ("Event cannot be immediately retriggered... Cooldown is
+// server-configurable"). A flat constant is the VS0-scope config knob the spec asks for; a real
+// admin-tunable value is future work, not attempted here.
+const crisisCooldown = 20 * time.Minute
 
 func tickAll() {
 	now := time.Now()
@@ -1651,7 +1674,13 @@ func tickAll() {
 	}
 
 	// World Crisis tick.
-	if gw.wcrisis.Status().Phase == worldcrisis.PhaseIdle && len(gw.players) > 0 {
+	// Real bug found live (2026-08-02, founder: "start working on the sunderworm world
+	// event"): this used to re-Start() the instant the previous crisis resolved (gw.wcrisis =
+	// worldcrisis.New() below immediately re-enters PhaseIdle, and this check re-triggers on
+	// the very next tick with zero delay) -- WORLD_CRISIS_VS0.md E2 explicitly requires "Event
+	// cannot be immediately retriggered." lastCrisisEndAt + crisisCooldown is the real gate.
+	if gw.wcrisis.Status().Phase == worldcrisis.PhaseIdle && len(gw.players) > 0 &&
+		now.Sub(gw.lastCrisisEndAt) >= crisisCooldown {
 		_ = gw.wcrisis.Start(now, "")
 		for _, cp := range gw.players {
 			cp.sendf("\r\n[World Crisis] Ley energies stir... a World Crisis is beginning!")
@@ -1662,10 +1691,10 @@ func tickAll() {
 		phaseChanged, oldPhase, newPhase := gw.wcrisis.Tick(now)
 		if phaseChanged {
 			phaseMsgs := map[worldcrisis.Phase]string{
-				worldcrisis.PhaseOmens:       "[Crisis] Omens spread across the land...",
-				worldcrisis.PhaseBurrow:      "[Crisis] The threat burrows deeper — prepare yourselves!",
-				worldcrisis.PhaseEmergence:   "[Crisis] Combat window open — strike now! Chaos Elementals emerge in the Swamp!",
-				worldcrisis.PhaseSplitWar:    "[Crisis] The enemy splits — two fronts detected!",
+				worldcrisis.PhaseOmens:       "[Crisis] Omens spread across New Handington... the earth near the Worm Hut trembles.",
+				worldcrisis.PhaseBurrow:      "[Crisis] Something vast burrows beneath the Worm Hut — prepare yourselves!",
+				worldcrisis.PhaseEmergence:   "[Crisis] THE SUNDERWORM SURFACES! Its brood erupts around it — strike now!",
+				worldcrisis.PhaseSplitWar:    "[Crisis] The Sunderworm splits — two heads now threaten separate fronts!",
 				worldcrisis.PhaseFinalWindow: "[Crisis] Final Window! Complete objectives NOW!",
 				worldcrisis.PhaseResolution:  "",
 			}
@@ -1676,23 +1705,65 @@ func tickAll() {
 					cp.prompt()
 				}
 			}
-			// Spawn crisis NMs in Swamp on Emergence.
+			// Sunderworm boss (WORLD_CRISIS_VS0.md D1/D2, founder: "worm as the northstar" /
+			// "build it on top of our starter zone"): spawns burrowed (invulnerable, reusing
+			// StateBurrowed unchanged) at the Worm Hut in zone 4 as soon as Burrow begins, then
+			// the crisis handler itself -- not the mob's own timer -- surfaces it at Emergence.
+			// crisisInstanceID keeps mob IDs unique across repeated crisis cycles, since
+			// server/mob's Registry has no removal API yet (Resolution below marks mobs dead in
+			// place instead, a real, named gap, not solved here).
+			const sunderwormHutX, sunderwormHutZ = 10.0, 30.0 // matches worm.go's own Worm Hut position
+			crisisInstanceID := now.Unix()
+			if newPhase == worldcrisis.PhaseBurrow {
+				if reg4 := gw.mobRegs[4]; reg4 != nil {
+					_ = reg4.Spawn(mob.NewSunderworm(
+						fmt.Sprintf("sunderworm-%d", crisisInstanceID),
+						mob.Pos{X: sunderwormHutX, Y: 0, Z: sunderwormHutZ},
+					))
+				}
+			}
 			if newPhase == worldcrisis.PhaseEmergence {
-				reg3 := gw.mobRegs[3]
-				if reg3 != nil {
+				if reg4 := gw.mobRegs[4]; reg4 != nil {
+					// Surface the Sunderworm itself -- direct State mutation via the pointer
+					// Get() returns, same "crisis phase machine owns this, not the mob's own
+					// clock" reasoning as sunderworm.go's own doc comment.
+					for _, id := range reg4.All() {
+						if strings.HasPrefix(id, "sunderworm-") && !strings.Contains(id, "head") {
+							if m, ok := reg4.Get(id); ok {
+								m.State = mob.StateIdle
+							}
+						}
+					}
+					// Add-wave brood (D1: "add waves that threaten objectives"), in the starter
+					// zone around the Worm Hut, not a generic swamp spawn.
 					for i := 1; i <= 3; i++ {
-						nmID := fmt.Sprintf("nm-chaos-elemental-%d", i)
-						spawnPos := mob.Pos{X: float64(-15 + i*12), Y: 0, Z: float64(-40 + i*10)}
-						_ = reg3.Spawn(mob.Mob{
-							ID: nmID, Kind: "Chaos Elemental",
+						nmID := fmt.Sprintf("nm-sunderworm-brood-%d-%d", crisisInstanceID, i)
+						spawnPos := mob.Pos{X: sunderwormHutX + float64(-6+i*6), Y: 0, Z: sunderwormHutZ + float64(-8+i*4)}
+						_ = reg4.Spawn(mob.Mob{
+							ID: nmID, Kind: "Sunderworm Brood",
 							HP: 1200, MaxHP: 1200,
-							SceneID:    3,
+							SceneID:    4,
 							AggroRange: 18, LeashRange: 45, MeleeRange: 3,
 							MoveSpeed: 6, MeleeDamage: 80, SwingDelay: 2 * time.Second,
 							Pos:     spawnPos,
 							HomePos: spawnPos,
 						})
 					}
+				}
+			}
+			// Split War sub-bosses (D2: "at least two sub-bosses/heads... different
+			// locations"). Geo-separated (B3) -- one east of the Worm Hut, one west, real
+			// distance apart, not a cosmetic offset.
+			if newPhase == worldcrisis.PhaseSplitWar {
+				if reg4 := gw.mobRegs[4]; reg4 != nil {
+					_ = reg4.Spawn(mob.NewSunderwormHead(
+						fmt.Sprintf("sunderworm-head-east-%d", crisisInstanceID),
+						mob.Pos{X: sunderwormHutX + 22, Y: 0, Z: sunderwormHutZ},
+					))
+					_ = reg4.Spawn(mob.NewSunderwormHead(
+						fmt.Sprintf("sunderworm-head-west-%d", crisisInstanceID),
+						mob.Pos{X: sunderwormHutX - 22, Y: 0, Z: sunderwormHutZ},
+					))
 				}
 			}
 			if newPhase == worldcrisis.PhaseResolution {
@@ -1706,7 +1777,20 @@ func tickAll() {
 						outcome, st.LeyIntegrity, worldcrisis.LeyMax)
 					cp.prompt()
 				}
-				// Auto-restart after resolution.
+				// Soft-despawn: mark any surviving Sunderworm content dead in place (Registry
+				// has no removal API -- see this block's own doc comment above). Skips mobs a
+				// player already killed (already StateDead, Hit already handled their events).
+				if reg4 := gw.mobRegs[4]; reg4 != nil {
+					for _, id := range reg4.All() {
+						if strings.HasPrefix(id, "sunderworm-") || strings.HasPrefix(id, "nm-sunderworm-brood-") {
+							if m, ok := reg4.Get(id); ok && m.State != mob.StateDead {
+								m.State = mob.StateDead
+							}
+						}
+					}
+				}
+				gw.lastCrisisEndAt = now
+				// Auto-restart after resolution (now gated by crisisCooldown above).
 				gw.wcrisis = worldcrisis.New()
 			}
 		}
