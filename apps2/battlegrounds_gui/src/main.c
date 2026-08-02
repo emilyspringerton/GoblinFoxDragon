@@ -2680,6 +2680,7 @@ int main(int argc, char *argv[]) {
     int running = 1;
     int win_logged = 0;
     uint32_t last_tick = SDL_GetTicks();
+    uint32_t last_wasd_send_ms = 0; /* WASD movement throttle, see the per-frame block below */
 
     while (running) {
         uint32_t now = SDL_GetTicks();
@@ -3037,22 +3038,26 @@ int main(int argc, char *argv[]) {
              * match" in local mode, so the ultimate goes on E. In net_mode,
              * casts are sent to the server, which owns cooldowns/effects. */
             if (!observing && e.type == SDL_KEYDOWN && arena_state.winner == 0) {
-                if (e.key.keysym.sym == SDLK_q || e.key.keysym.sym == SDLK_w || e.key.keysym.sym == SDLK_e) {
+                /* Battlegrounds GUI fork (2026-08-02, founder: "switch the abilities from qwe to
+                   123"): rebound from Q/W/E to 1/2/3. Frees up Q/W/E/R entirely for the WASD
+                   movement added just below in this same fork -- REDGARDEN's own copy keeps
+                   Q/W/E unchanged. */
+                if (e.key.keysym.sym == SDLK_1 || e.key.keysym.sym == SDLK_2 || e.key.keysym.sym == SDLK_3) {
                     apm_record_action(now);
                 }
                 if (net_mode) {
-                    if (e.key.keysym.sym == SDLK_q) net_send_cast(0, g_hover_target);
-                    if (e.key.keysym.sym == SDLK_w) net_send_cast(1, g_hover_target);
-                    if (e.key.keysym.sym == SDLK_e) net_send_cast(2, g_hover_target);
+                    if (e.key.keysym.sym == SDLK_1) net_send_cast(0, g_hover_target);
+                    if (e.key.keysym.sym == SDLK_2) net_send_cast(1, g_hover_target);
+                    if (e.key.keysym.sym == SDLK_3) net_send_cast(2, g_hover_target);
                 } else {
                     /* S170-143: local 1v1 demo casts directly (no wire hop), so the
                        hover target has to be set on the sim explicitly here -- the
                        networked path's equivalent is apps/arena_server's own
                        arena_set_hover_target() call in server_handle_packet(). */
                     arena_set_hover_target(my_owner, g_hover_target);
-                    if (e.key.keysym.sym == SDLK_q) { arena_cast_q(my_owner); arena_log_ability("Q"); }
-                    if (e.key.keysym.sym == SDLK_w) { arena_toggle_w(my_owner); arena_log_ability("W"); }
-                    if (e.key.keysym.sym == SDLK_e) { arena_cast_r(my_owner); arena_log_ability("R"); }
+                    if (e.key.keysym.sym == SDLK_1) { arena_cast_q(my_owner); arena_log_ability("Q"); }
+                    if (e.key.keysym.sym == SDLK_2) { arena_toggle_w(my_owner); arena_log_ability("W"); }
+                    if (e.key.keysym.sym == SDLK_3) { arena_cast_r(my_owner); arena_log_ability("R"); }
                 }
                 /* Active item (S170-205/S170-206, founder: "add blink dagger 1400 flow it gives
                    a new keybind on screen for tilda" -> "tilda should make the hero do the
@@ -3122,6 +3127,47 @@ int main(int argc, char *argv[]) {
         } else if (!win_logged && !net_mode) {
             arena_log_win(arena_state.winner);
             win_logged = 1;
+        }
+
+        /* WASD movement, battlegrounds GUI fork (2026-08-02, founder: "enable wasd movement in
+           addition to the click to move"). Continuous, camera-relative: held-key state (not
+           keydown events, same "held, not toggled" idiom the patrol/attack-move modifier and
+           Tab scoreboard already use elsewhere in this file), re-sent every ~100ms while any of
+           WASD is down. Same underlying move-to-point mechanic click-to-move already uses
+           (net_send_move / arena_set_move_target) -- the target is always a fixed distance ahead
+           of the hero's OWN current position in the pressed direction, refreshed continuously,
+           which reads as smooth continuous walking without needing a new wire packet type.
+           Direction is derived from cam_yaw (see camera_basis's own eye/forward derivation just
+           above in this file) projected onto the ground plane -- pitch deliberately excluded,
+           since tilting the camera shouldn't change which way "forward" walks or how fast.
+           Does not touch REDGARDEN's own apps/arena copy; this fork only. Real interaction, not
+           a conflict: SDL_SCANCODE_A doubles as the existing attack-move click-modifier (held A
+           + left-click = attack-move to that point) -- holding A to strafe left with no click
+           still behaves exactly as strafing, and clicking without A still behaves as a plain
+           move; the two only combine if a player holds A and *also* clicks while doing so. */
+        if (!observing && !shop_open && arena_state.winner == 0 &&
+            my_owner >= 0 && my_owner < ARENA_MAX_HEROES && arena_state.heroes[my_owner].alive &&
+            !(net_mode && net_phase == ARENA_PHASE_DRAFT)) {
+            const Uint8 *wasd_keys = SDL_GetKeyboardState(NULL);
+            int fwd_in = wasd_keys[SDL_SCANCODE_W] - wasd_keys[SDL_SCANCODE_S];
+            int right_in = wasd_keys[SDL_SCANCODE_D] - wasd_keys[SDL_SCANCODE_A];
+            if ((fwd_in || right_in) && now - last_wasd_send_ms >= 100) {
+                float yaw = cam_yaw * (float)M_PI / 180.0f;
+                float ground_fwd_x = -sinf(yaw), ground_fwd_z = -cosf(yaw);
+                float ground_right_x = -ground_fwd_z, ground_right_z = ground_fwd_x;
+                float dir_x = ground_fwd_x * (float)fwd_in + ground_right_x * (float)right_in;
+                float dir_z = ground_fwd_z * (float)fwd_in + ground_right_z * (float)right_in;
+                float dlen = sqrtf(dir_x * dir_x + dir_z * dir_z);
+                if (dlen > 0.0001f) {
+                    dir_x /= dlen; dir_z /= dlen;
+                    const float WASD_LOOKAHEAD = 4.0f;
+                    float tx = arena_state.heroes[my_owner].x + dir_x * WASD_LOOKAHEAD;
+                    float tz = arena_state.heroes[my_owner].z + dir_z * WASD_LOOKAHEAD;
+                    if (net_mode) net_send_move(my_owner, tx, tz);
+                    else arena_set_move_target(my_owner, tx, tz);
+                    last_wasd_send_ms = now;
+                }
+            }
         }
 
         /* S170-182: heroes[] isn't meaningful during ARENA_PHASE_DRAFT (protocol.h's own
@@ -4253,7 +4299,7 @@ int main(int argc, char *argv[]) {
             float tiles_x0 = win_w / 2.0f - tiles_total_w / 2.0f;
             float tiles_y = 90.0f; /* near the bottom edge, leaving room below for the keybind/name labels */
             draw_ability_tile(tiles_x0, tiles_y, tile_size, h->q_cooldown_ms, &q_cooldown_peak_ms,
-                               0, h->mp < ARENA_MP_COST_Q, "Q", arena_ability_name(h->hero_id, 0), 0.3f, 0.7f, 1.0f);
+                               0, h->mp < ARENA_MP_COST_Q, "1", arena_ability_name(h->hero_id, 0), 0.3f, 0.7f, 1.0f);
             /* S170-181: toggle heroes only need mp > 0 to activate (drained over time, not
                charged up front); the instant-effect W heroes (Ghost, Frog, etc.) still pay
                the old flat ARENA_MP_COST_W, so the tile's own "can I afford this" gate has to
@@ -4267,9 +4313,9 @@ int main(int argc, char *argv[]) {
                anymore), so this only ever adds the new condition, never changes behavior for
                any hero whose W really is a toggle. */
             draw_ability_tile(tiles_x0 + tile_pitch, tiles_y, tile_size, h->w_cooldown_ms, &w_cooldown_peak_ms,
-                               h->w_active || h->casting_slot != 0, w_mana_blocked, "W", arena_ability_name(h->hero_id, 1), 0.7f, 0.3f, 1.0f);
+                               h->w_active || h->casting_slot != 0, w_mana_blocked, "2", arena_ability_name(h->hero_id, 1), 0.7f, 0.3f, 1.0f);
             draw_ability_tile(tiles_x0 + tile_pitch * 2.0f, tiles_y, tile_size, h->r_cooldown_ms, &r_cooldown_peak_ms,
-                               h->r_active_ms > 0, h->mp < ARENA_MP_COST_R, "E", arena_ability_name(h->hero_id, 2), 1.0f, 0.85f, 0.2f);
+                               h->r_active_ms > 0, h->mp < ARENA_MP_COST_R, "3", arena_ability_name(h->hero_id, 2), 1.0f, 0.85f, 0.2f);
             /* Blink Dagger (S170-205, founder: "add blink dagger 1400 flow it gives a new
                keybind on screen for tilda"): a 4th tile, separate from the Q/W/E row's own
                fixed-width layout (tile_pitch * 3.0f, one pitch past E) -- only drawn while the
@@ -4320,7 +4366,7 @@ int main(int argc, char *argv[]) {
 
                 glColor3f(0.9f, 0.95f, 1.0f);
                 draw_string(arena_hero_name(h->hero_id), panel_x + 16.0f, panel_y + panel_h - 26.0f, 14);
-                const char *slot_labels[3] = {"Q", "W", "E"};
+                const char *slot_labels[3] = {"1", "2", "3"}; /* rebound from Q/W/E, this fork only */
                 float row_y = panel_y + panel_h - 60.0f;
                 for (int slot = 0; slot < 3; slot++) {
                     glColor3f(0.55f, 0.85f, 1.0f);

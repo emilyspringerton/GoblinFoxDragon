@@ -274,7 +274,12 @@ jobs:
           mkdir -p DragonsNShit_MUD_GUI_Client
           cp DragonsNShit_MUD_GUI.exe DragonsNShit_MUD_GUI_Client/
           cp sdl2_mingw/bin/SDL2.dll DragonsNShit_MUD_GUI_Client/
-          printf '%s\r\n' "@echo off" "echo DragonsNShit -- log in with your IDUNA account when prompted." "DragonsNShit_MUD_GUI.exe --queue 198.58.107.85" "pause" > DragonsNShit_MUD_GUI_Client/PLAY.bat
+          # IDUNA_BASE_URL (real bug found live, 2026-08-02, founder testing "test test" login):
+          # the client's own default (127.0.0.1:8080) only works if the client runs on the same
+          # box as IDUNA -- a real downloaded PLAY.bat run on the founder's own machine needs this
+          # set explicitly, or every login fails with "Could not reach login server". IDUNA
+          # listens on *:8080 (confirmed, not loopback-only), same public IP --queue already uses.
+          printf '%s\r\n' "@echo off" "set IDUNA_BASE_URL=http://198.58.107.85:8080" "echo DragonsNShit -- log in with your IDUNA account when prompted." "DragonsNShit_MUD_GUI.exe --queue 198.58.107.85" "pause" > DragonsNShit_MUD_GUI_Client/PLAY.bat
           zip -r "DragonsNShit_MUD_GUI_Client_${BUILD}.zip" DragonsNShit_MUD_GUI_Client
 
           # Backend package (Go preferred; legacy C server optional fallback)
