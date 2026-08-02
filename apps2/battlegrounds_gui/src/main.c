@@ -142,6 +142,20 @@ static int apm_compute(uint32_t now_ms) {
 
 static int net_sock = -1;
 static struct sockaddr_in net_server_addr;
+/* g_net_last_packet_ms/g_net_connected_at_ms (2026-08-02, founder, live bug report: "i closed
+ * dragonsnshit client and reopened it... it put me into the map with nothing happening skipping
+ * the draft"): a real, narrower race in the SAME REDGARDEN-side issue already found and
+ * accepted as client-side-only ("keep the battlegrounds working as is"): arena_server's own 60s
+ * no-lobby-progress watchdog can kill a match in the instant between net_connect() receiving
+ * PACKET_WELCOME (so the earlier connect-failure fallback never fires -- the client legitimately
+ * connected) and the server ever broadcasting its first real snapshot/phase transition. The
+ * client then sits on a dead socket forever, net_phase stuck at its default ARENA_PHASE_WAITING
+ * -- never DRAFT, so the draft screen never shows -- rendering a permanently empty arena_state.
+ * Tracked here so the main loop can detect "connected, but truly nothing has ever arrived" and
+ * recover, same "land back in Town, not a dead end" precedent the earlier requeue-failure fix
+ * already established. */
+static uint32_t g_net_last_packet_ms = 0;
+static uint32_t g_net_connected_at_ms = 0;
 
 /* g_supplied_ticket_hex (REDGARDEN_GUI_NORTHSTAR.md Milestone 3, 2026-07-31): a real,
  * already-minted ticket handed to this client externally -- GoblinFoxDragon/apps2/mud's
@@ -446,6 +460,8 @@ static int net_connect(const char *host, int port) {
             if (rh->type == PACKET_WELCOME) {
                 my_owner = rh->client_id;
                 printf("Connected -- assigned hero slot %d\n", my_owner);
+                g_net_connected_at_ms = SDL_GetTicks();
+                g_net_last_packet_ms = 0; /* reset -- see this variable's own doc comment; no real snapshot has arrived yet */
                 return 1;
             }
         }
@@ -755,6 +771,7 @@ static void net_poll_snapshots(uint32_t now_ms) {
     socklen_t slen = sizeof(sender);
     int len = recvfrom(net_sock, rbuf, sizeof(rbuf), 0, (struct sockaddr *)&sender, &slen);
     while (len > 0) {
+        g_net_last_packet_ms = now_ms; /* anything at all from the server -- see this variable's own doc comment */
         if (len >= (int)sizeof(NetHeader)) {
             NetHeader *h = (NetHeader *)rbuf;
             if (h->type == PACKET_ARENA_SNAPSHOT_HEROES && len >= (int)(sizeof(NetHeader) + sizeof(ArenaSnapshotHeroesMsg))) {
@@ -2818,6 +2835,11 @@ static void play_cast_tone(int slot) {
  * separate zone rather than reusing Meadow/zone 0). Position syncs (town_sync_position) tag
  * themselves with this scene_id. */
 #define TOWN_ZONE_ID 4
+/* TOWN_NET_STUCK_TIMEOUT_MS: see g_net_last_packet_ms's own doc comment -- how long to wait
+ * after a successful connect with zero packets ever received before treating it as a dead match
+ * and recovering to Town. Generous on purpose: a real, live match can take a few seconds to send
+ * its first snapshot after WELCOME. */
+#define TOWN_NET_STUCK_TIMEOUT_MS 10000
 /* Town Square's real starter-area worms, mirrored by hand from server/mob/worm.go's own
  * TownSquareWormSpawns() -- same "kept in sync by hand" convention this codebase already uses
  * for static, never-moving positions (REDGARDEN's own fountain positions, arena_bot's
@@ -4116,6 +4138,41 @@ int main(int argc, char *argv[]) {
                rather than running arena_update() locally (that would
                double-simulate and diverge from the server's own state). */
             net_poll_snapshots(now);
+
+            /* Dead-connection recovery (2026-08-02, founder: "i closed dragonsnshit client and
+               reopened it... it put me into the map with nothing happening skipping the draft").
+               See g_net_last_packet_ms's own doc comment: net_connect() can legitimately succeed
+               (PACKET_WELCOME received) moments before arena_server's own 60s watchdog kills the
+               match, leaving this client on a dead socket that will never receive a snapshot or
+               phase transition -- net_phase stuck at ARENA_PHASE_WAITING forever, draft screen
+               never shows, arena_state stays permanently empty. STUCK_TIMEOUT_MS is generous
+               (10s) precisely because a real, live match can legitimately take a few seconds to
+               send its first snapshot after WELCOME -- this only fires on TRUE silence, not a
+               slow-but-alive connection. Same "land back in Town, not a dead end" recovery the
+               earlier requeue-failure fix already established; REDGARDEN's own server/matchmaker
+               are still untouched. */
+            if (queue_host && g_net_last_packet_ms == 0 && g_net_connected_at_ms > 0 &&
+                now - g_net_connected_at_ms > TOWN_NET_STUCK_TIMEOUT_MS) {
+                fprintf(stderr, "[arena client] connected but no data ever arrived (%dms) -- "
+                                "match likely died right after connecting. Returning to Town.\n",
+                        TOWN_NET_STUCK_TIMEOUT_MS);
+#ifdef _WIN32
+                if (net_sock >= 0) closesocket(net_sock);
+#else
+                if (net_sock >= 0) close(net_sock);
+#endif
+                net_sock = -1;
+                memset(&arena_state, 0, sizeof(arena_state));
+                arena_obstacles_reset_layout();
+                memset(rings, 0, sizeof(rings));
+                win_logged = 0;
+                net_picked = 0;
+                selected_unit_count = 0;
+                net_phase = ARENA_PHASE_WAITING;
+                g_net_connected_at_ms = 0;
+                in_town = 1;
+                continue;
+            }
         }
         else if (arena_state.winner == 0) {
             arena_update(dt);

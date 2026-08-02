@@ -1,3 +1,31 @@
+## 2026-08-02 (15)
+
+- fix(town): dead-connection recovery -- a narrower race in the same REDGARDEN-side matchmaking
+  issue found earlier today, this time surfacing as "put me into the map with nothing happening
+  skipping the draft" rather than an outright connect failure. Founder: "i closed dragonsnshit
+  client and reopened it and that did not fix it - well it did something different it put me
+  into the map with nothing happening skipping the draft."
+  - Root cause: `net_connect()` can legitimately receive `PACKET_WELCOME` (so the earlier
+    connect-failure fallback never fires -- the client really did connect) in the same window
+    `arena_server`'s own 60s no-lobby-progress watchdog kills the match. The client is then left
+    on a dead socket forever: `net_phase` stuck at its default `ARENA_PHASE_WAITING`, never
+    `ARENA_PHASE_DRAFT`, so the draft screen never shows and `arena_state` never updates --
+    exactly "nothing happening, skipped the draft."
+  - Fix: `g_net_last_packet_ms` now tracks the last time *anything* arrived from the server
+    (`net_poll_snapshots`), reset to 0 on a fresh connect. If 10s pass post-connect with zero
+    packets ever received, the client treats it as a dead match and recovers -- same "land back
+    in Town, not a dead end" pattern the earlier requeue-failure fix already established. Gated
+    on `queue_host` (no Town to return to for a direct `--connect` dev session, same convention
+    as the other Town-recovery paths). `apps/arena_server`/`apps/matchmaker` untouched, per
+    standing instruction.
+  - Live-verified the exact race with a fake matchmaker+server (real `NetHeader`/`MatchFoundMsg`
+    wire format, confirmed via `sizeof()` against the real struct rather than assumed): replies
+    with a real `PACKET_WELCOME` then goes silent forever. Confirmed via log timestamps: the
+    client connects, waits the full 10s with zero packets, then fires the exact recovery message
+    and sets `in_town = 1` -- the same reused code path already visually verified rendering Town
+    correctly in three other contexts this session (initial entry, Return-to-Town button, failed
+    requeue).
+
 ## 2026-08-02 (14)
 
 - feat(town): "New Handington" -- real town layout transcribed from a hand-drawn map. Founder
