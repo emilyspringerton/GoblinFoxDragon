@@ -5314,15 +5314,31 @@ func cmdTravel(p *player, crystalID string) {
 	// Deduct cost and teleport.
 	p.flow -= c.CastCost
 	p.sendf("The crystal resonates... you are transported to %s! (-%d Flow)", c.TargetName, c.CastCost)
-	gw.mu.Lock()
-	broadcastZoneNoLock(p.zoneID, fmt.Sprintf("%s vanishes into a telecrystal.", p.name), p.slot)
-	_ = gw.zoneMgr.Transfer(p.slot, c.TargetScene)
-	p.combat.TargetMobID = ""
-	p.zoneID = c.TargetScene
-	p.pos = mob.Pos{X: c.SpawnPos.X, Y: c.SpawnPos.Y, Z: c.SpawnPos.Z}
-	syncChatSession(p)
-	broadcastZoneNoLock(p.zoneID, fmt.Sprintf("%s arrives via telecrystal.", p.name), p.slot)
-	gw.mu.Unlock()
+	// Real bug found live (2026-08-02, founder: "how do we get from town to the starter zone?
+	// have one of the gates act as a telecrystal"): a real, reproducible, pre-existing deadlock,
+	// isolated (not fixed) this session. Confirmed via a real SIGQUIT goroutine dump + direct
+	// A/B testing: the EXACT SAME crystal, invoked via a real telnet session, works correctly
+	// every time; invoked via the headless/`/api/town/command` HTTP path (what Town's own GUI
+	// client uses), the gw.mu.Lock() call two lines below never returns -- confirmed even with
+	// this whole function's body stripped down to a bare Lock()/Unlock() with nothing else
+	// inside it, so the bug is NOT in what this function does with the lock, it's in headless
+	// dispatch reaching this point in some way that leaves gw.mu unavailable. Root cause not
+	// isolated further given time spent -- gameLoop's own tick (confirmed healthy immediately
+	// before triggering this) permanently stops ticking afterward too, meaning the whole server
+	// deadlocks, not just this one request. defer here is real hardening regardless (a manual
+	// Unlock() would never fire on any future panic in this block), but does not fix the actual
+	// bug -- switched to defer anyway since it's strictly safer either way.
+	func() {
+		gw.mu.Lock()
+		defer gw.mu.Unlock()
+		broadcastZoneNoLock(p.zoneID, fmt.Sprintf("%s vanishes into a telecrystal.", p.name), p.slot)
+		_ = gw.zoneMgr.Transfer(p.slot, c.TargetScene)
+		p.combat.TargetMobID = ""
+		p.zoneID = c.TargetScene
+		p.pos = mob.Pos{X: c.SpawnPos.X, Y: c.SpawnPos.Y, Z: c.SpawnPos.Z}
+		syncChatSession(p)
+		broadcastZoneNoLock(p.zoneID, fmt.Sprintf("%s arrives via telecrystal.", p.name), p.slot)
+	}()
 	cmdLook(p)
 }
 

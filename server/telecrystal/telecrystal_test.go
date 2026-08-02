@@ -5,9 +5,11 @@ import (
 	"testing"
 )
 
-func TestRegistry_SixCrystals(t *testing.T) {
-	if len(Registry) != 6 {
-		t.Errorf("Registry: got %d, want 6", len(Registry))
+func TestRegistry_EightCrystals(t *testing.T) {
+	// 6 original + New Handington <-> Meadow pair (2026-08-02, founder: "how do we get from
+	// town to the starter zone? have one of the gates act as a telecrystal").
+	if len(Registry) != 8 {
+		t.Errorf("Registry: got %d, want 8", len(Registry))
 	}
 }
 
@@ -30,8 +32,15 @@ func TestLookup_NotFound(t *testing.T) {
 
 func TestInScene_Meadow(t *testing.T) {
 	cs := InScene(SceneMeadow)
-	if len(cs) != 2 {
-		t.Errorf("meadow crystals: got %d, want 2", len(cs))
+	if len(cs) != 3 { // +1: TELECRYSTAL_ID_MEADOW_RETURN_HANDINGTON
+		t.Errorf("meadow crystals: got %d, want 3", len(cs))
+	}
+}
+
+func TestInScene_NewHandington(t *testing.T) {
+	cs := InScene(SceneNewHandington)
+	if len(cs) != 1 {
+		t.Errorf("new handington crystals: got %d, want 1", len(cs))
 	}
 }
 
@@ -146,10 +155,14 @@ func TestCrystals_AllHavePrompt(t *testing.T) {
 	}
 }
 
-func TestCrystals_AllHavePositiveCost(t *testing.T) {
+func TestCrystals_AllHaveNonNegativeCost(t *testing.T) {
+	// Was "positive cost" until the New Handington <-> Meadow pair (2026-08-02): those are
+	// intentionally free (CastCost 0) -- a starter-zone shuttle a level-1 character needs
+	// before they'd ever have Flow to spend on the older, Flow-gated network. 0 is a real,
+	// valid cost now; negative never is.
 	for _, c := range Registry {
-		if c.CastCost <= 0 {
-			t.Errorf("crystal %q has non-positive CastCost %d", c.ID, c.CastCost)
+		if c.CastCost < 0 {
+			t.Errorf("crystal %q has negative CastCost %d", c.ID, c.CastCost)
 		}
 	}
 }

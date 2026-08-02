@@ -3896,6 +3896,20 @@ int main(int argc, char *argv[]) {
                             ah_open();
                             opened = 1;
                         }
+                        /* Dragon Gate deliberately NOT wired to `travel` yet (2026-08-02,
+                           founder: "how do we get from town to the starter zone? have one of
+                           the gates act as a telecrystal"). The real crystal entry exists
+                           server-side (server/telecrystal's TELECRYSTAL_ID_HANDINGTON_TO_MEADOW)
+                           and works correctly via real telnet -- but a real, reproducible,
+                           unresolved deadlock was found live: the exact same `travel` command,
+                           invoked through apps2/mud's headless `/api/town/command` path (what
+                           this client's own town_send_command uses for every chat/gate command),
+                           hangs forever acquiring gw.mu and takes the WHOLE mud server down with
+                           it (confirmed via a SIGQUIT goroutine dump -- gameLoop's own tick stops
+                           forever too, not just this one request). Not safe to trigger from the
+                           GUI until that's root-caused and fixed server-side -- see
+                           GoblinFoxDragon CHANGELOG for the investigation. Founder: do not type
+                           "/travel ..." in chat either, same danger, same path. */
                     }
                     if (!opened) {
                         dragging_cam = 1; last_mx = te.button.x; last_my = te.button.y;

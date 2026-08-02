@@ -1,3 +1,33 @@
+## 2026-08-02 (23)
+
+- feat(mud): New Handington <-> Meadow telecrystal, real critical bug found and NOT shipped to
+  the GUI -- founder: "how do we get from town to the starter zone? have one of the gates act as
+  a telecrystal... check the shankpit dragonsnshit codebase for the telecrystal logic." Found
+  apps2/mud already has a full, real, player-facing telecrystal system (`server/telecrystal`,
+  `cmdCrystals`/`cmdTravel`/`cmdTouchCrystal`) that apps/lobby's own SHANKPIT-style client
+  already uses for Town/Mines/Docks/Giza -- New Handington (zone 4, apps2/battlegrounds_gui's own
+  Town) predates that network entirely and had no crystal of its own. Added
+  `TELECRYSTAL_ID_HANDINGTON_TO_MEADOW` + its return pair (free, CastCost 0 -- a starter-zone
+  shuttle a level-1 character needs before they'd ever have Flow to spend on the older network),
+  positioned at New Handington's real "Dragon Gate" building. Updated telecrystal_test.go for the
+  new registry size/shape (8 crystals, non-negative-cost convention now that free ones exist).
+  - **Real, critical, unresolved bug found live, not shipped**: the exact same crystal, invoked
+    via a real telnet session, works correctly every time. Invoked via
+    apps2/mud's headless `/api/town/command` HTTP path -- what Town's own GUI client uses for
+    every chat/gate command -- `cmdTravel`'s `gw.mu.Lock()` call never returns, and takes the
+    WHOLE mud server down with it: confirmed via a real SIGQUIT goroutine dump that `gameLoop`'s
+    own 1Hz tick, which was ticking healthily seconds earlier, permanently stops too. Reproduced
+    with `cmdTravel`'s body stripped to a bare `Lock()`/`Unlock()` with nothing else inside --
+    the bug is not in what the function does with the lock, it's in headless dispatch reaching
+    this point in some way not yet isolated. Converted the manual `Lock()`/`Unlock()` pair to
+    `defer` (real hardening against any future panic there, but did not fix the actual hang).
+    Given the severity (one GUI interaction can deadlock the entire server for every player),
+    deliberately did NOT wire the Dragon Gate's right-click to `travel` in
+    `apps2/battlegrounds_gui` -- the building interaction was reverted, left as a clear comment
+    warning future work (and the founder, via chat) not to trigger `/travel` from the GUI until
+    this is properly root-caused. The underlying telecrystal system itself is real and working
+    for telnet players; only the headless/GUI path is unsafe right now.
+
 ## 2026-08-02 (22)
 
 - feat(mud): real Sunderworm boss content for World Crisis -- founder: "start working on the

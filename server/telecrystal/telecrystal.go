@@ -47,10 +47,11 @@ func (c Crystal) InRange(pos Vec3) bool {
 
 // Scene IDs matching server/zone.
 const (
-	SceneMeadow = 0 // Town / SCENE_CITY
-	SceneHills  = 1
-	SceneCaves  = 2 // Mines / SCENE_MINES
-	SceneSwamp  = 3 // Docks / SCENE_DOCKS
+	SceneMeadow      = 0 // Town / SCENE_CITY (the OLDER "Town" -- apps/lobby's SHANKPIT-style scene)
+	SceneHills       = 1
+	SceneCaves       = 2 // Mines / SCENE_MINES
+	SceneSwamp       = 3 // Docks / SCENE_DOCKS
+	SceneNewHandington = 4 // New Handington -- apps2/battlegrounds_gui's own, newer Town
 )
 
 // Registry is the global telecrystal network (from TELECRYSTAL_NETWORK_SPEC.md).
@@ -96,6 +97,30 @@ var Registry = []Crystal{
 		Prompt: "G: RETURN TOWN", CastCost: 900,
 		TargetScene: SceneMeadow, SpawnPos: Vec3{300, 0, 238},
 		SpawnYaw: 210, SpawnPitch: 0, TargetName: "TOWN",
+	},
+	// New Handington <-> Meadow (2026-08-02, founder: "how do we get from town to the starter
+	// zone? have one of the gates act as a telecrystal"): New Handington (zone 4,
+	// apps2/battlegrounds_gui's own Town) predates this network entirely -- it has no telecrystal
+	// of its own yet, and Meadow (zone 0) is the REAL starter zone real telnet players spawn into
+	// (MeadowWormSpawns' worm-meadow-0..7), not the same thing as New Handington's own decorative
+	// Worm Hut. Position matches New Handington's real "Dragon Gate" building
+	// (TOWN_BUILDINGS, apps2/battlegrounds_gui/src/main.c) -- one of Town's own gate buildings,
+	// per founder direction, made real instead of purely decorative. Free (CastCost 0): unlike
+	// the older network's Flow-gated crystals, there's no real economy reason to charge for a
+	// starter-zone shuttle a level-1 character needs before they'd ever have Flow to spend.
+	{
+		ID:          "TELECRYSTAL_ID_HANDINGTON_TO_MEADOW",
+		SourceScene: SceneNewHandington, Position: Vec3{-40, 0, -50}, Radius: 12,
+		Prompt: "G: TELEPORT MEADOW (STARTER ZONE)", CastCost: 0,
+		TargetScene: SceneMeadow, SpawnPos: Vec3{0, 2, 0},
+		SpawnYaw: 0, SpawnPitch: 0, TargetName: "MEADOW",
+	},
+	{
+		ID:          "TELECRYSTAL_ID_MEADOW_RETURN_HANDINGTON",
+		SourceScene: SceneMeadow, Position: Vec3{0, 2, 0}, Radius: 12,
+		Prompt: "G: RETURN NEW HANDINGTON", CastCost: 0,
+		TargetScene: SceneNewHandington, SpawnPos: Vec3{-40, 0, -50},
+		SpawnYaw: 180, SpawnPitch: 0, TargetName: "NEW HANDINGTON",
 	},
 }
 
