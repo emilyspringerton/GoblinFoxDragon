@@ -65,20 +65,23 @@ func wormID(i int) string {
 	return "worm-meadow-" + itoa(i)
 }
 
-// TownSquareWormSpawns returns the starter mobs for zone 4 (Town Square, 2026-08-02 --
+// TownSquareWormSpawns returns the starter mobs for zone 4 (New Handington, 2026-08-02 --
 // GoblinFoxDragon's Battlegrounds-GUI Town scene, founder: "implement the starter area worm" ->
-// later, after playing it: "where's my starter zone outside of town with the worms?" -- a single
-// worm didn't read as "a starter zone," so this is now a small ring, same shape as
-// MeadowWormSpawns' own ring but with 4 worms instead of 8 (Town Square is still meant to be
-// smaller/denser than Meadow's own open field, just not a single decorative mob). NewWorm
+// "where's my starter zone outside of town with the worms?" -- a single worm didn't read as "a
+// starter zone," so this became a 4-worm ring around the origin -> then the real hand-drawn
+// town-map.jpeg arrived ("i want the town layout to match town map pretty much exactly"), which
+// names this exact spot "Worm Hut" at a specific position in the town, not centered on spawn --
+// repositioned to match. Clustered tightly (small deltas around the hut), not spread in a wide
+// ring, since it's meant to read as "a hut with worms in it," not an open field. NewWorm
 // defaults SceneID to 0 (Meadow); overridden to 4 here since this is the one caller that isn't
 // spawning into Meadow itself.
 func TownSquareWormSpawns() []Mob {
+	const hutX, hutZ = 5.0, 15.0 // "Worm Hut" position, see apps2/battlegrounds_gui's TOWN_BUILDINGS
 	positions := []Pos{
-		{X: 8, Y: 2, Z: 0},
-		{X: -8, Y: 2, Z: 0},
-		{X: 0, Y: 2, Z: 8},
-		{X: 0, Y: 2, Z: -8},
+		{X: hutX + 1.5, Y: 2, Z: hutZ},
+		{X: hutX - 1.5, Y: 2, Z: hutZ},
+		{X: hutX, Y: 2, Z: hutZ + 1.5},
+		{X: hutX, Y: 2, Z: hutZ - 1.5},
 	}
 	worms := make([]Mob, len(positions))
 	for i, p := range positions {

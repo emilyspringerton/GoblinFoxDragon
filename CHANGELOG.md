@@ -1,3 +1,29 @@
+## 2026-08-02 (14)
+
+- feat(town): "New Handington" -- real town layout transcribed from a hand-drawn map. Founder
+  uploaded `town-map.jpeg` straight to GitHub: "i want the town layout to match town map pretty
+  much exactly."
+  - Zone 4 renamed "Town Square" -> "New Handington" (`server/zone/zone.go`), matching the map's
+    own title.
+  - 25 named buildings transcribed from the sketch into `TOWN_BUILDINGS` (`apps2/battlegrounds_gui`):
+    Warrior Guild, Seed Shop, Fishing, Blacksmith, Butcher, Armor Shop, Shady Dealer, Guild
+    House, Potions, Gold Guild, Secret Gate, Auction House, Archery Guild, Post Office, Town
+    Hall, Gem Dealer, Police, Gemani Tower, MineCo Ops Office, Mining Supplies, Glove Shop,
+    Hats, Worm Hut, Dragon Gate, Diamond Gate -- placed at a row/col reading of the map's own
+    relative layout, not exact hand-drawn shapes (every other structure in this renderer is
+    axis-aligned boxes, so buildings follow the same art style). Each renders as a colored box
+    (category-coded: guilds blue, shops green, official grey, shady/secret purple, gates gold)
+    with a floating name label (`world_to_screen`, same projection Battlegrounds' own per-hero
+    health bars use).
+  - `server/mob/worm.go`'s `TownSquareWormSpawns` repositioned from an origin-centered ring to a
+    tight cluster at the map's own real "Worm Hut" location (5, 15) -- client-side
+    `TOWN_TARGET_X/Y` updated to match exactly.
+  Go build/test green. Native client build clean; visually verified under Xvfb (elevated test
+  camera): buildings render at real relative positions with readable labels, matching the map's
+  layout (Dragon Gate north, Warrior Guild/Seed Shop/Blacksmith clustered near it, Gold
+  Guild/Guild House/Butcher/Fishing/Post Office/Potions/Auction House/Armor Shop all correctly
+  positioned relative to each other and to spawn).
+
 ## 2026-08-02 (13)
 
 - feat(town): chat + combat log panes, target cycling, real "1" attack, jump, worm ring expanded

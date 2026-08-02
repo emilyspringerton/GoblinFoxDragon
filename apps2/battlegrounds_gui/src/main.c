@@ -2829,11 +2829,59 @@ static void play_cast_tone(int slot) {
 static const char *TOWN_TARGET_NAMES[TOWN_TARGET_COUNT] = {
     "worm-town-0", "worm-town-1", "worm-town-2", "worm-town-3"
 };
-static const float TOWN_TARGET_X[TOWN_TARGET_COUNT] = {8.0f, -8.0f, 0.0f, 0.0f};
-static const float TOWN_TARGET_Z[TOWN_TARGET_COUNT] = {0.0f, 0.0f, 8.0f, -8.0f};
+/* Worm Hut cluster (5, 15) -- must match server/mob/worm.go's own TownSquareWormSpawns hutX/hutZ
+ * exactly, same "kept in sync by hand" convention. */
+static const float TOWN_TARGET_X[TOWN_TARGET_COUNT] = {6.5f, 3.5f, 5.0f, 5.0f};
+static const float TOWN_TARGET_Z[TOWN_TARGET_COUNT] = {15.0f, 15.0f, 16.5f, 13.5f};
 /* -1 = no target selected. Tab/Shift+Tab cycle (2026-08-02, founder: "add tab and shift tab to
  * cycle through targets like wow"). */
 static int g_town_target_index = -1;
+
+/* TOWN_BUILDINGS (2026-08-02, founder uploaded a real hand-drawn town map straight to GitHub --
+ * "i want the town layout to match town map pretty much exactly"): transcribed from
+ * town-map.jpeg, "New Handington." Real named buildings at their real relative positions (a
+ * row/col reading of the hand-drawn layout, north=-Z/top of the drawing, west=-X/left, spacing
+ * 10 units), not exact hand-drawn shapes -- every other structure in this renderer (heroes, the
+ * worm, nodes) is built from axis-aligned boxes, so buildings follow the same art style rather
+ * than trying to reproduce hexagons/trapezoids/triangles from the sketch. Purely decorative,
+ * same "for now" scope as the rest of Town's own content -- no interiors, no NPCs, no real
+ * per-building function yet (Auction House doesn't sell anything, Police doesn't do anything).
+ * Color is by category, not per-building: guilds blue-ish, shops green-ish, official grey,
+ * shady/secret purple, gates gold. */
+typedef struct {
+    const char *name;
+    float x, z;
+    float half_w, half_h, half_d;
+    float r, g, b;
+} TownBuilding;
+#define TOWN_BUILDING_COUNT 25
+static const TownBuilding TOWN_BUILDINGS[TOWN_BUILDING_COUNT] = {
+    {"Seed Shop",         0.0f, -30.0f, 1.8f, 1.4f, 1.8f,  0.25f, 0.55f, 0.25f},
+    {"Warrior Guild",   -10.0f, -20.0f, 2.6f, 2.0f, 2.6f,  0.25f, 0.35f, 0.75f},
+    {"Fishing",          10.0f, -20.0f, 1.8f, 1.3f, 1.8f,  0.25f, 0.55f, 0.25f},
+    {"Blacksmith",      -15.0f, -15.0f, 1.4f, 1.5f, 1.4f,  0.25f, 0.55f, 0.25f},
+    {"Butcher",           0.0f, -10.0f, 1.8f, 1.3f, 1.8f,  0.25f, 0.55f, 0.25f},
+    {"Armor Shop",        10.0f, -10.0f, 1.9f, 1.4f, 1.9f, 0.25f, 0.55f, 0.25f},
+    {"Shady Dealer",      20.0f, -5.0f, 1.7f, 1.3f, 1.7f,  0.55f, 0.2f,  0.6f},
+    {"Guild House",      -10.0f,  0.0f, 2.2f, 1.7f, 2.2f,  0.25f, 0.35f, 0.75f},
+    {"Potions",            3.0f,  0.0f, 1.6f, 1.2f, 1.6f,  0.25f, 0.55f, 0.25f},
+    {"Gold Guild",       -20.0f,  5.0f, 2.4f, 1.9f, 2.4f,  0.25f, 0.35f, 0.75f},
+    {"Secret Gate",       23.0f, -3.0f, 1.0f, 2.2f, 1.0f,  0.55f, 0.2f,  0.6f},
+    {"Auction House",     -5.0f, 10.0f, 4.0f, 1.8f, 2.2f,  0.55f, 0.4f,  0.2f},
+    {"Archery Guild",     15.0f, 15.0f, 2.3f, 1.8f, 2.3f,  0.25f, 0.35f, 0.75f},
+    {"Post Office",      -20.0f, 20.0f, 1.9f, 1.5f, 1.9f,  0.6f,  0.6f,  0.62f},
+    {"Town Hall",           5.0f, 20.0f, 3.2f, 2.6f, 3.2f, 0.6f,  0.6f,  0.62f},
+    {"Gem Dealer",        -5.0f, 25.0f, 1.7f, 1.3f, 1.7f,  0.25f, 0.55f, 0.25f},
+    {"Police",              5.0f, 25.0f, 1.5f, 1.3f, 1.5f, 0.6f,  0.6f,  0.62f},
+    {"Gemani Tower",       15.0f, 25.0f, 1.6f, 3.2f, 1.6f, 0.55f, 0.2f,  0.6f},
+    {"MineCo Ops Office", -10.0f, 30.0f, 1.9f, 1.4f, 1.9f, 0.6f,  0.6f,  0.62f},
+    {"Mining Supplies",    0.0f, 30.0f, 1.8f, 1.3f, 1.8f,  0.25f, 0.55f, 0.25f},
+    {"Glove Shop",        10.0f, 30.0f, 1.6f, 1.2f, 1.6f,  0.25f, 0.55f, 0.25f},
+    {"Hats",               13.0f, 30.0f, 1.0f, 1.0f, 1.0f, 0.25f, 0.55f, 0.25f},
+    {"Worm Hut",            5.0f, 15.0f, 1.4f, 1.1f, 1.4f, 0.5f,  0.38f, 0.16f},
+    {"Dragon Gate",       -20.0f, -25.0f, 1.2f, 2.6f, 1.2f, 0.85f, 0.65f, 0.15f},
+    {"Diamond Gate",       20.0f, 35.0f, 1.2f, 2.6f, 1.2f,  0.85f, 0.65f, 0.15f},
+};
 
 /* g_town_char_loaded and the town_*_peak_ms trio are declared here (ahead of town_draw_hud,
  * which reads them) rather than down with the rest of Town's avatar/movement state below --
@@ -2897,6 +2945,36 @@ static void town_draw_worms(const Mat4 *vp, GLint loc_mvp, GLint loc_model, GLin
                       vp, loc_mvp, loc_model, cube_mesh);
         draw_hero_box(wx, wz, -0.45f, 0.14f, 0.0f, 0.22f, 0.14f, 0.16f, 1.0f,
                       vp, loc_mvp, loc_model, cube_mesh);
+    }
+}
+
+/* town_draw_buildings: one box per TOWN_BUILDINGS entry -- see that table's own doc comment for
+ * scope/style. Each box's own vertical center sits at half_h above ground (draw_hero_box's own
+ * dy parameter), so every building rests on the checkerboard rather than being centered through
+ * it. */
+static void town_draw_buildings(const Mat4 *vp, GLint loc_mvp, GLint loc_model, GLint loc_color, const Mesh *cube_mesh) {
+    for (int i = 0; i < TOWN_BUILDING_COUNT; i++) {
+        const TownBuilding *b = &TOWN_BUILDINGS[i];
+        glUniform4f_(loc_color, b->r, b->g, b->b, 1.0f);
+        draw_hero_box(b->x, b->z, 0.0f, b->half_h, 0.0f, b->half_w, b->half_h, b->half_d, 1.0f,
+                      vp, loc_mvp, loc_model, cube_mesh);
+    }
+}
+
+/* town_draw_building_labels: 2D name labels, one per TOWN_BUILDINGS entry, projected via
+ * world_to_screen (the same helper Battlegrounds' own per-hero floating health bars use) --
+ * called from the HUD's own 2D pass (already unbound from the GLSL program, ortho projection
+ * already set up), not the 3D pass above. Skips anything behind the camera (world_to_screen's
+ * own return value) -- no distance culling beyond that; showing all 25 at once is real clutter
+ * up close, a known, accepted tradeoff for a first "match the map" pass, not solved here. */
+static void town_draw_building_labels(const Mat4 *vp, int win_w, int win_h) {
+    for (int i = 0; i < TOWN_BUILDING_COUNT; i++) {
+        const TownBuilding *b = &TOWN_BUILDINGS[i];
+        float sx, sy;
+        if (!world_to_screen(vp, b->x, b->half_h * 2.0f + 0.6f, b->z, win_w, win_h, &sx, &sy)) continue;
+        if (sx < -100.0f || sx > (float)win_w + 100.0f || sy < -50.0f || sy > (float)win_h + 50.0f) continue;
+        glColor3f(0.9f, 0.9f, 0.85f);
+        draw_string(b->name, sx - (float)strlen(b->name) * 2.5f, sy, 7);
     }
 }
 
@@ -3503,6 +3581,7 @@ int main(int argc, char *argv[]) {
                 glUseProgram_(prog);
                 glUniform3f_(loc_light, 0.4f, 0.8f, 0.3f);
                 town_draw_ground(loc_mvp, loc_model, loc_color, vp, &plane_mesh);
+                town_draw_buildings(&vp, loc_mvp, loc_model, loc_color, &cube_mesh);
                 town_draw_worms(&vp, loc_mvp, loc_model, loc_color, &cube_mesh);
                 if (g_town_char_loaded) {
                     /* jump offset applied by pre-multiplying vp with a world-space Y translate --
@@ -3520,6 +3599,7 @@ int main(int argc, char *argv[]) {
                 }
 
                 town_draw_hud(win_w, win_h, queue_host != NULL);
+                town_draw_building_labels(&vp, win_w, win_h);
                 chat_draw(win_w, win_h);
                 combat_log_draw(win_w, win_h);
 
