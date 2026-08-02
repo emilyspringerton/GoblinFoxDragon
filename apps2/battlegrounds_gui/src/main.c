@@ -2788,6 +2788,97 @@ static void play_cast_tone(int slot) {
     }
 }
 
+/* ---------------- Town scene (2026-08-02) ----------------
+ * Founder: "we need the default to be town... a button top right to queue for battlegrounds
+ * which would trigger the matchmaker that leads to the draft and the game etc... build the world
+ * outside of the battlegrounds for now a flat plane is ok have it checkers grey and brown like a
+ * chessboard just make it the same size as the battlegrounds scene for now just with no
+ * buildings or trees or rocks yet." First slice of HEADLESS_SESSION_NORTHSTAR.md's own §3.4 "the
+ * second scene" -- purely client-side rendering for now (no headless MUD session wired up yet,
+ * that's the northstar's own later milestone), reusing the same shader/camera/mesh pipeline
+ * battlegrounds already sets up in main() so this doesn't need a second rendering path.
+ * Deliberately not a function taking every local it needs as a parameter -- both are called
+ * inline from main()'s own loop, right next to the locals (prog, loc_mvp/model/color, plane_mesh,
+ * win_w/win_h) they read, same "one big stateful main(), not modularized" convention the rest of
+ * this file already uses throughout. */
+#define TOWN_GRID_N 12       /* tiles per side */
+#define TOWN_QUEUE_BTN_W 280.0f
+#define TOWN_QUEUE_BTN_H 44.0f
+
+/* town_draw_ground: NxN alternating grey/brown tiles spanning the exact same total footprint
+ * (ARENA_HALF_EXTENT * 2.2f) as battlegrounds' own single-color ground plane just below in
+ * main()'s "ground" block -- "same size as the battlegrounds scene," per the founder's own ask.
+ * One draw_mesh call per tile since the shared shader only takes one flat uColor per draw call
+ * (no per-vertex/textured color path exists in this pipeline) -- a real chessboard needs that
+ * many quads, not one plane with a texture. */
+static void town_draw_ground(GLint loc_mvp, GLint loc_model, GLint loc_color, Mat4 vp,
+                              const Mesh *plane_mesh) {
+    float total = ARENA_HALF_EXTENT * 2.2f;
+    float tile = total / TOWN_GRID_N;
+    float half = total / 2.0f;
+    for (int gz = 0; gz < TOWN_GRID_N; gz++) {
+        for (int gx = 0; gx < TOWN_GRID_N; gx++) {
+            float cx = -half + tile * ((float)gx + 0.5f);
+            float cz = -half + tile * ((float)gz + 0.5f);
+            Mat4 t = mat4_translate(cx, 0.0f, cz);
+            Mat4 s = mat4_scale(tile, 1.0f, tile);
+            Mat4 model = mat4_multiply(&t, &s);
+            Mat4 mvp = mat4_multiply(&vp, &model);
+            glUniformMatrix4fv_(loc_mvp, 1, GL_FALSE, mvp.m);
+            glUniformMatrix4fv_(loc_model, 1, GL_FALSE, model.m);
+            if ((gx + gz) % 2 == 0) {
+                glUniform4f_(loc_color, 0.55f, 0.55f, 0.55f, 1.0f); /* grey */
+            } else {
+                glUniform4f_(loc_color, 0.4f, 0.28f, 0.16f, 1.0f); /* brown */
+            }
+            draw_mesh(plane_mesh);
+        }
+    }
+}
+
+/* town_queue_button_rect: shared by the draw call and the click hit-test below so the two can
+ * never drift apart -- top-right, per the founder's own "button top right" placement. */
+static void town_queue_button_rect(int win_w, int win_h, float *x0, float *y0, float *x1, float *y1) {
+    *x0 = (float)win_w - TOWN_QUEUE_BTN_W - 20.0f;
+    *y0 = (float)win_h - TOWN_QUEUE_BTN_H - 20.0f;
+    *x1 = (float)win_w - 20.0f;
+    *y1 = (float)win_h - 20.0f;
+}
+
+static int town_queue_button_hit(float bx, float by, int win_w, int win_h) {
+    float x0, y0, x1, y1;
+    town_queue_button_rect(win_w, win_h, &x0, &y0, &x1, &y1);
+    return bx >= x0 && bx <= x1 && by >= y0 && by <= y1;
+}
+
+static void town_draw_hud(int win_w, int win_h, int queue_available) {
+    glUseProgram_(0); /* legacy immediate-mode 2D pass -- see the match renderer's own identical
+                          "2D HUD pass" comment; draw_string/glBegin below need the fixed-function
+                          pipeline, not the custom GLSL program the checkerboard just used. */
+    glDisable(GL_DEPTH_TEST); /* 2D overlay, same precedent as chat_draw/combat_log_draw */
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(0, win_w, 0, win_h, -1, 1);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+    glColor3f(0.85f, 0.87f, 0.9f);
+    draw_string("TOWN", 16.0f, (float)win_h - 34.0f, 16);
+
+    if (!queue_available) return;
+    float x0, y0, x1, y1;
+    town_queue_button_rect(win_w, win_h, &x0, &y0, &x1, &y1);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glColor4f(0.15f, 0.35f, 0.2f, 0.9f);
+    glBegin(GL_QUADS);
+    glVertex2f(x0, y0); glVertex2f(x1, y0); glVertex2f(x1, y1); glVertex2f(x0, y1);
+    glEnd();
+    glDisable(GL_BLEND);
+    glColor3f(0.6f, 1.0f, 0.7f);
+    draw_string("QUEUE FOR BATTLEGROUNDS", x0 + 14.0f, y0 + TOWN_QUEUE_BTN_H / 2.0f - 4.0f, 10);
+}
+
 int main(int argc, char *argv[]) {
     /* No srand() call existed anywhere in this file before -- mint_ticket_fallback's own
        rand()-based nonce (used only when IDUNA isn't reachable) was silently using the default
@@ -2839,6 +2930,17 @@ int main(int argc, char *argv[]) {
         }
     }
     net_mode = (connect_host != NULL) || (queue_host != NULL);
+    /* in_town (2026-08-02, founder: "the default to be town... a button top right to queue for
+       battlegrounds which would trigger the matchmaker that leads to the draft and the game").
+       Only the --queue path (what PLAY.bat/real players use) is deferred -- login still happens
+       up front exactly as before, landing the player in Town instead of straight into queueing;
+       the actual net_find_and_connect call that used to run immediately below now runs when the
+       Town "QUEUE FOR BATTLEGROUNDS" button is clicked (see the in_town branch in the main loop).
+       --connect (a developer connecting straight to an already-known arena_server) is untouched
+       -- there's no matchmaker/queue step to defer in that path, so it still connects immediately
+       and never sees Town at all. Battlegrounds itself -- draft, live match, everything from
+       net_find_and_connect onward -- is completely unchanged, per "keep battlegrounds as is". */
+    int in_town = (queue_host != NULL);
     load_iduna_agent_config();
 #ifdef _WIN32
     /* Sockets need WSAStartup before any socket() call on Windows -- only
@@ -2862,7 +2964,8 @@ int main(int argc, char *argv[]) {
     int win_w = 1280, win_h = 720;
     SDL_Window *win = SDL_CreateWindow(
         observing ? "KNIGHTS OF THE VOID — OBSERVER MODE" :
-        (net_mode ? "KNIGHTS OF THE VOID (networked PvP)" : "KNIGHTS OF THE VOID (local)"),
+        (in_town ? "DRAGONSNSHIT — TOWN" :
+        (net_mode ? "KNIGHTS OF THE VOID (networked PvP)" : "KNIGHTS OF THE VOID (local)")),
         100, 100, win_w, win_h, SDL_WINDOW_OPENGL);
     if (!win) { fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError()); return 1; }
     SDL_GLContext ctx = SDL_GL_CreateContext(win);
@@ -2892,12 +2995,9 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "Failed to connect to arena server at %s:%d\n", connect_host, connect_port);
             return 1;
         }
-    } else if (queue_host) {
-        if (!net_find_and_connect(queue_host, queue_port)) {
-            fprintf(stderr, "Failed to join a match via matchmaker at %s:%d\n", queue_host, queue_port);
-            return 1;
-        }
     }
+    /* queue_host's own connect is deferred to the Town "QUEUE FOR BATTLEGROUNDS" button click,
+       see in_town's own doc comment above -- intentionally not connected here. */
 
     /* Hover cursor indicators (S170-69, founder northstar: "nice cursor indicators for hover
        over enemy vers aly etc"). The color-coded YOU/ALLY/ENEMY bracket+label below already
@@ -2946,6 +3046,78 @@ int main(int argc, char *argv[]) {
         uint32_t now = SDL_GetTicks();
         uint32_t dt = now - last_tick;
         last_tick = now;
+
+        /* Town scene (2026-08-02) -- see its own doc comment above main(). Deliberately its own
+           early branch with `continue`, not woven into the huge battlegrounds frame body below:
+           "keep battlegrounds as is" means that body -- every line of it -- stays completely
+           untouched. Reuses the same cam_yaw/cam_pitch/cam_dist right-drag+wheel camera controls
+           battlegrounds itself uses (declared at file scope, shared, not reset here) so the feel
+           carries over once a match actually starts. */
+        if (in_town) {
+            SDL_Event te;
+            while (SDL_PollEvent(&te)) {
+                if (te.type == SDL_QUIT) { running = 0; }
+                else if (te.type == SDL_WINDOWEVENT && te.window.event == SDL_WINDOWEVENT_RESIZED) {
+                    win_w = te.window.data1; win_h = te.window.data2;
+                }
+                else if (te.type == SDL_MOUSEBUTTONDOWN && te.button.button == SDL_BUTTON_RIGHT) {
+                    dragging_cam = 1; last_mx = te.button.x; last_my = te.button.y;
+                }
+                else if (te.type == SDL_MOUSEBUTTONUP && te.button.button == SDL_BUTTON_RIGHT) {
+                    dragging_cam = 0;
+                }
+                else if (te.type == SDL_MOUSEMOTION && dragging_cam) {
+                    int mdx = te.motion.x - last_mx, mdy = te.motion.y - last_my;
+                    last_mx = te.motion.x; last_my = te.motion.y;
+                    cam_yaw += mdx * 0.3f;
+                    cam_pitch += mdy * 0.3f;
+                    if (cam_pitch < 10.0f) cam_pitch = 10.0f;
+                    if (cam_pitch > 80.0f) cam_pitch = 80.0f;
+                }
+                else if (te.type == SDL_MOUSEWHEEL) {
+                    cam_dist -= te.wheel.y * 1.0f;
+                    if (cam_dist < 4.0f) cam_dist = 4.0f;
+                    if (cam_dist > 30.0f) cam_dist = 30.0f;
+                }
+                else if (te.type == SDL_MOUSEBUTTONDOWN && te.button.button == SDL_BUTTON_LEFT) {
+                    float bx = (float)te.button.x, by = (float)(win_h - te.button.y);
+                    if (queue_host && town_queue_button_hit(bx, by, win_w, win_h)) {
+                        /* net_find_and_connect blocks for up to 60s -- same known, named
+                           limitation draw_queuing_screen's own doc comment already covers for
+                           the post-match requeue button; reused here rather than leaving Town's
+                           last frame on screen looking hung for the whole wait. */
+                        draw_queuing_screen(win, win_w, win_h);
+                        if (net_find_and_connect(queue_host, queue_port)) {
+                            in_town = 0;
+                        } else {
+                            fprintf(stderr, "Failed to join a match via matchmaker at %s:%d\n",
+                                    queue_host, queue_port);
+                        }
+                    }
+                }
+            }
+
+            if (in_town) { /* still true -- didn't just transition into a match this frame */
+                glViewport(0, 0, win_w, win_h);
+                glClearColor(0.5f, 0.75f, 0.92f, 1.0f); /* open-sky blue, distinct from battlegrounds' dark-green backdrop */
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+                Mat4 view = mat4_orbit_view(0.0f, 0.0f, 0.0f, cam_yaw, cam_pitch, cam_dist);
+                Mat4 proj = mat4_perspective(60.0f, (float)win_w / (float)win_h, 0.1f, 100.0f);
+                Mat4 vp = mat4_multiply(&proj, &view);
+
+                glUseProgram_(prog);
+                glUniform3f_(loc_light, 0.4f, 0.8f, 0.3f);
+                town_draw_ground(loc_mvp, loc_model, loc_color, vp, &plane_mesh);
+
+                town_draw_hud(win_w, win_h, queue_host != NULL);
+
+                SDL_GL_SwapWindow(win);
+                SDL_Delay(16);
+                continue;
+            }
+        }
+
         if (observing) {
             observe_elapsed_ms += dt;
         } else {

@@ -1,3 +1,26 @@
+## 2026-08-02 (5)
+
+- feat(town): `apps2/battlegrounds_gui` now defaults to a real Town scene instead of connecting
+  straight into the matchmaker. Founder: "we need the default to be town... a button top right
+  to queue for battlegrounds which would trigger the matchmaker that leads to the draft and the
+  game etc... build the world outside of the battlegrounds for now a flat plane is ok have it
+  checkers grey and brown like a chessboard just make it the same size as the battlegrounds
+  scene for now just with no buildings or trees or rocks yet." First slice of
+  `HEADLESS_SESSION_NORTHSTAR.md` §3.4's "second scene," client-rendering-only for now (no
+  headless MUD session wired up). `--queue`'s own `net_find_and_connect` call is deferred from
+  startup to a real "QUEUE FOR BATTLEGROUNDS" button (top-right, per the founder's own
+  placement); login still happens up front unchanged, landing the player in Town instead.
+  `--connect` (direct dev connect to a known arena_server) is untouched -- no queue step to
+  defer there, so it skips Town entirely, same as before. Town's own ground is a 12x12
+  grey/brown checkerboard spanning the exact same footprint (`ARENA_HALF_EXTENT * 2.2f`) as
+  battlegrounds' own ground plane -- "same size as the battlegrounds scene." Reuses
+  battlegrounds' existing right-drag+wheel orbit camera and the same queuing "please wait"
+  screen the post-match requeue button already used, so the window doesn't look hung during the
+  up-to-60s matchmaker wait. Battlegrounds' own code is untouched -- the whole existing frame
+  body is skipped via an early `continue` while in Town, not woven into it. Visually verified
+  under Xvfb: TOWN label, checkerboard, and the button all render correctly (mingw unavailable
+  locally, same standing note as the rest of this client).
+
 ## 2026-08-02 (4)
 
 - feat(combat-log): second pane in `apps2/battlegrounds_gui`, bottom-right (mirrors the chat
