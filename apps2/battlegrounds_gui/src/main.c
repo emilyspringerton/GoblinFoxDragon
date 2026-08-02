@@ -3018,10 +3018,18 @@ static void town_fetch_character(void) {
  * xyz source of truth." Throttled (every 2s, and only if actually moved) rather than every frame
  * -- a walking player would otherwise fire a PATCH ~60 times/sec for no real benefit. Reuses the
  * player's own JWT from login, the same credential the now-ownership-checked position endpoint
- * expects from a non-agent caller. */
-static void town_sync_position(uint32_t now) {
+ * expects from a non-agent caller.
+ *
+ * force (2026-08-02, founder: "ensure my avatar can move around town and the location is
+ * persisted so login to same spot"): the 2s throttle above means a player who moves and then
+ * quits within that window loses their last few steps -- next login would place them slightly
+ * short of where they actually stood. Called with force=1 once, right as the app is shutting
+ * down (see main()'s own cleanup block), to flush any not-yet-synced movement so "login to same
+ * spot" is actually true rather than "usually true." Still gated on has-actually-moved (skips
+ * the PATCH entirely if nothing changed since the last sync), just not on elapsed time. */
+static void town_sync_position(uint32_t now, int force) {
     if (!g_town_char_loaded || !g_chat_jwt[0] || !g_town_char_id[0]) return;
-    if (now - g_town_last_sync_ms < 2000) return;
+    if (!force && now - g_town_last_sync_ms < 2000) return;
     float dx = g_town_x - g_town_synced_x, dz = g_town_z - g_town_synced_z;
     if (dx * dx + dz * dz < 0.01f) return; /* hasn't moved far enough to bother */
     g_town_last_sync_ms = now;
@@ -3312,7 +3320,7 @@ int main(int argc, char *argv[]) {
                 }
                 update_facing_from_motion(g_town_x, g_town_z, &g_town_prev_facing_x, &g_town_prev_facing_z,
                                            &g_town_prev_facing_valid, &g_town_facing_rad);
-                town_sync_position(now);
+                town_sync_position(now, 0);
 
                 glViewport(0, 0, win_w, win_h);
                 glClearColor(0.5f, 0.75f, 0.92f, 1.0f); /* open-sky blue, distinct from battlegrounds' dark-green backdrop */
@@ -5365,6 +5373,12 @@ int main(int argc, char *argv[]) {
         SDL_GL_SwapWindow(win);
         SDL_Delay(16);
     }
+
+    /* Final, forced position flush -- see town_sync_position's own doc comment on `force`. Only
+       ever does anything if g_town_char_loaded and the avatar actually moved since its last
+       throttled sync; a no-op for bots/--ticket launches (no character ever loaded) and for a
+       player who quit from inside a match (never touched Town this session). */
+    town_sync_position(SDL_GetTicks(), 1);
 
     if (audio_dev != 0) SDL_CloseAudioDevice(audio_dev);
     if (cursor_default) SDL_FreeCursor(cursor_default);

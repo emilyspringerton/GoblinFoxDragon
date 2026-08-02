@@ -1,3 +1,17 @@
+## 2026-08-02 (11)
+
+- fix(town): position now flushes on quit, closing a real "login to same spot" gap. Founder:
+  "ensure my avatar can move around town and the location is persisted so login to same spot."
+  `town_sync_position` was throttled to once per 2s -- a player who moved and then closed the
+  window inside that window lost their last few steps, landing slightly short of their real
+  position on next login. `town_sync_position` gained a `force` param; called once more, forced,
+  right as the app shuts down (after the main loop exits, before SDL teardown), flushing any
+  movement the throttle hadn't caught yet. Live-verified end-to-end: reset test character to
+  (0,0,0), ran a real login + forced movement + quit at 800ms (well under the 2s throttle) --
+  IDUNA showed the partial movement `(2.383, 0, 1.589)` persisted anyway; a second fresh launch
+  loaded from exactly that position, confirming true session-to-session persistence, not just
+  in-session syncing.
+
 ## 2026-08-02 (10)
 
 - fix(mud): S170-57, worm's Poison restored. Founder, real-time: "add poison back to that level
