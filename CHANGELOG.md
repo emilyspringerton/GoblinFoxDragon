@@ -1,3 +1,19 @@
+## 2026-08-02 (19)
+
+- fix(town): Auction House Enter-key event-ordering bug -- founder, live-testing: "when i hit
+  enter for browse categories the whole client crashes." Not a crash: Town's event loop checked
+  the "Enter opens chat" shortcut BEFORE the Auction House menu's own Enter handling, so for any
+  real logged-in player (`g_chat_jwt` set -- never true in this session's own earlier dev-agent
+  testing, which is why it went unnoticed until a real login hit it), pressing Enter with the AH
+  menu open opened the chat box instead of confirming the menu selection, then swallowed every
+  further keystroke as chat text with the AH menu stuck open behind it and no way back -- reads
+  exactly like a hang/crash at the keyboard. Fixed by checking the AH-menu block first, same
+  precedence chat_input_active itself already gets. Verified both ways: pushed a real
+  `SDL_KEYDOWN`/`SDLK_RETURN` event through the actual event-dispatch code (not a direct function
+  call, which didn't reproduce this) against the pre-fix commit -- confirmed it reproduces
+  (`ah_screen` stuck on MAIN, `chat_input_active` set) -- then against the fix, confirmed the
+  menu now advances correctly and chat is untouched.
+
 ## 2026-08-02 (18)
 
 - feat(town): real FFXI-style Auction House menu, doubled town/buildings, `/logout` chat command.

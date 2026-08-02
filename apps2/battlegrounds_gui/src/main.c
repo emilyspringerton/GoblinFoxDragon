@@ -3756,17 +3756,20 @@ int main(int argc, char *argv[]) {
                     }
                     continue;
                 }
-                if (te.type == SDL_KEYDOWN && (te.key.keysym.sym == SDLK_RETURN || te.key.keysym.sym == SDLK_KP_ENTER) && g_chat_jwt[0]) {
-                    chat_input_active = 1;
-                    chat_input_buf[0] = '\0';
-                    SDL_StartTextInput();
-                    continue;
-                }
                 /* Auction House menu, checked next -- same "consume every event while focused"
                    precedence chat_input_active uses just above, so WASD/target-cycling/attack
                    never fire while the menu is open (2026-08-02, founder: "make the auction
                    house real - menu based system navigatable with arrow keys and enter just
-                   like ffxi"). */
+                   like ffxi"). Real bug found live (2026-08-02, founder: "when i hit enter for
+                   browse categories the whole client crashes"): this block used to sit AFTER the
+                   "open chat" Enter-shortcut just below, so with a real logged-in player
+                   (g_chat_jwt set -- never true in this session's own earlier dev-agent testing,
+                   which is why it went unnoticed until a real login hit it) pressing Enter with
+                   the AH menu open opened the chat box instead of confirming the menu selection,
+                   then swallowed every further keystroke (arrows, Escape, Enter) as chat text
+                   input with the AH menu stuck open behind it and no way back -- not a real
+                   crash, but indistinguishable from one at the keyboard. Checked first now, same
+                   as chat_input_active's own precedence. */
                 if (g_ah_screen != AH_CLOSED) {
                     if (te.type == SDL_QUIT) { running = 0; }
                     else if (te.type == SDL_KEYDOWN) {
@@ -3782,6 +3785,12 @@ int main(int argc, char *argv[]) {
                             ah_close();
                         }
                     }
+                    continue;
+                }
+                if (te.type == SDL_KEYDOWN && (te.key.keysym.sym == SDLK_RETURN || te.key.keysym.sym == SDLK_KP_ENTER) && g_chat_jwt[0]) {
+                    chat_input_active = 1;
+                    chat_input_buf[0] = '\0';
+                    SDL_StartTextInput();
                     continue;
                 }
                 if (te.type == SDL_QUIT) { running = 0; }
