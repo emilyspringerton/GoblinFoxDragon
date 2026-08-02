@@ -442,3 +442,53 @@ func (c *Client) TravelTelecrystal(characterID string, castCost, targetScene int
 	}
 	return c.UpdatePosition(characterID, targetScene, tx, ty, tz)
 }
+
+// ChatMessage is one row from GET /api/v1/chat/messages.
+type ChatMessage struct {
+	ID           int64  `json:"id"`
+	Channel      string `json:"channel"`
+	SenderName   string `json:"sender_name"`
+	SenderSource string `json:"sender_source"`
+	Body         string `json:"body"`
+	CreatedAt    string `json:"created_at"`
+}
+
+// PostChatMessage relays one chat line to IDUNA's chat_messages relay (2026-08-02,
+// REDGARDEN_GUI_NORTHSTAR.md's in-match MUD chat) so REDGARDEN's Battlegrounds GUI client can
+// pick it up. channel is "say"|"yell"|"guild"|"battlegrounds"; senderSource here is always
+// "mud" -- the Battlegrounds client posts its own messages with senderSource "battlegrounds"
+// directly.
+func (c *Client) PostChatMessage(channel, senderName, body string) error {
+	reqBody, _ := json.Marshal(map[string]string{
+		"channel": channel, "sender_name": senderName, "sender_source": "mud", "body": body,
+	})
+	req, _ := http.NewRequest(http.MethodPost, c.baseURL+"/api/v1/chat/messages", bytes.NewReader(reqBody))
+	resp, err := c.do(req)
+	if err != nil {
+		return fmt.Errorf("idunaclient: PostChatMessage: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+	return nil
+}
+
+// GetChatMessages polls for chat messages with id > sinceID, oldest first, capped at limit.
+func (c *Client) GetChatMessages(sinceID int64, limit int) ([]ChatMessage, error) {
+	url := fmt.Sprintf("%s/api/v1/chat/messages?since_id=%d&limit=%d", c.baseURL, sinceID, limit)
+	req, _ := http.NewRequest(http.MethodGet, url, nil)
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, fmt.Errorf("idunaclient: GetChatMessages: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+	var msgs []ChatMessage
+	if err := json.NewDecoder(resp.Body).Decode(&msgs); err != nil {
+		return nil, fmt.Errorf("idunaclient: GetChatMessages decode: %w", err)
+	}
+	return msgs, nil
+}

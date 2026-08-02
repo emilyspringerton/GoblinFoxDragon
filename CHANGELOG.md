@@ -1,3 +1,33 @@
+## 2026-08-02 (3)
+
+- feat(chat): in-match MUD chat, `apps2/battlegrounds_gui`'s own real affordance surfacing
+  `apps2/mud`'s persistent-world chat. `deliverChat` now relays say/yell/guild lines to IDUNA's
+  new `POST /api/v1/chat/messages` (tell stays private, not relayed) via `idunaclient`'s new
+  `PostChatMessage`/`GetChatMessages`. The Battlegrounds client polls every ~1.5s and renders a
+  scrolling log; Enter opens a real chat-input line (consumes all other keybinds while focused,
+  same "held/focused, not toggled" idiom the rest of the client already uses) and posts back as
+  channel `battlegrounds`. Own JWT reused from login -- inert (no polling/posting at all) for
+  bots/`--ticket`/dev-agent launches, which have no real player identity to chat as. One-way for
+  now, named honestly: `apps2/mud` doesn't yet poll for Battlegrounds-originated messages, so MUD
+  players don't see chat sent from a match -- real, separate, unbuilt follow-up.
+
+## 2026-08-02 (2)
+
+- feat(battlegrounds-gui): real fork of REDGARDEN's `apps/arena` into `apps2/battlegrounds_gui/`
+  at commit `61baafb`. Corrects the previous approach (live cross-repo checkout of REDGARDEN at
+  CI build time) per founder direction: "REDGARDEN isnt literally the GUI its supposed to be a
+  starting place for the GUI like a clean fork." Self-contained -- own `packages/simulation` +
+  `packages/common`, not sharing GFD's existing top-level `packages/`/`packages2/` (which have
+  unrelated real content, e.g. `packages2/common/protocol.h` is a completely different wire
+  protocol). CI now builds directly from this local copy, no cross-repo checkout step. Verified:
+  clean standalone build, live login->ticket->connect reaches "20/20 connected" in a real match.
+- feat(battlegrounds-gui): rebound ability casts from Q/W/E to 1/2/3 and added continuous,
+  camera-relative WASD movement alongside the existing click-to-move (re-sent every ~100ms while
+  held, same underlying move-to-point mechanic, no new wire packet). Fork-only -- REDGARDEN's own
+  copy is untouched. Also fixed a real bug found live testing the founder's test account:
+  `PLAY.bat` never set `IDUNA_BASE_URL`, so a real downloaded client always got "Could not reach
+  login server" (its `127.0.0.1` default only works on the same box as IDUNA).
+
 ## 2026-08-02
 
 - ci: `GoblinFoxDragon Factory` now also cross-compiles REDGARDEN's `apps/arena` (the real MUD

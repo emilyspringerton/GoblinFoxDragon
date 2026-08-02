@@ -300,4 +300,24 @@ static int http_extract_json_string_field(const char *json, const char *field,
     return 1;
 }
 
+// http_extract_json_int_field: same "controlled shape, not a real parser" scope as
+// http_extract_json_string_field just above, but for a bare numeric value ("field":123, not
+// "field":"123"). Added 2026-08-02 for /api/v1/chat/messages's own "id" field. Returns 1 and
+// writes *out if found and parseable, 0 otherwise.
+static int http_extract_json_int_field(const char *json, const char *field, long long *out) {
+    char needle[128];
+    snprintf(needle, sizeof(needle), "\"%s\"", field);
+    const char *p = strstr(json, needle);
+    if (!p) return 0;
+    p = strchr(p + strlen(needle), ':');
+    if (!p) return 0;
+    p++;
+    while (*p == ' ' || *p == '\t') p++;
+    char *end = NULL;
+    long long v = strtoll(p, &end, 10);
+    if (end == p) return 0;
+    *out = v;
+    return 1;
+}
+
 #endif

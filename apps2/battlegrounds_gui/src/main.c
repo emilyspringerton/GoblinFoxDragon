@@ -152,6 +152,16 @@ static struct sockaddr_in net_server_addr;
  * identity, and self-registration would silently mint a throwaway one instead. */
 static const char *g_supplied_ticket_hex = NULL;
 
+/* In-match MUD chat (2026-08-02, founder: "can we start adding affordances to the fork to
+ * surface the features of the MUD?" -> "In-match MUD chat"). g_chat_jwt is set once, by
+ * get_player_login_ticket on a successful login, and reused for every chat POST/GET for the
+ * rest of the process's life -- empty (unset) whenever the client connects via --ticket/agent
+ * env instead of the login screen (bots, dev boxes), which is the correct behavior: those paths
+ * have no real player JWT to chat as, so the chat overlay simply stays inactive for them rather
+ * than send unauthenticated requests that would just fail. */
+static char g_chat_jwt[2048] = "";
+static char g_chat_display_name[64] = "";
+
 static char iduna_host[128] = "127.0.0.1";
 static int iduna_port = 8080;
 static char iduna_agent_name[128] = "";
@@ -338,6 +348,14 @@ static int get_player_login_ticket(const char *email, const char *password,
     if (!http_extract_json_string_field(resp, "token", token, sizeof(token))) {
         snprintf(out_err, out_err_len, "Login response missing token.");
         return 0;
+    }
+    /* Kept around past this function's own return, not just used locally: the in-match chat
+       overlay (2026-08-02, founder: "In-match MUD chat") authenticates its own
+       /api/v1/chat/messages POST/GET calls with this same JWT for the rest of the session,
+       rather than minting a second credential for one feature. */
+    snprintf(g_chat_jwt, sizeof(g_chat_jwt), "%s", token);
+    if (!http_extract_json_string_field(resp, "display_name", g_chat_display_name, sizeof(g_chat_display_name))) {
+        snprintf(g_chat_display_name, sizeof(g_chat_display_name), "%s", email); /* fallback: email is always present */
     }
 
     if (http_post_json(iduna_host, iduna_port, "/api/v1/redgarden/self-ticket", token,
@@ -1976,6 +1994,134 @@ static int run_login_screen(SDL_Window *win, int win_w, int win_h,
     return ok;
 }
 
+/* ---------------- in-match MUD chat (2026-08-02) ----------------
+ * Founder: "can we start adding affordances to the fork to surface the features of the MUD?"
+ * -> "In-match MUD chat." apps2/mud's own say/yell/guild chat relays outward to
+ * IDUNA's /api/v1/chat/messages (server/idunaclient.go's PostChatMessage, called from
+ * deliverChat); this client polls that same endpoint and can post its own lines back in as
+ * channel "battlegrounds". Only active when g_chat_jwt is set, i.e. the player actually
+ * authenticated through the login screen -- bots and --ticket/agent-env launches have no real
+ * player JWT to chat as, so this whole feature is simply inert for them, not an error. */
+#define CHAT_LINE_MAX 160
+#define CHAT_LINES 8
+#define CHAT_INPUT_MAX 200
+static char chat_lines[CHAT_LINES][CHAT_LINE_MAX];
+static int chat_line_count = 0; /* how many of chat_lines[] are populated, caps at CHAT_LINES */
+static long long chat_last_id = 0;
+static uint32_t chat_last_poll_ms = 0;
+static int chat_input_active = 0;
+static char chat_input_buf[CHAT_INPUT_MAX] = "";
+
+static void chat_push_line(const char *channel, const char *sender, const char *body) {
+    const char *tag = "Say";
+    if (strcmp(channel, "yell") == 0) tag = "Yell";
+    else if (strcmp(channel, "guild") == 0) tag = "LS";
+    else if (strcmp(channel, "battlegrounds") == 0) tag = "BG";
+    /* Ring buffer via memmove, not a mod-indexed circular buffer -- CHAT_LINES is small (8) and
+       this only runs on an actual new message (at most a handful per poll), so the O(n) shift
+       cost here is negligible against the 1.5s poll cadence; simpler to read than tracking a
+       wrap-around head index for no real benefit at this size. */
+    if (chat_line_count == CHAT_LINES) {
+        for (int i = 1; i < CHAT_LINES; i++) {
+            memcpy(chat_lines[i - 1], chat_lines[i], CHAT_LINE_MAX);
+        }
+        chat_line_count--;
+    }
+    snprintf(chat_lines[chat_line_count], CHAT_LINE_MAX, "[%s] %s: %s", tag, sender, body);
+    chat_line_count++;
+}
+
+/* chat_poll: parses a controlled, known, flat-object JSON array (no nesting) with a simple
+ * brace-matching scan -- same "not a real parser, IDUNA's response is trusted, not adversarial"
+ * scope as http_client.h's own field extractors, just applied once per array element here since
+ * neither extractor handles arrays on its own. */
+static void chat_poll(uint32_t now) {
+    if (!g_chat_jwt[0] || now - chat_last_poll_ms < 1500) return;
+    chat_last_poll_ms = now;
+
+    char path[128];
+    snprintf(path, sizeof(path), "/api/v1/chat/messages?since_id=%lld&limit=20", chat_last_id);
+    char resp[8192];
+    int status = 0;
+    if (http_get_json(iduna_host, iduna_port, path, g_chat_jwt, resp, sizeof(resp), &status) != 0) return;
+    if (status != 200) return;
+
+    const char *p = resp;
+    while ((p = strchr(p, '{')) != NULL) {
+        int depth = 1;
+        const char *obj_start = p;
+        const char *q = p + 1;
+        while (*q && depth > 0) {
+            if (*q == '{') depth++;
+            else if (*q == '}') depth--;
+            q++;
+        }
+        if (depth != 0) break; /* unterminated object -- truncated response, stop here */
+        char obj[1024];
+        size_t obj_len = (size_t)(q - obj_start);
+        if (obj_len >= sizeof(obj)) obj_len = sizeof(obj) - 1;
+        memcpy(obj, obj_start, obj_len);
+        obj[obj_len] = '\0';
+
+        long long id = 0;
+        char sender[64] = "", body[512] = "", channel[16] = "";
+        if (http_extract_json_int_field(obj, "id", &id) &&
+            http_extract_json_string_field(obj, "channel", channel, sizeof(channel)) &&
+            http_extract_json_string_field(obj, "sender_name", sender, sizeof(sender)) &&
+            http_extract_json_string_field(obj, "body", body, sizeof(body))) {
+            chat_push_line(channel, sender, body);
+            if (id > chat_last_id) chat_last_id = id;
+        }
+        p = q;
+    }
+}
+
+static void chat_send(const char *body) {
+    if (!g_chat_jwt[0] || !body[0]) return;
+    char body_esc[384], name_esc[128];
+    json_escape_into(body, body_esc, sizeof(body_esc));
+    json_escape_into(g_chat_display_name, name_esc, sizeof(name_esc));
+    char req_body[512];
+    snprintf(req_body, sizeof(req_body),
+             "{\"channel\":\"battlegrounds\",\"sender_name\":\"%s\",\"sender_source\":\"battlegrounds\",\"body\":\"%s\"}",
+             name_esc, body_esc);
+    char resp[512];
+    int status = 0;
+    http_post_json(iduna_host, iduna_port, "/api/v1/chat/messages", g_chat_jwt, req_body, resp, sizeof(resp), &status);
+    /* Own message isn't appended locally here -- the next chat_poll picks it up from IDUNA like
+       any other line, same source of truth for everyone rather than a separate "local echo"
+       path that could drift from what other clients actually see. */
+}
+
+static void chat_draw(int win_w, int win_h) {
+    if (!g_chat_jwt[0]) return; /* inert for bots/--ticket/agent-env launches, see file header */
+    float x0 = 16.0f, y0 = 210.0f, line_h = 16.0f;
+    glDisable(GL_DEPTH_TEST); /* 2D overlay, same precedent as draw_login_screen/draw_draft_screen */
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(0, win_w, 0, win_h, -1, 1);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glColor4f(0.03f, 0.05f, 0.05f, 0.55f);
+    glRectf(x0 - 6.0f, y0 - line_h * (CHAT_LINES + 1) - 4.0f, x0 + 480.0f, y0 + 4.0f);
+    glDisable(GL_BLEND);
+    glColor3f(0.7f, 0.85f, 0.8f);
+    for (int i = 0; i < chat_line_count; i++) {
+        draw_string(chat_lines[i], x0, y0 - line_h * (chat_line_count - i), 8);
+    }
+    if (chat_input_active) {
+        glColor3f(0.9f, 1.0f, 0.6f);
+        char line[CHAT_INPUT_MAX + 4];
+        snprintf(line, sizeof(line), "> %s_", chat_input_buf);
+        draw_string(line, x0, y0 - line_h * (CHAT_LINES + 1), 9);
+    } else {
+        glColor3f(0.45f, 0.55f, 0.5f);
+        draw_string("(Enter to chat)", x0, y0 - line_h * (CHAT_LINES + 1), 7);
+    }
+}
+
 /* ---------------- placement rings ---------------- */
 #define MAX_RINGS 6
 #define RING_LIFETIME_MS 500.0f
@@ -2714,6 +2860,38 @@ int main(int argc, char *argv[]) {
 
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
+            /* Chat input, checked first and unconditionally: while focused, this consumes every
+               event itself (continue, below) so ability casts/WASD/camera drag etc. never also
+               react to the same keystrokes a player is typing into chat -- a real, easy-to-miss
+               MMO chat-box bug class if input handling isn't ordered this way. */
+            if (chat_input_active) {
+                if (e.type == SDL_QUIT) { running = 0; }
+                else if (e.type == SDL_TEXTINPUT) {
+                    size_t len = strlen(chat_input_buf), add = strlen(e.text.text);
+                    if (len + add < CHAT_INPUT_MAX - 1) strcat(chat_input_buf, e.text.text);
+                } else if (e.type == SDL_KEYDOWN) {
+                    if (e.key.keysym.sym == SDLK_RETURN || e.key.keysym.sym == SDLK_KP_ENTER) {
+                        chat_send(chat_input_buf);
+                        chat_input_buf[0] = '\0';
+                        chat_input_active = 0;
+                        SDL_StopTextInput();
+                    } else if (e.key.keysym.sym == SDLK_ESCAPE) {
+                        chat_input_buf[0] = '\0';
+                        chat_input_active = 0;
+                        SDL_StopTextInput();
+                    } else if (e.key.keysym.sym == SDLK_BACKSPACE) {
+                        size_t len = strlen(chat_input_buf);
+                        if (len > 0) chat_input_buf[len - 1] = '\0';
+                    }
+                }
+                continue;
+            }
+            if (e.type == SDL_KEYDOWN && (e.key.keysym.sym == SDLK_RETURN || e.key.keysym.sym == SDLK_KP_ENTER) && g_chat_jwt[0]) {
+                chat_input_active = 1;
+                chat_input_buf[0] = '\0';
+                SDL_StartTextInput();
+                continue;
+            }
             if (e.type == SDL_QUIT) running = 0;
             if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_RESIZED) {
                 win_w = e.window.data1; win_h = e.window.data2;
@@ -3145,7 +3323,7 @@ int main(int argc, char *argv[]) {
            + left-click = attack-move to that point) -- holding A to strafe left with no click
            still behaves exactly as strafing, and clicking without A still behaves as a plain
            move; the two only combine if a player holds A and *also* clicks while doing so. */
-        if (!observing && !shop_open && arena_state.winner == 0 &&
+        if (!observing && !shop_open && !chat_input_active && arena_state.winner == 0 &&
             my_owner >= 0 && my_owner < ARENA_MAX_HEROES && arena_state.heroes[my_owner].alive &&
             !(net_mode && net_phase == ARENA_PHASE_DRAFT)) {
             const Uint8 *wasd_keys = SDL_GetKeyboardState(NULL);
@@ -3169,6 +3347,8 @@ int main(int argc, char *argv[]) {
                 }
             }
         }
+
+        chat_poll(now); /* rate-limited internally to ~1.5s, safe to call every frame */
 
         /* S170-182: heroes[] isn't meaningful during ARENA_PHASE_DRAFT (protocol.h's own
            ArenaHeroSnapshot doc comment already says so) -- render the pick screen instead of
@@ -4611,6 +4791,8 @@ int main(int argc, char *argv[]) {
             }
         }
         glEnable(GL_DEPTH_TEST);
+
+        chat_draw(win_w, win_h);
 
         SDL_GL_SwapWindow(win);
         SDL_Delay(16);

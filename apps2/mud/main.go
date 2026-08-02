@@ -3374,6 +3374,22 @@ func syncChatSession(p *player) {
 
 // deliverChat routes a chat message and writes to each recipient.
 func deliverChat(fromSlot string, channel int, target, msg string) {
+	// Relay to IDUNA's chat_messages table (2026-08-02, REDGARDEN_GUI_NORTHSTAR.md's in-match
+	// MUD chat, founder: "can we start adding affordances to the fork to surface the features
+	// of the MUD?") so REDGARDEN's Battlegrounds GUI client can see it. Once per chat event, not
+	// once per recipient -- this loop below fires once per delivery (one per in-range/guild
+	// player), and posting inside it would relay N duplicate copies of the same line. tell
+	// (private) is deliberately not relayed -- a DM isn't meant for a wider audience. Fire in a
+	// goroutine and ignore errors on purpose: chat relay to a different game's client is a real,
+	// but non-essential, feature -- it must never be able to delay or break a telnet player's
+	// own in-MUD chat, which is why this doesn't happen inline before the delivery loop below.
+	if relayChannel, ok := map[int]string{chat.ChatSay: "say", chat.ChatYell: "yell", chat.ChatGuild: "guild"}[channel]; ok {
+		senderName := gw.players[fromSlot].name
+		go func() {
+			_ = gw.iduna.PostChatMessage(relayChannel, senderName, msg)
+		}()
+	}
+
 	deliveries := gw.chatRouter.Deliver(fromSlot, channel, target, msg, 50.0)
 	for _, d := range deliveries {
 		ch, _, body, ok := chat.ParseChatPacket(d.Packet)
