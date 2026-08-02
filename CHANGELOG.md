@@ -1,3 +1,37 @@
+## 2026-08-02 (8)
+
+- feat(town): real avatar, movement, and position sync in Town, backed by IDUNA's real
+  `characters` record ("the dragonfly backend"). Founder: "i want my avatar to move around in
+  town but i want it backed by dragonfly" -- continuing "this is the time to unify the whole
+  bitch" / "wire up the dragonfly backend" / "the xyz at least needs to flow back to the
+  dragonfly server for the gui xyz source of truth." M1-M4 of the same-day backlog/sprint plan:
+  - `town_fetch_character()`: on entering Town, resolves the player_id captured from login's own
+    self-ticket response (already returned it, no new endpoint) to the real character via
+    `GET /api/v1/characters/by-player/:id`, seeding position and `job_main`.
+  - `town_hero_id_for_job()`: `ARENA_HERO_WARRIOR` for job `WAR` -- the one real, non-guessed
+    correspondence (`arena_game.h`'s own doc comment already calls it "DragonsNShit's Warrior
+    job, ported as Battlegrounds content"). Every other apps2/mud job has no hero-visual mapping
+    yet -- falls back to Warrior, named as a placeholder in the comment, not the UI. A real, open
+    design question, not resolved here.
+  - Real movement: WASD (camera-relative, same derivation as Battlegrounds' own) + click-to-move
+    (`screen_to_ground`, same ray-cast), interpolated at `ARENA_HERO_SPEED` for a consistent feel
+    between the two scenes. Camera now follows the avatar's own position instead of a fixed
+    origin. Purely local -- no server involved in Town's own simulation.
+  - `town_sync_position()`: throttled (2s, only if actually moved) `PATCH
+    /api/v1/characters/:id/position` using the player's own JWT -- the same endpoint IDUNA
+    `ab35b72` just hardened for exactly this caller.
+  - New `http_extract_json_double_field` helper (`http_client.h`) for `pos_x`/`pos_y`/`pos_z`
+    (SQL `REAL` columns) -- the existing extractors only handled strings and integers.
+  Accepted tradeoff, founder's own words: "it might get weird having the gui and the mud play
+  nice" -- whichever of Town or a live apps2/mud telnet session last PATCHes position wins, no
+  conflict resolution beyond that. Live-verified end-to-end against the real test account and
+  live IDUNA: real login -> real character fetch (confirmed exact `pos_x/y/z`/`job_main` from a
+  prior manual PATCH) -> simulated movement -> position correctly persisted back
+  (`pos_x/z` matched the exact forced offset). Visually verified under Xvfb: avatar renders,
+  faces its movement direction, camera follows. Ability panes (M5) not done this pass. Native
+  Linux build + link clean (mingw unavailable locally, same standing note as the rest of this
+  client).
+
 ## 2026-08-02 (7)
 
 - fix(town): a failed requeue now lands back in Town instead of a dead blank arena. Founder,

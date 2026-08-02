@@ -320,4 +320,24 @@ static int http_extract_json_int_field(const char *json, const char *field, long
     return 1;
 }
 
+// http_extract_json_double_field: same scope as the int/string extractors above, for a bare
+// floating-point value ("field":1.5 or "field":-3). Added 2026-08-02 for
+// GET /api/v1/characters/:id's own pos_x/pos_y/pos_z (SQL REAL columns, so IDUNA's own encoder
+// can emit either an integer or decimal literal for a whole-number position).
+static int http_extract_json_double_field(const char *json, const char *field, double *out) {
+    char needle[128];
+    snprintf(needle, sizeof(needle), "\"%s\"", field);
+    const char *p = strstr(json, needle);
+    if (!p) return 0;
+    p = strchr(p + strlen(needle), ':');
+    if (!p) return 0;
+    p++;
+    while (*p == ' ' || *p == '\t') p++;
+    char *end = NULL;
+    double v = strtod(p, &end);
+    if (end == p) return 0;
+    *out = v;
+    return 1;
+}
+
 #endif

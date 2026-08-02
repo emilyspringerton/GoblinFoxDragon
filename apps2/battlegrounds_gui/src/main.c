@@ -161,6 +161,11 @@ static const char *g_supplied_ticket_hex = NULL;
  * than send unauthenticated requests that would just fail. */
 static char g_chat_jwt[2048] = "";
 static char g_chat_display_name[64] = "";
+/* g_player_id (2026-08-02, Town avatar work): captured from the self-ticket response below,
+ * which already includes it (RedgardenSelfTicketHandler's own response body) -- no new endpoint
+ * needed to resolve "who is this JWT" to a player_id for the GET /api/v1/characters/by-player/
+ * lookup Town's own character fetch uses. */
+static char g_player_id[64] = "";
 
 static char iduna_host[128] = "127.0.0.1";
 static int iduna_port = 8080;
@@ -376,6 +381,10 @@ static int get_player_login_ticket(const char *email, const char *password,
         snprintf(out_err, out_err_len, "Ticket response missing ticket field.");
         return 0;
     }
+    /* player_id, for Town's own GET /api/v1/characters/by-player/:id lookup -- see g_player_id's
+       own doc comment. Best-effort: if it's ever missing, town_fetch_character simply has
+       nothing to look up and Town falls back to no-avatar (same as today), not a login failure. */
+    http_extract_json_string_field(resp, "player_id", g_player_id, sizeof(g_player_id));
     if (!hex_decode(ticket_hex, out, ARENA_TICKET_TOTAL_LEN)) {
         snprintf(out_err, out_err_len, "Ticket field was not valid hex.");
         return 0;
@@ -2879,6 +2888,96 @@ static void town_draw_hud(int win_w, int win_h, int queue_available) {
     draw_string("QUEUE FOR BATTLEGROUNDS", x0 + 14.0f, y0 + TOWN_QUEUE_BTN_H / 2.0f - 4.0f, 10);
 }
 
+/* ---------------- Town avatar, movement, and the real character backend (2026-08-02) ----------------
+ * Founder: "i dont have an avatar or ability panes... the MUD may need to be updated on the
+ * backend to store xyz coordinates etc -- actually this is the time to unify the whole bitch" ->
+ * "wire up the dragonfly backend" -> "the xyz at least needs to flow back to the dragonfly server
+ * for the gui xyz source of truth." "The dragonfly backend" is IDUNA's already-existing
+ * `characters` table (pos_x/pos_y/pos_z, job_main) -- the exact same row apps2/mud already reads
+ * and writes on every login/disconnect, resolved via the character REST API
+ * `REDGARDEN_GUI_NORTHSTAR.md` Milestone 4 already shipped (`GET .../by-player/:id`,
+ * `PATCH .../:id/position`, the latter now ownership-checked, IDUNA `ab35b72`). No new backend
+ * endpoint needed -- this is new client-side plumbing only.
+ *
+ * Real, accepted tradeoff (founder's own words): "it might get weird having the gui and the mud
+ * play nice" -- whichever of Town's own client or a live apps2/mud telnet session last PATCHes
+ * position wins, no conflict resolution beyond that. Not solved here, by choice. */
+static char g_town_char_id[64] = "";
+static char g_town_job[16] = "WAR";
+static float g_town_x = 0.0f, g_town_y = 0.0f, g_town_z = 0.0f;
+static float g_town_target_x = 0.0f, g_town_target_z = 0.0f;
+static float g_town_facing_rad = 0.0f;
+static float g_town_prev_facing_x = 0.0f, g_town_prev_facing_z = 0.0f;
+static int g_town_prev_facing_valid = 0;
+static int g_town_char_loaded = 0;
+static uint32_t g_town_last_sync_ms = 0;
+static float g_town_synced_x = 0.0f, g_town_synced_z = 0.0f;
+
+/* town_hero_id_for_job: the one real, non-guessed correspondence in this mapping is
+ * ARENA_HERO_WARRIOR (arena_game.h's own doc comment: "DragonsNShit's Warrior job, ported as
+ * Battlegrounds content") <-> apps2/mud's default job_main "WAR". Every other apps2/mud job
+ * (job.JobID's real roster: THF, WHM, BLM, etc.) has no hero-visual counterpart yet -- a real,
+ * open design question (see this session's own backlog entry), not resolved by guessing here.
+ * Falls back to ARENA_HERO_WARRIOR for any job without a real mapping so Town always has SOME
+ * avatar rather than none, honestly named as a placeholder in the comment, not the UI. */
+static ArenaHeroID town_hero_id_for_job(const char *job_main) {
+    (void)job_main; /* only WAR has a real mapping right now; see doc comment above */
+    return ARENA_HERO_WARRIOR;
+}
+
+/* town_fetch_character: resolves g_player_id (captured from login's self-ticket response) to
+ * the player's real DragonsNShit character via IDUNA's existing by-player lookup, and seeds
+ * Town's local position/job from it. Called once, right before Town's own loop starts -- not
+ * re-called on a later Return-to-Town, so a locally-moved-but-not-yet-synced position never gets
+ * clobbered by a stale re-fetch. Best-effort and silent on failure (bots/--ticket launches have
+ * no g_player_id at all, see g_player_id's own doc comment -- Town simply has no avatar for them,
+ * not an error). */
+static void town_fetch_character(void) {
+    if (!g_chat_jwt[0] || !g_player_id[0]) return;
+    char path[128];
+    snprintf(path, sizeof(path), "/api/v1/characters/by-player/%s", g_player_id);
+    char resp[2048];
+    int status = 0;
+    if (http_get_json(iduna_host, iduna_port, path, g_chat_jwt, resp, sizeof(resp), &status) != 0) return;
+    if (status != 200) return;
+    http_extract_json_string_field(resp, "character_id", g_town_char_id, sizeof(g_town_char_id));
+    http_extract_json_string_field(resp, "job_main", g_town_job, sizeof(g_town_job));
+    double px = 0.0, py = 0.0, pz = 0.0;
+    if (http_extract_json_double_field(resp, "pos_x", &px)) g_town_x = (float)px;
+    if (http_extract_json_double_field(resp, "pos_y", &py)) g_town_y = (float)py;
+    if (http_extract_json_double_field(resp, "pos_z", &pz)) g_town_z = (float)pz;
+    g_town_target_x = g_town_x;
+    g_town_target_z = g_town_z;
+    g_town_synced_x = g_town_x;
+    g_town_synced_z = g_town_z;
+    g_town_char_loaded = 1;
+}
+
+/* town_sync_position: "the xyz at least needs to flow back to the dragonfly server for the gui
+ * xyz source of truth." Throttled (every 2s, and only if actually moved) rather than every frame
+ * -- a walking player would otherwise fire a PATCH ~60 times/sec for no real benefit. Reuses the
+ * player's own JWT from login, the same credential the now-ownership-checked position endpoint
+ * expects from a non-agent caller. */
+static void town_sync_position(uint32_t now) {
+    if (!g_town_char_loaded || !g_chat_jwt[0] || !g_town_char_id[0]) return;
+    if (now - g_town_last_sync_ms < 2000) return;
+    float dx = g_town_x - g_town_synced_x, dz = g_town_z - g_town_synced_z;
+    if (dx * dx + dz * dz < 0.01f) return; /* hasn't moved far enough to bother */
+    g_town_last_sync_ms = now;
+    g_town_synced_x = g_town_x;
+    g_town_synced_z = g_town_z;
+    char body[192];
+    snprintf(body, sizeof(body), "{\"scene_id\":0,\"pos_x\":%.3f,\"pos_y\":%.3f,\"pos_z\":%.3f}",
+             g_town_x, g_town_y, g_town_z);
+    char path[128];
+    snprintf(path, sizeof(path), "/api/v1/characters/%s/position", g_town_char_id);
+    char resp[256];
+    int status = 0;
+    http_patch_json(iduna_host, iduna_port, path, g_chat_jwt, body, resp, sizeof(resp), &status);
+    /* Best-effort, same silent-discard convention apps2/mud's own disconnect-time position sync
+       already uses -- a sync failure shouldn't block Town's own local movement. */
+}
+
 int main(int argc, char *argv[]) {
     /* No srand() call existed anywhere in this file before -- mint_ticket_fallback's own
        rand()-based nonce (used only when IDUNA isn't reachable) was silently using the default
@@ -3041,6 +3140,9 @@ int main(int argc, char *argv[]) {
     int win_logged = 0;
     uint32_t last_tick = SDL_GetTicks();
     uint32_t last_wasd_send_ms = 0; /* WASD movement throttle, see the per-frame block below */
+    uint32_t last_town_wasd_ms = 0; /* Town's own WASD throttle, separate from battlegrounds' above */
+
+    if (in_town) town_fetch_character(); /* once -- see its own doc comment */
 
     while (running) {
         uint32_t now = SDL_GetTicks();
@@ -3093,22 +3195,80 @@ int main(int argc, char *argv[]) {
                             fprintf(stderr, "Failed to join a match via matchmaker at %s:%d\n",
                                     queue_host, queue_port);
                         }
+                    } else {
+                        /* Click-to-move (2026-08-02, "we need to be able to run around town") --
+                           same screen_to_ground ray-cast Battlegrounds' own click-to-move uses,
+                           camera focused on the avatar's own current position rather than a
+                           fixed origin, same "camera follows your hero" convention. */
+                        float gx, gz;
+                        if (screen_to_ground(te.button.x, te.button.y, win_w, win_h, 60.0f,
+                                              g_town_x, g_town_z, &gx, &gz)) {
+                            g_town_target_x = gx;
+                            g_town_target_z = gz;
+                        }
                     }
                 }
             }
 
             if (in_town) { /* still true -- didn't just transition into a match this frame */
+                /* WASD movement -- same camera-relative derivation as Battlegrounds' own (see
+                   its own doc comment further down in this file), just driving g_town_target_x/z
+                   directly instead of net_send_move/arena_set_move_target since Town has no
+                   server-side simulation to route through. */
+                const Uint8 *town_wasd_keys = SDL_GetKeyboardState(NULL);
+                int town_fwd_in = town_wasd_keys[SDL_SCANCODE_W] - town_wasd_keys[SDL_SCANCODE_S];
+                int town_right_in = town_wasd_keys[SDL_SCANCODE_D] - town_wasd_keys[SDL_SCANCODE_A];
+                if ((town_fwd_in || town_right_in) && now - last_town_wasd_ms >= 100) {
+                    float yaw = cam_yaw * (float)M_PI / 180.0f;
+                    float ground_fwd_x = -sinf(yaw), ground_fwd_z = -cosf(yaw);
+                    float ground_right_x = -ground_fwd_z, ground_right_z = ground_fwd_x;
+                    float dir_x = ground_fwd_x * (float)town_fwd_in + ground_right_x * (float)town_right_in;
+                    float dir_z = ground_fwd_z * (float)town_fwd_in + ground_right_z * (float)town_right_in;
+                    float dlen = sqrtf(dir_x * dir_x + dir_z * dir_z);
+                    if (dlen > 0.0001f) {
+                        dir_x /= dlen; dir_z /= dlen;
+                        const float TOWN_WASD_LOOKAHEAD = 4.0f;
+                        g_town_target_x = g_town_x + dir_x * TOWN_WASD_LOOKAHEAD;
+                        g_town_target_z = g_town_z + dir_z * TOWN_WASD_LOOKAHEAD;
+                        last_town_wasd_ms = now;
+                    }
+                }
+
+                /* Move toward the target at the same ARENA_HERO_SPEED Battlegrounds' own heroes
+                   use, for a consistent feel between the two scenes. No arrival snap needed --
+                   clamping to the remaining distance this frame already prevents overshoot. */
+                float mdx = g_town_target_x - g_town_x, mdz = g_town_target_z - g_town_z;
+                float mdist = sqrtf(mdx * mdx + mdz * mdz);
+                if (mdist > 0.01f) {
+                    float step = ARENA_HERO_SPEED * ((float)dt / 1000.0f);
+                    if (step >= mdist) {
+                        g_town_x = g_town_target_x;
+                        g_town_z = g_town_target_z;
+                    } else {
+                        g_town_x += mdx / mdist * step;
+                        g_town_z += mdz / mdist * step;
+                    }
+                }
+                update_facing_from_motion(g_town_x, g_town_z, &g_town_prev_facing_x, &g_town_prev_facing_z,
+                                           &g_town_prev_facing_valid, &g_town_facing_rad);
+                town_sync_position(now);
+
                 glViewport(0, 0, win_w, win_h);
                 glClearColor(0.5f, 0.75f, 0.92f, 1.0f); /* open-sky blue, distinct from battlegrounds' dark-green backdrop */
                 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-                Mat4 view = mat4_orbit_view(0.0f, 0.0f, 0.0f, cam_yaw, cam_pitch, cam_dist);
+                Mat4 view = mat4_orbit_view(g_town_x, 0.0f, g_town_z, cam_yaw, cam_pitch, cam_dist);
                 Mat4 proj = mat4_perspective(60.0f, (float)win_w / (float)win_h, 0.1f, 100.0f);
                 Mat4 vp = mat4_multiply(&proj, &view);
 
                 glUseProgram_(prog);
                 glUniform3f_(loc_light, 0.4f, 0.8f, 0.3f);
                 town_draw_ground(loc_mvp, loc_model, loc_color, vp, &plane_mesh);
+                if (g_town_char_loaded) {
+                    glUniform4f_(loc_color, 0.1f, 0.8f, 0.95f, 1.0f); /* same "my hero" cyan Battlegrounds uses */
+                    draw_hero_model(town_hero_id_for_job(g_town_job), g_town_x, g_town_z,
+                                     g_town_facing_rad, 1.0f, &vp, loc_mvp, loc_model, &cube_mesh);
+                }
 
                 town_draw_hud(win_w, win_h, queue_host != NULL);
 
