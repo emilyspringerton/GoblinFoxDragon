@@ -93,6 +93,38 @@ jobs:
             -lmingw32 -lSDL2main -lSDL2 \
             -lopengl32 -lglu32 -lws2_32 -lwinmm -lgdi32 -lm
 
+      # --- Real MUD GUI client (REDGARDEN_GUI_NORTHSTAR.md): apps/lobby above is a stale
+      # SHANKPIT-lobby fork (window title still literally says "SHANKPIT", boots into SHANKPIT's
+      # own SCENE_GARAGE_OSAKA) with only the EduScript minigame genuinely GFD-specific -- not
+      # the real DragonsNShit MMO frontend. Per REDGARDEN_GUI_NORTHSTAR.md, REDGARDEN's own
+      # apps/arena ships as-is as DragonsNShit's Battlegrounds and is the actual MUD GUI players
+      # log into (real IDUNA email+password login screen, apps/arena/src/main.c, REDGARDEN
+      # 9c98342 + e6fb748). Checked out and cross-compiled here, from GFD's own CI, using the
+      # exact same mingw/SDL2 toolchain already set up above -- mirrors REDGARDEN's own
+      # .github/workflows/ci.yml Windows step verbatim so the two pipelines can't silently drift.
+      - name: Checkout REDGARDEN (real MUD GUI frontend source)
+        uses: actions/checkout@v4
+        with:
+          repository: emilyspringerton/REDGARDEN
+          path: redgarden-src
+
+      - name: Cross-compile REDGARDEN arena client (real DragonsNShit MUD GUI)
+        shell: bash
+        run: |
+          set -euo pipefail
+          x86_64-w64-mingw32-gcc -std=c99 -D_DEFAULT_SOURCE -O2 \
+            -o DragonsNShit_MUD_GUI.exe \
+            redgarden-src/apps/arena/src/main.c \
+            redgarden-src/packages/simulation/arena_game.c \
+            redgarden-src/packages/simulation/arena_replay.c \
+            redgarden-src/packages/simulation/arena_ai_bridge.c \
+            redgarden-src/packages/common/mlp_infer.c \
+            -I./sdl2_mingw/include \
+            -Iredgarden-src/packages \
+            -L./sdl2_mingw/lib \
+            -lmingw32 -lSDL2main -lSDL2 \
+            -lopengl32 -lws2_32 -lwinmm -lgdi32 -lm
+
       # --- Optional legacy C server build (safe to remove later) ---
       - name: Build Linux Server (legacy C server, optional)
         shell: bash
@@ -226,8 +258,8 @@ jobs:
           set -euo pipefail
           BUILD="build_${{ github.run_number }}_${GITHUB_SHA::7}"
 
-          rm -rf GoblinFoxDragon_Client GoblinFoxDragon_Backend GoblinFoxDragon_Tools || true
-          rm -f GoblinFoxDragon_Client_*.zip GoblinFoxDragon_Backend_*.zip GoblinFoxDragon_Tools_*.zip || true
+          rm -rf GoblinFoxDragon_Client GoblinFoxDragon_Backend GoblinFoxDragon_Tools DragonsNShit_MUD_GUI_Client || true
+          rm -f GoblinFoxDragon_Client_*.zip GoblinFoxDragon_Backend_*.zip GoblinFoxDragon_Tools_*.zip DragonsNShit_MUD_GUI_Client_*.zip || true
 
           # Client package
           mkdir -p GoblinFoxDragon_Client
@@ -237,6 +269,18 @@ jobs:
           cp GOBLINFOXDRAGON_MANIFEST.txt GoblinFoxDragon_Client/
           printf '%s\n' "start GoblinFoxDragon.exe" > GoblinFoxDragon_Client/PLAY.bat
           zip -r "GoblinFoxDragon_Client_${BUILD}.zip" GoblinFoxDragon_Client
+
+          # Real MUD GUI client package (REDGARDEN apps/arena, DragonsNShit's Battlegrounds --
+          # see the checkout/cross-compile steps above for why this is the real one, not
+          # GoblinFoxDragon.exe above). Real IDUNA email+password login screen built in -- no
+          # REDGARDEN_TICKET_SECRET needed here, unlike REDGARDEN's own older PLAY.bat generation
+          # (being updated separately, REDGARDEN commit follows this one) which predates the
+          # login screen and used a self-minted anonymous ticket as its only path.
+          mkdir -p DragonsNShit_MUD_GUI_Client
+          cp DragonsNShit_MUD_GUI.exe DragonsNShit_MUD_GUI_Client/
+          cp sdl2_mingw/bin/SDL2.dll DragonsNShit_MUD_GUI_Client/
+          printf '%s\r\n' "@echo off" "echo DragonsNShit -- log in with your IDUNA account when prompted." "DragonsNShit_MUD_GUI.exe --queue 198.58.107.85" "pause" > DragonsNShit_MUD_GUI_Client/PLAY.bat
+          zip -r "DragonsNShit_MUD_GUI_Client_${BUILD}.zip" DragonsNShit_MUD_GUI_Client
 
           # Backend package (Go preferred; legacy C server optional fallback)
           mkdir -p GoblinFoxDragon_Backend
@@ -272,6 +316,7 @@ jobs:
           name: GoblinFoxDragon_Builds_${{ github.run_number }}_${{ github.sha }}
           path: |
             GoblinFoxDragon_Client_*.zip
+            DragonsNShit_MUD_GUI_Client_*.zip
             GoblinFoxDragon_Backend_*.zip
             GoblinFoxDragon_Tools_*.zip
             GOBLINFOXDRAGON_MANIFEST.txt
