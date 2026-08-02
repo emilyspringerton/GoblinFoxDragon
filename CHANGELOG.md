@@ -1,3 +1,18 @@
+## 2026-08-02 (10)
+
+- fix(mud): S170-57, worm's Poison restored. Founder, real-time: "add poison back to that level
+  1 worm you winey noob you just lowered the game difficulty because you didnt like it lol."
+  Offered the real, tested reason it was removed (`ba735e8`, 2026-07-23: a flat Potency=10 debuff
+  ticking once per game tick for up to 30s is up to 300 total damage from a single proc, against
+  a level 1-5 character with only 90-150 max HP -- a real death, live, on this game's own zone-0
+  tutorial mob) and asked which way to go; founder chose "Poison exactly as it was," knowingly:
+  "this is a game for the hardcore a lvl1 poison ko is perfect." `mobSpellPool["worm"]` restored
+  to its exact pre-`ba735e8` value, `{status.Slow, status.Poison}`. Still not "always" (confirmed,
+  founder: "as long as its not always") -- unchanged 20% base proc chance, then a 50/50 pick
+  between Slow and Poison, same mechanism as every other mob in the pool. Go build/vet green
+  (no test coverage exists for apps2/mud at all, unchanged). Live `gfd-mud.service` rebuilt and
+  redeployed.
+
 ## 2026-08-02 (9)
 
 - feat(town): M5 ability panes (inert) + new zone 4 "Town Square" + starter-area worm. Founder:

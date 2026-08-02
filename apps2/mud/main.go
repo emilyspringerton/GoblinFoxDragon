@@ -5394,30 +5394,24 @@ func cmdRecasts(p *player) {
 
 // mobSpellPool maps mob kind prefix → debuffs it might cast.
 //
-// Worm is deliberately Slow-only, not Poison -- found live 2026-07-23: every
-// debuff cast by mobSpellcast uses a flat Potency=10 applied once per game
-// tick (1s) for up to 30s, i.e. up to 300 total damage from a single 20%-
-// chance proc. Worm is this game's own starting-zone tutorial mob (worm.go's
-// own doc comment: "short sight; mostly passive"), with only 90-150 max HP
-// on a level 1-5 character -- a single proc could solo-kill a brand-new
-// player from the very first mob they ever fight, on a mob explicitly
-// designed to be safe. Slow fits a worm's flavor at least as well as Poison
-// did and carries none of that lethality; Poison stays on Slime/Chaos/Leech,
-// which aren't the zone-0 tutorial mob and can reasonably ask more of a
-// player who's already progressed past Meadow.
-// Keys are lowercase to match real mob IDs (e.g. "worm-meadow-4", "slime-swamp-2")
-// -- mobID is never capitalized, so a capitalized key here would silently never
-// match and fall through to the generic fallback pool below. Found live
-// 2026-07-23: this exact mismatch was why the Worm-is-Slow-only fix never took
-// effect at runtime -- "Worm" never matched "worm-meadow-4", so every mob kept
-// falling through to the fallback pool, which still includes Poison.
+// Worm carries Poison again (2026-08-02, founder, real-time, S170-57, verbatim: "add poison back
+// to that level 1 worm you winey noob you just lowered the game difficulty because you didnt
+// like it lol" -> re-offered the real, tested reason it was removed (ba735e8, 2026-07-23: a flat
+// Potency=10 debuff ticking once per game tick for up to 30s is up to 300 total damage from a
+// single 20%-chance proc, against a level 1-5 character with only 90-150 max HP -- a real death,
+// live, on this game's own zone-0 tutorial mob) and asked to choose; founder chose "Poison
+// exactly as it was" over a capped/safer version, knowingly accepting that risk. Restored to its
+// exact pre-ba735e8 value, Slow+Poison. Poison unchanged for Slime/Chaos/Leech throughout.
+// Keys are lowercase to match real mob IDs (e.g. "worm-meadow-4", "slime-swamp-2") -- mobID is
+// never capitalized, so a capitalized key here would silently never match and fall through to
+// the generic fallback pool below (found live 2026-07-23, same session as the fix above).
 var mobSpellPool = map[string][]status.Kind{
 	"slime":  {status.Poison, status.Slow},
 	"lizard": {status.Paralyze, status.Slow},
 	"zombie": {status.Bind, status.Silence},
 	"chaos":  {status.Paralyze, status.Bind, status.Silence, status.Poison},
 	"leech":  {status.Bind, status.Poison},
-	"worm":   {status.Slow},
+	"worm":   {status.Slow, status.Poison},
 }
 
 // mobSpellNames maps status.Kind to display names.
