@@ -10,6 +10,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	crand "crypto/rand"
 	"encoding/binary"
 	"encoding/json"
@@ -781,6 +782,26 @@ type player struct {
 	conn          net.Conn
 	w             *bufio.Writer
 	inbox         chan string
+	// headlessBuf (2026-08-02, HEADLESS_SESSION_NORTHSTAR.md Milestone 1+, founder: "the real MUD
+	// combat system" for GoblinFoxDragon's Town scene): non-nil only for a headless player (see
+	// getOrCreateHeadlessPlayer) -- w wraps this buffer instead of a real net.Conn, same
+	// bufio.Writer abstraction every existing send/sendf call already goes through unchanged.
+	// nil for every real telnet player. Registered directly into gw.players like any other
+	// player, so the real 1Hz gameLoop()/tickAll() resolves its combat (auto-attack, TP, enmity,
+	// kill/loot/XP via resolveKill) exactly as it would for a live telnet session -- no changes
+	// to tickAll() itself were needed for this.
+	headlessBuf *bytes.Buffer
+	// headlessSyncedLevel/XP/Flow (2026-08-02): a real telnet player's level/XP/flow persist to
+	// IDUNA on disconnect (handleConn's own defer block) -- a headless session never
+	// disconnects (it stays registered in gw.players for the rest of the process's life once
+	// created, so tickAll() keeps resolving its combat), so that defer never fires. Tracked here
+	// so runHeadlessCommand can persist a delta after every command instead, same
+	// UpdateCharacterLevel/CreditGold/DeductGold calls, just driven by "did anything change
+	// since the last sync" rather than "did the connection just close." Unused (stays zero) for
+	// every real telnet player.
+	headlessSyncedLevel int
+	headlessSyncedXP    int
+	headlessSyncedFlow  int
 }
 
 func (p *player) send(msg string) {
@@ -2510,7 +2531,9 @@ func handle(p *player, line string) {
 		cmdHelp(p)
 	case "quit", "exit", "q":
 		p.send("Farewell, adventurer.")
-		p.conn.Close()
+		if p.conn != nil { // nil for a headless session (headlessBuf != nil) -- nothing to close
+			p.conn.Close()
+		}
 	default:
 		p.sendf("Unknown command: %q — type HELP for a list.", cmd)
 	}
@@ -6710,6 +6733,144 @@ func broadcastZone(zoneID int, msg, exceptSlot string) {
 	broadcastZoneNoLock(zoneID, msg, exceptSlot)
 }
 
+// ── headless sessions (2026-08-02, HEADLESS_SESSION_NORTHSTAR.md) ─────────────────────────────
+//
+// getOrCreateHeadlessPlayer builds (or reuses) a real *player for characterID with no telnet
+// connection, registered directly into gw.players under slot "headless:"+characterID -- the
+// exact same map every real telnet player is registered in. That's the whole mechanism: the
+// real 1Hz gameLoop()/tickAll() iterates gw.players uniformly, so a headless player's combat
+// (auto-attack swing timer, TP gain, enmity, kill/loot/XP via resolveKill) resolves through the
+// real system with zero changes to tickAll() itself. Same structural shape as handleConn's own
+// player{} literal, seeded from the character's real IDUNA-persisted zone/position instead of
+// always defaulting to zone 0 -- Town's own position sync (GoblinFoxDragon `50d582e`) already
+// writes scene_id=4 (Town Square), so a fresh headless session naturally starts standing in the
+// same zone the character's Town avatar is in, with the real worm mob (TownSquareWormSpawns)
+// already spawned there to fight.
+//
+// Deliberately NOT registered in gw.zoneMgr/gw.chatRouter -- no chat/say routing needed for
+// combat-only commands, and cmdLook's own "other players here" loop is gw.players-based, not
+// zoneMgr-based, so a real telnet player standing in Town Square would still see this character
+// listed as present via `look`, without needing that registration.
+//
+// Known, accepted gaps in this first pass (not fixed here): no idle eviction (a headless session
+// stays registered, and therefore keeps auto-attacking if it has a live target, for the rest of
+// the process's life once created); no telnet-conflict handling (the same character logging in
+// over telnet while a headless session is active would register a second, independent gw.players
+// entry rather than taking over the existing one). Both are real, named follow-ups, same
+// HEADLESS_SESSION_NORTHSTAR.md M4 scope already flagged before any of this was built.
+func getOrCreateHeadlessPlayer(characterID string) (*player, error) {
+	slot := "headless:" + characterID
+	if p, ok := gw.players[slot]; ok {
+		return p, nil
+	}
+	ch, err := gw.iduna.GetCharacter(characterID)
+	if err != nil {
+		return nil, err
+	}
+	startHP, _ := job.HPAtLevel(job.WAR, 1)
+	startMP, _ := job.MPAtLevel(job.WAR, 1)
+	if startHP == 0 {
+		startHP = defaultHP
+	}
+	buf := &bytes.Buffer{}
+	w := bufio.NewWriter(buf)
+	p := &player{
+		slot:          slot,
+		name:          ch.Name,
+		zoneID:        ch.SceneID,
+		pos:           mob.Pos{X: ch.PosX, Y: ch.PosY, Z: ch.PosZ},
+		hp:            startHP,
+		maxHP:         startHP,
+		mp:            startMP,
+		maxMP:         startMP,
+		tp:            &combatTp.TPState{},
+		statFX:        status.New(),
+		combat:        &mob.PlayerCombat{BaseDamage: playerDamage, MeleeRange: playerMeleeRng},
+		miningSkill:   0,
+		charXP:        xp.NewCharXP(),
+		homePoint:     homepoint.NewState(ch.SceneID),
+		wsSkill:       "Fast Blade",
+		jobID:         job.WAR,
+		charJob:       func() *job.CharJob { cj, _ := job.NewCharJob(job.WAR, "", 1, 0); return cj }(),
+		meritBank:     merit.NewMeritBank(),
+		recastTracker: job.NewRecastTracker(job.WarriorAbilities()),
+		petSlot:       pet.NewSlot(),
+		questJournal:  quest.NewJournal(),
+		atlas:         cartography.NewAtlas(),
+		fameStore:     fame.NewStore(),
+		inventory:     make(map[string]int),
+		craftSkill:    craft.NewCraftSkill(),
+		flow:          500,
+		equip:         gear.NewEquipment(),
+		conn:          nil,
+		w:             w,
+		headlessBuf:   buf,
+	}
+	if ch.Level > 1 {
+		p.charXP.Level = ch.Level
+		p.charXP.CurrentXP = ch.CurrentXP
+	}
+	if ch.GoldBalance > 0 {
+		p.flow = ch.GoldBalance
+	}
+	// Baseline for runHeadlessCommand's own delta-sync -- matches what was just loaded from
+	// IDUNA, so the very first sync check doesn't false-positive on values that haven't
+	// actually changed yet this session.
+	p.headlessSyncedLevel = p.charXP.Level
+	p.headlessSyncedXP = p.charXP.CurrentXP
+	p.headlessSyncedFlow = p.flow
+	gw.charIDBySlot[slot] = ch.CharacterID
+	gw.players[slot] = p
+	p.atlas.Visit(p.zoneID)
+	return p, nil
+}
+
+// runHeadlessCommand runs one command line through the real handle(p, line) dispatch for
+// characterID's headless session (creating one if needed) and returns everything written to its
+// buffer since the last drain -- both this command's own immediate response AND any background
+// tick messages (auto-attack "You hit for N damage" lines, etc.) that accumulated since the
+// caller's last poll. An empty line just drains without dispatching anything, so a caller can
+// poll for background combat ticks without issuing a new command every time.
+func runHeadlessCommand(characterID, line string) (string, error) {
+	gw.mu.Lock()
+	p, err := getOrCreateHeadlessPlayer(characterID)
+	gw.mu.Unlock()
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(line) != "" {
+		handle(p, line) // same unlocked call shape handleConn's own read loop already uses
+	}
+	gw.mu.Lock()
+	defer gw.mu.Unlock()
+	p.w.Flush()
+	out := p.headlessBuf.String()
+	p.headlessBuf.Reset()
+
+	// Persist level/XP/flow deltas since the last sync -- see headlessSyncedLevel's own doc
+	// comment on the player struct for why this can't just wait for a disconnect that will
+	// never come. Best-effort, same silent-discard convention every other idunaclient call site
+	// in this file already uses; a sync failure shouldn't block combat from continuing.
+	charID := gw.charIDBySlot[p.slot]
+	if charID != "" {
+		if p.charXP.Level != p.headlessSyncedLevel || p.charXP.CurrentXP != p.headlessSyncedXP {
+			_ = gw.iduna.UpdateCharacterLevel(charID, p.charXP.Level, p.charXP.CurrentXP)
+			p.headlessSyncedLevel = p.charXP.Level
+			p.headlessSyncedXP = p.charXP.CurrentXP
+		}
+		if flowDelta := p.flow - p.headlessSyncedFlow; flowDelta != 0 {
+			if flowDelta > 0 {
+				_ = gw.iduna.CreditGold(charID, flowDelta)
+			} else {
+				_ = gw.iduna.DeductGold(charID, -flowDelta)
+			}
+			p.headlessSyncedFlow = p.flow
+		}
+	}
+
+	return out, nil
+}
+
 // ── connection handler ────────────────────────────────────────────────────────
 
 func handleConn(conn net.Conn) {
@@ -7486,6 +7647,38 @@ func startWorldEventAPI(port int) {
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
+	})
+	// /api/town/command (2026-08-02, HEADLESS_SESSION_NORTHSTAR.md, founder: "the real MUD
+	// combat system" for GoblinFoxDragon's Town scene): runs one line through a real headless
+	// player for character_id via runHeadlessCommand. Known, named gap: no auth at all on this
+	// endpoint, same as /api/world-events right above it -- character_id is caller-supplied, not
+	// derived from any verified identity, so anyone who can reach this port and knows a
+	// character_id can act as it. Fine for apps2/mud's existing same-box/internal trust model
+	// (nothing here verifies IDUNA JWTs at all, unlike IDUNA's own endpoints); a real gap if this
+	// port is ever reachable from the open internet the same way IDUNA:8080 is, flagged rather
+	// than fixed here -- building real JWT verification into apps2/mud would be a separate,
+	// larger piece of work (this process has never verified an incoming token, only ever issued
+	// outbound agent calls to IDUNA).
+	mux.HandleFunc("/api/town/command", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var req struct {
+			CharacterID string `json:"character_id"`
+			Command     string `json:"command"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.CharacterID == "" {
+			http.Error(w, "character_id required", http.StatusBadRequest)
+			return
+		}
+		out, err := runHeadlessCommand(req.CharacterID, req.Command)
+		if err != nil {
+			http.Error(w, "character not found: "+err.Error(), http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{"output": out})
 	})
 	addr := fmt.Sprintf(":%d", port)
 	fmt.Printf("[WorldEvent API] listening on %s\n", addr)

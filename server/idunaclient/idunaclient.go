@@ -410,12 +410,19 @@ func (c *Client) CreateCharacter(playerID, name, jobMain string) (string, error)
 }
 
 // UpdateCharacterLevel patches a character's level and current_xp.
+//
+// Real bug found live 2026-08-02 (GoblinFoxDragon's Town headless-combat work): this called
+// plain PATCH /api/v1/characters/:id for its entire history -- a route IDUNA has never had (only
+// /position, /gold, /gold/credit, /skills exist). Every caller (this package is shared by
+// apps2/mud and apps2/server-go) has had every level/XP persist silently fail, masked by
+// "best-effort" error handling everywhere it's called from. Fixed to hit the real new
+// /api/v1/characters/:id/level route (IDUNA's own mmo.go handleUpdateLevel).
 func (c *Client) UpdateCharacterLevel(characterID string, level, currentXP int) error {
 	body, _ := json.Marshal(map[string]any{
 		"level":      level,
 		"current_xp": currentXP,
 	})
-	req, _ := http.NewRequest(http.MethodPatch, c.baseURL+"/api/v1/characters/"+characterID, bytes.NewReader(body))
+	req, _ := http.NewRequest(http.MethodPatch, c.baseURL+"/api/v1/characters/"+characterID+"/level", bytes.NewReader(body))
 	resp, err := c.do(req)
 	if err != nil {
 		return fmt.Errorf("idunaclient: UpdateCharacterLevel: %w", err)

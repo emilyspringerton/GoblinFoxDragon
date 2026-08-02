@@ -17,7 +17,23 @@
 #
 # Connect: telnet <host> 2323  (or nc <host> 2323) — plain-text MUD protocol,
 # no special client needed. World-event HTTP API (Emily Prime injection +
-# recent-events feed) on :7171, used by the status-page check below.
+# recent-events feed, plus the newer /api/town/command headless-session
+# endpoint) on :7171, used by the status-page check below.
+#
+# Real bug found live 2026-08-02, GoblinFoxDragon's Town avatar/combat work: this unit never had
+# IDUNA_AGENT_NAME/IDUNA_AGENT_SECRET set at all (no EnvironmentFile= line existed), so every
+# idunaclient call this process has ever made (GetCharacter/CreateCharacter/UpdatePosition/
+# CreditGold/DeductGold) was silently failing with a 401 -- masked entirely by every call site's
+# own "best-effort, non-blocking" error handling, same shape as the earlier `do()`-sends-secret-
+# as-bearer-token bug (idunaclient.go's own doc comment, fixed 2026-07-31) but a plain
+# configuration gap this time, not a code bug. Fixed by pointing at a real, git-ignored env file
+# (same convention iduna.service already uses for its own secrets):
+#   mkdir -p ~/.config/gfd-mud
+#   cat > ~/.config/gfd-mud/env <<'ENV'
+#   IDUNA_AGENT_NAME=DRAGONSNSHIT-MUD
+#   IDUNA_AGENT_SECRET=<IDUNA_SECRET_DRAGONSNSHIT_MUD from IDUNA/var/agent-secrets.env>
+#   ENV
+#   chmod 600 ~/.config/gfd-mud/env
 
 [Unit]
 Description=DragonsNShit MUD (GoblinFoxDragon apps2/mud)
@@ -26,6 +42,7 @@ After=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/home/fatbaby/GoblinFoxDragon
+EnvironmentFile=-%h/.config/gfd-mud/env
 ExecStart=/home/fatbaby/GoblinFoxDragon/mud -port 2323 -api-port 7171
 Restart=on-failure
 RestartSec=10s

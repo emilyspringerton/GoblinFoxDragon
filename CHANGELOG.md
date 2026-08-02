@@ -1,3 +1,48 @@
+## 2026-08-02 (12)
+
+- feat(mud): real headless-session combat -- Town Square's worm is now genuinely fightable, not
+  decorative. Founder: "can we kill worms?" -> chose "the real MUD combat system" over a simpler
+  fake-hit-for-damage mode. Implements HEADLESS_SESSION_NORTHSTAR.md's core mechanism for the
+  first time:
+  - `getOrCreateHeadlessPlayer(characterID)`: builds a real `*player` (no telnet connection) from
+    a real IDUNA character, `w: bufio.NewWriter(&buf)` where `buf` is an owned `*bytes.Buffer`
+    (new `headlessBuf` field on `player`, nil for every real telnet player). Registered directly
+    into `gw.players["headless:"+characterID]` -- the exact same map every telnet player uses --
+    so the real 1Hz `gameLoop()`/`tickAll()` resolves its combat (auto-attack swing timer, TP,
+    enmity, kill/loot/XP via `resolveKill`) with zero changes to the tick loop itself. Seeded from
+    the character's real `scene_id`/position, which Town's own position sync (`50d582e`) already
+    writes as zone 4 -- a fresh headless session naturally starts standing in Town Square, next
+    to the real worm.
+  - `runHeadlessCommand(characterID, line)`: runs one line through the real `handle(p, line)`
+    dispatch and drains everything written since the last drain -- both the command's own
+    response and any background tick messages, so a caller can poll with an empty line to catch
+    auto-attack ticks without issuing a new command each time.
+  - New `POST /api/town/command` on the existing `:7171` world-events API (same mux, same
+    no-auth trust model -- named gap, not fixed: `character_id` is caller-supplied, not derived
+    from any verified identity; apps2/mud has never verified an incoming JWT at all, only issued
+    outbound agent calls).
+  - Fixed a real, separate bug found while making this actually persist: a headless session
+    never "disconnects," so `handleConn`'s own disconnect-time level/XP/flow sync never fires for
+    it. New `headlessSyncedLevel/XP/Flow` fields + a delta-sync after every `runHeadlessCommand`
+    call, same `UpdateCharacterLevel`/`CreditGold`/`DeductGold` calls the disconnect path uses.
+  - **Two additional real bugs found and fixed along the way**, both pre-existing, both affecting
+    real telnet play too, not just this feature: (1) `gfd-mud.service` never had
+    `IDUNA_AGENT_NAME`/`IDUNA_AGENT_SECRET` configured (no `EnvironmentFile=` line existed) --
+    every `idunaclient` call this live process has ever made was silently 401ing, masked by
+    best-effort error handling everywhere. Fixed via a new `~/.config/gfd-mud/env`, same
+    convention `iduna.service` already uses. (2) `idunaclient.UpdateCharacterLevel` called a
+    route that has never existed on IDUNA (`PATCH /api/v1/characters/:id` with no suffix) --
+    fixed client-side (now hits the new `/level` route, IDUNA `3ebad87`) and would have silently
+    broken level/XP persistence for every real telnet disconnect too, this whole time.
+  - `p.conn.Close()` in the `quit` command guarded against a nil `conn` (headless sessions have
+    none) -- defensive; the new endpoint never sends `quit`, but cheap to guard anyway.
+  Live-verified end-to-end, real character, real live worm: `attack worm` targets and
+  auto-approaches, real tick-based swings land (30 damage/hit, worm's own 8-damage retaliation),
+  real kill (`The creature collapses!`), real XP (+900), real level-up (1→3), real loot (Worm
+  Sinew, Earth Crystal) -- and, after the two bugs above were fixed, confirmed landing in IDUNA
+  for real (`level: 3, current_xp: 452`), not just in-memory. Go build + vet clean across
+  `apps2/mud`, `apps2/server-go` (shares the fixed `idunaclient`), and `server/idunaclient`.
+
 ## 2026-08-02 (11)
 
 - fix(town): position now flushes on quit, closing a real "login to same spot" gap. Founder:
