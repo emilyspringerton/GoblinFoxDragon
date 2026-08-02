@@ -1,3 +1,25 @@
+## 2026-08-02 (20)
+
+- fix(town): stale connect ticket silently broke every requeue after ~5 minutes of play --
+  founder, live-testing: "if i queue for battle grounds and then after that game return to town
+  and then requeu for battlegrounds it doesnt work"; repro'd worked twice, then failed every
+  time; "killing my client and relaunching it fixes it its a bug." Not the bot-pool/matchmaker
+  race investigated earlier in this same session (that's real but was a red herring for this
+  specific symptom) -- the real cause: `get_player_login_ticket` mints a connect ticket ONCE at
+  initial login, and `net_connect()` reused that exact same `g_supplied_ticket_hex` for every
+  reconnect for the rest of the session. IDUNA's `RedgardenTicketTTL` is a hardcoded 5 minutes
+  (`redgarden_self_ticket.go`), and `arena_server` silently drops `PACKET_CONNECT` for an expired
+  ticket (`apps/arena_server/src/main.c`'s own `expires_at` check, no rejection packet sent back)
+  -- a dropped UDP connect just looks like "the human never joined the lobby," matching the
+  "stuck at 19/20" symptom found while investigating. A fresh client relaunch mints a fresh
+  5-minute ticket at its own new login, which is why that "fixed" it -- confirming this was
+  never a REDGARDEN-side bug. Added `refresh_self_ticket()`, which re-mints from the stored login
+  JWT (`g_chat_jwt`, much longer-lived than the ticket itself) right before every connect instead
+  of reusing the first one -- same `/api/v1/redgarden/self-ticket` call `get_player_login_ticket`
+  already made once, just repeatable. Falls through to the original static ticket if the refresh
+  call itself fails (network hiccup, IDUNA briefly down). Bots/--ticket/--connect dev launches
+  are untouched (no `g_chat_jwt` in those paths).
+
 ## 2026-08-02 (19)
 
 - fix(town): Auction House Enter-key event-ordering bug -- founder, live-testing: "when i hit

@@ -407,6 +407,42 @@ static int get_player_login_ticket(const char *email, const char *password,
     return 1;
 }
 
+/* refresh_self_ticket: real bug found live (2026-08-02, founder: "ok if i queue for battle
+ * grounds and then after that game return to town and then requeu for battlegrounds it doesnt
+ * work" -> repro'd worked twice then failed every time, "killing my client and relaunching it
+ * fixes it"). Root cause: get_player_login_ticket's own ticket is minted ONCE at initial login
+ * and net_connect() reused that exact same g_supplied_ticket_hex for every reconnect for the
+ * rest of the session -- but IDUNA's RedgardenTicketTTL is a hardcoded 5 minutes
+ * (redgarden_self_ticket.go), and arena_server silently drops PACKET_CONNECT for an expired
+ * ticket (apps/arena_server/src/main.c's own expires_at check, no rejection packet sent back --
+ * a UDP PACKET_CONNECT that never gets a WELCOME just looks like "the human never joined," which
+ * is exactly the "stuck at 19/20 lobby" symptom this surfaced as). A fresh client relaunch mints
+ * a fresh 5-minute ticket at its own new login, which is why that "fixed" it -- not a REDGARDEN-
+ * side bug at all. This re-mints a new ticket from g_chat_jwt (the real login JWT, much
+ * longer-lived than the ticket itself) right before every connect instead of reusing the first
+ * one -- same self-ticket call get_player_login_ticket already made once, just repeatable. Only
+ * meaningful for the real human login path (g_chat_jwt set); bots/--ticket/--connect dev
+ * launches are untouched, see this function's own call site in net_connect(). */
+static int refresh_self_ticket(unsigned char out[ARENA_TICKET_TOTAL_LEN]) {
+    char resp[4096];
+    int status = 0;
+    if (http_post_json(iduna_host, iduna_port, "/api/v1/redgarden/self-ticket", g_chat_jwt,
+                        NULL, resp, sizeof(resp), &status) != 0 || status != 200) {
+        fprintf(stderr, "Ticket refresh failed (status=%d) -- falling back to the original ticket.\n", status);
+        return 0;
+    }
+    char ticket_hex[128];
+    if (!http_extract_json_string_field(resp, "ticket", ticket_hex, sizeof(ticket_hex))) {
+        fprintf(stderr, "Ticket refresh response missing ticket field.\n");
+        return 0;
+    }
+    if (!hex_decode(ticket_hex, out, ARENA_TICKET_TOTAL_LEN)) {
+        fprintf(stderr, "Ticket refresh field was not valid hex.\n");
+        return 0;
+    }
+    return 1;
+}
+
 static int net_connect(const char *host, int port) {
     net_sock = socket(AF_INET, SOCK_DGRAM, 0);
 #ifdef _WIN32
@@ -422,7 +458,15 @@ static int net_connect(const char *host, int port) {
 
     unsigned char ticket[ARENA_TICKET_TOTAL_LEN];
     int have_ticket = 0;
-    if (g_supplied_ticket_hex) {
+    /* Real logged-in human: re-mint a fresh ticket every connect rather than reusing the one
+       from initial login, which silently goes stale after IDUNA's 5-minute RedgardenTicketTTL --
+       see refresh_self_ticket's own doc comment for the real bug this fixes. Falls through to
+       the original g_supplied_ticket_hex below if the refresh call itself fails (network hiccup,
+       IDUNA briefly down), same as before this fix existed. */
+    if (g_chat_jwt[0]) {
+        have_ticket = refresh_self_ticket(ticket);
+    }
+    if (!have_ticket && g_supplied_ticket_hex) {
         have_ticket = hex_decode(g_supplied_ticket_hex, ticket, ARENA_TICKET_TOTAL_LEN);
         if (!have_ticket) {
             fprintf(stderr, "--ticket: not valid %d-byte hex\n", ARENA_TICKET_TOTAL_LEN);
