@@ -2851,10 +2851,11 @@ static void play_cast_tone(int slot) {
 static const char *TOWN_TARGET_NAMES[TOWN_TARGET_COUNT] = {
     "worm-town-0", "worm-town-1", "worm-town-2", "worm-town-3"
 };
-/* Worm Hut cluster (5, 15) -- must match server/mob/worm.go's own TownSquareWormSpawns hutX/hutZ
- * exactly, same "kept in sync by hand" convention. */
-static const float TOWN_TARGET_X[TOWN_TARGET_COUNT] = {6.5f, 3.5f, 5.0f, 5.0f};
-static const float TOWN_TARGET_Z[TOWN_TARGET_COUNT] = {15.0f, 15.0f, 16.5f, 13.5f};
+/* Worm Hut cluster (10, 30) -- doubled 2026-08-02 alongside the rest of the town, must match
+ * server/mob/worm.go's own TownSquareWormSpawns hutX/hutZ exactly, same "kept in sync by hand"
+ * convention. */
+static const float TOWN_TARGET_X[TOWN_TARGET_COUNT] = {13.0f, 7.0f, 10.0f, 10.0f};
+static const float TOWN_TARGET_Z[TOWN_TARGET_COUNT] = {30.0f, 30.0f, 33.0f, 27.0f};
 /* -1 = no target selected. Tab/Shift+Tab cycle (2026-08-02, founder: "add tab and shift tab to
  * cycle through targets like wow"). */
 static int g_town_target_index = -1;
@@ -2877,32 +2878,37 @@ typedef struct {
     float r, g, b;
 } TownBuilding;
 #define TOWN_BUILDING_COUNT 25
+/* Doubled 2026-08-02, founder: "double the size of the town and the buildings" -- every
+ * position AND every half-extent scaled x2 (both the layout's own spacing and each building's
+ * physical size double, matching "town and the buildings" literally rather than just spreading
+ * the same-sized buildings further apart). Worm Hut's own position must stay in sync by hand
+ * with server/mob/worm.go's TownSquareWormSpawns hutX/hutZ, same convention as before. */
 static const TownBuilding TOWN_BUILDINGS[TOWN_BUILDING_COUNT] = {
-    {"Seed Shop",         0.0f, -30.0f, 1.8f, 1.4f, 1.8f,  0.25f, 0.55f, 0.25f},
-    {"Warrior Guild",   -10.0f, -20.0f, 2.6f, 2.0f, 2.6f,  0.25f, 0.35f, 0.75f},
-    {"Fishing",          10.0f, -20.0f, 1.8f, 1.3f, 1.8f,  0.25f, 0.55f, 0.25f},
-    {"Blacksmith",      -15.0f, -15.0f, 1.4f, 1.5f, 1.4f,  0.25f, 0.55f, 0.25f},
-    {"Butcher",           0.0f, -10.0f, 1.8f, 1.3f, 1.8f,  0.25f, 0.55f, 0.25f},
-    {"Armor Shop",        10.0f, -10.0f, 1.9f, 1.4f, 1.9f, 0.25f, 0.55f, 0.25f},
-    {"Shady Dealer",      20.0f, -5.0f, 1.7f, 1.3f, 1.7f,  0.55f, 0.2f,  0.6f},
-    {"Guild House",      -10.0f,  0.0f, 2.2f, 1.7f, 2.2f,  0.25f, 0.35f, 0.75f},
-    {"Potions",            3.0f,  0.0f, 1.6f, 1.2f, 1.6f,  0.25f, 0.55f, 0.25f},
-    {"Gold Guild",       -20.0f,  5.0f, 2.4f, 1.9f, 2.4f,  0.25f, 0.35f, 0.75f},
-    {"Secret Gate",       23.0f, -3.0f, 1.0f, 2.2f, 1.0f,  0.55f, 0.2f,  0.6f},
-    {"Auction House",     -5.0f, 10.0f, 4.0f, 1.8f, 2.2f,  0.55f, 0.4f,  0.2f},
-    {"Archery Guild",     15.0f, 15.0f, 2.3f, 1.8f, 2.3f,  0.25f, 0.35f, 0.75f},
-    {"Post Office",      -20.0f, 20.0f, 1.9f, 1.5f, 1.9f,  0.6f,  0.6f,  0.62f},
-    {"Town Hall",           5.0f, 20.0f, 3.2f, 2.6f, 3.2f, 0.6f,  0.6f,  0.62f},
-    {"Gem Dealer",        -5.0f, 25.0f, 1.7f, 1.3f, 1.7f,  0.25f, 0.55f, 0.25f},
-    {"Police",              5.0f, 25.0f, 1.5f, 1.3f, 1.5f, 0.6f,  0.6f,  0.62f},
-    {"Gemani Tower",       15.0f, 25.0f, 1.6f, 3.2f, 1.6f, 0.55f, 0.2f,  0.6f},
-    {"MineCo Ops Office", -10.0f, 30.0f, 1.9f, 1.4f, 1.9f, 0.6f,  0.6f,  0.62f},
-    {"Mining Supplies",    0.0f, 30.0f, 1.8f, 1.3f, 1.8f,  0.25f, 0.55f, 0.25f},
-    {"Glove Shop",        10.0f, 30.0f, 1.6f, 1.2f, 1.6f,  0.25f, 0.55f, 0.25f},
-    {"Hats",               13.0f, 30.0f, 1.0f, 1.0f, 1.0f, 0.25f, 0.55f, 0.25f},
-    {"Worm Hut",            5.0f, 15.0f, 1.4f, 1.1f, 1.4f, 0.5f,  0.38f, 0.16f},
-    {"Dragon Gate",       -20.0f, -25.0f, 1.2f, 2.6f, 1.2f, 0.85f, 0.65f, 0.15f},
-    {"Diamond Gate",       20.0f, 35.0f, 1.2f, 2.6f, 1.2f,  0.85f, 0.65f, 0.15f},
+    {"Seed Shop",              0.0f,   -60.0f, 3.6f, 2.8f, 3.6f,  0.25f, 0.55f, 0.25f},
+    {"Warrior Guild",        -20.0f,   -40.0f, 5.2f, 4.0f, 5.2f,  0.25f, 0.35f, 0.75f},
+    {"Fishing",               20.0f,   -40.0f, 3.6f, 2.6f, 3.6f,  0.25f, 0.55f, 0.25f},
+    {"Blacksmith",           -30.0f,   -30.0f, 2.8f, 3.0f, 2.8f,  0.25f, 0.55f, 0.25f},
+    {"Butcher",                0.0f,   -20.0f, 3.6f, 2.6f, 3.6f,  0.25f, 0.55f, 0.25f},
+    {"Armor Shop",            20.0f,   -20.0f, 3.8f, 2.8f, 3.8f,  0.25f, 0.55f, 0.25f},
+    {"Shady Dealer",          40.0f,   -10.0f, 3.4f, 2.6f, 3.4f,  0.55f, 0.2f,  0.6f},
+    {"Guild House",          -20.0f,     0.0f, 4.4f, 3.4f, 4.4f,  0.25f, 0.35f, 0.75f},
+    {"Potions",                6.0f,     0.0f, 3.2f, 2.4f, 3.2f,  0.25f, 0.55f, 0.25f},
+    {"Gold Guild",           -40.0f,    10.0f, 4.8f, 3.8f, 4.8f,  0.25f, 0.35f, 0.75f},
+    {"Secret Gate",           46.0f,    -6.0f, 2.0f, 4.4f, 2.0f,  0.55f, 0.2f,  0.6f},
+    {"Auction House",        -10.0f,    20.0f, 8.0f, 3.6f, 4.4f,  0.55f, 0.4f,  0.2f},
+    {"Archery Guild",         30.0f,    30.0f, 4.6f, 3.6f, 4.6f,  0.25f, 0.35f, 0.75f},
+    {"Post Office",          -40.0f,    40.0f, 3.8f, 3.0f, 3.8f,  0.6f,  0.6f,  0.62f},
+    {"Town Hall",             10.0f,    40.0f, 6.4f, 5.2f, 6.4f,  0.6f,  0.6f,  0.62f},
+    {"Gem Dealer",           -10.0f,    50.0f, 3.4f, 2.6f, 3.4f,  0.25f, 0.55f, 0.25f},
+    {"Police",                10.0f,    50.0f, 3.0f, 2.6f, 3.0f,  0.6f,  0.6f,  0.62f},
+    {"Gemani Tower",          30.0f,    50.0f, 3.2f, 6.4f, 3.2f,  0.55f, 0.2f,  0.6f},
+    {"MineCo Ops Office",    -20.0f,    60.0f, 3.8f, 2.8f, 3.8f,  0.6f,  0.6f,  0.62f},
+    {"Mining Supplies",        0.0f,    60.0f, 3.6f, 2.6f, 3.6f,  0.25f, 0.55f, 0.25f},
+    {"Glove Shop",            20.0f,    60.0f, 3.2f, 2.4f, 3.2f,  0.25f, 0.55f, 0.25f},
+    {"Hats",                  26.0f,    60.0f, 2.0f, 2.0f, 2.0f,  0.25f, 0.55f, 0.25f},
+    {"Worm Hut",              10.0f,    30.0f, 2.8f, 2.2f, 2.8f,  0.5f,  0.38f, 0.16f},
+    {"Dragon Gate",          -40.0f,   -50.0f, 2.4f, 5.2f, 2.4f,  0.85f, 0.65f, 0.15f},
+    {"Diamond Gate",          40.0f,    70.0f, 2.4f, 5.2f, 2.4f,  0.85f, 0.65f, 0.15f},
 };
 
 /* g_town_char_loaded and the town_*_peak_ms trio are declared here (ahead of town_draw_hud,
@@ -2998,6 +3004,20 @@ static void town_draw_building_labels(const Mat4 *vp, int win_w, int win_h) {
         glColor3f(0.9f, 0.9f, 0.85f);
         draw_string(b->name, sx - (float)strlen(b->name) * 2.5f, sy, 7);
     }
+}
+
+/* town_building_at: which TOWN_BUILDINGS entry (if any) a ground-plane world point falls inside
+ * -- an axis-aligned box test against each building's own half_w/half_d, same footprint
+ * town_draw_buildings renders. -1 if none. Used by the Auction House's own right-click handler
+ * (2026-08-02, founder: "have it be interractable on right click (the whole auction house
+ * building for now is fine)") -- "for now" scope matches this exactly: any building-shaped box
+ * test, not a precise per-shape hit test. */
+static int town_building_at(float wx, float wz) {
+    for (int i = 0; i < TOWN_BUILDING_COUNT; i++) {
+        const TownBuilding *b = &TOWN_BUILDINGS[i];
+        if (fabsf(wx - b->x) <= b->half_w && fabsf(wz - b->z) <= b->half_d) return i;
+    }
+    return -1;
 }
 
 /* town_queue_button_rect: shared by the draw call and the click hit-test below so the two can
@@ -3263,6 +3283,260 @@ static void chat_send_or_command(const char *text) {
     }
 }
 
+/* ---------------- Auction House menu (2026-08-02) ----------------
+ * Founder: "make the auction house real - menu based system navigatable with arrow keys and
+ * enter just like ffxi - have it be interractable on right click." Real backend, not invented:
+ * apps2/mud already has a full, working Auction House (server/market.AuctionHouse, cmdAH's own
+ * real `ah browse|sell|buy|history|status|cancel` telnet subcommands) -- this is a GUI front end
+ * for it, routed through the exact same real headless-session dispatch Town's chat commands
+ * already use (town_send_command), not a second, fake economy.
+ *
+ * Scope, honestly: `ah browse <category>` only ever returns item-level aggregates (name, lowest
+ * price, listing count) -- no individual listing IDs, so there is genuinely no real command a
+ * telnet player could use to buy a SPECIFIC listing from someone else's browse either; this is a
+ * real, pre-existing gap in cmdAH itself, not something invented or skipped here. What IS real
+ * and actionable: browsing categories, browsing items within a category, and viewing + cancelling
+ * your OWN listings (`ah status` returns real listing IDs, `ah cancel <id>` is a real action). */
+#define AH_MAX_ROWS 20
+#define AH_ROW_MAX 96
+#define AH_ID_MAX 40
+typedef enum { AH_CLOSED = 0, AH_MAIN, AH_CATEGORIES, AH_CATEGORY_ITEMS, AH_MY_LISTINGS } AHScreen;
+static AHScreen g_ah_screen = AH_CLOSED;
+static int g_ah_selected = 0;
+static char g_ah_rows[AH_MAX_ROWS][AH_ROW_MAX];
+static char g_ah_row_ids[AH_MAX_ROWS][AH_ID_MAX]; /* "" for a row with no real bracketed [id] -- header/instructional lines */
+static int g_ah_row_count = 0;
+static char g_ah_title[64] = "";
+
+/* ah_parse_rows: same line-splitting/noise-filtering shape town_send_command's own combat-log
+ * parser already uses, generalized to ALSO capture whatever's inside a line's first "[...]" as
+ * that row's real id (a category number for the categories screen, a real listing UUID for My
+ * Listings) -- one parser for every AH screen instead of one per real output shape. */
+static void ah_parse_rows(const char *text) {
+    g_ah_row_count = 0;
+    char buf[4096];
+    snprintf(buf, sizeof(buf), "%s", text);
+    char *line = buf;
+    while (line && *line && g_ah_row_count < AH_MAX_ROWS) {
+        char *nl = strstr(line, "\r\n");
+        if (nl) *nl = '\0';
+        char *trimmed = line;
+        while (*trimmed == ' ' || *trimmed == '\t') trimmed++;
+        size_t tlen = strlen(trimmed);
+        while (tlen > 0 && (trimmed[tlen - 1] == ' ' || trimmed[tlen - 1] == '\t')) trimmed[--tlen] = '\0';
+        int is_status_line = (strncmp(trimmed, "[ Lv.", 5) == 0);
+        int is_prompt = (tlen == 1 && trimmed[0] == '>');
+        int is_header = (strncmp(trimmed, "===", 3) == 0);
+        if (tlen > 0 && !is_status_line && !is_prompt && !is_header) {
+            snprintf(g_ah_rows[g_ah_row_count], AH_ROW_MAX, "%s", trimmed);
+            g_ah_row_ids[g_ah_row_count][0] = '\0';
+            char *lb = strchr(trimmed, '[');
+            char *rb = lb ? strchr(lb, ']') : NULL;
+            if (lb && rb && rb > lb + 1) {
+                size_t idlen = (size_t)(rb - lb - 1);
+                if (idlen >= AH_ID_MAX) idlen = AH_ID_MAX - 1;
+                memcpy(g_ah_row_ids[g_ah_row_count], lb + 1, idlen);
+                g_ah_row_ids[g_ah_row_count][idlen] = '\0';
+            }
+            g_ah_row_count++;
+        }
+        line = nl ? nl + 2 : NULL;
+    }
+}
+
+static void ah_open(void) {
+    g_ah_screen = AH_MAIN;
+    g_ah_selected = 0;
+    snprintf(g_ah_title, sizeof(g_ah_title), "AUCTION HOUSE");
+    g_ah_row_count = 3;
+    snprintf(g_ah_rows[0], AH_ROW_MAX, "Browse Categories");
+    snprintf(g_ah_rows[1], AH_ROW_MAX, "My Listings");
+    snprintf(g_ah_rows[2], AH_ROW_MAX, "Close");
+    g_ah_row_ids[0][0] = g_ah_row_ids[1][0] = g_ah_row_ids[2][0] = '\0';
+}
+
+static void ah_close(void) { g_ah_screen = AH_CLOSED; }
+
+/* ah_fetch: the same real HTTP round-trip town_send_command uses (/api/town/command against
+ * apps2/mud's own headless-session dispatch), but returns the raw output text directly instead
+ * of only pushing it to the combat log -- the AH menu needs to parse structured rows out of it,
+ * not just display it as a scrolling log line. Returns 1 and fills out_text on success. */
+static int ah_fetch(const char *command, char *out_text, size_t out_text_len) {
+    if (!g_town_char_id[0]) return 0;
+    char cmd_esc[128];
+    json_escape_into(command, cmd_esc, sizeof(cmd_esc));
+    char body[256];
+    snprintf(body, sizeof(body), "{\"character_id\":\"%s\",\"command\":\"%s\"}", g_town_char_id, cmd_esc);
+    char resp[4096];
+    int status = 0;
+    if (http_post_json(iduna_host, TOWN_MUD_API_PORT, "/api/town/command", NULL, body, resp, sizeof(resp), &status) != 0) return 0;
+    if (status != 200) return 0;
+    return http_extract_json_string_field(resp, "output", out_text, out_text_len);
+}
+
+/* ah_draw_loading: real gap found live-testing this feature -- each screen transition below
+ * blocks the whole frame for the HTTP round-trip (ah_fetch/town_send_command), same shape
+ * net_find_and_connect's own blocking call had before draw_queuing_screen was built for it.
+ * Presented right before every blocking call here, same "the last thing on screen is an honest
+ * status, not a stale frame" reasoning draw_queuing_screen's own doc comment already gives. */
+static void ah_draw_loading(SDL_Window *win, int win_w, int win_h) {
+    glClearColor(0.03f, 0.05f, 0.04f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glDisable(GL_DEPTH_TEST);
+    glUseProgram_(0);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(0, win_w, 0, win_h, -1, 1);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    glColor3f(0.85f, 0.7f, 0.3f);
+    draw_string("AUCTION HOUSE -- LOADING...", (float)win_w / 2.0f - 130.0f, (float)win_h / 2.0f, 14);
+    SDL_GL_SwapWindow(win);
+}
+
+static void ah_enter_categories(SDL_Window *win, int win_w, int win_h) {
+    ah_draw_loading(win, win_w, win_h);
+    char text[4096];
+    if (ah_fetch("ah browse", text, sizeof(text))) {
+        ah_parse_rows(text);
+    } else {
+        g_ah_row_count = 0;
+    }
+    g_ah_screen = AH_CATEGORIES;
+    g_ah_selected = 0;
+    snprintf(g_ah_title, sizeof(g_ah_title), "AUCTION HOUSE - CATEGORIES");
+}
+
+static void ah_enter_category_items(SDL_Window *win, int win_w, int win_h, const char *category_id) {
+    ah_draw_loading(win, win_w, win_h);
+    char cmd[64];
+    snprintf(cmd, sizeof(cmd), "ah browse %s", category_id);
+    char text[4096];
+    if (ah_fetch(cmd, text, sizeof(text))) {
+        ah_parse_rows(text);
+    } else {
+        g_ah_row_count = 0;
+    }
+    g_ah_screen = AH_CATEGORY_ITEMS;
+    g_ah_selected = 0;
+    snprintf(g_ah_title, sizeof(g_ah_title), "AUCTION HOUSE - ITEMS (read-only for now)");
+}
+
+static void ah_enter_my_listings(SDL_Window *win, int win_w, int win_h) {
+    ah_draw_loading(win, win_w, win_h);
+    char text[4096];
+    if (ah_fetch("ah status", text, sizeof(text))) {
+        ah_parse_rows(text);
+    } else {
+        g_ah_row_count = 0;
+    }
+    g_ah_screen = AH_MY_LISTINGS;
+    g_ah_selected = 0;
+    snprintf(g_ah_title, sizeof(g_ah_title), "AUCTION HOUSE - MY LISTINGS (enter to cancel)");
+}
+
+/* ah_handle_enter: the one real action this menu takes beyond navigation -- cancelling your own
+ * listing (ah cancel <id>, a real cmdAH subcommand). Everything else Enter does is pure
+ * navigation between screens; see this file's own AUCTION HOUSE doc comment for why buying a
+ * specific OTHER player's listing isn't wired up (no real command exposes a listing ID from
+ * browse to buy against). */
+static void ah_handle_enter(SDL_Window *win, int win_w, int win_h) {
+    if (g_ah_selected < 0 || g_ah_selected >= g_ah_row_count) return;
+    switch (g_ah_screen) {
+        case AH_MAIN:
+            if (g_ah_selected == 0) ah_enter_categories(win, win_w, win_h);
+            else if (g_ah_selected == 1) ah_enter_my_listings(win, win_w, win_h);
+            else ah_close();
+            break;
+        case AH_CATEGORIES:
+            if (g_ah_row_ids[g_ah_selected][0]) ah_enter_category_items(win, win_w, win_h, g_ah_row_ids[g_ah_selected]);
+            break;
+        case AH_CATEGORY_ITEMS:
+            break; /* read-only -- see this section's own doc comment on why */
+        case AH_MY_LISTINGS:
+            if (g_ah_row_ids[g_ah_selected][0]) {
+                char cmd[64];
+                snprintf(cmd, sizeof(cmd), "ah cancel %s", g_ah_row_ids[g_ah_selected]);
+                ah_draw_loading(win, win_w, win_h);
+                town_send_command(cmd); /* real cancel -- result also lands in the combat log */
+                ah_enter_my_listings(win, win_w, win_h); /* refresh -- the cancelled listing should be gone now */
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+/* ah_handle_back: Backspace steps up one screen (matching this file's own Escape-closes-
+ * everything convention elsewhere, Backspace here is the "one level up" idiom instead so a
+ * player browsing items can get back to categories without losing the whole menu). */
+static void ah_handle_back(SDL_Window *win, int win_w, int win_h) {
+    switch (g_ah_screen) {
+        case AH_CATEGORY_ITEMS:
+            ah_enter_categories(win, win_w, win_h);
+            break;
+        case AH_CATEGORIES:
+        case AH_MY_LISTINGS:
+            ah_open();
+            break;
+        default:
+            ah_close();
+            break;
+    }
+}
+
+/* ah_draw: FFXI-style centered menu panel (founder: "navigatable with arrow keys and enter just
+ * like ffxi") -- a title bar, one row per g_ah_rows entry, the selected row highlighted with an
+ * amber background bar, same amber this file already uses for "the thing you're about to act on"
+ * (Town's own selected-target highlight). Called from Town's own 2D HUD pass -- glUseProgram_(0)
+ * and ortho projection are already set up by the time this runs (town_draw_hud's own call
+ * happens first each frame), same assumption chat_draw/combat_log_draw already make. */
+static void ah_draw(int win_w, int win_h) {
+    if (g_ah_screen == AH_CLOSED) return;
+    float panel_w = 520.0f, row_h = 22.0f;
+    float panel_h = 60.0f + row_h * (float)(g_ah_row_count > 0 ? g_ah_row_count : 1);
+    float x0 = (float)win_w / 2.0f - panel_w / 2.0f;
+    float y0 = (float)win_h / 2.0f - panel_h / 2.0f;
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glColor4f(0.04f, 0.05f, 0.06f, 0.94f);
+    glRectf(x0, y0, x0 + panel_w, y0 + panel_h);
+    glDisable(GL_BLEND);
+    glColor3f(0.55f, 0.45f, 0.2f);
+    glLineWidth(2.0f);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(x0, y0); glVertex2f(x0 + panel_w, y0);
+    glVertex2f(x0 + panel_w, y0 + panel_h); glVertex2f(x0, y0 + panel_h);
+    glEnd();
+    glLineWidth(1.0f);
+
+    glColor3f(0.85f, 0.7f, 0.3f);
+    draw_string(g_ah_title, x0 + 16.0f, y0 + panel_h - 28.0f, 12);
+    glColor3f(0.5f, 0.55f, 0.55f);
+    draw_string("UP/DOWN - select   ENTER - confirm   BACKSPACE - back   ESC - close",
+                x0 + 16.0f, y0 + panel_h - 46.0f, 7);
+
+    float row_y = y0 + panel_h - 70.0f;
+    for (int i = 0; i < g_ah_row_count; i++) {
+        if (i == g_ah_selected) {
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            glColor4f(0.55f, 0.4f, 0.1f, 0.55f);
+            glRectf(x0 + 8.0f, row_y - 4.0f, x0 + panel_w - 8.0f, row_y + row_h - 6.0f);
+            glDisable(GL_BLEND);
+            glColor3f(1.0f, 0.9f, 0.6f);
+        } else {
+            glColor3f(0.8f, 0.8f, 0.78f);
+        }
+        draw_string(g_ah_rows[i], x0 + 16.0f, row_y, 9);
+        row_y -= row_h;
+    }
+    if (g_ah_row_count == 0) {
+        glColor3f(0.6f, 0.6f, 0.6f);
+        draw_string("(nothing here)", x0 + 16.0f, row_y, 9);
+    }
+}
+
 int main(int argc, char *argv[]) {
     /* No srand() call existed anywhere in this file before -- mint_ticket_fallback's own
        rand()-based nonce (used only when IDUNA isn't reachable) was silently using the default
@@ -3454,7 +3728,20 @@ int main(int argc, char *argv[]) {
                         if (len + add < CHAT_INPUT_MAX - 1) strcat(chat_input_buf, te.text.text);
                     } else if (te.type == SDL_KEYDOWN) {
                         if (te.key.keysym.sym == SDLK_RETURN || te.key.keysym.sym == SDLK_KP_ENTER) {
-                            chat_send_or_command(chat_input_buf);
+                            /* "/logout" (2026-08-02, founder: "in the chat /logout should log me
+                               out") -- a client-side action, not a real MUD command, checked
+                               before chat_send_or_command's own "/" routing would otherwise send
+                               it to apps2/mud as an unknown command. Ends the session by quitting
+                               the client -- there's no "return to a fresh login screen mid-game"
+                               flow built, and "log me out" reads most honestly as "end my
+                               session" without one. The real headless session this identity owns
+                               (if any) is cleaned up server-side by its own idle-eviction sweep
+                               (HEADLESS_SESSION_NORTHSTAR.md M4), not an immediate disconnect. */
+                            if (strcmp(chat_input_buf, "/logout") == 0) {
+                                running = 0;
+                            } else {
+                                chat_send_or_command(chat_input_buf);
+                            }
                             chat_input_buf[0] = '\0';
                             chat_input_active = 0;
                             SDL_StopTextInput();
@@ -3473,6 +3760,28 @@ int main(int argc, char *argv[]) {
                     chat_input_active = 1;
                     chat_input_buf[0] = '\0';
                     SDL_StartTextInput();
+                    continue;
+                }
+                /* Auction House menu, checked next -- same "consume every event while focused"
+                   precedence chat_input_active uses just above, so WASD/target-cycling/attack
+                   never fire while the menu is open (2026-08-02, founder: "make the auction
+                   house real - menu based system navigatable with arrow keys and enter just
+                   like ffxi"). */
+                if (g_ah_screen != AH_CLOSED) {
+                    if (te.type == SDL_QUIT) { running = 0; }
+                    else if (te.type == SDL_KEYDOWN) {
+                        if (te.key.keysym.sym == SDLK_UP) {
+                            g_ah_selected = (g_ah_row_count > 0) ? (g_ah_selected - 1 + g_ah_row_count) % g_ah_row_count : 0;
+                        } else if (te.key.keysym.sym == SDLK_DOWN) {
+                            g_ah_selected = (g_ah_row_count > 0) ? (g_ah_selected + 1) % g_ah_row_count : 0;
+                        } else if (te.key.keysym.sym == SDLK_RETURN || te.key.keysym.sym == SDLK_KP_ENTER) {
+                            ah_handle_enter(win, win_w, win_h);
+                        } else if (te.key.keysym.sym == SDLK_BACKSPACE) {
+                            ah_handle_back(win, win_w, win_h);
+                        } else if (te.key.keysym.sym == SDLK_ESCAPE) {
+                            ah_close();
+                        }
+                    }
                     continue;
                 }
                 if (te.type == SDL_QUIT) { running = 0; }
@@ -3506,7 +3815,24 @@ int main(int argc, char *argv[]) {
                     if (g_town_jump_age_ms >= TOWN_JUMP_DURATION_MS) g_town_jump_age_ms = 0.0f;
                 }
                 else if (te.type == SDL_MOUSEBUTTONDOWN && te.button.button == SDL_BUTTON_RIGHT) {
-                    dragging_cam = 1; last_mx = te.button.x; last_my = te.button.y;
+                    /* Auction House right-click (2026-08-02, founder: "have it be interractable
+                       on right click (the whole auction house building for now is fine)") --
+                       checked before starting a camera drag, same screen_to_ground ray-cast
+                       click-to-move already uses. Any point within the building's own box
+                       (town_building_at) opens it; right-click anywhere else still drags the
+                       camera exactly as before. */
+                    float gx, gz;
+                    int opened = 0;
+                    if (screen_to_ground(te.button.x, te.button.y, win_w, win_h, 60.0f, g_town_x, g_town_z, &gx, &gz)) {
+                        int bidx = town_building_at(gx, gz);
+                        if (bidx >= 0 && strcmp(TOWN_BUILDINGS[bidx].name, "Auction House") == 0) {
+                            ah_open();
+                            opened = 1;
+                        }
+                    }
+                    if (!opened) {
+                        dragging_cam = 1; last_mx = te.button.x; last_my = te.button.y;
+                    }
                 }
                 else if (te.type == SDL_MOUSEBUTTONUP && te.button.button == SDL_BUTTON_RIGHT) {
                     dragging_cam = 0;
@@ -3643,6 +3969,7 @@ int main(int argc, char *argv[]) {
                 town_draw_building_labels(&vp, win_w, win_h);
                 chat_draw(win_w, win_h);
                 combat_log_draw(win_w, win_h);
+                ah_draw(win_w, win_h);
 
                 SDL_GL_SwapWindow(win);
                 SDL_Delay(16);
@@ -3689,7 +4016,15 @@ int main(int argc, char *argv[]) {
                     if (len + add < CHAT_INPUT_MAX - 1) strcat(chat_input_buf, e.text.text);
                 } else if (e.type == SDL_KEYDOWN) {
                     if (e.key.keysym.sym == SDLK_RETURN || e.key.keysym.sym == SDLK_KP_ENTER) {
-                        chat_send(chat_input_buf);
+                        /* "/logout" (2026-08-02, founder: "in the chat /logout should log me
+                           out") -- same client-side end-the-session action Town's own chat
+                           handling has, applied here too for "the chat" generally, not just one
+                           of the two chat boxes this client has. */
+                        if (strcmp(chat_input_buf, "/logout") == 0) {
+                            running = 0;
+                        } else {
+                            chat_send_or_command(chat_input_buf);
+                        }
                         chat_input_buf[0] = '\0';
                         chat_input_active = 0;
                         SDL_StopTextInput();

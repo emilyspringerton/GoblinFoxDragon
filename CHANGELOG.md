@@ -1,3 +1,34 @@
+## 2026-08-02 (18)
+
+- feat(town): real FFXI-style Auction House menu, doubled town/buildings, `/logout` chat command.
+  - Auction House (founder: "make the auction house real - menu based system navigatable with
+    arrow keys and enter just like ffxi - have it be interractable on right click"): right-click
+    on the Auction House building opens a real menu (`AHScreen`: MAIN -> CATEGORIES ->
+    CATEGORY_ITEMS / MY_LISTINGS), Up/Down navigate with wraparound, Enter confirms, Backspace
+    goes back a level, Escape closes -- wired to apps2/mud's real, pre-existing `ah` command
+    surface (`ah browse`, `ah sell`, `ah buy`, `ah history`, `ah status`, `ah cancel`) via
+    `/api/town/command`, not mocked. `ah_draw_loading` added after live testing showed the
+    blocking HTTP calls froze the frame with no feedback -- same fix pattern as
+    `draw_queuing_screen`. Known real gap, not solved here: `ah browse <category>` only returns
+    item-level aggregates, no listing IDs, so buying a specific other player's listing has no
+    command surface yet.
+  - Doubled the town (founder: "double the size of the town and the buildings"): every
+    `TOWN_BUILDINGS[]` position and half-extent x2 (25 entries), `TOWN_TARGET_X/Z[]` (worm hut
+    cluster) x2 to match, `server/mob/worm.go`'s `TownSquareWormSpawns` hutX/hutZ and cluster
+    spread x2 to stay in sync with the client-side Worm Hut position. Diffed field-by-field
+    against the pre-doubling commit (20b418e) to confirm an exact, clean x2 on every value.
+  - `/logout` (founder: "in the chat /logout should log me out"): typing `/logout` in chat now
+    quits the client, in both Town's own chat and Battlegrounds' in-match chat. Found and fixed a
+    real bug in the process: the in-match chat handler had never actually been converted to
+    `chat_send_or_command` (still called plain `chat_send`), so `/`-prefixed commands only worked
+    from Town, not from an in-progress match.
+  - Real bug found live during doubled-town verification, not a regression in the doubling
+    itself: a test character had been positioned at the Auction House's exact center coordinates
+    for AH testing before the doubling landed. Standing inside a building's own mesh means its
+    inward-facing polygons are backface-culled, so the building (and anything else near you)
+    renders as nothing -- read exactly like "buildings are gone." Repositioned off any building's
+    bounding box; not a rendering or geometry defect.
+
 ## 2026-08-02 (17)
 
 - feat(mud): headless-session M4 -- idle eviction + telnet-conflict handling, closing out

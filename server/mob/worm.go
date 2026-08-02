@@ -71,17 +71,18 @@ func wormID(i int) string {
 // starter zone," so this became a 4-worm ring around the origin -> then the real hand-drawn
 // town-map.jpeg arrived ("i want the town layout to match town map pretty much exactly"), which
 // names this exact spot "Worm Hut" at a specific position in the town, not centered on spawn --
-// repositioned to match. Clustered tightly (small deltas around the hut), not spread in a wide
-// ring, since it's meant to read as "a hut with worms in it," not an open field. NewWorm
-// defaults SceneID to 0 (Meadow); overridden to 4 here since this is the one caller that isn't
-// spawning into Meadow itself.
+// repositioned to match -> founder: "double the size of the town and the buildings," hut
+// position and cluster spread doubled again to stay in sync. Clustered tightly (small deltas
+// around the hut), not spread in a wide ring, since it's meant to read as "a hut with worms in
+// it," not an open field. NewWorm defaults SceneID to 0 (Meadow); overridden to 4 here since
+// this is the one caller that isn't spawning into Meadow itself.
 func TownSquareWormSpawns() []Mob {
-	const hutX, hutZ = 5.0, 15.0 // "Worm Hut" position, see apps2/battlegrounds_gui's TOWN_BUILDINGS
+	const hutX, hutZ = 10.0, 30.0 // "Worm Hut" position, see apps2/battlegrounds_gui's TOWN_BUILDINGS
 	positions := []Pos{
-		{X: hutX + 1.5, Y: 2, Z: hutZ},
-		{X: hutX - 1.5, Y: 2, Z: hutZ},
-		{X: hutX, Y: 2, Z: hutZ + 1.5},
-		{X: hutX, Y: 2, Z: hutZ - 1.5},
+		{X: hutX + 3.0, Y: 2, Z: hutZ},
+		{X: hutX - 3.0, Y: 2, Z: hutZ},
+		{X: hutX, Y: 2, Z: hutZ + 3.0},
+		{X: hutX, Y: 2, Z: hutZ - 3.0},
 	}
 	worms := make([]Mob, len(positions))
 	for i, p := range positions {
