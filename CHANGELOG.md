@@ -1,3 +1,17 @@
+## 2026-08-02 (4)
+
+- feat(combat-log): second pane in `apps2/battlegrounds_gui`, bottom-right (mirrors the chat
+  pane's bottom-left), showing damage taken and deaths for the current match. Founder: "add a
+  second chat pane to GFD that shows the combat log." No wire packet carries discrete
+  damage/kill events -- derived client-side by diffing `arena_state.heroes[]` frame-to-frame
+  (`combat_log_scan`), which works identically for local play, net_mode, and replay/observing
+  since all three write into the same `arena_state`. Attacker attribution via the existing
+  `attack_target` field (already wire-synced, S170-162); unattributed damage (DoTs, creeps,
+  skillshots) just shows the amount. Deliberately excludes heals to keep the log readable.
+  Always visible, unlike the chat pane (not gated on a real player JWT -- bots/`--ticket`
+  launches still show it). Native Linux build + link verified clean (mingw unavailable locally,
+  same standing note as the rest of this client).
+
 ## 2026-08-02 (3)
 
 - feat(chat): in-match MUD chat, `apps2/battlegrounds_gui`'s own real affordance surfacing

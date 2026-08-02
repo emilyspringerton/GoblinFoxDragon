@@ -2122,6 +2122,120 @@ static void chat_draw(int win_w, int win_h) {
     }
 }
 
+/* ---------------- combat log pane (2026-08-02) ----------------
+ * Founder: "add a second chat pane to GFD that shows the combat log." A second, read-only pane
+ * alongside the MUD chat pane above -- distinct data source (this hero's fight, not IDUNA chat)
+ * and distinct screen position (bottom-right, mirroring chat's bottom-left) so the two never
+ * overlap and are never confused for each other.
+ *
+ * No wire packet carries discrete damage/kill events (protocol.h's ArenaHero snapshot only ever
+ * broadcasts point-in-time hp/alive, see its own struct comment) -- so this is derived entirely
+ * client-side by diffing arena_state.heroes[] frame-to-frame. Works identically for local
+ * single-player (arena_update() drives arena_state directly), net_mode (net_poll_snapshots()
+ * writes the server's authoritative state into the same arena_state), and observing/replay
+ * (arena_replay_apply_at() does the same) -- combat_log_scan() is called once per frame right
+ * after whichever of those three just ran, so it always reads this frame's freshest state
+ * regardless of where it came from.
+ *
+ * Attacker attribution uses attack_target (S170-162, synced over the wire for every hero, see
+ * PACKET_ARENA_SNAPSHOT_HEROES's own decode): if some other living hero has attack_target ==
+ * the victim's slot, credit them by name; otherwise the damage is unattributed (a DoT, a creep,
+ * a skillshot from a hero not currently attack-locked on them, etc.) and just shows the amount.
+ * Deliberately does not log healing -- real heals happen often (fountain, Ghost's kit) and would
+ * bury the signal a combat log is actually for; scope here is damage taken + deaths, the same
+ * MVP a first "combat log" pane needs. */
+#define COMBAT_LOG_LINE_MAX 96
+#define COMBAT_LOG_LINES 8
+static char combat_log_lines[COMBAT_LOG_LINES][COMBAT_LOG_LINE_MAX];
+static int combat_log_line_count = 0;
+static int combat_log_prev_hp[ARENA_MAX_HEROES];
+static int combat_log_prev_alive[ARENA_MAX_HEROES];
+static int combat_log_prev_valid[ARENA_MAX_HEROES];
+
+static void combat_log_push(const char *line) {
+    /* Same shift-based ring buffer as chat_push_line -- small, infrequent, simpler to read than
+       a wrap-around head index at this size. */
+    if (combat_log_line_count == COMBAT_LOG_LINES) {
+        for (int i = 1; i < COMBAT_LOG_LINES; i++) {
+            memcpy(combat_log_lines[i - 1], combat_log_lines[i], COMBAT_LOG_LINE_MAX);
+        }
+        combat_log_line_count--;
+    }
+    snprintf(combat_log_lines[combat_log_line_count], COMBAT_LOG_LINE_MAX, "%s", line);
+    combat_log_line_count++;
+}
+
+static void combat_log_scan(void) {
+    for (int i = 0; i < ARENA_MAX_HEROES; i++) {
+        ArenaHero *h = &arena_state.heroes[i];
+        if (!h->active) {
+            combat_log_prev_valid[i] = 0;
+            continue;
+        }
+        if (!combat_log_prev_valid[i]) {
+            /* First frame this slot's ever been seen (match start, or a fresh draft-to-live
+               transition) -- capture a baseline silently, nothing "happened" yet from this
+               scan's point of view. */
+            combat_log_prev_hp[i] = h->hp;
+            combat_log_prev_alive[i] = h->alive;
+            combat_log_prev_valid[i] = 1;
+            continue;
+        }
+
+        int was_alive = combat_log_prev_alive[i];
+        int prev_hp = combat_log_prev_hp[i];
+        char line[COMBAT_LOG_LINE_MAX];
+
+        if (was_alive && h->alive && h->hp < prev_hp) {
+            int dmg = prev_hp - h->hp;
+            const char *attacker_name = NULL;
+            for (int j = 0; j < ARENA_MAX_HEROES; j++) {
+                if (j == i) continue;
+                ArenaHero *aj = &arena_state.heroes[j];
+                if (aj->active && aj->alive && aj->attack_target == i) {
+                    attacker_name = arena_hero_name(aj->hero_id);
+                    break;
+                }
+            }
+            if (attacker_name) {
+                snprintf(line, sizeof(line), "%s hit %s for %d (%d/%d)",
+                         attacker_name, arena_hero_name(h->hero_id), dmg, h->hp, h->max_hp);
+            } else {
+                snprintf(line, sizeof(line), "%s took %d damage (%d/%d)",
+                         arena_hero_name(h->hero_id), dmg, h->hp, h->max_hp);
+            }
+            combat_log_push(line);
+        }
+        if (was_alive && !h->alive) {
+            snprintf(line, sizeof(line), "%s has been slain!", arena_hero_name(h->hero_id));
+            combat_log_push(line);
+        }
+
+        combat_log_prev_hp[i] = h->hp;
+        combat_log_prev_alive[i] = h->alive;
+    }
+}
+
+static void combat_log_draw(int win_w, int win_h) {
+    float line_h = 16.0f, panel_w = 300.0f;
+    float x0 = (float)win_w - 16.0f - panel_w, y0 = 210.0f;
+    glDisable(GL_DEPTH_TEST); /* 2D overlay, same precedent as chat_draw */
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(0, win_w, 0, win_h, -1, 1);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glColor4f(0.05f, 0.03f, 0.03f, 0.55f);
+    glRectf(x0 - 6.0f, y0 - line_h * COMBAT_LOG_LINES - 4.0f, x0 + panel_w, y0 + 4.0f);
+    glDisable(GL_BLEND);
+    glColor3f(0.85f, 0.7f, 0.55f);
+    for (int i = 0; i < combat_log_line_count; i++) {
+        draw_string(combat_log_lines[i], x0, y0 - line_h * (combat_log_line_count - i), 8);
+    }
+}
+
 /* ---------------- placement rings ---------------- */
 #define MAX_RINGS 6
 #define RING_LIFETIME_MS 500.0f
@@ -3306,6 +3420,7 @@ int main(int argc, char *argv[]) {
             arena_log_win(arena_state.winner);
             win_logged = 1;
         }
+        combat_log_scan();
 
         /* WASD movement, battlegrounds GUI fork (2026-08-02, founder: "enable wasd movement in
            addition to the click to move"). Continuous, camera-relative: held-key state (not
@@ -4793,6 +4908,7 @@ int main(int argc, char *argv[]) {
         glEnable(GL_DEPTH_TEST);
 
         chat_draw(win_w, win_h);
+        combat_log_draw(win_w, win_h);
 
         SDL_GL_SwapWindow(win);
         SDL_Delay(16);
