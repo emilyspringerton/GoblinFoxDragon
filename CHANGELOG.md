@@ -1,3 +1,27 @@
+## 2026-08-02 (17)
+
+- feat(mud): headless-session M4 -- idle eviction + telnet-conflict handling, closing out
+  `HEADLESS_SESSION_NORTHSTAR.md`'s full milestone table.
+  - `evictIdleHeadlessSessions`: drops any headless session idle past 10 minutes (new
+    `headlessLastActive`, updated on every `runHeadlessCommand` call), flushing final position
+    the same shape a real telnet disconnect would (level/XP/flow are already kept in sync
+    incrementally, unlike telnet's one-shot flush). Runs once per tick from `tickAll()`.
+  - `disconnectHeadlessSession`: shared teardown (position flush, party leave, every registry a
+    real disconnect clears, "has left the world" broadcast) used by both the idle sweep and the
+    telnet-conflict path below.
+  - `handleConn` now tears down any live headless session for the same character before a real
+    telnet login takes over -- never two live `*player` structs for one character. Live-verified:
+    created a headless session for a real character, connected via telnet under the same name,
+    no crash, no duplicate registration.
+  - Symmetric case also handled: `getOrCreateHeadlessPlayer` now refuses (409, not a crash) to
+    spawn a headless session for a character already connected over real telnet -- a real
+    telnet `*player`'s `w` wraps a `net.Conn`, not a buffer, so there's no output to hand back to
+    a headless caller (routing a command INTO a live telnet session's own output stream is a
+    real, separate, harder feature, not built here). Live-verified: held a telnet connection
+    open, confirmed a concurrent `/api/town/command` call for the same character correctly
+    returns 409 "character is currently connected via telnet" instead of crashing or duplicating.
+  Go build/vet clean.
+
 ## 2026-08-02 (16)
 
 - feat(town): sync Town with the MUD -- real commands from the chat box, real telnet visibility.

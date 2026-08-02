@@ -802,6 +802,12 @@ type player struct {
 	headlessSyncedLevel int
 	headlessSyncedXP    int
 	headlessSyncedFlow  int
+	// headlessLastActive (2026-08-02, HEADLESS_SESSION_NORTHSTAR.md M4, founder: "sync up town
+	// with the MUD" arc's own named follow-up): updated on every runHeadlessCommand call. A
+	// background sweep (see evictIdleHeadlessSessions) drops any headless session idle past
+	// headlessIdleTimeout, flushing state the same way a real telnet disconnect would. Zero/unused
+	// for every real telnet player -- their own liveness is the TCP connection itself.
+	headlessLastActive time.Time
 }
 
 func (p *player) send(msg string) {
@@ -1326,6 +1332,8 @@ func gameLoop() {
 func tickAll() {
 	now := time.Now()
 	dt := tickRate.Seconds()
+
+	evictIdleHeadlessSessions(now) // HEADLESS_SESSION_NORTHSTAR.md M4 -- see its own doc comment
 
 	playerPosByZone := map[int][]mob.PlayerPositions{}
 	for _, p := range gw.players {
@@ -6752,16 +6760,83 @@ func broadcastZone(zoneID int, msg, exceptSlot string) {
 // sees "X has entered the world" and this character in zoneMgr-based queries, not just
 // cmdLook's own gw.players-based "other players here" loop (which already worked without it).
 //
-// Known, accepted gaps in this first pass (not fixed here): no idle eviction (a headless session
-// stays registered, and therefore keeps auto-attacking if it has a live target, for the rest of
-// the process's life once created); no telnet-conflict handling (the same character logging in
-// over telnet while a headless session is active would register a second, independent gw.players
-// entry rather than taking over the existing one). Both are real, named follow-ups, same
-// HEADLESS_SESSION_NORTHSTAR.md M4 scope already flagged before any of this was built.
+// Idle eviction and telnet-conflict handling (M4) are both real now too -- see
+// evictIdleHeadlessSessions and disconnectHeadlessSession below, and handleConn's own
+// pre-registration check further down this file.
+
+// headlessIdleTimeout: how long a headless session can go with no runHeadlessCommand call before
+// evictIdleHeadlessSessions drops it. 10 minutes, same window HEADLESS_SESSION_NORTHSTAR.md's
+// own original design proposed before any of M4 was built.
+const headlessIdleTimeout = 10 * time.Minute
+
+// evictIdleHeadlessSessions drops every headless session idle past headlessIdleTimeout, flushing
+// final state the same shape a real telnet disconnect would. Called once per tick from tickAll(),
+// which gameLoop() already wraps in gw.mu.Lock()/Unlock() -- must never be called without that
+// lock already held.
+func evictIdleHeadlessSessions(now time.Time) {
+	for slot, p := range gw.players {
+		if !strings.HasPrefix(slot, "headless:") {
+			continue
+		}
+		if now.Sub(p.headlessLastActive) < headlessIdleTimeout {
+			continue
+		}
+		disconnectHeadlessSession(slot, p)
+	}
+}
+
+// disconnectHeadlessSession flushes a headless session's final position (level/XP/flow are
+// already kept in sync incrementally by runHeadlessCommand's own delta-sync, unlike a real
+// telnet session's one-shot disconnect-time flush -- no need to push them again here) and
+// removes it from every registry a real telnet disconnect would clear
+// (handleConn's own defer, mirrored here). Must be called with gw.mu already held -- both
+// call sites (evictIdleHeadlessSessions, handleConn's own telnet-conflict check) already hold it.
+func disconnectHeadlessSession(slot string, p *player) {
+	if charID, hasChar := gw.charIDBySlot[slot]; hasChar {
+		_ = gw.iduna.UpdatePosition(charID, p.zoneID, p.pos.X, p.pos.Y, float64(p.zoneID)*1000)
+	}
+	if partyID, ok := gw.playerParty[slot]; ok {
+		pt := gw.parties[partyID]
+		_ = pt.Leave(slot)
+		delete(gw.playerParty, slot)
+		if pt.Size() == 0 {
+			delete(gw.parties, partyID)
+			delete(gw.xpChains, partyID)
+		} else {
+			for _, s := range pt.All() {
+				if op, ok := gw.players[s]; ok {
+					op.sendf("\r\n[Party] %s left the world. (%d/%d)", p.name, pt.Size(), party.MaxPartySize)
+				}
+			}
+		}
+	}
+	delete(gw.charIDBySlot, slot)
+	delete(gw.pendingInvites, slot)
+	delete(gw.players, slot)
+	gw.zoneMgr.Leave(slot)
+	gw.chatRouter.Unregister(slot)
+	broadcastZoneNoLock(p.zoneID, fmt.Sprintf("%s has left the world.", p.name), slot)
+}
+
 func getOrCreateHeadlessPlayer(characterID string) (*player, error) {
 	slot := "headless:" + characterID
 	if p, ok := gw.players[slot]; ok {
 		return p, nil
+	}
+	// Symmetric to handleConn's own telnet-conflict check (M4): if this same character is
+	// already connected over real telnet, refuse to spawn a phantom parallel headless session
+	// for it -- a real telnet *player's own w wraps a net.Conn, not a buffer, so there is no
+	// output to hand back to a headless caller even if we returned it (runHeadlessCommand's own
+	// p.headlessBuf.String() would nil-panic). Routing a headless command INTO a live telnet
+	// session's own output stream is a real, different, harder feature (the response would need
+	// to reach Town's own HTTP caller, not just the player's terminal) -- not built here; this
+	// only prevents the crash/duplicate-session case.
+	for otherSlot, otherCharID := range gw.charIDBySlot {
+		if otherCharID == characterID && !strings.HasPrefix(otherSlot, "headless:") {
+			if _, ok := gw.players[otherSlot]; ok {
+				return nil, fmt.Errorf("character is currently connected via telnet")
+			}
+		}
 	}
 	ch, err := gw.iduna.GetCharacter(characterID)
 	if err != nil {
@@ -6849,6 +6924,9 @@ func getOrCreateHeadlessPlayer(characterID string) (*player, error) {
 func runHeadlessCommand(characterID, line string) (string, error) {
 	gw.mu.Lock()
 	p, err := getOrCreateHeadlessPlayer(characterID)
+	if err == nil {
+		p.headlessLastActive = time.Now() // see this field's own doc comment -- feeds evictIdleHeadlessSessions
+	}
 	gw.mu.Unlock()
 	if err != nil {
 		return "", err
@@ -6984,6 +7062,17 @@ func handleConn(conn net.Conn) {
 	startingFlow := p.flow
 
 	gw.mu.Lock()
+	// Telnet-conflict handling (2026-08-02, HEADLESS_SESSION_NORTHSTAR.md M4, founder: "sync up
+	// town with the MUD"): this same character may already have a live headless session (Town's
+	// GUI). Never two live *player structs for one character -- tear the headless one down
+	// first, same flush disconnectHeadlessSession always does, before this real telnet
+	// connection takes over.
+	if charID, hasChar := gw.charIDBySlot[slot]; hasChar {
+		headlessSlot := "headless:" + charID
+		if hp, ok := gw.players[headlessSlot]; ok {
+			disconnectHeadlessSession(headlessSlot, hp)
+		}
+	}
 	gw.players[slot] = p
 	p.atlas.Visit(0) // starting zone is always known
 	_ = gw.zoneMgr.Enter(slot, name, 0)
@@ -7689,7 +7778,15 @@ func startWorldEventAPI(port int) {
 		}
 		out, err := runHeadlessCommand(req.CharacterID, req.Command)
 		if err != nil {
-			http.Error(w, "character not found: "+err.Error(), http.StatusNotFound)
+			// 409 for the real telnet-conflict case (M4) -- the character exists and is fine,
+			// just unavailable for headless commands right now; 404 would wrongly imply it
+			// doesn't exist at all. Any other error (character genuinely not found in IDUNA,
+			// etc.) still reads reasonably as a client-facing 404.
+			status := http.StatusNotFound
+			if strings.Contains(err.Error(), "connected via telnet") {
+				status = http.StatusConflict
+			}
+			http.Error(w, err.Error(), status)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
