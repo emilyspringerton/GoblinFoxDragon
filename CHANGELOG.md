@@ -1,3 +1,13 @@
+## 2026-08-02 (6)
+
+- feat(town): "RETURN TO TOWN" button on the post-match win/lose screen, alongside the existing
+  "OK - REQUEUE" button. Founder: "after a battlegrounds game in GFD i need the option to return
+  to the town like a back button i only have requeue." Same cleanup path requeue already uses
+  (close socket, reset `arena_state`/obstacles/rings/win_logged/net_picked/selected_unit_count),
+  except no reconnect -- just sets `in_town = 1` so next frame's Town branch takes over. Only
+  shown for the `--queue` path (there's no Town to return to for a direct `--connect` dev
+  session, same gate Town's own entry uses).
+
 ## 2026-08-02 (5)
 
 - feat(town): `apps2/battlegrounds_gui` now defaults to a real Town scene instead of connecting

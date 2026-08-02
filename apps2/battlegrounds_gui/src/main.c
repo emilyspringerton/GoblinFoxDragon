@@ -3485,6 +3485,35 @@ int main(int argc, char *argv[]) {
                     fflush(stdout);
                 }
             }
+            /* Return-to-Town button (2026-08-02, founder: "after a battlegrounds game in GFD i
+             * need the option to return to the town like a back button i only have requeue").
+             * Only meaningful for the --queue path -- there's no Town to return to for a direct
+             * --connect dev session (same queue_host gate Town's own entry uses). Click box
+             * stacked directly below the REQUEUE button's own (see its draw call further down). */
+            if (net_mode && queue_host && !observing && e.type == SDL_MOUSEBUTTONDOWN &&
+                e.button.button == SDL_BUTTON_LEFT && arena_state.winner != 0) {
+                float bx = e.button.x, by = win_h - e.button.y;
+                float bt_left = win_w / 2.0f - 90, bt_right = win_w / 2.0f + 90;
+                float bt_bottom = win_h / 2.0f - 120, bt_top = win_h / 2.0f - 80;
+                if (bx >= bt_left && bx <= bt_right && by >= bt_bottom && by <= bt_top) {
+                    printf("[arena client] returning to Town...\n");
+                    fflush(stdout);
+#ifdef _WIN32
+                    if (net_sock >= 0) closesocket(net_sock);
+#else
+                    if (net_sock >= 0) close(net_sock);
+#endif
+                    net_sock = -1;
+                    memset(&arena_state, 0, sizeof(arena_state));
+                    arena_obstacles_reset_layout(); /* S170-148, same reset the requeue path uses */
+                    memset(rings, 0, sizeof(rings));
+                    win_logged = 0;
+                    net_picked = 0;
+                    selected_unit_count = 0;
+                    net_phase = ARENA_PHASE_WAITING;
+                    in_town = 1; /* no reconnect -- next frame's in_town branch takes over */
+                }
+            }
             if (!net_mode && e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_r) {
                 if (observing) {
                     observe_elapsed_ms = 0; /* restart playback from the beginning */
@@ -5075,6 +5104,18 @@ int main(int argc, char *argv[]) {
                 glEnd();
                 glColor3f(0.6f, 1.0f, 0.7f);
                 draw_string("OK - REQUEUE", win_w / 2.0f - 78, win_h / 2.0f - 55, 14);
+            }
+            if (net_mode && queue_host) {
+                /* Return-to-Town button -- bounds must match the click hit-test above. */
+                glColor3f(0.2f, 0.25f, 0.35f);
+                glBegin(GL_QUADS);
+                glVertex2f(win_w / 2.0f - 90, win_h / 2.0f - 120);
+                glVertex2f(win_w / 2.0f + 90, win_h / 2.0f - 120);
+                glVertex2f(win_w / 2.0f + 90, win_h / 2.0f - 80);
+                glVertex2f(win_w / 2.0f - 90, win_h / 2.0f - 80);
+                glEnd();
+                glColor3f(0.65f, 0.75f, 1.0f);
+                draw_string("RETURN TO TOWN", win_w / 2.0f - 84, win_h / 2.0f - 105, 14);
             }
         }
         glEnable(GL_DEPTH_TEST);
