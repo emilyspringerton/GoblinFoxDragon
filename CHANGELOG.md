@@ -1,3 +1,25 @@
+## 2026-08-02 (16)
+
+- feat(town): sync Town with the MUD -- real commands from the chat box, real telnet visibility.
+  Founder: "i want you to sync up town with the MUD" -> chose both "real MUD commands from
+  Town's chat box" and "telnet players see Town's GUI players."
+  - `chat_send_or_command` (`apps2/battlegrounds_gui`): a line typed into either chat box (Town's
+    own, or the in-match one -- `g_town_char_id` survives entering/leaving a match) starting with
+    "/" now routes to the real headless-session command dispatch instead of ordinary chat --
+    `HEADLESS_SESSION_NORTHSTAR.md`'s own original M3 design, finally built. "/look",
+    "/inventory", anything `handle(p, line)` understands, not just the "1" attack keybind. Output
+    shares the combat log pane.
+  - `getOrCreateHeadlessPlayer` (`apps2/mud`) now registers into `gw.zoneMgr`/`gw.chatRouter` and
+    broadcasts "X has entered the world" on creation, same as a real telnet connection -- a real
+    telnet player standing in the same zone now sees a Town player's presence live, not just via
+    `look`'s own already-working `gw.players` loop.
+  Go build/vet clean. Live-verified end-to-end with two real characters: created character 1's
+  headless session, then character 2's -- character 1's own session buffer captured "Test2Warrior2
+  has entered the world." in real time, confirming the broadcast reaches other live sessions
+  exactly like a real telnet connection would see it.
+  Still open, unchanged: no idle eviction or "has left the world" broadcast (a headless session
+  never disconnects in the traditional sense, `HEADLESS_SESSION_NORTHSTAR.md` M4).
+
 ## 2026-08-02 (15)
 
 - fix(town): dead-connection recovery -- a narrower race in the same REDGARDEN-side matchmaking

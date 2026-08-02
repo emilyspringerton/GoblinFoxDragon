@@ -6747,10 +6747,10 @@ func broadcastZone(zoneID int, msg, exceptSlot string) {
 // same zone the character's Town avatar is in, with the real worm mob (TownSquareWormSpawns)
 // already spawned there to fight.
 //
-// Deliberately NOT registered in gw.zoneMgr/gw.chatRouter -- no chat/say routing needed for
-// combat-only commands, and cmdLook's own "other players here" loop is gw.players-based, not
-// zoneMgr-based, so a real telnet player standing in Town Square would still see this character
-// listed as present via `look`, without needing that registration.
+// Registered in gw.zoneMgr/gw.chatRouter too (2026-08-02, founder: "sync up town with the MUD" ->
+// "telnet players see Town's GUI players") -- a real telnet player standing in the same zone
+// sees "X has entered the world" and this character in zoneMgr-based queries, not just
+// cmdLook's own gw.players-based "other players here" loop (which already worked without it).
 //
 // Known, accepted gaps in this first pass (not fixed here): no idle eviction (a headless session
 // stays registered, and therefore keeps auto-attacking if it has a live target, for the rest of
@@ -6822,6 +6822,21 @@ func getOrCreateHeadlessPlayer(characterID string) (*player, error) {
 	gw.charIDBySlot[slot] = ch.CharacterID
 	gw.players[slot] = p
 	p.atlas.Visit(p.zoneID)
+
+	// Zone/chat registration (2026-08-02, founder: "i want you to sync up town with the MUD" ->
+	// chose "telnet players see Town's GUI players" over staying invisible). A real telnet
+	// player standing in the same zone now sees "X has entered the world" and this character
+	// listed in `look`/zoneMgr-based queries the same as any live connection -- not just
+	// gw.players-based loops like cmdLook's own "other players here", which already worked
+	// before this without the registration. Real, still-open gap, unchanged from before: no
+	// idle eviction or "has left the world" broadcast, since a headless session never
+	// disconnects in the traditional sense (HEADLESS_SESSION_NORTHSTAR.md M4, still not built).
+	_ = gw.zoneMgr.Enter(slot, p.name, p.zoneID)
+	gw.chatRouter.Register(slot, chat.Session{
+		Name: p.name, SceneID: p.zoneID,
+		Pos: chat.Pos{X: p.pos.X, Y: p.pos.Y, Z: p.pos.Z},
+	})
+	broadcastZoneNoLock(p.zoneID, fmt.Sprintf("%s has entered the world.", p.name), slot)
 	return p, nil
 }
 

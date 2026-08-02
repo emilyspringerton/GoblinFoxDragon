@@ -3244,6 +3244,25 @@ static void town_poll_combat(uint32_t now) {
     town_send_command("");
 }
 
+/* chat_send_or_command (2026-08-02, founder: "i want you to sync up town with the MUD" ->
+ * chose "real MUD commands from Town's chat box"): a line typed into EITHER chat box (Town's own,
+ * or the in-match one -- g_town_char_id survives entering/leaving a match, set once at Town
+ * entry) starting with "/" is a real MUD command, not chat -- HEADLESS_SESSION_NORTHSTAR.md's
+ * own original M3 design ("Battlegrounds chat box routes `/`-prefixed lines to it"), finally
+ * built. "/look", "/inventory", "/stats", anything the real handle(p, line) dispatch
+ * understands -- not just "attack", which the ability-slot "1" key already covers on its own.
+ * Output goes to the shared combat log pane (town_send_command's own doc comment), same as
+ * combat text -- Town has no separate "MUD output" pane, and combat log is already the closest
+ * thing to a scrolling event log this HUD has. Falls back to ordinary chat_send when there's no
+ * character to route a command through (bots/--ticket launches) or the line isn't a command. */
+static void chat_send_or_command(const char *text) {
+    if (text[0] == '/' && text[1] != '\0' && g_town_char_id[0]) {
+        town_send_command(text + 1); /* strip the leading '/' -- handle()'s own dispatch doesn't expect it */
+    } else {
+        chat_send(text);
+    }
+}
+
 int main(int argc, char *argv[]) {
     /* No srand() call existed anywhere in this file before -- mint_ticket_fallback's own
        rand()-based nonce (used only when IDUNA isn't reachable) was silently using the default
@@ -3435,7 +3454,7 @@ int main(int argc, char *argv[]) {
                         if (len + add < CHAT_INPUT_MAX - 1) strcat(chat_input_buf, te.text.text);
                     } else if (te.type == SDL_KEYDOWN) {
                         if (te.key.keysym.sym == SDLK_RETURN || te.key.keysym.sym == SDLK_KP_ENTER) {
-                            chat_send(chat_input_buf);
+                            chat_send_or_command(chat_input_buf);
                             chat_input_buf[0] = '\0';
                             chat_input_active = 0;
                             SDL_StopTextInput();
