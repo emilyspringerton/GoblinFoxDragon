@@ -3831,7 +3831,21 @@ int main(int argc, char *argv[]) {
                     }
                     continue;
                 }
-                if (te.type == SDL_KEYDOWN && (te.key.keysym.sym == SDLK_RETURN || te.key.keysym.sym == SDLK_KP_ENTER) && g_chat_jwt[0]) {
+                /* C/Y/T also open chat, alongside Enter (2026-08-02, founder: "the reason the
+                   auction house menu doesnt work is im trying to hit enter but that is
+                   triggering chat can we get a different hotkey than enter to start a chat enter
+                   can still send the chat" -> "how about make it work for c y and t just have
+                   them all map to start chat for now" -> "and then when we are not in the
+                   auction house enter also will open the chat"). Enter staying in the list is
+                   safe here specifically because the AH-menu block just above already runs FIRST
+                   and `continue`s while g_ah_screen != AH_CLOSED -- Enter never reaches this
+                   point while the menu is open, so there's no conflict left to dodge; T/Y/C are
+                   just extra ways in on top, not a replacement. Enter still SENDS an already-open
+                   chat message (chat_input_active's own SDLK_RETURN handling above, untouched). */
+                if (te.type == SDL_KEYDOWN &&
+                    (te.key.keysym.sym == SDLK_RETURN || te.key.keysym.sym == SDLK_KP_ENTER ||
+                     te.key.keysym.sym == SDLK_c || te.key.keysym.sym == SDLK_y || te.key.keysym.sym == SDLK_t) &&
+                    g_chat_jwt[0]) {
                     chat_input_active = 1;
                     chat_input_buf[0] = '\0';
                     SDL_StartTextInput();
@@ -4092,7 +4106,14 @@ int main(int argc, char *argv[]) {
                 }
                 continue;
             }
-            if (e.type == SDL_KEYDOWN && (e.key.keysym.sym == SDLK_RETURN || e.key.keysym.sym == SDLK_KP_ENTER) && g_chat_jwt[0]) {
+            /* Y/T also open chat here, alongside Enter -- same "for now" list Town's own chat-open
+               just got, minus "C": that's already NORTHSTAR §15.1's cam_locked toggle in this
+               specific in-match loop (see the SDLK_c handler further down), and "keep
+               battlegrounds as is" means that pre-existing binding doesn't get contested. */
+            if (e.type == SDL_KEYDOWN &&
+                (e.key.keysym.sym == SDLK_RETURN || e.key.keysym.sym == SDLK_KP_ENTER ||
+                 e.key.keysym.sym == SDLK_y || e.key.keysym.sym == SDLK_t) &&
+                g_chat_jwt[0]) {
                 chat_input_active = 1;
                 chat_input_buf[0] = '\0';
                 SDL_StartTextInput();

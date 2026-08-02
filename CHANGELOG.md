@@ -1,3 +1,18 @@
+## 2026-08-02 (21)
+
+- feat(town): C/Y/T also open chat, alongside Enter -- founder, after the Enter-key AH ordering
+  fix still felt broken in practice: "the reason the auction house menu doesnt work is im trying
+  to hit enter but that is triggering chat can we get a different hotkey than enter to start a
+  chat enter can still send the chat" -> "how about make it work for c y and t just have them all
+  map to start chat for now" -> "and then when we are not in the auction house enter also will
+  open the chat." Enter staying in the open-chat list is safe specifically because the AH-menu
+  block already runs first and consumes the event while `g_ah_screen != AH_CLOSED` -- Enter never
+  reaches the chat-open check while the menu is open, so C/Y/T are additional ways in, not a
+  replacement. In Battlegrounds' own in-match chat (separate event loop from Town's), "C" is
+  deliberately left out -- it's already NORTHSTAR §15.1's `cam_locked` toggle there, and "keep
+  battlegrounds as is" means that pre-existing binding doesn't get contested; Y/T are added there
+  instead.
+
 ## 2026-08-02 (20)
 
 - fix(town): stale connect ticket silently broke every requeue after ~5 minutes of play --
