@@ -96,31 +96,26 @@ jobs:
       # --- Real MUD GUI client (REDGARDEN_GUI_NORTHSTAR.md): apps/lobby above is a stale
       # SHANKPIT-lobby fork (window title still literally says "SHANKPIT", boots into SHANKPIT's
       # own SCENE_GARAGE_OSAKA) with only the EduScript minigame genuinely GFD-specific -- not
-      # the real DragonsNShit MMO frontend. Per REDGARDEN_GUI_NORTHSTAR.md, REDGARDEN's own
-      # apps/arena ships as-is as DragonsNShit's Battlegrounds and is the actual MUD GUI players
-      # log into (real IDUNA email+password login screen, apps/arena/src/main.c, REDGARDEN
-      # 9c98342 + e6fb748). Checked out and cross-compiled here, from GFD's own CI, using the
-      # exact same mingw/SDL2 toolchain already set up above -- mirrors REDGARDEN's own
-      # .github/workflows/ci.yml Windows step verbatim so the two pipelines can't silently drift.
-      - name: Checkout REDGARDEN (real MUD GUI frontend source)
-        uses: actions/checkout@v4
-        with:
-          repository: emilyspringerton/REDGARDEN
-          path: redgarden-src
-
-      - name: Cross-compile REDGARDEN arena client (real DragonsNShit MUD GUI)
+      # the real DragonsNShit MMO frontend. apps2/battlegrounds_gui is a real, standalone fork of
+      # REDGARDEN's apps/arena (commit 61baafb, 2026-08-02) living in THIS repo -- not a live
+      # checkout of the REDGARDEN repo at build time (that was tried first and corrected: founder,
+      # "REDGARDEN isnt literally the GUI its supposed to be a starting place for the GUI like a
+      # clean fork"). Has the real IDUNA email+password login screen built in
+      # (apps2/battlegrounds_gui/src/main.c) and can diverge from REDGARDEN going forward, same as
+      # apps/lobby's own SHANKPIT fork already does.
+      - name: Cross-compile Battlegrounds GUI client (real DragonsNShit MUD GUI, forked from REDGARDEN)
         shell: bash
         run: |
           set -euo pipefail
           x86_64-w64-mingw32-gcc -std=c99 -D_DEFAULT_SOURCE -O2 \
             -o DragonsNShit_MUD_GUI.exe \
-            redgarden-src/apps/arena/src/main.c \
-            redgarden-src/packages/simulation/arena_game.c \
-            redgarden-src/packages/simulation/arena_replay.c \
-            redgarden-src/packages/simulation/arena_ai_bridge.c \
-            redgarden-src/packages/common/mlp_infer.c \
+            apps2/battlegrounds_gui/src/main.c \
+            apps2/battlegrounds_gui/packages/simulation/arena_game.c \
+            apps2/battlegrounds_gui/packages/simulation/arena_replay.c \
+            apps2/battlegrounds_gui/packages/simulation/arena_ai_bridge.c \
+            apps2/battlegrounds_gui/packages/common/mlp_infer.c \
             -I./sdl2_mingw/include \
-            -Iredgarden-src/packages \
+            -Iapps2/battlegrounds_gui/packages \
             -L./sdl2_mingw/lib \
             -lmingw32 -lSDL2main -lSDL2 \
             -lopengl32 -lws2_32 -lwinmm -lgdi32 -lm
