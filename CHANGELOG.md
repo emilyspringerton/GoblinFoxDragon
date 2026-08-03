@@ -1,3 +1,19 @@
+## 2026-08-03 (1)
+
+- fix(town): clamp movement to the real ground extent -- founder, live: "when i log in im not in
+  town... i am floating in a blue abyss and it looks like theres some white writing off in the
+  distance and i cant tell if i can run towards it or not and thats all thats rendering." Real
+  bug: neither click-to-move nor WASD ever clamped position, unlike Battlegrounds' own hero
+  movement (bounded to `ARENA_HALF_EXTENT`). Confirmed live -- the founder's own real character
+  had drifted to `(61, 0, 3332.6)`, thousands of units past the actual ~113-unit ground/building
+  layout. Nothing 3D renders that far out (only 2D building-name labels still project onto
+  screen from any distance, which is exactly what read as "white writing in the distance" with
+  everything else gone). Repositioned the live character back to open ground via a direct IDUNA
+  update. Added `TOWN_MOVE_HALF_EXTENT` (derived from `town_draw_ground`'s own real footprint, so
+  it can't drift out of sync with the visible ground) and clamped both click-to-move's target and
+  WASD's per-tick target to it -- WASD held long enough was the more likely way to reach an
+  absurd position in the first place, since it compounds every ~100ms with no cap.
+
 ## 2026-08-02 (23)
 
 - feat(mud): New Handington <-> Meadow telecrystal, real critical bug found and NOT shipped to

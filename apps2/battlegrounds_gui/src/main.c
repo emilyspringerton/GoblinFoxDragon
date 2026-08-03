@@ -2874,6 +2874,17 @@ static void play_cast_tone(int slot) {
 #define TOWN_GRID_N 12       /* tiles per side */
 #define TOWN_QUEUE_BTN_W 280.0f
 #define TOWN_QUEUE_BTN_H 44.0f
+/* TOWN_MOVE_HALF_EXTENT (2026-08-03, real bug found live, founder: "when i log in im not in
+ * town... i am floating in a blue abyss and it looks like theres some white writing off in the
+ * distance"): neither click-to-move nor WASD clamped position at all, unlike Battlegrounds' own
+ * hero movement -- a player could walk (WASD, compounding every ~100ms with no cap) or click
+ * (screen_to_ground near the horizon) thousands of units past the actual ground/building layout,
+ * landing somewhere with nothing 3D nearby to render at all (only 2D building-name labels, which
+ * project from any distance, still showed up -- that's the "white writing" with everything else
+ * gone). Matches town_draw_ground's own real footprint (ARENA_HALF_EXTENT * 2.2f total, so half
+ * of that) rather than a separate guessed number -- the clamp and the visible ground can never
+ * drift out of sync with each other. */
+#define TOWN_MOVE_HALF_EXTENT (ARENA_HALF_EXTENT * 1.1f)
 /* TOWN_ZONE_ID (2026-08-02, founder: "you may need to add the next zone"): apps2/mud's own new
  * zone 4, "Town Square" (server/zone/zone.go's own doc comment explains why this is a real,
  * separate zone rather than reusing Meadow/zone 0). Position syncs (town_sync_position) tag
@@ -3953,8 +3964,19 @@ int main(int argc, char *argv[]) {
                         float gx, gz;
                         if (screen_to_ground(te.button.x, te.button.y, win_w, win_h, 60.0f,
                                               g_town_x, g_town_z, &gx, &gz)) {
-                            g_town_target_x = gx;
-                            g_town_target_z = gz;
+                            /* Real bug found live (2026-08-03, founder: "when i log in im not in
+                               town... i am floating in a blue abyss") -- Town's own click-to-move
+                               and WASD (below) had no bounds check at all, unlike Battlegrounds'
+                               own hero movement (clamped to ARENA_HALF_EXTENT). A click near the
+                               horizon, or WASD held long enough, could walk a player thousands of
+                               units past the ground/building layout -- so far out that literally
+                               nothing 3D renders nearby (a floating building-name label can still
+                               project onto screen from any distance since it's a 2D overlay, which
+                               is exactly what read as "white writing in the distance" with
+                               everything else gone). Clamped to TOWN_MOVE_HALF_EXTENT, matching
+                               the real rendered ground's own half-extent. */
+                            g_town_target_x = fmaxf(-TOWN_MOVE_HALF_EXTENT, fminf(TOWN_MOVE_HALF_EXTENT, gx));
+                            g_town_target_z = fmaxf(-TOWN_MOVE_HALF_EXTENT, fminf(TOWN_MOVE_HALF_EXTENT, gz));
                         }
                     }
                 }
@@ -3978,8 +4000,11 @@ int main(int argc, char *argv[]) {
                     if (dlen > 0.0001f) {
                         dir_x /= dlen; dir_z /= dlen;
                         const float TOWN_WASD_LOOKAHEAD = 4.0f;
-                        g_town_target_x = g_town_x + dir_x * TOWN_WASD_LOOKAHEAD;
-                        g_town_target_z = g_town_z + dir_z * TOWN_WASD_LOOKAHEAD;
+                        /* Same clamp as click-to-move above, same real bug -- WASD held long
+                           enough is actually the more likely way to reach an absurd position
+                           (thousands of units), since it compounds every ~100ms with no cap. */
+                        g_town_target_x = fmaxf(-TOWN_MOVE_HALF_EXTENT, fminf(TOWN_MOVE_HALF_EXTENT, g_town_x + dir_x * TOWN_WASD_LOOKAHEAD));
+                        g_town_target_z = fmaxf(-TOWN_MOVE_HALF_EXTENT, fminf(TOWN_MOVE_HALF_EXTENT, g_town_z + dir_z * TOWN_WASD_LOOKAHEAD));
                         last_town_wasd_ms = now;
                     }
                 }
