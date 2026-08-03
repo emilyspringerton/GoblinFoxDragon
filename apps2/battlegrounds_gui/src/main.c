@@ -3584,6 +3584,39 @@ static void town_draw_worms(const Mat4 *vp, GLint loc_mvp, GLint loc_model, GLin
     }
 }
 
+/* town_worm_hit_test (2026-08-03, founder: "switch right click to attack move/interact") -- which
+ * of town_active_targets' own worms, if any, a real screen-space click landed on. Same real
+ * technique the box-select code uses for its own per-unit screen position (world_to_screen against
+ * g_last_vp, last frame's vp -- this frame's own vp isn't computed yet at the point input events
+ * are processed), just a single click-radius test instead of a rectangle. Anchored at the same
+ * point town_draw_worm_nameplates projects its own bar to, so "click the nameplate/bar" and "click
+ * the creature" both land on the one real hit target, not two slightly-offset ones. Returns the
+ * target index, or -1 if the click didn't land on any worm. */
+static int town_worm_hit_test(int mx, int my, int win_w, int win_h) {
+    int count;
+    const char *const *names;
+    const float *tx, *tz;
+    town_active_targets(&count, &names, &tx, &tz);
+    float click_y = (float)(win_h - my); /* SDL mouse y is top-down, world_to_screen's own sy is bottom-up */
+    int best = -1;
+    float best_dist_sq = 26.0f * 26.0f; /* click radius, generous enough for the now-much-bigger worm model without overlapping neighbors at this ring's real spacing */
+    for (int i = 0; i < count; i++) {
+        float wx = tx[i], wz = tz[i];
+        float ground_y = 0.0f;
+        if (g_dfzone_active) dfzone_height_at(wx, wz, &ground_y);
+        float anchor_y = ground_y + WORM_FLOAT_Y + 0.45f + 0.6f; /* same body-center anchor town_draw_worm_nameplates uses, minus its own extra clearance */
+        float sx, sy;
+        if (!world_to_screen(&g_last_vp, wx, anchor_y, wz, win_w, win_h, &sx, &sy)) continue;
+        float dx = sx - (float)mx, dy = sy - click_y;
+        float dist_sq = dx * dx + dy * dy;
+        if (dist_sq < best_dist_sq) {
+            best_dist_sq = dist_sq;
+            best = i;
+        }
+    }
+    return best;
+}
+
 /* town_draw_buildings: one box per TOWN_BUILDINGS entry -- see that table's own doc comment for
  * scope/style. Each box's own vertical center sits at half_h above ground (draw_hero_box's own
  * dy parameter), so every building rests on the checkerboard rather than being centered through
@@ -4709,6 +4742,16 @@ int main(int argc, char *argv[]) {
 
     int dragging_cam = 0;
     int last_mx = 0, last_my = 0;
+    /* right_press_x/y (2026-08-03, founder: "switch right click to attack move/interact for both
+       the mud gui battlegrounds as well as meadows"): real click-vs-drag distinction for
+       right-click, shared by Town/Meadow and Battlegrounds -- right-click already starts a camera
+       drag (dragging_cam/last_mx/my track that, continuously, for smooth real-time rotation while
+       held), but a QUICK right-click (down and up with barely any movement) should ALSO fire the
+       real attack-move/interact command, same "which one happened" test
+       ARENA_DRAG_SELECT_THRESHOLD_PX already established for left-drag box-select vs an ordinary
+       click. Recorded once on DOWN, compared against the UP position -- unlike last_mx/my, never
+       touched by MOUSEMOTION, so it always reflects the real total press-to-release distance. */
+    int right_press_x = 0, right_press_y = 0;
     int running = 1;
     int win_logged = 0;
     uint32_t last_tick = SDL_GetTicks();
@@ -4908,29 +4951,68 @@ int main(int argc, char *argv[]) {
                     else if (town_player_lost()) town_recenter_in_town(now);
                 }
                 else if (te.type == SDL_MOUSEBUTTONDOWN && te.button.button == SDL_BUTTON_RIGHT) {
-                    /* Auction House right-click (2026-08-02, founder: "have it be interractable
-                       on right click (the whole auction house building for now is fine)") --
-                       checked before starting a camera drag, same screen_to_ground ray-cast
-                       click-to-move already uses. Any point within the building's own box
-                       (town_building_at) opens it; right-click anywhere else still drags the
-                       camera exactly as before. The Dragon Gate's own former right-click trigger
-                       lived here until 2026-08-03 -- replaced by the real cast UX above (G key +
-                       proximity ring), not click-based anymore. */
-                    float gx, gz;
-                    int opened = 0;
-                    if (screen_to_ground(te.button.x, te.button.y, win_w, win_h, 60.0f, g_town_x, g_town_z, &gx, &gz)) {
-                        int bidx = town_building_at(gx, gz);
-                        if (bidx >= 0 && strcmp(TOWN_BUILDINGS[bidx].name, "Auction House") == 0) {
-                            ah_open();
-                            opened = 1;
-                        }
-                    }
-                    if (!opened) {
-                        dragging_cam = 1; last_mx = te.button.x; last_my = te.button.y;
-                    }
+                    /* Real right-click = attack-move/interact (2026-08-03, founder: "switch right
+                       click to attack move/interract for both the mud gui battlegrounds as well as
+                       meadows"), same real click-vs-drag distinction Battlegrounds' own left-drag
+                       box-select already established (right_press_x/y's own doc comment) -- DOWN
+                       just records the press position and starts real-time camera-drag tracking
+                       (unchanged, so holding+dragging still rotates smoothly); the actual command
+                       (interact/attack/move) is decided on UP, once we know whether this was a
+                       real drag or a quick click. */
+                    right_press_x = te.button.x; right_press_y = te.button.y;
+                    dragging_cam = 1; last_mx = te.button.x; last_my = te.button.y;
                 }
                 else if (te.type == SDL_MOUSEBUTTONUP && te.button.button == SDL_BUTTON_RIGHT) {
                     dragging_cam = 0;
+                    int rdx = te.button.x - right_press_x, rdy = te.button.y - right_press_y;
+                    if ((float)(rdx * rdx + rdy * rdy) < ARENA_DRAG_SELECT_THRESHOLD_PX * ARENA_DRAG_SELECT_THRESHOLD_PX) {
+                        /* A real click, not a drag -- dispatch in priority order: interact with a
+                           building (Auction House, founder: "have it be interractable on right
+                           click"), else attack a worm under the cursor (town_worm_hit_test, same
+                           "attack <name>" command the "1" key already sends -- target+attack in
+                           one click, real WoW/MOBA attack-move convention), else move there
+                           (click-to-move, moved here from left-click -- see its own doc comment
+                           further down for the real out-of-bounds bug this clamp still closes). */
+                        float gx, gz;
+                        int handled = 0;
+                        if (screen_to_ground(te.button.x, te.button.y, win_w, win_h, 60.0f, g_town_x, g_town_z, &gx, &gz)) {
+                            int bidx = town_building_at(gx, gz);
+                            if (bidx >= 0 && strcmp(TOWN_BUILDINGS[bidx].name, "Auction House") == 0) {
+                                ah_open();
+                                handled = 1;
+                            }
+                        }
+                        if (!handled) {
+                            int hit = town_worm_hit_test(te.button.x, te.button.y, win_w, win_h);
+                            if (hit >= 0) {
+                                g_town_target_index = hit;
+                                int tgt_count;
+                                const char *const *tgt_names;
+                                const float *tgt_x, *tgt_z;
+                                town_active_targets(&tgt_count, &tgt_names, &tgt_x, &tgt_z);
+                                char cmd[80];
+                                snprintf(cmd, sizeof(cmd), "attack %s", tgt_names[hit]);
+                                town_send_command(cmd);
+                                handled = 1;
+                            }
+                        }
+                        if (!handled && screen_to_ground(te.button.x, te.button.y, win_w, win_h, 60.0f, g_town_x, g_town_z, &gx, &gz)) {
+                            /* Real bug found live (2026-08-03, founder: "when i log in im not in
+                               town... i am floating in a blue abyss") -- Town's own click-to-move
+                               and WASD (below) had no bounds check at all, unlike Battlegrounds'
+                               own hero movement (clamped to ARENA_HALF_EXTENT). A click near the
+                               horizon, or WASD held long enough, could walk a player thousands of
+                               units past the ground/building layout. Clamped to
+                               town_move_half_extent_x/z, matching whichever real rendered ground's
+                               own half-extent is currently active -- Town's own (square), or the
+                               Dragonfly zone's (a real rectangle since the golden-ratio
+                               expansion). */
+                            float move_half_x = town_move_half_extent_x();
+                            float move_half_z = town_move_half_extent_z();
+                            g_town_target_x = fmaxf(-move_half_x, fminf(move_half_x, gx));
+                            g_town_target_z = fmaxf(-move_half_z, fminf(move_half_z, gz));
+                        }
+                    }
                 }
                 else if (te.type == SDL_MOUSEMOTION && dragging_cam) {
                     int mdx = te.motion.x - last_mx, mdy = te.motion.y - last_my;
@@ -4946,6 +5028,12 @@ int main(int argc, char *argv[]) {
                     if (cam_dist > 30.0f) cam_dist = 30.0f;
                 }
                 else if (te.type == SDL_MOUSEBUTTONDOWN && te.button.button == SDL_BUTTON_LEFT) {
+                    /* Left-click is UI-buttons only now (2026-08-03, founder: "switch right click
+                       to attack move/interract") -- click-to-move/attack/interact all moved to a
+                       real right-click, matching the same left-select/right-command convention
+                       Battlegrounds' own move/attack dispatch is being rebound to in this same
+                       pass (see its own doc comment). Left no longer has a ground/worm fallback;
+                       clicking empty ground here is simply a no-op. */
                     float bx = (float)te.button.x, by = (float)(win_h - te.button.y);
                     if (queue_host && town_queue_button_hit(bx, by, win_w, win_h)) {
                         /* net_find_and_connect blocks for up to 60s -- same known, named
@@ -4967,33 +5055,6 @@ int main(int argc, char *argv[]) {
                            real Town-side case too now, see its own doc comment). */
                         if (g_dfzone_active) town_telecrystal_return();
                         else town_recenter_in_town(now);
-                    } else {
-                        /* Click-to-move (2026-08-02, "we need to be able to run around town") --
-                           same screen_to_ground ray-cast Battlegrounds' own click-to-move uses,
-                           camera focused on the avatar's own current position rather than a
-                           fixed origin, same "camera follows your hero" convention. */
-                        float gx, gz;
-                        if (screen_to_ground(te.button.x, te.button.y, win_w, win_h, 60.0f,
-                                              g_town_x, g_town_z, &gx, &gz)) {
-                            /* Real bug found live (2026-08-03, founder: "when i log in im not in
-                               town... i am floating in a blue abyss") -- Town's own click-to-move
-                               and WASD (below) had no bounds check at all, unlike Battlegrounds'
-                               own hero movement (clamped to ARENA_HALF_EXTENT). A click near the
-                               horizon, or WASD held long enough, could walk a player thousands of
-                               units past the ground/building layout -- so far out that literally
-                               nothing 3D renders nearby (a floating building-name label can still
-                               project onto screen from any distance since it's a 2D overlay, which
-                               is exactly what read as "white writing in the distance" with
-                               everything else gone). Clamped to town_move_half_extent_x/z,
-                               matching whichever real rendered ground's own half-extent is
-                               currently active -- Town's own (square), or the Dragonfly zone's
-                               (a real rectangle since the golden-ratio expansion), see their own
-                               doc comment for the real bug this closes there too. */
-                            float move_half_x = town_move_half_extent_x();
-                            float move_half_z = town_move_half_extent_z();
-                            g_town_target_x = fmaxf(-move_half_x, fminf(move_half_x, gx));
-                            g_town_target_z = fmaxf(-move_half_z, fminf(move_half_z, gz));
-                        }
                     }
                 }
             }
@@ -5082,6 +5143,7 @@ int main(int argc, char *argv[]) {
                 Mat4 view = mat4_orbit_view(g_town_x, town_ground_y, g_town_z, cam_yaw, cam_pitch, cam_dist);
                 Mat4 proj = mat4_perspective(60.0f, (float)win_w / (float)win_h, 0.1f, 100.0f);
                 Mat4 vp = mat4_multiply(&proj, &view);
+                g_last_vp = vp; /* same "next frame's click hit-test reads last frame's vp" convention Battlegrounds' own g_last_vp already established -- Town's own right-click worm hit-test needs it too */
 
                 glUseProgram_(prog);
                 glUniform3f_(loc_light, 0.4f, 0.8f, 0.3f);
@@ -5213,10 +5275,79 @@ int main(int argc, char *argv[]) {
                 win_w = e.window.data1; win_h = e.window.data2;
             }
             if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_RIGHT) {
+                /* right_press_x/y (2026-08-03, founder: "switch right click to attack move/
+                   interract for both the mud gui battlegrounds as well as meadows") -- real
+                   click-vs-drag distinction, same shared pair Town/Meadow's own right-click uses
+                   (see its own doc comment). DOWN just records the press position and starts
+                   real-time camera-drag tracking (unchanged); the real move/attack/attack-move/
+                   patrol dispatch (moved here from left-click, see that block's own doc comment)
+                   fires on UP only if this turns out to have been a quick click, not a drag. */
+                right_press_x = e.button.x; right_press_y = e.button.y;
                 dragging_cam = 1; last_mx = e.button.x; last_my = e.button.y;
             }
             if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_RIGHT) {
                 dragging_cam = 0;
+                int rdx = e.button.x - right_press_x, rdy = e.button.y - right_press_y;
+                if (!observing && arena_state.winner == 0
+                    && (float)(rdx * rdx + rdy * rdy) < ARENA_DRAG_SELECT_THRESHOLD_PX * ARENA_DRAG_SELECT_THRESHOLD_PX) {
+                    /* An ordinary click, not a drag -- same attack-vs-move decision as before
+                       (S170-162, NORTHSTAR §17.1's own "right-click ground vs right-click a unit"
+                       split -- this is the button that design always specified, just never bound
+                       here until now), dispatched to every currently-selected unit (selected_or_
+                       self already includes the local player's own active Tyler clones -- founder,
+                       real-time: "ensuring tyler clones have the ability to attack with right
+                       click" -- unchanged by this move, since commanders[]/selected_or_self itself
+                       isn't touched, only which button reaches this code). */
+                    int commanders[ARENA_MAX_SELECTED_UNITS];
+                    int commander_count = selected_or_self(commanders);
+
+                    int enemy_click_target = -1;
+                    if (net_mode && net_lobby_size > 2 && g_hover_target >= 0 && g_hover_target < net_lobby_size
+                        && my_owner >= 0 && my_owner < ARENA_MAX_HEROES) {
+                        ArenaHero *hovered = &arena_state.heroes[g_hover_target];
+                        if (hovered->active && hovered->alive && hovered->team != arena_state.heroes[my_owner].team) {
+                            enemy_click_target = g_hover_target;
+                        }
+                    }
+                    if (enemy_click_target >= 0) {
+                        /* Team-mode-only, same reasoning the original single-unit version of
+                           this branch already documented -- enemy_click_target can only ever be
+                           set under net_mode && net_lobby_size > 2 above, so every commander here
+                           is real, net_send_attack is always the right call, no local-mode
+                           fallback needed (Tyler's own clones are team-mode only too). */
+                        for (int k = 0; k < commander_count; k++) net_send_attack(commanders[k], enemy_click_target);
+                        apm_record_action(now);
+                    } else {
+                        float gx, gz;
+                        float focus_x = arena_state.heroes[my_owner].x, focus_z = arena_state.heroes[my_owner].z;
+                        if (screen_to_ground(e.button.x, e.button.y, win_w, win_h, 60.0f,
+                                             focus_x, focus_z, &gx, &gz)) {
+                            /* Attack-move / Patrol (NORTHSTAR.md §17.4 + §24 Milestone 2,
+                               2026-07-31): real LoL/WC3 "hold A/P, then click ground" -- checked
+                               via this frame's held-key state, same "held, not toggled" idiom
+                               the Tab scoreboard already uses, not a separate keydown event/mode
+                               toggle. Patrol checked first: if both happened to be held (an
+                               unusual chord, not a real player intent either way), patrol wins
+                               rather than leaving the outcome to whichever branch happened to be
+                               written first with no comment explaining why. */
+                            const Uint8 *ks = SDL_GetKeyboardState(NULL);
+                            int patrol = ks[SDL_SCANCODE_P];
+                            int attack_move = ks[SDL_SCANCODE_A];
+                            for (int k = 0; k < commander_count; k++) {
+                                if (patrol) {
+                                    if (net_mode) net_send_patrol(commanders[k], gx, gz);
+                                    else arena_set_patrol_target(commanders[k], gx, gz);
+                                } else if (attack_move) {
+                                    if (net_mode) net_send_attack_move(commanders[k], gx, gz);
+                                    else arena_set_attack_move_target(commanders[k], gx, gz);
+                                } else if (net_mode) net_send_move(commanders[k], gx, gz);
+                                else arena_set_move_target(commanders[k], gx, gz);
+                            }
+                            spawn_ring(gx, gz);
+                            apm_record_action(now);
+                        }
+                    }
+                }
             }
             if (e.type == SDL_MOUSEMOTION && dragging_cam) {
                 int dx = e.motion.x - last_mx, dy = e.motion.y - last_my;
@@ -5397,59 +5528,37 @@ int main(int argc, char *argv[]) {
                     for (int i = 0; i < new_count; i++) selected_units[i] = new_units[i];
                     apm_record_action(now);
                 } else if (arena_state.winner == 0) {
-                    /* An ordinary click -- same attack-vs-move decision as before (S170-162,
-                       NORTHSTAR SS17.1's "right-click ground vs right-click a unit" split), now
-                       dispatched to every currently-selected unit instead of hardcoded to
-                       my_owner. */
-                    int commanders[ARENA_MAX_SELECTED_UNITS];
-                    int commander_count = selected_or_self(commanders);
-
-                    int enemy_click_target = -1;
-                    if (net_mode && net_lobby_size > 2 && g_hover_target >= 0 && g_hover_target < net_lobby_size
-                        && my_owner >= 0 && my_owner < ARENA_MAX_HEROES) {
-                        ArenaHero *hovered = &arena_state.heroes[g_hover_target];
-                        if (hovered->active && hovered->alive && hovered->team != arena_state.heroes[my_owner].team) {
-                            enemy_click_target = g_hover_target;
-                        }
+                    /* Plain left-click, no drag (2026-08-03, founder: "switch right click to
+                       attack move/interract") -- move/attack/attack-move/patrol dispatch moved to
+                       a real right-click (see its own doc comment, SDL_BUTTON_RIGHT's mouseup
+                       handler above); left is select-only now, matching the real
+                       left-select/right-command convention this rebind is aligning the whole
+                       client to. A single click with no real drag distance still needs to DO
+                       something though (leaving it a dead input would be a real regression, not a
+                       neutral one) -- same real single-unit-select every RTS gives a plain click,
+                       reusing the box-select loop just above with a small click-radius point test
+                       instead of a rectangle. Empty result still resets to "just self," same
+                       "never fully deselect your only unit" precedent box-select already uses. */
+                    float click_best_dist_sq = 24.0f * 24.0f;
+                    int click_best = -1;
+                    for (int cand = 0; cand < ARENA_HEROES_ARRAY_SIZE; cand++) {
+                        ArenaHero *ch = &arena_state.heroes[cand];
+                        if (!ch->active || !ch->alive) continue;
+                        if (cand != my_owner && !(ch->is_clone && ch->clone_owner == my_owner)) continue;
+                        float sx, sy;
+                        if (!world_to_screen(&g_last_vp, ch->x, 1.0f, ch->z, win_w, win_h, &sx, &sy)) continue;
+                        float sy_top = (float)win_h - sy;
+                        float cdx = sx - (float)e.button.x, cdy = sy_top - (float)e.button.y;
+                        float cd_sq = cdx * cdx + cdy * cdy;
+                        if (cd_sq < click_best_dist_sq) { click_best_dist_sq = cd_sq; click_best = cand; }
                     }
-                    if (enemy_click_target >= 0) {
-                        /* Team-mode-only, same reasoning the original single-unit version of
-                           this branch already documented -- enemy_click_target can only ever be
-                           set under net_mode && net_lobby_size > 2 above, so every commander here
-                           is real, net_send_attack is always the right call, no local-mode
-                           fallback needed (Tyler's own clones are team-mode only too). */
-                        for (int k = 0; k < commander_count; k++) net_send_attack(commanders[k], enemy_click_target);
-                        apm_record_action(now);
+                    if (click_best >= 0) {
+                        selected_unit_count = 1;
+                        selected_units[0] = click_best;
                     } else {
-                        float gx, gz;
-                        float focus_x = arena_state.heroes[my_owner].x, focus_z = arena_state.heroes[my_owner].z;
-                        if (screen_to_ground(e.button.x, e.button.y, win_w, win_h, 60.0f,
-                                             focus_x, focus_z, &gx, &gz)) {
-                            /* Attack-move / Patrol (NORTHSTAR.md §17.4 + §24 Milestone 2,
-                               2026-07-31): real LoL/WC3 "hold A/P, then click ground" -- checked
-                               via this frame's held-key state, same "held, not toggled" idiom
-                               the Tab scoreboard already uses, not a separate keydown event/mode
-                               toggle. Patrol checked first: if both happened to be held (an
-                               unusual chord, not a real player intent either way), patrol wins
-                               rather than leaving the outcome to whichever branch happened to be
-                               written first with no comment explaining why. */
-                            const Uint8 *ks = SDL_GetKeyboardState(NULL);
-                            int patrol = ks[SDL_SCANCODE_P];
-                            int attack_move = ks[SDL_SCANCODE_A];
-                            for (int k = 0; k < commander_count; k++) {
-                                if (patrol) {
-                                    if (net_mode) net_send_patrol(commanders[k], gx, gz);
-                                    else arena_set_patrol_target(commanders[k], gx, gz);
-                                } else if (attack_move) {
-                                    if (net_mode) net_send_attack_move(commanders[k], gx, gz);
-                                    else arena_set_attack_move_target(commanders[k], gx, gz);
-                                } else if (net_mode) net_send_move(commanders[k], gx, gz);
-                                else arena_set_move_target(commanders[k], gx, gz);
-                            }
-                            spawn_ring(gx, gz);
-                            apm_record_action(now);
-                        }
+                        selected_unit_count = 0; /* selected_or_self's own convention: 0 means "just self" */
                     }
+                    apm_record_action(now);
                 }
             }
             /* Draft pick-screen click (S170-182): only meaningful while the draft screen is

@@ -1,3 +1,40 @@
+## 2026-08-03 (29)
+
+- feat(battlegrounds_gui): right-click is the real attack-move/interact button now, everywhere --
+  founder: "switch right click to attack move /interract for both the mud gui battlegrounds as
+  well as meadows ensuring meadows shows nameplates with healthbars for the worms" + "ensuring
+  tyler clones have the ability to attack with right click."
+
+  Town/Meadow: right-click used to be Auction-House-interact-or-camera-drag, left-click did
+  click-to-move. New shared `right_press_x/y` gives a real click-vs-drag distinction (same
+  `ARENA_DRAG_SELECT_THRESHOLD_PX` Battlegrounds' own box-select already uses) -- a quick
+  right-click now dispatches in priority order: interact with a building (Auction House, existing
+  behavior), else attack a worm under the cursor (new `town_worm_hit_test`, a real screen-space
+  hit-test against whichever ring `town_active_targets` resolves -- Town's or Meadow's -- reusing
+  `g_last_vp`, the same "last frame's vp, since this frame's isn't computed yet at input time"
+  convention Battlegrounds' own box-select established, now also written by Town's own render
+  pass), else move there (click-to-move, relocated from left-click). Left-click is UI-buttons only
+  now (queue/teleport-to-town).
+
+  Battlegrounds: the existing, already-complete move/attack/attack-move/patrol dispatch (NORTHSTAR
+  §17.1's own doc comment already specified "right-click ground vs right-click a unit" -- it had
+  just never actually been bound to that button) moved from LEFT mouseup to RIGHT mouseup, using
+  the same click-vs-drag distinction (right-click already drives camera rotation, so a real drag
+  must not also fire a command). `commanders[]`/`selected_or_self` -- which already includes the
+  local player's own active Tyler clones -- moved verbatim, so clone-inclusive attack-move is
+  unchanged by the rebind. Left-click is selection-only now: box-select-drag unchanged, and a
+  plain click (no drag) gained real single-unit-select (same per-candidate screen-space test as
+  box-select, a point instead of a rectangle) so a non-drag left click isn't left as a dead input.
+
+  Verified end-to-end via a real synthetic SDL right-click (SDL_PushEvent, not just static
+  reasoning): fired at a live worm's own real screen position (computed from `g_last_vp`) and
+  confirmed the full pipeline -- `town_worm_hit_test` correctly resolved the target, and the real
+  "attack worm-meadow-N" command was dispatched via `town_send_command`. Nameplates/health bars
+  (`town_draw_worm_nameplates`, shipped last pass) reconfirmed visually via Xvfb screenshot,
+  unaffected by this change. `gcc -Wall -Wextra` clean, `go test ./...` clean (no Go changes this
+  pass). All temp debug instrumentation used for the synthetic-click verification fully reverted
+  before commit.
+
 ## 2026-08-03 (28)
 
 - feat(battlegrounds_gui): real worm silhouette + nameplates/health bars -- founder: "the worms
