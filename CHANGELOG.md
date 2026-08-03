@@ -1,3 +1,15 @@
+## 2026-08-03 (6)
+
+- docs(mud): confirmed Sunderworm crisis broadcasts reach Town's chat/combat-log pane -- an
+  earlier open item, resolved by direct observation rather than new code. The crisis-phase
+  handler (`main.go` ~1702) broadcasts to every connected player (`gw.players`), not zone-scoped,
+  which is why this session's own Meadow validation test (P2, above) saw a New-Handington-zone
+  crisis message while sitting in Meadow. On the headless path the push queues into the
+  character's connection buffer and flushes on the next command -- observed directly in the P2
+  `attack` response. `apps2/battlegrounds_gui`'s `town_poll_combat` already drains that buffer
+  every ~1.5s into the shared combat log pane -- the exact code path this session's manual test
+  exercised. No code change; delivery was already shipped, now verified rather than assumed.
+
 ## 2026-08-03 (5)
 
 - test(mud): validated Meadow (scene 0) end-to-end through the real headless `/api/town/command`
