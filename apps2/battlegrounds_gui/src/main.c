@@ -3959,9 +3959,19 @@ static void town_sync_position(uint32_t now, int force) {
     g_town_last_sync_ms = now;
     g_town_synced_x = g_town_x;
     g_town_synced_z = g_town_z;
+    /* BUGFIX 2026-08-03, found live: a real character's own row was found sitting at scene_id=4
+       with real Meadow-space coordinates (pos near a real MEADOW_TARGET_X/Z worm position) --
+       this call hardcoded TOWN_ZONE_ID (4) unconditionally, so every periodic position sync while
+       genuinely playing in Meadow (g_dfzone_active) silently overwrote the real scene_id the
+       travel command had just set correctly, the moment the player took one more step. Harmless
+       to the LIVE MUD session itself (that's tracked in-memory, independent of IDUNA's own copy,
+       only re-read from IDUNA at session creation) but corrupts what a FRESH session (or a
+       relaunch, see town_fetch_character's own scene_id read) would see -- the exact same
+       "stranded on relog" bug class already fixed once, reopened by this one hardcoded constant. */
+    int sync_scene_id = g_dfzone_active ? g_dfzone_scene : TOWN_ZONE_ID;
     char body[192];
     snprintf(body, sizeof(body), "{\"scene_id\":%d,\"pos_x\":%.3f,\"pos_y\":%.3f,\"pos_z\":%.3f}",
-             TOWN_ZONE_ID, g_town_x, g_town_y, g_town_z);
+             sync_scene_id, g_town_x, g_town_y, g_town_z);
     char path[128];
     snprintf(path, sizeof(path), "/api/v1/characters/%s/position", g_town_char_id);
     char resp[256];

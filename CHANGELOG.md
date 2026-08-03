@@ -1,3 +1,29 @@
+## 2026-08-03 (30)
+
+- fix(battlegrounds_gui): position sync silently reverted Meadow's real scene_id back to Town on
+  every step -- founder, live: "ok i ran up to a worm and right click - it turns yellow on the
+  name plate good but i never actually auto attack." Investigated the real character
+  (`test@test.com`'s TestWarrior): found `scene_id=4` (Town) in IDUNA sitting alongside real
+  Meadow-space coordinates (near a real `MEADOW_TARGET_X/Z` worm position) -- a live reproduction
+  of the exact bug class already fixed once for relogging, reopened by a different real bug.
+  `town_sync_position` (the periodic best-effort position PATCH, fires on every ~2s/moved-far-
+  enough step) hardcoded `TOWN_ZONE_ID` (4) unconditionally, so simply walking around in Meadow
+  kept silently overwriting the correct `scene_id` the real `travel` command had just set. The
+  live MUD session itself wasn't affected (tracked in-memory, only re-read from IDUNA at session
+  creation) -- but a relaunch (`town_fetch_character`'s own scene_id read) or a session eviction
+  would have read the corrupted value and put the player back in Town. Fixed: `sync_scene_id =
+  g_dfzone_active ? g_dfzone_scene : TOWN_ZONE_ID`.
+
+  Separately, the real reason THIS particular right-click never landed a hit: the character was
+  genuinely KO'd (`HP:0/90` -- a live `nm-king-worm` NM, 800 HP, is present in this Meadow
+  instance, likely what killed a level-5 character). `attack` was correctly rejected server-side
+  ("You are KO'd. Type 'home' to return to your Home Point.") -- not a client bug, confirmed via a
+  direct `/api/town/command` probe against the real character. Manually sent the real `home`
+  command on the character's behalf (agent JWT) to revive it (no Home Point set, so a free
+  respawn at Meadow, HP:1/90 -- fragile, not topped up further, that's the real game rule) and
+  corrected the corrupted IDUNA row (`scene_id` 4 -> 0, matching where the live MUD session and
+  the character's own real position already agreed they were). `gcc -Wall -Wextra` clean.
+
 ## 2026-08-03 (29)
 
 - feat(battlegrounds_gui): right-click is the real attack-move/interact button now, everywhere --
