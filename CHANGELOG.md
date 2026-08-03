@@ -1,3 +1,17 @@
+## 2026-08-03 (15)
+
+- fix(battlegrounds_gui): telecrystal cast now auto-starts on ring entry, no key needed --
+  founder: "pressing g does nothing i expect it to auto cast when i enter the ring." The first
+  pass ported apps/lobby's own G-press-to-start mechanic verbatim; not what was actually wanted.
+  `town_gate_tick` now auto-starts the cast itself on the ring-enter edge (`was_in_range` false ->
+  true tracked via a static, so a completed/cancelled cast doesn't instantly restart every frame
+  still standing in the ring -- leaving and re-entering starts a fresh one). `town_gate_start_cast`
+  still exists (needed a forward decl since `town_gate_tick` now calls it before its own
+  definition) and G is left wired to it as a harmless manual fallback, but the primary path is
+  pure proximity now. Live-verified visually under Xvfb: simulated walking from outside the ring
+  to inside it and screenshotted the cast bar already progressing on arrival, no keypress
+  simulated. `go vet`/`go test ./...` and a direct `gcc` client build both clean.
+
 ## 2026-08-03 (14)
 
 - feat(battlegrounds_gui): real telecrystal cast UX, ported from apps/lobby -- founder: "check the

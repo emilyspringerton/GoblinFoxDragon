@@ -226,13 +226,21 @@ world-space ring (`town_draw_gate_ring`, new `draw_mesh_lines` -- this client's 
 shader-bound, not the legacy matrix stack apps/lobby's own ring uses, so the ring is a real mesh
 through the same pipeline instead of mixed-in immediate-mode calls) sits at the crystal's real
 radius (12 units, both directions, `server/telecrystal`'s own registry values), turning solid
-white when the player is inside it. Pressing G while in range starts a real cast
-(`town_gate_start_cast`) instead of an instant teleport -- a fill bar with a visible commit
-tick-mark (`town_draw_gate_overlay`) advances over 1000ms, the real travel/return call fires at
-the 600ms commit mark (matching the reference's own commit-before-bar-finishes feel), and leaving
-the ring before commit cancels the cast (`town_gate_tick`). Live-verified visually under Xvfb:
-screenshotted mid-cast showing the fill bar, commit marker, and "CASTING: TELEPORT MEADOW" text
-against the real in-range white ring.
+white when the player is inside it. A fill bar with a visible commit tick-mark
+(`town_draw_gate_overlay`) advances over 1000ms, the real travel/return call fires at the 600ms
+commit mark (matching the reference's own commit-before-bar-finishes feel), and leaving the ring
+before commit cancels the cast (`town_gate_tick`). Live-verified visually under Xvfb: screenshotted
+mid-cast showing the fill bar, commit marker, and "CASTING: TELEPORT MEADOW" text against the real
+in-range white ring.
+
+**Corrected same day, founder: "pressing g does nothing i expect it to auto cast when i enter the
+ring"**: the first pass ported apps/lobby's own G-press-to-start mechanic verbatim -- not what was
+actually wanted here. `town_gate_tick` now auto-starts the cast itself on the ring-enter edge
+(`was_in_range` false -> true), no key involved at all; `town_gate_start_cast` still exists and is
+still safe to call (G is left wired to it as a harmless manual fallback), but the primary,
+expected path is now pure proximity -- walk in, the bar starts. Live-verified visually under
+Xvfb: simulated walking from outside the ring to inside it and screenshotted the cast bar already
+progressing on arrival, no keypress simulated.
 
 **Still not done, named rather than silently ignored**: this is a client-side render swap, not a
 protocol bridge -- the character's real backend session is still `apps2/mud`'s text MUD (position

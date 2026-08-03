@@ -3699,15 +3699,30 @@ static int g_gatecast_committed = 0;
 static int g_gate_in_range = 0;
 static Mesh g_gate_ring_mesh;
 static int g_gate_ring_ready = 0;
+static void town_gate_start_cast(uint32_t now); /* forward decl -- town_gate_tick calls this, defined just below it */
 
 /* town_gate_tick: called once per frame from Town's own render loop (same "rate-limited
  * internally, safe to call every frame" convention chat_poll/town_poll_combat already use, minus
  * the rate limit -- this is pure local state, no HTTP round trip except the one real commit
- * call). Updates proximity, advances/cancels/commits the active cast. */
+ * call). Updates proximity, auto-starts a cast on the enter-ring edge, advances/cancels/commits
+ * the active cast.
+ *
+ * BUGFIX 2026-08-03, founder: "pressing g does nothing i expect it to auto cast when i enter the
+ * ring" -- G-press-to-start (apps/lobby's own real mechanic, ported verbatim the first time) is
+ * not what was actually wanted here; auto-starting on entry is simpler anyway and removes G
+ * entirely as a point of failure. Edge-triggered on `was_in_range` (false -> true) rather than
+ * "start every frame you're in range" so a completed/cancelled cast doesn't instantly restart
+ * every frame you're still standing in the ring -- leaving and re-entering starts a fresh one. */
 static void town_gate_tick(uint32_t now) {
+    static int was_in_range = 0;
     GateCrystalInfo info = town_gate_current_crystal();
     float dx = g_town_x - info.x, dz = g_town_z - info.z;
     g_gate_in_range = (dx * dx + dz * dz) <= (info.radius * info.radius);
+
+    if (g_gate_in_range && !was_in_range && g_gatecast_type == GATECAST_NONE) {
+        town_gate_start_cast(now);
+    }
+    was_in_range = g_gate_in_range;
 
     if (g_gatecast_type == GATECAST_NONE) return;
     uint32_t elapsed = now - g_gatecast_started_ms;
@@ -3730,9 +3745,10 @@ static void town_gate_tick(uint32_t now) {
     }
 }
 
-/* town_gate_start_cast: the "G" key handler calls this -- SDL_KEYDOWN is itself edge-triggered
- * (fires once per physical press, not held), so no separate debounce state is needed, same
- * precedent every other one-shot Town keybind (F10, SPACE) in this file already relies on. */
+/* town_gate_start_cast: the real cast-start logic -- called automatically by town_gate_tick on
+ * the ring-enter edge (the primary path, 2026-08-03 bugfix above), and still callable from the
+ * "G" key as a manual fallback (harmless no-op if already casting or out of range, same guard
+ * either caller relies on). */
 static void town_gate_start_cast(uint32_t now) {
     if (g_gatecast_type != GATECAST_NONE || !g_gate_in_range) return;
     g_gatecast_type = GATECAST_ACTIVE;
