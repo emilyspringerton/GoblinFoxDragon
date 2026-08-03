@@ -3069,7 +3069,13 @@ static int build_heightfield_mesh(const unsigned char *heights, int subdiv,
  * frame without a GPU readback -- build_heightfield_mesh's own cell_size/height_scale args are
  * duplicated as TERRAIN_TEST_CELL_SIZE/TERRAIN_TEST_HEIGHT_SCALE below so mesh generation and
  * height lookup can never disagree about what a heightmap unit means in world space. */
-#define TERRAIN_TEST_CELL_SIZE 1.0f
+/* CELL_SIZE bumped 1.0 -> 3.0, 2026-08-03 (founder: "i waws pretty big in relation to it... its
+ * just a green plane floating in the air") -- a 16x16-cell chunk at cell_size=1.0 is only 16
+ * world units across, roughly two Town buildings wide, genuinely tiny next to a human-scale
+ * avatar. Tripling the physical footprint (48x48) without touching the 16x16 heightmap
+ * resolution itself (fixed by worldapi's own chunk size) makes it read as an actual clearing,
+ * not a table-sized platform. */
+#define TERRAIN_TEST_CELL_SIZE 3.0f
 #define TERRAIN_TEST_HEIGHT_SCALE 0.5f
 typedef struct { Mesh mesh; int scene; int ready; unsigned char heights[256]; } TerrainTestPatch;
 static TerrainTestPatch g_terrain_test[3] = {{{0}, 0, 0, {0}}, {{0}, 1, 0, {0}}, {{0}, 3, 0, {0}}};
@@ -3082,7 +3088,10 @@ static int g_terrain_test_active = 0;
  * placement math WILL drift, and a drift here means the avatar floats over/sinks into terrain
  * that's rendered a few units to the side of where movement thinks it is. */
 static float terrain_test_offset_x(int i) {
-    return ARENA_HALF_EXTENT * 2.2f + 24.0f + (float)i * 20.0f;
+    /* Per-patch step scales with TERRAIN_TEST_CELL_SIZE (full patch width is 16*cell_size) plus
+       an 8-unit gap, so bumping cell_size can never make adjacent patches overlap -- same "one
+       shared constant, every dependent formula reads it" discipline as the constant itself. */
+    return ARENA_HALF_EXTENT * 2.2f + 24.0f + (float)i * (16.0f * TERRAIN_TEST_CELL_SIZE + 8.0f);
 }
 
 /* biome_color (SMOOTH_TERRAIN_NORTHSTAR.md §3.3, Milestone 3, "flat color per mesh-chunk keyed
@@ -3218,6 +3227,19 @@ static int dfzone_height_at(float wx, float wz, float *out_y) {
     float gz = wz / TERRAIN_TEST_CELL_SIZE + 8.0f;
     *out_y = heightfield_sample(g_dfzone_heights, gx, gz) * TERRAIN_TEST_HEIGHT_SCALE;
     return 1;
+}
+
+/* town_move_half_extent (BUGFIX 2026-08-03, founder: "i fell off of it its just a green plane
+ * floating in the air") -- the real, same-class bug TOWN_MOVE_HALF_EXTENT itself was created to
+ * fix (see its own doc comment, "floating in a blue abyss"), just not caught for the Dragonfly
+ * zone case: click-to-move/WASD were clamping to TOWN_MOVE_HALF_EXTENT (~57 units) unconditionally
+ * even while standing on the real dfzone mesh, which only actually spans +-8*TERRAIN_TEST_CELL_SIZE
+ * (24 units at the current scale) -- easily walkable straight off the edge into nothing, same
+ * "no ground renders past a hard-coded bound" failure mode as the original bug. This is now the
+ * single real source both movement clamp call sites read, matching that same fix's own
+ * "one shared constant, not two copies that can drift" discipline. */
+static float town_move_half_extent(void) {
+    return g_dfzone_active ? (8.0f * TERRAIN_TEST_CELL_SIZE) : TOWN_MOVE_HALF_EXTENT;
 }
 
 static void town_draw_dfzone(GLint loc_mvp, GLint loc_model, GLint loc_color, Mat4 vp) {
@@ -4278,17 +4300,30 @@ int main(int argc, char *argv[]) {
                             ah_open();
                             opened = 1;
                         }
-                        else if (bidx >= 0 && strcmp(TOWN_BUILDINGS[bidx].name, "Dragon Gate") == 0 && !g_dfzone_active) {
-                            /* Real telecrystal, routed around apps2/mud's own broken `travel`
-                               dispatch (2026-08-03) -- see town_telecrystal_travel's own doc
-                               comment for the full deadlock investigation. Direct IDUNA PATCH,
-                               same safe mechanism town_sync_position already uses continuously
-                               for ordinary movement, not the headless command path. Guarded on
-                               !g_dfzone_active since Town's own buildings (including this one)
-                               aren't rendered/clickable once the real Dragonfly zone is active --
-                               the "G" key is the return trip from there, see its own handler. */
-                            town_telecrystal_travel();
-                            opened = 1;
+                        else if (!g_dfzone_active) {
+                            /* Dragon Gate telecrystal trigger (BUGFIX 2026-08-03, founder: "it was
+                               hard to trigger the telecrystal and im not sure how it even was
+                               triggered"). Real bug: this used to require the click to land inside
+                               the building's own tiny visual box (half_w=half_d=2.4, a ~5-unit
+                               square) via town_building_at -- nothing like a usable interaction
+                               range, and completely different from how real telecrystals actually
+                               work server-side. server/telecrystal's own
+                               TELECRYSTAL_ID_HANDINGTON_TO_MEADOW carries a real Radius (12
+                               units) specifically for this -- checked directly against the gate's
+                               own real position here (same "client keeps its own copy of crystal
+                               data" convention town_telecrystal_travel's own values already use),
+                               independent of the building's tiny click box. Routed around
+                               apps2/mud's own broken `travel` dispatch (2026-08-03) -- see
+                               town_telecrystal_travel's own doc comment for the full deadlock
+                               investigation. Guarded on !g_dfzone_active since Town's own
+                               buildings aren't rendered once the real Dragonfly zone is active --
+                               the "G" key is the return trip from there. */
+                            const float gate_x = -40.0f, gate_z = -50.0f, gate_radius = 12.0f;
+                            float gdx = gx - gate_x, gdz = gz - gate_z;
+                            if (gdx * gdx + gdz * gdz <= gate_radius * gate_radius) {
+                                town_telecrystal_travel();
+                                opened = 1;
+                            }
                         }
                     }
                     if (!opened) {
@@ -4342,10 +4377,13 @@ int main(int argc, char *argv[]) {
                                nothing 3D renders nearby (a floating building-name label can still
                                project onto screen from any distance since it's a 2D overlay, which
                                is exactly what read as "white writing in the distance" with
-                               everything else gone). Clamped to TOWN_MOVE_HALF_EXTENT, matching
-                               the real rendered ground's own half-extent. */
-                            g_town_target_x = fmaxf(-TOWN_MOVE_HALF_EXTENT, fminf(TOWN_MOVE_HALF_EXTENT, gx));
-                            g_town_target_z = fmaxf(-TOWN_MOVE_HALF_EXTENT, fminf(TOWN_MOVE_HALF_EXTENT, gz));
+                               everything else gone). Clamped to town_move_half_extent(), matching
+                               whichever real rendered ground's own half-extent is currently
+                               active -- Town's own, or the Dragonfly zone's, see its own doc
+                               comment for the real bug this closes there too. */
+                            float move_half = town_move_half_extent();
+                            g_town_target_x = fmaxf(-move_half, fminf(move_half, gx));
+                            g_town_target_z = fmaxf(-move_half, fminf(move_half, gz));
                         }
                     }
                 }
@@ -4371,9 +4409,12 @@ int main(int argc, char *argv[]) {
                         const float TOWN_WASD_LOOKAHEAD = 4.0f;
                         /* Same clamp as click-to-move above, same real bug -- WASD held long
                            enough is actually the more likely way to reach an absurd position
-                           (thousands of units), since it compounds every ~100ms with no cap. */
-                        g_town_target_x = fmaxf(-TOWN_MOVE_HALF_EXTENT, fminf(TOWN_MOVE_HALF_EXTENT, g_town_x + dir_x * TOWN_WASD_LOOKAHEAD));
-                        g_town_target_z = fmaxf(-TOWN_MOVE_HALF_EXTENT, fminf(TOWN_MOVE_HALF_EXTENT, g_town_z + dir_z * TOWN_WASD_LOOKAHEAD));
+                           (thousands of units), since it compounds every ~100ms with no cap.
+                           town_move_half_extent() picks the right bound for whichever ground is
+                           actually rendered right now (Town's own, or the Dragonfly zone's). */
+                        float wasd_move_half = town_move_half_extent();
+                        g_town_target_x = fmaxf(-wasd_move_half, fminf(wasd_move_half, g_town_x + dir_x * TOWN_WASD_LOOKAHEAD));
+                        g_town_target_z = fmaxf(-wasd_move_half, fminf(wasd_move_half, g_town_z + dir_z * TOWN_WASD_LOOKAHEAD));
                         last_town_wasd_ms = now;
                     }
                 }

@@ -205,6 +205,18 @@ follow it (`dfzone_height_at`). A dedicated "G" key is the return trip
 verified visually under Xvfb: Town's checkerboard and buildings genuinely disappear and the real
 Meadow terrain fills the screen at the destination.
 
+**First real playtest found three more real bugs, all fixed same day**: (1) IDUNA's own position
+endpoint returns 204 on success, not 200 -- the client's status check was wrong, so every
+successful travel reported "the crystal fizzles" (`status != 204`, both directions, fixed). (2)
+Movement had no bounds check *inside* the zone -- click-to-move/WASD still clamped to Town's own
+~57-unit footprint, easily walking straight off the real ~8-unit-radius mesh into nothing (same
+failure class as the original Town "floating in a blue abyss" bug, just not caught here yet;
+`town_move_half_extent()` now picks the right bound for whichever ground is actually rendered).
+(3) The zone read as "pretty big in relation to" the avatar and the Dragon Gate click was "hard to
+trigger" -- `TERRAIN_TEST_CELL_SIZE` tripled (1.0 -> 3.0, tripling the physical footprint without
+touching the fixed 16x16 heightmap resolution) and the gate's own click trigger now uses its real
+12-unit telecrystal radius instead of the building's ~5-unit visual box.
+
 **Still not done, named rather than silently ignored**: this is a client-side render swap, not a
 protocol bridge -- the character's real backend session is still `apps2/mud`'s text MUD (position
 PATCHed via IDUNA, same as before), not actually inside `apps2/server-go`'s own UDP world. No

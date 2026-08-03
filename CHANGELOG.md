@@ -1,3 +1,31 @@
+## 2026-08-03 (13)
+
+- fix(battlegrounds_gui): founder tried the real teleport after the fizzle fix -- "it kind of
+  worked... hard to trigger... we teleported to a floating green plane i was pretty big in
+  relation to it and i fell off of it." Three real, separate bugs, all fixed:
+  - **Fell off / floating in the air**: click-to-move and WASD were clamping to
+    `TOWN_MOVE_HALF_EXTENT` (~57 units, Town's own footprint) unconditionally, even while
+    standing on the real Dragonfly zone mesh, which only spans +-8*`TERRAIN_TEST_CELL_SIZE` --
+    easily walkable straight off the edge into nothing. Same failure class as the original
+    "floating in a blue abyss" bug this session already fixed for Town, just not caught for this
+    new case. New `town_move_half_extent()` picks the right bound for whichever ground is
+    actually rendered right now; both movement clamp call sites use it.
+  - **Too small / "pretty big in relation to it"**: `TERRAIN_TEST_CELL_SIZE` bumped 1.0 -> 3.0 --
+    a 16x16-cell chunk at cell_size=1.0 is only 16 world units across, about two Town buildings
+    wide. Tripling the physical footprint (48x48) without touching the fixed 16x16 heightmap
+    resolution makes it read as an actual clearing. `terrain_test_offset_x`'s own per-patch
+    spacing now scales with the same constant so the three F10 debug patches can't start
+    overlapping at the new scale.
+  - **Hard to trigger**: the Dragon Gate click required landing inside the building's own tiny
+    visual box (half_w=half_d=2.4, a ~5-unit square) via `town_building_at` -- nothing like a
+    usable interaction range. Now checks a real 12-unit radius against the gate's own position
+    (server/telecrystal's own real `Radius` value for this crystal), independent of the tiny
+    click box -- roughly 25x more click-tolerant.
+  - Live-verified: screenshotted the larger zone footprint, and directly exercised
+    `town_move_half_extent()` confirming a runaway target position (999 units) correctly clamps
+    to 24 (8*3.0, the new bound) instead of walking off the edge. `go vet`/`go test ./...` and a
+    direct `gcc` client build both clean.
+
 ## 2026-08-03 (12)
 
 - fix(battlegrounds_gui): real root cause of "the crystal fizzles -- travel failed" -- founder hit
