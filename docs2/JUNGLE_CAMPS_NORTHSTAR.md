@@ -8,7 +8,12 @@ assault the towers so it becomes difficult to stale out the game by never attack
 own fork (`apps2/battlegrounds_gui`'s local single-binary simulation), NOT REDGARDEN's own
 `apps/arena_server` -- "work out of a single binary [for now], we will back port to the other one
 [later]." REDGARDEN's own repo/server stays untouched by this doc, same boundary as every other
-Battlegrounds change this session.*
+Battlegrounds change this session. Designed the four Kings' buff mechanics ("i want the god of
+music to give a buff that sticks around as long as one of your team has it... design the other
+mechanics for the rewards for the other encounters") -> "check wikipedia for the 4 heavenly kings
+budhism and update the designs accordingly" -- corrected the initial draft's directions/domains
+against the real Shitennō (the Musician King is East, not North as first guessed); §3.3 now
+checked against source, not invented.*
 
 ---
 
@@ -54,9 +59,9 @@ partly motivating one. Not resolved here -- flagged as a real open question, see
 4 jungle camps, one at each cardinal edge midpoint (N/S/E/W), between the 2 fountain corners
 and the 2 shop corners
     -> each camp waves regular minions from 0:00 (reusing the lane-creep wave/march pattern)
-    -> at 1:00, one boss ("Heavenly King") spawns per camp -- North/Music, South/War, East/Hunt,
-       West/Stone, each granting a mechanically distinct buff on death (team-viral, individual-
-       stacking, team-flat, and proximity-aura respectively -- see §3.3)
+    -> at 1:00, one boss ("Heavenly King") spawns per camp -- East/Music, South/Growth,
+       West/All-Seeing, North/Wealth, each granting a mechanically distinct buff on death
+       (team-viral, individual-stacking, team-flat, and proximity-aura respectively -- see §3.3)
     -> a camp left uncleared for [threshold] escalates -- its own minions eventually stop
        waiting and march toward the nearest node-tower/objective on their own, same
        waypoint-march idiom lane creeps already use, just neutral-aggressive instead of
@@ -94,41 +99,57 @@ up once the first minute's positioning has happened.
 
 Each King grants a genuinely distinct buff mechanic, not four reskins of the same timer (founder
 confirmed: give the four Kings different domains, not a shared buff type -- resolves §5's own
-open question). Designed here, one per cardinal camp:
+open question). Real names/directions/domains checked against Wikipedia's Four Heavenly Kings
+(Buddhism) article, per founder direction ("check wikipedia for the 4 heavenly kings budhism and
+update the designs accordingly") -- the actual Shitennō each guard a specific cardinal direction
+with a specific, real domain, not an arbitrary one this doc gets to assign. Corrected once against
+that source (an earlier draft of this doc had Music at North; the real Musician King is East):
 
-**North -- The God of Music.** Buff: *Catchy Song* (attack speed + move speed, a rhythm buff).
-Mechanic, founder's own design: **team-sticky, spreads on respawn.** Not a flat timer -- the buff
-persists on the TEAM as long as at least one living member currently carries it. A carrier who
-dies loses it personally, but if another teammate still holds it, the team keeps the buff; the
-moment ANY teammate respawns, they pick it up too ("the song reaches them"). Only truly ends once
-every carrier who ever held it is dead with no live relay left to spread it to -- effectively
-un-siegeable in a single teamfight, the opposite of every other timed buff in this game. Real new
-mechanic needed: a team-level buff-carrier set (not a single per-hero timer), checked on every
-respawn event.
+**East -- Dhṛtarāṣṭra, God of Music.** Real iconography: carries a *pipa* (a lute-like stringed
+instrument), leads the Gandharvas (celestial musicians). Buff: *Catchy Song* (attack speed + move
+speed, a rhythm buff). Mechanic, founder's own design: **team-sticky, spreads on respawn.** Not a
+flat timer -- the buff persists on the TEAM as long as at least one living member currently
+carries it. A carrier who dies loses it personally, but if another teammate still holds it, the
+team keeps the buff; the moment ANY teammate respawns, they pick it up too ("the song reaches
+them"). Only truly ends once every carrier who ever held it is dead with no live relay left to
+spread it to -- effectively un-siegeable in a single teamfight, the opposite of every other timed
+buff in this game. Real new mechanic needed: a team-level buff-carrier set (not a single per-hero
+timer), checked on every respawn event.
 
-**South -- The God of War.** Buff: *Bloodroar* (stacking bonus damage). Mechanic: **individual,
+**South -- Virūḍhaka, God of Growth.** Real iconography: rules wind, carries a sword, leads the
+Kumbhāṇḍas (and pretas). Buff: *Bloodroar* (stacking bonus damage). Mechanic: **individual,
 stacking, fragile.** Each takedown while holding it adds a stack (more damage) and refreshes the
 buff's duration -- but it is NOT team-shared and does not survive death: the instant the holder
 dies, the buff and every stack are gone, no drop, no relay. High-risk/high-reward, rewards
 continued aggression and punishes hesitation -- the deliberate opposite of Music's forgiving,
-un-losable persistence.
+un-losable persistence, and a real thematic fit besides: a sword-wielding king whose own domain is
+literally "growth" maps cleanly onto "grows stronger with every kill."
 
-**East -- The God of the Hunt.** Buff: *Farsight* (team-wide vision reveal near camps/objectives +
-bonus gold from monster kills). Mechanic: **team-wide, flat timer, utility not combat.** Everyone
-on the team gets it the instant it's claimed, it just counts down like the existing
-`ARENA_POWERUP_BUFF_MS` powerups already do -- deliberately the simplest of the four (not every
-King needs an exotic mechanic), an econ/scouting reward rather than a fight-winning one.
+**West -- Virūpākṣa, The All-Seeing.** Real iconography: "sees all," associated with a serpent/
+dragon (a red cord representing a nāga), leads the Nāgas, converts non-believers by his sight.
+Buff: *Farsight* (team-wide vision reveal near camps/objectives + bonus gold from monster kills).
+Mechanic: **team-wide, flat timer, utility not combat.** Everyone on the team gets it the instant
+it's claimed, it just counts down like the existing `ARENA_POWERUP_BUFF_MS` powerups already do --
+deliberately the simplest of the four (not every King needs an exotic mechanic), an econ/scouting
+reward rather than a fight-winning one, and a direct fit for "the All-Seeing" specifically (not a
+guessed association -- his real domain is sight).
 
-**West -- The God of Stone.** Buff: *Bulwark* (damage reduction). Mechanic: **proximity aura, not
-a carried buff.** While active, any teammate NEAR the holder also gets the damage reduction, not
-just the holder -- a support/grouping incentive with a normal timer (no team-wide auto-spread like
-Music, no stacking like War), encouraging the team to physically cluster around whoever holds it
-rather than scatter.
+**North -- Vaiśravaṇa, God of Wealth.** Real iconography: chief of the four kings, rules rain,
+carries an umbrella/pagoda, leads the Yakṣas -- widely known outside this context too (Bishamonten
+in Japan, one of the Seven Lucky Gods). Buff: *Bulwark* (damage reduction, umbrella-as-shelter) +
+a smaller bonus-gold trickle to nearby teammates (a direct nod to his real wealth domain, not
+invented from nothing). Mechanic: **proximity aura, not a carried buff.** While active, any
+teammate NEAR the holder also gets the damage reduction (and the gold trickle), not just the
+holder -- a support/grouping incentive with a normal timer (no team-wide auto-spread like Music,
+no stacking like Growth), encouraging the team to physically cluster around whoever holds it
+rather than scatter -- an umbrella large enough to shelter a group, not one person.
 
-Four different persistence shapes on purpose: team-viral (Music), individual-fragile (War),
-team-flat (Hunt), proximity-aura (Stone) -- covers genuinely different strategic incentives
-(protect your carrier vs. play aggressive vs. just wait out the timer vs. group up) instead of
-four buffs that all just feel like different flavors of "+damage for 20 seconds."
+Four different persistence shapes on purpose: team-viral (Music/East), individual-fragile
+(Growth/South), team-flat (All-Seeing/West), proximity-aura (Wealth/North) -- covers genuinely
+different strategic incentives (protect your carrier vs. play aggressive vs. just wait out the
+timer vs. group up) instead of four buffs that all just feel like different flavors of "+damage
+for 20 seconds," and now each one's mechanic is also a real, checked fit for that King's actual
+mythological domain rather than an arbitrary assignment.
 
 ### 3.4 Anti-stall escalation
 
@@ -151,7 +172,8 @@ objective system -- real open question, not guessed at (§5).
 ## 5. Open questions (not resolved here)
 
 - ~~Do the 4 Kings each grant a distinct buff?~~ Resolved: yes, four distinct mechanics, designed
-  in §3.3 (Music/team-viral, War/individual-stacking, Hunt/team-flat, Stone/proximity-aura).
+  in §3.3 against each King's real mythological domain (East/Music-team-viral,
+  South/Growth-individual-stacking, West/All-Seeing-team-flat, North/Wealth-proximity-aura).
 - ~~When does the first King spawn?~~ Resolved: 1:00 into the match (founder). Camp minion waves
   themselves start immediately, same as lane creeps.
 - King respawn after death: does a defeated King respawn later (like the existing powerup pickups'
@@ -169,7 +191,7 @@ objective system -- real open question, not guessed at (§5).
 |---|---|---|---|
 | 0 | This northstar | Written, registered in golden-docs-index | DONE |
 | 1 | Camp placement + minion waves | 4 camps at real N/S/E/W positions spawn neutral-hostile minions on a wave timer from the opening bell, reusing the lane-creep wave/march primitives | NOT STARTED |
-| 2 | Four Heavenly Kings | One real boss per camp, silent until 1:00, each granting its own distinct buff mechanic on death (§3.3: Music/War/Hunt/Stone) | NOT STARTED |
+| 2 | Four Heavenly Kings | One real boss per camp, silent until 1:00, each granting its own distinct buff mechanic on death (§3.3: East/Music, South/Growth, West/All-Seeing, North/Wealth) | NOT STARTED |
 | 2.5 | Team-viral buff carrier system | New mechanic Music's own design needs: a team-level buff-carrier set that persists across deaths and auto-grants on respawn -- the one King mechanic with no existing primitive to extend | NOT STARTED |
 | 3 | Anti-stall escalation | An uncleared camp's minions begin marching toward the nearest objective past a real time threshold | NOT STARTED |
 | 4 | King respawn | Resolves §5's open question -- does a defeated King return on a timer, or once per match | NOT STARTED |
