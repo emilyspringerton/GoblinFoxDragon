@@ -59,17 +59,38 @@ type gameWorld struct {
 type gameEntityHit struct {
 	pos      system.Vec3
 	clientID uint8
+	slot     string // the hit client's own key in gw.clients -- carried through so Entity() can apply real damage
+	clients  map[string]clientInfo
 }
 
 func (h gameEntityHit) Position() system.Vec3       { return h.pos }
-func (h gameEntityHit) Entity() player.LivingEntity { return nopEntity{} }
+func (h gameEntityHit) Entity() player.LivingEntity { return realEntity{clients: h.clients, slot: h.slot} }
 
-// nopEntity satisfies player.LivingEntity -- real damage is applied by the caller (the
-// PacketUserCmd/BtnAttack handler) after HandleShankFire returns hitEntity=true and the hit
-// client's ID, same division of responsibility SHANKPIT's own real version already uses.
-type nopEntity struct{}
+// realEntity applies real damage to a real connected client's hpState (backend-unification,
+// 2026-08-03, founder: "for damage we want to make it match up") -- replaces the previous
+// nopEntity no-op now that gameWorld has a real client to hit in the first place. h.clients is
+// the SAME map the main loop owns (Go maps are reference types), so this mutation is visible
+// there immediately after HandleShankFire returns -- no separate write-back plumbing needed.
+// Mirrors PacketWSCast's own already-real damage application exactly (same
+// targetInfo.hpState.TakeDamage(...) call, same defensive fallback for a client that somehow
+// has no hpState yet), just reached via a hitscan hit instead of an explicit weapon-skill cast.
+type realEntity struct {
+	clients map[string]clientInfo
+	slot    string
+}
 
-func (nopEntity) Hurt(_ float64, _ player.DamageSource) {}
+func (e realEntity) Hurt(amount float64, _ player.DamageSource) {
+	info, ok := e.clients[e.slot]
+	if !ok {
+		return
+	}
+	if info.hpState == nil {
+		fallbackHP, _ := jobpkg.HPAtLevel(jobpkg.WAR, 1)
+		info.hpState = combatTp.NewHPState(fallbackHP)
+	}
+	info.hpState.TakeDamage(int(amount))
+	e.clients[e.slot] = info
+}
 
 const hitboxRadius = 0.4 // matches SHANKPIT's own real value, a real tuned constant, not a guess
 
@@ -83,7 +104,7 @@ func (gw *gameWorld) RayTrace(start, end system.Vec3) (player.RaycastResult, boo
 
 	bestT := maxDist + 1
 	var bestHit *gameEntityHit
-	for _, c := range gw.clients {
+	for slot, c := range gw.clients {
 		if c.id == gw.shooterID {
 			continue
 		}
@@ -98,7 +119,7 @@ func (gw *gameWorld) RayTrace(start, end system.Vec3) (player.RaycastResult, boo
 		closest := start.Add(dirN.Mul(t))
 		if center.Sub(closest).Len() < hitboxRadius && t < bestT {
 			bestT = t
-			h := gameEntityHit{pos: closest, clientID: c.id}
+			h := gameEntityHit{pos: closest, clientID: c.id, slot: slot, clients: gw.clients}
 			bestHit = &h
 		}
 	}

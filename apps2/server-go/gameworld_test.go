@@ -3,6 +3,8 @@ package main
 import (
 	"testing"
 
+	combatTp "dragonsnshit/server/combat"
+	"dragonsnshit/server/player"
 	"dragonsnshit/server/system"
 )
 
@@ -126,5 +128,37 @@ func TestGameWorldRayTrace_ZeroLengthRayNoHit(t *testing.T) {
 	_, hit := gw.RayTrace(system.Vec3{}, system.Vec3{})
 	if hit {
 		t.Fatal("expected a zero-length ray to never report a hit")
+	}
+}
+
+// TestGameEntityHit_EntityAppliesRealDamage checks the real fix (founder: "for damage we want
+// to make it match up") -- Entity().Hurt() now actually reduces the hit client's own real
+// hpState, mirroring PacketWSCast's own already-real damage application, mutating the same
+// clients map the caller (main loop) owns since Go maps are reference types.
+func TestGameEntityHit_EntityAppliesRealDamage(t *testing.T) {
+	clients := map[string]clientInfo{
+		"target": {id: 2, hpState: combatTp.NewHPState(100)},
+	}
+	hit := gameEntityHit{clientID: 2, slot: "target", clients: clients}
+	hit.Entity().Hurt(30, player.DamageSource{Cause: player.CauseProjectile})
+	if got := clients["target"].hpState.Current; got != 70 {
+		t.Fatalf("expected 100-30=70 HP after Hurt(30), got %d", got)
+	}
+}
+
+func TestGameEntityHit_EntityHurtOnMissingClientIsSafeNoop(t *testing.T) {
+	clients := map[string]clientInfo{}
+	hit := gameEntityHit{clientID: 99, slot: "ghost", clients: clients}
+	hit.Entity().Hurt(30, player.DamageSource{Cause: player.CauseProjectile}) // must not panic
+}
+
+func TestGameEntityHit_EntityHurtCreatesFallbackHPStateIfMissing(t *testing.T) {
+	clients := map[string]clientInfo{
+		"target": {id: 2}, // no hpState -- real defensive path, same as PacketWSCast's own
+	}
+	hit := gameEntityHit{clientID: 2, slot: "target", clients: clients}
+	hit.Entity().Hurt(5, player.DamageSource{Cause: player.CauseProjectile})
+	if clients["target"].hpState == nil {
+		t.Fatal("expected a fallback hpState to be created, got nil")
 	}
 }
