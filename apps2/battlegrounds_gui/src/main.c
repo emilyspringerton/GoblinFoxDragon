@@ -1418,10 +1418,23 @@ static void draw_hero_box(float hero_x, float hero_z, float dx, float dy, float 
    staying frozen pointing at a fixed +Z regardless of which way the hero's
    actually walking -- see hero_facing_rad's own doc comment for how
    facing_rad itself gets computed. */
-static void draw_hero_model(ArenaHeroID hero_id, float hero_x, float hero_z, float facing_rad, float squish, const Mat4 *vp,
+/* hero_y (BUGFIX 2026-08-03, founder: "my avatar is not visible in the meadow scene") -- real
+ * world-space Y for the hero's own base (ground height under it), 0.0f for every existing caller
+ * (Battlegrounds' own hero/clone rendering, unaffected). The ONLY place in this entire file that
+ * ever needed a nonzero one -- Town's own avatar, to sit on the real Dragonfly zone's own
+ * elevated terrain (town_ground_y) instead of assuming y=0 -- used to fake it by pre-multiplying
+ * the camera's own vp matrix with a translation (`jump_t * vp`) and passing that AS `vp`. That's
+ * mathematically wrong: a translation applied AFTER `vp` (which already includes the perspective
+ * projection) operates in clip space, not world space, and does NOT correspond to a uniform
+ * world-space shift once the perspective divide happens -- confirmed empirically (a direct,
+ * controlled comparison: the exact same draw call with a real, unmodified `vp` rendered
+ * correctly; with the pre-multiplied one, invisible, regardless of size). The correct fix:
+ * thread the Y offset through the MODEL side (added to every box's own `dy`), where a world-space
+ * shift genuinely belongs, and always pass the real, untouched `vp` through unchanged. */
+static void draw_hero_model(ArenaHeroID hero_id, float hero_x, float hero_y, float hero_z, float facing_rad, float squish, const Mat4 *vp,
                              GLint loc_mvp, GLint loc_model, const Mesh *cube_mesh) {
 #define BOX(dx, dy, dz, sx, sy, sz) \
-    draw_hero_box_facing(hero_x, hero_z, facing_rad, dx, dy, dz, sx, sy, sz, squish, vp, loc_mvp, loc_model, cube_mesh)
+    draw_hero_box_facing(hero_x, hero_z, facing_rad, dx, (dy) + hero_y, dz, sx, sy, sz, squish, vp, loc_mvp, loc_model, cube_mesh)
     switch (hero_id) {
         case ARENA_HERO_UNICORN: /* SHANKPIT SKIN_UNICORN: body + tapered horn */
             BOX(0.0f, 0.55f, 0.0f, 0.85f, 1.1f, 0.85f);
@@ -2929,6 +2942,26 @@ static const float TOWN_TARGET_Z[TOWN_TARGET_COUNT] = {30.0f, 30.0f, 33.0f, 27.0
  * cycle through targets like wow"). */
 static int g_town_target_index = -1;
 
+/* Meadow's real starter-zone worms (2026-08-03, founder: "and we can fight worms in that new
+ * area?" -> "do the engineering work to fix that first"): mirrored by hand from server/mob/
+ * worm.go's own MeadowWormSpawns() (positions AND order, index-for-index, so MEADOW_TARGET_NAMES[i]
+ * always names the mob actually standing at (MEADOW_TARGET_X[i], MEADOW_TARGET_Z[i])), same
+ * "kept in sync by hand" convention TOWN_TARGET_* already established. This is the SAME real
+ * Meadow the MUD's own telnet players have been fighting worms in since before this GUI zone
+ * existed (CHANGELOG: "attack worm-meadow-0 lands a real 30-damage hit") -- not a new mob roster,
+ * just the first time dfzone (this file's own Dragonfly-backed visual Meadow) renders and targets
+ * them. Real, live, server-authoritative combat once town_telecrystal_travel below actually routes
+ * through cmdTravel (fixed 2026-08-03, GoblinFoxDragon 15ea788) instead of the dead IDUNA-only
+ * bypass -- confirmed end-to-end via a direct /api/town/command probe (travel, look, attack all
+ * landing correctly against worm-meadow-0..7) before writing any of this render code. */
+#define MEADOW_TARGET_COUNT 8
+static const char *MEADOW_TARGET_NAMES[MEADOW_TARGET_COUNT] = {
+    "worm-meadow-0", "worm-meadow-1", "worm-meadow-2", "worm-meadow-3",
+    "worm-meadow-4", "worm-meadow-5", "worm-meadow-6", "worm-meadow-7"
+};
+static const float MEADOW_TARGET_X[MEADOW_TARGET_COUNT] = {35.0f, -35.0f, 0.0f, 0.0f, 25.0f, -25.0f, 25.0f, -25.0f};
+static const float MEADOW_TARGET_Z[MEADOW_TARGET_COUNT] = {0.0f, 0.0f, 35.0f, -35.0f, 25.0f, 25.0f, -25.0f, -25.0f};
+
 /* TOWN_BUILDINGS (2026-08-02, founder uploaded a real hand-drawn town map straight to GitHub --
  * "i want the town layout to match town map pretty much exactly"): transcribed from
  * town-map.jpeg, "New Handington." Real named buildings at their real relative positions (a
@@ -3083,14 +3116,22 @@ static int build_heightfield_mesh(const unsigned char *heights, int subdiv,
  * frame without a GPU readback -- build_heightfield_mesh's own cell_size/height_scale args are
  * duplicated as TERRAIN_TEST_CELL_SIZE/TERRAIN_TEST_HEIGHT_SCALE below so mesh generation and
  * height lookup can never disagree about what a heightmap unit means in world space. */
-/* CELL_SIZE bumped 1.0 -> 3.0, 2026-08-03 (founder: "i waws pretty big in relation to it... its
- * just a green plane floating in the air") -- a 16x16-cell chunk at cell_size=1.0 is only 16
- * world units across, roughly two Town buildings wide, genuinely tiny next to a human-scale
- * avatar. Tripling the physical footprint (48x48) without touching the 16x16 heightmap
- * resolution itself (fixed by worldapi's own chunk size) makes it read as an actual clearing,
- * not a table-sized platform. */
-#define TERRAIN_TEST_CELL_SIZE 3.0f
-#define TERRAIN_TEST_HEIGHT_SCALE 0.5f
+/* CELL_SIZE bumped 1.0 -> 3.0 -> 5.0, 2026-08-03 (founder: "i waws pretty big in relation to it...
+ * its just a green plane floating in the air", then later the same day: "also the scene seems
+ * quite small") -- a 16x16-cell chunk at cell_size=1.0 is only 16 world units across, roughly two
+ * Town buildings wide, genuinely tiny next to a human-scale avatar; 3.0 (48x48) still read as
+ * small once real content (Meadow's 8 real worms, MEADOW_TARGET_X/Z up to +-35 units out) needed
+ * to fit inside it. 5.0 gives an 80x80 footprint with a comfortable margin past the farthest real
+ * worm spawn (+-35), so dfzone_height_at's own "one chunk for now" +-8*CELL_SIZE bound
+ * (server/mob/worm.go's own doc comment) covers every real Meadow worm instead of leaving the far
+ * ring standing on the y=0 fallback past the mesh's edge. HEIGHT_SCALE bumped 0.5 -> 1.5 alongside
+ * it, same day, founder: "meadows are not completely flat my bro" landed the real gentle-roll
+ * height data (server/worldapi's own meadowColumnHeight, range 3-5) but at the old 0.5 scale that
+ * 2-unit raw swing was only 1 world unit of real Y variation across an 80-unit-wide zone --
+ * essentially flat again once CELL_SIZE grew. 1.5 makes the same real data read as an actual
+ * gentle roll (up to 3 world units of Y swing) without turning Meadow into Hills. */
+#define TERRAIN_TEST_CELL_SIZE 5.0f
+#define TERRAIN_TEST_HEIGHT_SCALE 1.5f
 typedef struct { Mesh mesh; int scene; int ready; unsigned char heights[256]; } TerrainTestPatch;
 static TerrainTestPatch g_terrain_test[3] = {{{0}, 0, 0, {0}}, {{0}, 1, 0, {0}}, {{0}, 3, 0, {0}}};
 static int g_terrain_test_active = 0;
@@ -3207,6 +3248,31 @@ static int g_dfzone_scene = 0; /* Meadow -- the only real destination Dragon Gat
 static int g_dfzone_ready = 0;
 static int g_dfzone_active = 0;
 
+/* town_active_targets: resolves the real Tab/1-key target set for whichever zone is actually on
+ * screen (2026-08-03, founder: "and we can fight worms in that new area?") -- Town's own
+ * TOWN_TARGET_* while in New Handington, Meadow's real MEADOW_TARGET_* once g_dfzone_active.
+ * Every call site that used to reach for TOWN_TARGET_* directly (town_draw_worms, the HUD target
+ * label, Tab cycling, the "1" attack key) now goes through this instead of a fifth hand-copied
+ * g_dfzone_active check -- and critically, the two arrays are different lengths (4 vs 8), so a
+ * stale index from one zone would silently read out of bounds against the other's shorter array
+ * without this (a Meadow index 5-7 carried into Town's own 4-entry TOWN_TARGET_NAMES).
+ * g_town_target_index is reset to -1 on every real zone transition (town_telecrystal_travel/
+ * return) specifically to close that hole too, not just for UX tidiness. */
+static void town_active_targets(int *out_count, const char *const **out_names,
+                                 const float **out_x, const float **out_z) {
+    if (g_dfzone_active) {
+        *out_count = MEADOW_TARGET_COUNT;
+        *out_names = MEADOW_TARGET_NAMES;
+        *out_x = MEADOW_TARGET_X;
+        *out_z = MEADOW_TARGET_Z;
+    } else {
+        *out_count = TOWN_TARGET_COUNT;
+        *out_names = TOWN_TARGET_NAMES;
+        *out_x = TOWN_TARGET_X;
+        *out_z = TOWN_TARGET_Z;
+    }
+}
+
 static void dfzone_load(void) {
     char path[64];
     snprintf(path, sizeof(path), "/heightmap?scene=%d&cx=0&cz=0", g_dfzone_scene);
@@ -3270,22 +3336,39 @@ static void town_draw_dfzone(GLint loc_mvp, GLint loc_model, GLint loc_color, Ma
 
 /* town_meadow_tree_positions (2026-08-03, founder's own original ask: "render the dragonfly
  * biomes smooth with trees" -- delivered smooth terrain in Milestones 2-4, never actually
- * rendered the trees). Mirrors `server/worldapi/scenes.go`'s own `meadowTrees` exactly -- same
- * deterministic hash (chunkX*31 + chunkZ*17, mod 5) -- so trees render at the exact chunk-local
- * positions the real backend generates them at, not just "some trees somewhere." Meadow only:
- * Hills has none by design (open sightlines, its own doc comment), Swampville has its own
- * mangrove variant but isn't offered as a real Dragon Gate destination. Returns up to 3 (lx, lz)
- * pairs in local chunk-grid coordinates (0-15, same convention `heightfield_sample` uses). */
-static int town_meadow_tree_positions(int chunk_x, int chunk_z, int out_lx[3], int out_lz[3]) {
+ * rendered the trees; density bumped the same day, founder: "adding more trees"). Mirrors
+ * `server/worldapi/scenes.go`'s own `meadowTrees` exactly -- same deterministic hash
+ * (chunkX*31 + chunkZ*17, mod 5) AND the same real positions, so trees render at the exact
+ * chunk-local spots the real backend generates them at, not just "some trees somewhere." Meadow
+ * only: Hills has none by design (open sightlines, its own doc comment), Swampville has its own
+ * mangrove variant but isn't offered as a real Dragon Gate destination. Returns up to 6 (lx, lz)
+ * pairs in local chunk-grid coordinates (0-15, same convention `heightfield_sample` uses) -- every
+ * bucket now real trees, no bare bucket left (the old h%5==4 default returned none at all). */
+static int town_meadow_tree_positions(int chunk_x, int chunk_z, int out_lx[6], int out_lz[6]) {
     int h = chunk_x * 31 + chunk_z * 17;
     int m = h % 5;
     if (m < 0) m += 5; /* C's % can be negative for a negative h; kept correct for future chunks beyond (0,0) */
     switch (m) {
-        case 0: out_lx[0] = 4; out_lz[0] = 4; out_lx[1] = 12; out_lz[1] = 11; return 2;
-        case 1: out_lx[0] = 7; out_lz[0] = 3; return 1;
-        case 2: out_lx[0] = 2; out_lz[0] = 9; out_lx[1] = 13; out_lz[1] = 5; out_lx[2] = 8; out_lz[2] = 13; return 3;
-        case 3: out_lx[0] = 5; out_lz[0] = 7; return 1;
-        default: return 0;
+        case 0:
+            out_lx[0]=2; out_lz[0]=2; out_lx[1]=4; out_lz[1]=11; out_lx[2]=9; out_lz[2]=3;
+            out_lx[3]=12; out_lz[3]=9; out_lx[4]=6; out_lz[4]=14; out_lx[5]=14; out_lz[5]=5;
+            return 6;
+        case 1:
+            out_lx[0]=3; out_lz[0]=6; out_lx[1]=8; out_lz[1]=2; out_lx[2]=11; out_lz[2]=12;
+            out_lx[3]=5; out_lz[3]=9; out_lx[4]=14; out_lz[4]=14; out_lx[5]=2; out_lz[5]=13;
+            return 6;
+        case 2:
+            out_lx[0]=2; out_lz[0]=9; out_lx[1]=13; out_lz[1]=5; out_lx[2]=8; out_lz[2]=13;
+            out_lx[3]=5; out_lz[3]=2; out_lx[4]=11; out_lz[4]=8; out_lx[5]=3; out_lz[5]=14;
+            return 6;
+        case 3:
+            out_lx[0]=5; out_lz[0]=7; out_lx[1]=9; out_lz[1]=12; out_lx[2]=2; out_lz[2]=4;
+            out_lx[3]=13; out_lz[3]=10; out_lx[4]=7; out_lz[4]=2; out_lx[5]=12; out_lz[5]=14;
+            return 6;
+        default:
+            out_lx[0]=6; out_lz[0]=6; out_lx[1]=10; out_lz[1]=3; out_lx[2]=3; out_lz[2]=11;
+            out_lx[3]=13; out_lz[3]=13; out_lx[4]=8; out_lz[4]=8;
+            return 5;
     }
 }
 
@@ -3298,7 +3381,7 @@ static int town_meadow_tree_positions(int chunk_x, int chunk_z, int out_lx[3], i
  * the zone's own real terrain height (dfzone_height_at) rather than assuming y=0. */
 static void town_draw_dfzone_trees(const Mat4 *vp, GLint loc_mvp, GLint loc_model, GLint loc_color, const Mesh *cube_mesh) {
     if (!g_dfzone_active || !g_dfzone_ready || g_dfzone_scene != 0) return; /* Meadow only, see own doc comment above */
-    int lx[3], lz[3];
+    int lx[6], lz[6];
     int n = town_meadow_tree_positions(0, 0, lx, lz);
     for (int i = 0; i < n; i++) {
         float wx = ((float)lx[i] - 8.0f) * TERRAIN_TEST_CELL_SIZE;
@@ -3346,28 +3429,40 @@ static void town_draw_ground(GLint loc_mvp, GLint loc_model, GLint loc_color, Ma
 }
 
 /* town_draw_worms (2026-08-02, founder: "implement the starter area worm" -> "where's my starter
- * zone outside of town with the worms?" -> a ring of TOWN_TARGET_COUNT, not one): server/mob/
- * worm.go's own TownSquareWormSpawns() gives zone 4 real backend worm mobs, but there is no HTTP
- * surface for apps2/mud's mob position/HP at all (only combat text through
- * /api/town/command's own output), so these are decorative placeholders at their real spawn
- * positions, not a live sync of position/HP. Same honest "inert for now" scope as M5's ability
- * panes -- named in the comment, not hidden behind a misleadingly "live" look. The currently
- * Tab-selected target (g_town_target_index) is drawn brighter -- the one real visual affordance
- * for "what am I about to attack." Reuses draw_hero_box, the same stacked-box silhouette
- * primitive every hero model already uses. */
+ * zone outside of town with the worms?" -> a ring of TOWN_TARGET_COUNT, not one; extended
+ * 2026-08-03, founder: "and we can fight worms in that new area?" -> real Meadow worms once
+ * g_dfzone_active): draws whichever target set town_active_targets resolves -- Town's own
+ * decorative TOWN_TARGET_* ring (server/mob/worm.go's TownSquareWormSpawns(), zone 4, no HTTP
+ * surface for live position/HP so this stays a positional placeholder, same honest "inert for
+ * now" scope as M5's ability panes) or Meadow's real MEADOW_TARGET_* worms (the SAME
+ * server-authoritative MeadowWormSpawns() mobs the MUD's own telnet players have fought since
+ * before this GUI zone existed -- equally decorative on the render side, since apps2/mud still has
+ * no live mob-state HTTP surface, but every "1" attack against one of these lands on the real,
+ * live mob). Meadow worms sit on the zone's own real rolling terrain (dfzone_height_at, same
+ * "positioned at real terrain height, not y=0" discipline town_draw_dfzone_trees already uses);
+ * Town's ground is flat by design, so ground_y is always 0 there. The currently Tab-selected
+ * target (g_town_target_index) is drawn brighter -- the one real visual affordance for "what am I
+ * about to attack." Reuses draw_hero_box, the same stacked-box silhouette primitive every hero
+ * model already uses. */
 static void town_draw_worms(const Mat4 *vp, GLint loc_mvp, GLint loc_model, GLint loc_color, const Mesh *cube_mesh) {
-    for (int i = 0; i < TOWN_TARGET_COUNT; i++) {
-        float wx = TOWN_TARGET_X[i], wz = TOWN_TARGET_Z[i];
+    int count;
+    const char *const *names;
+    const float *tx, *tz;
+    town_active_targets(&count, &names, &tx, &tz);
+    for (int i = 0; i < count; i++) {
+        float wx = tx[i], wz = tz[i];
+        float ground_y = 0.0f;
+        if (g_dfzone_active) dfzone_height_at(wx, wz, &ground_y);
         if (i == g_town_target_index) {
             glUniform4f_(loc_color, 0.85f, 0.65f, 0.15f, 1.0f); /* selected: amber highlight */
         } else {
             glUniform4f_(loc_color, 0.5f, 0.38f, 0.16f, 1.0f); /* earthy worm brown */
         }
-        draw_hero_box(wx, wz, 0.5f, 0.18f, 0.0f, 0.35f, 0.18f, 0.22f, 1.0f,
+        draw_hero_box(wx, wz, 0.5f, ground_y + 0.18f, 0.0f, 0.35f, 0.18f, 0.22f, 1.0f,
                       vp, loc_mvp, loc_model, cube_mesh);
-        draw_hero_box(wx, wz, 0.0f, 0.16f, 0.0f, 0.3f, 0.16f, 0.2f, 1.0f,
+        draw_hero_box(wx, wz, 0.0f, ground_y + 0.16f, 0.0f, 0.3f, 0.16f, 0.2f, 1.0f,
                       vp, loc_mvp, loc_model, cube_mesh);
-        draw_hero_box(wx, wz, -0.45f, 0.14f, 0.0f, 0.22f, 0.14f, 0.16f, 1.0f,
+        draw_hero_box(wx, wz, -0.45f, ground_y + 0.14f, 0.0f, 0.22f, 0.14f, 0.16f, 1.0f,
                       vp, loc_mvp, loc_model, cube_mesh);
     }
 }
@@ -3471,7 +3566,11 @@ static void town_draw_hud(int win_w, int win_h, int queue_available) {
            it explains" placement WoW's own target frame uses relative to the action bar. */
         char target_line[64];
         if (g_town_target_index >= 0) {
-            snprintf(target_line, sizeof(target_line), "Target: %s", TOWN_TARGET_NAMES[g_town_target_index]);
+            int tgt_count;
+            const char *const *tgt_names;
+            const float *tgt_x, *tgt_z;
+            town_active_targets(&tgt_count, &tgt_names, &tgt_x, &tgt_z);
+            snprintf(target_line, sizeof(target_line), "Target: %s", tgt_names[g_town_target_index]);
             glColor3f(0.85f, 0.65f, 0.15f);
         } else {
             snprintf(target_line, sizeof(target_line), "Target: none");
@@ -3479,7 +3578,12 @@ static void town_draw_hud(int win_w, int win_h, int queue_available) {
         }
         draw_string(target_line, tiles_x0, tiles_y + tile_size + 10.0f, 10);
         glColor3f(0.5f, 0.55f, 0.55f);
-        draw_string("TAB/SHIFT+TAB - cycle target   1 - attack   SPACE - jump", tiles_x0 - 40.0f, tiles_y + tile_size + 28.0f, 8);
+        if (g_dfzone_active) {
+            draw_string("TAB/SHIFT+TAB - cycle target   1 - attack   SPACE - jump   H - return to town",
+                        tiles_x0 - 40.0f, tiles_y + tile_size + 28.0f, 8);
+        } else {
+            draw_string("TAB/SHIFT+TAB - cycle target   1 - attack   SPACE - jump", tiles_x0 - 40.0f, tiles_y + tile_size + 28.0f, 8);
+        }
     }
 
     if (!queue_available) return;
@@ -3557,7 +3661,21 @@ static ArenaHeroID town_hero_id_for_job(const char *job_main) {
  * re-called on a later Return-to-Town, so a locally-moved-but-not-yet-synced position never gets
  * clobbered by a stale re-fetch. Best-effort and silent on failure (bots/--ticket launches have
  * no g_player_id at all, see g_player_id's own doc comment -- Town simply has no avatar for them,
- * not an error). */
+ * not an error).
+ *
+ * BUGFIX 2026-08-03, founder, live: "i was in the meadow and closed the game - then the thing
+ * happened where i was in the middle of nowhere not in town." Real root cause: this function
+ * used to load pos_x/pos_z unconditionally into g_town_x/g_town_z (Town's own coordinate
+ * variables) without ever reading scene_id -- but g_dfzone_active always starts false on a fresh
+ * launch. A character who last quit while in Meadow has real Meadow-space coordinates (up to
+ * +-35 units, MEADOW_TARGET_X/Z's own real range) sitting in pos_x/pos_z; relaunching read those
+ * same raw numbers straight into Town's own render, which has a much smaller real footprint
+ * (TOWN_MOVE_HALF_EXTENT), landing the avatar and camera orbit far outside anything Town actually
+ * renders -- the exact "floating in nowhere" symptom, just a different root cause than the
+ * earlier unclamped-movement version of that bug (this one is a fetch-time scene mismatch, never
+ * clamped at all, not a movement-clamp gap). Same unresolved gap town_telecrystal_travel's own
+ * doc comment already named ("requiring a relog to (still never) catch up") -- closed here by
+ * reading the real scene_id and switching render mode to match instead of assuming Town. */
 static void town_fetch_character(void) {
     if (!g_chat_jwt[0] || !g_player_id[0]) return;
     char path[128];
@@ -3572,6 +3690,12 @@ static void town_fetch_character(void) {
     if (http_extract_json_double_field(resp, "pos_x", &px)) g_town_x = (float)px;
     if (http_extract_json_double_field(resp, "pos_y", &py)) g_town_y = (float)py;
     if (http_extract_json_double_field(resp, "pos_z", &pz)) g_town_z = (float)pz;
+    long long scene_id = 4; /* New Handington -- the real default a brand-new character's own IDUNA row has */
+    http_extract_json_int_field(resp, "scene_id", &scene_id);
+    if (scene_id == 0) { /* Meadow -- see this function's own BUGFIX doc comment above */
+        dfzone_load();
+        if (g_dfzone_ready) g_dfzone_active = 1;
+    }
     g_town_target_x = g_town_x;
     g_town_target_z = g_town_z;
     g_town_synced_x = g_town_x;
@@ -3612,24 +3736,26 @@ static void town_sync_position(uint32_t now, int force) {
        already uses -- a sync failure shouldn't block Town's own local movement. */
 }
 
-/* town_telecrystal_travel (2026-08-03, founder: "how do we get from town to the starter zone?
- * have one of the gates act as a telecrystal") -- deliberately does NOT go through apps2/mud's
- * own `travel <crystalID>` command / headless `/api/town/command` dispatch. That path has a real,
- * confirmed, unresolved bug (see CHANGELOG + the "Telecrystal to the starter zone" backlog entry):
- * `cmdTravel`'s own gw.mu.Lock() call permanently deadlocks the ENTIRE mud server the moment it's
- * reached via headless dispatch specifically -- reproduced with EVERY pre-existing crystal (not
- * just this one), with the function's body stripped to a bare Lock()/Unlock(), under the race
- * detector, and confirmed via a live delve session that the mutex's own raw state shows locked
- * with zero live holders anywhere in the complete goroutine set. Root cause not found despite
- * exhausting the obvious leads. Rather than ship a GUI trigger for a command that reliably takes
- * the whole server down, this calls the SAME real, already-proven-safe mechanism
- * town_sync_position uses just below -- a direct PATCH to IDUNA's own
- * /api/v1/characters/:id/position, bypassing apps2/mud (and its broken lock) entirely. Target
- * scene/position are the exact real values from server/telecrystal's own
- * TELECRYSTAL_ID_HANDINGTON_TO_MEADOW entry, duplicated here rather than looked up -- the same
- * "client keeps its own copy of crystal data" convention apps/lobby's own TELECRYSTAL_DEFS
- * already established for the older SHANKPIT-lobby client, not a new pattern. Free (CastCost 0
- * server-side too), so there's no gold-deduction race to worry about doing this client-side. */
+/* town_telecrystal_travel/return (2026-08-03, founder: "how do we get from town to the starter
+ * zone? have one of the gates act as a telecrystal" -> later, once Meadow's own worms turned out
+ * unreachable: "do the engineering work to fix that first"): now dispatches the REAL `travel
+ * <crystalID>` MUD command via town_mud_command, same as every other real command in this file.
+ * This used to bypass apps2/mud entirely (a direct PATCH to IDUNA's own
+ * /api/v1/characters/:id/position) because cmdTravel had a real, confirmed self-deadlock reached
+ * via headless dispatch specifically. That bug is now fixed (GoblinFoxDragon 15ea788, "real root
+ * cause of the gw.mu deadlock" -- handle() already locks gw.mu before its own dispatch switch;
+ * cmdTravel's own redundant Lock() call was the bug, not anything about headless dispatch). The
+ * direct-PATCH bypass was never updated to match, which is the real reason Meadow's worms were
+ * unreachable: IDUNA's own character record said scene_id=0, and the client happily rendered
+ * Meadow's terrain, but the LIVE headless MUD session backing real combat (gw.players, cached by
+ * character ID, zoneID set once at session creation) never actually left New Handington, since
+ * only cmdTravel's own gw.zoneMgr.Transfer call registers a real zone change. Confirmed end-to-end
+ * before writing this: a direct /api/town/command probe (travel TELECRYSTAL_ID_HANDINGTON_TO_
+ * MEADOW, then look, then attack worm-meadow-0) landed a real, correct hit against a live Meadow
+ * worm. Crystal IDs/target names match the real response text cmdTravel sends
+ * ("...transported to %s! (-%d Flow)", c.TargetName) -- server/telecrystal's own TargetName
+ * fields ("MEADOW", "NEW HANDINGTON"), not guessed strings. */
+static int town_mud_command(const char *command, char *out_buf, size_t out_buf_size);
 
 /* Arrival banner (apps/lobby's own draw_travel_overlay/travel_overlay_text) -- the one piece of
  * that reference's telecrystal UX not yet ported. Distinct from combat_log_push's own arrival
@@ -3641,74 +3767,39 @@ static char g_travel_overlay_text[64] = "";
 static uint32_t g_travel_overlay_until_ms = 0;
 
 static void town_telecrystal_travel(void) {
-    if (!g_town_char_loaded || !g_chat_jwt[0] || !g_town_char_id[0]) return;
-    const int target_scene = 0;   /* Meadow -- SceneMeadow in server/telecrystal */
-    const float target_x = 0.0f, target_y = 2.0f, target_z = 0.0f; /* real zone.DefaultZones() Meadow spawn */
-    char body[192];
-    snprintf(body, sizeof(body), "{\"scene_id\":%d,\"pos_x\":%.3f,\"pos_y\":%.3f,\"pos_z\":%.3f}",
-             target_scene, target_x, target_y, target_z);
-    char path[128];
-    snprintf(path, sizeof(path), "/api/v1/characters/%s/position", g_town_char_id);
-    char resp[256];
-    int status = 0;
-    /* BUGFIX 2026-08-03, founder: "its not working... it says the crystal fizzles travel fail" --
-       real root cause, not a network/auth problem: IDUNA's own handleUpdatePosition
-       (IDUNA/internal/http/handlers/mmo.go) returns 204 No Content on success
-       (w.WriteHeader(http.StatusNoContent)), not 200. This check was always wrong -- it just
-       never surfaced before, because town_sync_position (the only other caller of this exact
-       endpoint) never checks the status at all ("best-effort, silent-discard"). This was the
-       FIRST caller to actually validate the response, and it validated against the wrong code,
-       so every real travel attempt through the GUI reported failure even when IDUNA's own update
-       had genuinely succeeded. */
-    if (http_patch_json(iduna_host, iduna_port, path, g_chat_jwt, body, resp, sizeof(resp), &status) != 0
-        || status != 204) {
-        combat_log_push("The crystal fizzles -- travel failed.");
+    if (!g_town_char_loaded || !g_town_char_id[0]) return;
+    char out[4096];
+    /* town_mud_command already pushes the real server response text (success or the real
+       rejection reason -- "Crystal ... is not in this zone," "Need N Flow," etc.) to the combat
+       log, so a failure here needs no separate message; just don't flip the render mode. */
+    if (!town_mud_command("travel TELECRYSTAL_ID_HANDINGTON_TO_MEADOW", out, sizeof(out))
+        || !strstr(out, "transported to MEADOW")) {
         return;
     }
-    /* 2026-08-03, founder: "im expecting to teleport from town to the new zone" -- this used to
-       stop here, leaving Town's own New-Handington geometry on screen despite the character's
-       real backend position now being Meadow (named gap, see git history for the old comment).
-       Closed: lazy-load the real Dragonfly Meadow heightmap (dfzone_load, worldapi scene 0) and
-       switch the client's own render mode, so the 3D view actually shows the destination instead
-       of requiring a relog to (still never) catch up. */
     if (!g_dfzone_ready) dfzone_load();
     if (g_dfzone_ready) {
         g_dfzone_active = 1;
-        g_town_x = target_x;
-        g_town_z = target_z;
-        combat_log_push("The crystal resonates... you are transported to Meadow! (press G to return)");
+        g_town_x = 0.0f;
+        g_town_z = 0.0f;
+        g_town_target_index = -1; /* Town's own target index has no meaning against Meadow's real worms */
         snprintf(g_travel_overlay_text, sizeof(g_travel_overlay_text), "TRAVELING: MEADOW");
         g_travel_overlay_until_ms = SDL_GetTicks() + 1400;
     } else {
-        combat_log_push("The crystal resonates, but Meadow's own terrain won't load -- worldapi unreachable?");
+        combat_log_push("Meadow's own terrain won't load -- worldapi unreachable?");
     }
 }
 
-/* town_telecrystal_return: the reverse trip, real values from server/telecrystal's own
- * TELECRYSTAL_ID_MEADOW_RETURN_HANDINGTON entry (SpawnPos {-40,0,-50}, matching the Dragon Gate's
- * own real position in TOWN_BUILDINGS so arriving back lands you right where you left). Same
- * direct-PATCH mechanism as the outbound trip, same reasoning for bypassing apps2/mud. */
 static void town_telecrystal_return(void) {
-    if (!g_town_char_loaded || !g_chat_jwt[0] || !g_town_char_id[0]) return;
-    const int target_scene = 4;   /* New Handington -- SceneNewHandington in server/telecrystal */
-    const float target_x = -40.0f, target_y = 0.0f, target_z = -50.0f; /* Dragon Gate's own real position */
-    char body[192];
-    snprintf(body, sizeof(body), "{\"scene_id\":%d,\"pos_x\":%.3f,\"pos_y\":%.3f,\"pos_z\":%.3f}",
-             target_scene, target_x, target_y, target_z);
-    char path[128];
-    snprintf(path, sizeof(path), "/api/v1/characters/%s/position", g_town_char_id);
-    char resp[256];
-    int status = 0;
-    /* Same 204-not-200 fix as town_telecrystal_travel above -- see its own doc comment. */
-    if (http_patch_json(iduna_host, iduna_port, path, g_chat_jwt, body, resp, sizeof(resp), &status) != 0
-        || status != 204) {
-        combat_log_push("The crystal fizzles -- return failed.");
+    if (!g_town_char_loaded || !g_town_char_id[0]) return;
+    char out[4096];
+    if (!town_mud_command("travel TELECRYSTAL_ID_MEADOW_RETURN_HANDINGTON", out, sizeof(out))
+        || !strstr(out, "transported to NEW HANDINGTON")) {
         return;
     }
     g_dfzone_active = 0;
-    g_town_x = target_x;
-    g_town_z = target_z;
-    combat_log_push("The crystal resonates... you are transported back to New Handington!");
+    g_town_x = -40.0f;
+    g_town_z = -50.0f;
+    g_town_target_index = -1; /* Meadow's real worm-meadow-N indices have no meaning against Town's ring */
     snprintf(g_travel_overlay_text, sizeof(g_travel_overlay_text), "TRAVELING: NEW HANDINGTON");
     g_travel_overlay_until_ms = SDL_GetTicks() + 1400;
 }
@@ -3893,28 +3984,35 @@ static void town_draw_gate_overlay(int win_w, int win_h) {
     }
 }
 
-/* town_send_command: POST to apps2/mud's own /api/town/command (real headless-session combat,
- * GoblinFoxDragon `3a2940d`), parse the "output" field, and push meaningful lines into the
- * SHARED combat log pane (combat_log_push -- the exact same ring buffer/pane Battlegrounds' own
- * combat log already uses; founder: "unify battlegrounds combat with the mud combat on the
- * dragonsnshit side" -- sharing the display surface, not just the "1/2/3" keybind language, is
- * the concrete first step). Filters out pure noise (blank lines, the bracketed status line, the
- * bare "> " prompt) so the log reads as combat events, not a raw MUD terminal dump. Best-effort,
- * same convention as chat_poll -- a request failure just means nothing new shows up this poll. */
-static void town_send_command(const char *command) {
-    if (!g_town_char_id[0]) return;
+/* town_mud_command: POST to apps2/mud's own /api/town/command (real headless-session combat,
+ * GoblinFoxDragon `3a2940d`), parse the "output" field, push meaningful lines into the SHARED
+ * combat log pane (combat_log_push -- the exact same ring buffer/pane Battlegrounds' own combat
+ * log already uses; founder: "unify battlegrounds combat with the mud combat on the dragonsnshit
+ * side"), AND hand the real, unmutated response text back to the caller via out_buf -- the shared
+ * core every /api/town/command caller in this file uses (town_send_command below is the common
+ * "fire and forget" wrapper; town_telecrystal_travel/return use out_buf directly to tell a real
+ * "transported to MEADOW" success from a real server-side rejection, since the response is text,
+ * not a status code). Filters pure noise (blank lines, the bracketed status line, the bare "> "
+ * prompt) out of the combat log specifically -- out_buf itself keeps the full, original text.
+ * Returns 1 on a real response, 0 on any transport/parse failure (out_buf untouched on 0, same as
+ * this function's own callers already assume from town_send_command's prior void-and-silent
+ * shape). Best-effort, same convention as chat_poll -- a request failure just means nothing new
+ * shows up this poll. */
+static int town_mud_command(const char *command, char *out_buf, size_t out_buf_size) {
+    if (!g_town_char_id[0]) return 0;
     char cmd_esc[128];
     json_escape_into(command, cmd_esc, sizeof(cmd_esc));
     char body[256];
     snprintf(body, sizeof(body), "{\"character_id\":\"%s\",\"command\":\"%s\"}", g_town_char_id, cmd_esc);
     char resp[4096];
     int status = 0;
-    if (http_post_json(iduna_host, TOWN_MUD_API_PORT, "/api/town/command", NULL, body, resp, sizeof(resp), &status) != 0) return;
-    if (status != 200) return;
-    char out[4096];
-    if (!http_extract_json_string_field(resp, "output", out, sizeof(out))) return;
+    if (http_post_json(iduna_host, TOWN_MUD_API_PORT, "/api/town/command", NULL, body, resp, sizeof(resp), &status) != 0) return 0;
+    if (status != 200) return 0;
+    if (!http_extract_json_string_field(resp, "output", out_buf, out_buf_size)) return 0;
 
-    char *line = out;
+    char scratch[4096];
+    snprintf(scratch, sizeof(scratch), "%s", out_buf);
+    char *line = scratch;
     while (line && *line) {
         char *nl = strstr(line, "\r\n");
         if (nl) *nl = '\0';
@@ -3929,6 +4027,12 @@ static void town_send_command(const char *command) {
         }
         line = nl ? nl + 2 : NULL;
     }
+    return 1;
+}
+
+static void town_send_command(const char *command) {
+    char out[4096];
+    town_mud_command(command, out, sizeof(out));
 }
 
 /* town_poll_combat: throttled drain (empty command) so background auto-attack ticks -- "You hit
@@ -4493,21 +4597,31 @@ int main(int argc, char *argv[]) {
                        through targets like wow"). SDL's own modifier-state flag, same idiom
                        already used elsewhere in this file (KMOD_SHIFT checks). */
                     int shift = (SDL_GetModState() & KMOD_SHIFT) != 0;
+                    int tgt_count;
+                    const char *const *tgt_names;
+                    const float *tgt_x, *tgt_z;
+                    town_active_targets(&tgt_count, &tgt_names, &tgt_x, &tgt_z);
                     if (g_town_target_index < 0) {
-                        g_town_target_index = shift ? TOWN_TARGET_COUNT - 1 : 0;
+                        g_town_target_index = shift ? tgt_count - 1 : 0;
                     } else if (shift) {
-                        g_town_target_index = (g_town_target_index - 1 + TOWN_TARGET_COUNT) % TOWN_TARGET_COUNT;
+                        g_town_target_index = (g_town_target_index - 1 + tgt_count) % tgt_count;
                     } else {
-                        g_town_target_index = (g_town_target_index + 1) % TOWN_TARGET_COUNT;
+                        g_town_target_index = (g_town_target_index + 1) % tgt_count;
                     }
                 }
                 else if (te.type == SDL_KEYDOWN && te.key.keysym.sym == SDLK_1) {
                     /* "1" -- same ability-slot keybind Battlegrounds already uses (Q/W/E rebound
                        to 1/2/3 this same fork), founder: "unify battlegrounds combat with the
-                       mud combat" -- the real MUD attack command, not a separate control scheme. */
+                       mud combat" -- the real MUD attack command, not a separate control scheme.
+                       Real Meadow worm targets once g_dfzone_active (town_active_targets), same
+                       "1" key, same town_send_command dispatch -- unified, not a second path. */
                     if (g_town_target_index >= 0) {
+                        int tgt_count;
+                        const char *const *tgt_names;
+                        const float *tgt_x, *tgt_z;
+                        town_active_targets(&tgt_count, &tgt_names, &tgt_x, &tgt_z);
                         char cmd[80];
-                        snprintf(cmd, sizeof(cmd), "attack %s", TOWN_TARGET_NAMES[g_town_target_index]);
+                        snprintf(cmd, sizeof(cmd), "attack %s", tgt_names[g_town_target_index]);
                         town_send_command(cmd);
                     }
                 }
@@ -4540,6 +4654,20 @@ int main(int argc, char *argv[]) {
                        directions (town_gate_current_crystal flips identity on g_dfzone_active) --
                        a no-op if not in range, so this is safe to leave unconditional here. */
                     town_gate_start_cast(now);
+                }
+                else if (te.type == SDL_KEYDOWN && te.key.keysym.sym == SDLK_h) {
+                    /* Emergency return-to-town (2026-08-03, founder, live: "i was in the meadow
+                       and closed the game - then the thing happened where i was in the middle of
+                       nowhere not in town - dunno how i get so far away from town i guess we need
+                       a town teleport button"). G/the gate ring is range-gated by design (real
+                       telecrystal UX, see SDLK_g above) -- exactly the problem when you're
+                       actually lost: you can't walk back to a crystal you can't see and don't know
+                       the direction to. H bypasses range/ring state entirely and unconditionally
+                       calls the same real, already-proven town_telecrystal_return -- an escape
+                       hatch, not a replacement for the normal cast UX. Only wired for the Meadow
+                       side (g_dfzone_active) -- being "lost" in Town itself is a different,
+                       already-fixed bug (TOWN_MOVE_HALF_EXTENT's own doc comment). */
+                    if (g_dfzone_active) town_telecrystal_return();
                 }
                 else if (te.type == SDL_MOUSEBUTTONDOWN && te.button.button == SDL_BUTTON_RIGHT) {
                     /* Auction House right-click (2026-08-02, founder: "have it be interractable
@@ -4714,6 +4842,10 @@ int main(int argc, char *argv[]) {
                        Town's own render doesn't apply outside Town. */
                     town_draw_dfzone(loc_mvp, loc_model, loc_color, vp);
                     town_draw_dfzone_trees(&vp, loc_mvp, loc_model, loc_color, &cube_mesh);
+                    /* Real Meadow worms (2026-08-03, founder: "and we can fight worms in that new
+                       area?") -- town_draw_worms itself resolves Town vs Meadow via
+                       town_active_targets/g_dfzone_active, same shared function used below. */
+                    town_draw_worms(&vp, loc_mvp, loc_model, loc_color, &cube_mesh);
                 } else {
                     town_draw_ground(loc_mvp, loc_model, loc_color, vp, &plane_mesh);
                     town_draw_buildings(&vp, loc_mvp, loc_model, loc_color, &cube_mesh);
@@ -4722,21 +4854,18 @@ int main(int argc, char *argv[]) {
                 town_draw_terrain_test(loc_mvp, loc_model, loc_color, vp); /* F10 debug patches, independent of dfzone */
                 town_draw_gate_ring(loc_mvp, loc_model, loc_color, vp); /* real telecrystal cast-radius ring, both directions */
                 if (g_town_char_loaded) {
-                    /* jump offset (and, Milestone 4, real terrain height on an F10 test patch)
-                       applied by pre-multiplying vp with a world-space Y translate --
-                       mat4_translate(0,Y,0) * (vp * model) = (vp * model) shifted by (0,Y,0) in
-                       world space, regardless of whatever squish/rotation is already baked into
-                       draw_hero_model's own internal model matrix. Scoped to just this one draw
-                       call (a local vp copy), not a change to draw_hero_model's shared signature
-                       -- that function is also called from the real match renderer further down
-                       in this file, untouched here. town_ground_y is 0.0f (no-op) everywhere in
-                       Town outside a test patch, computed once above alongside the camera's own
-                       identical lookup so both agree on where the avatar's feet actually are. */
-                    Mat4 jump_t = mat4_translate(0.0f, town_ground_y + g_town_jump_y_offset, 0.0f);
-                    Mat4 vp_avatar = mat4_multiply(&jump_t, &vp);
+                    /* BUGFIX 2026-08-03 (founder: "my avatar is not visible in the meadow
+                       scene"): jump offset + real terrain height (Milestone 4, on an F10 test
+                       patch or the real Dragonfly zone) now passed as draw_hero_model's own real
+                       hero_y parameter -- a genuine world-space Y applied on the MODEL side, not
+                       faked by pre-multiplying the camera's own vp matrix (mathematically wrong,
+                       see draw_hero_model's own doc comment for the full real root cause). vp
+                       itself is passed through untouched, same as every other caller in this
+                       file. */
                     glUniform4f_(loc_color, 0.1f, 0.8f, 0.95f, 1.0f); /* same "my hero" cyan Battlegrounds uses */
-                    draw_hero_model(town_hero_id_for_job(g_town_job), g_town_x, g_town_z,
-                                     g_town_facing_rad, 1.0f, &vp_avatar, loc_mvp, loc_model, &cube_mesh);
+                    draw_hero_model(town_hero_id_for_job(g_town_job), g_town_x,
+                                     town_ground_y + g_town_jump_y_offset, g_town_z,
+                                     g_town_facing_rad, 1.0f, &vp, loc_mvp, loc_model, &cube_mesh);
                 }
 
                 town_draw_hud(win_w, win_h, queue_host != NULL);
@@ -5716,7 +5845,7 @@ int main(int argc, char *argv[]) {
             }
             /* S170-118: per-hero_id silhouette (multi-box), not one generic cube --
                relationship color above still wins for self/team/enemy legibility. */
-            draw_hero_model(h->hero_id, h->x, h->z, hero_facing_rad[i], compute_squish(i), &vp, loc_mvp, loc_model, &cube_mesh);
+            draw_hero_model(h->hero_id, h->x, 0.0f, h->z, hero_facing_rad[i], compute_squish(i), &vp, loc_mvp, loc_model, &cube_mesh);
             if (is_intangible) {
                 glDepthMask(GL_TRUE);
                 glDisable(GL_BLEND);
@@ -5750,7 +5879,7 @@ int main(int argc, char *argv[]) {
             } else {
                 glUniform4f_(loc_color, 0.95f, 0.25f, 0.15f, 1.0f); /* enemy's clone: red */
             }
-            draw_hero_model(h->hero_id, h->x, h->z, clone_facing, 1.0f, &vp, loc_mvp, loc_model, &cube_mesh);
+            draw_hero_model(h->hero_id, h->x, 0.0f, h->z, clone_facing, 1.0f, &vp, loc_mvp, loc_model, &cube_mesh);
         }
 
         /* Selection rings (2026-07-30, "clones multi control drag click all of it"): a ring
