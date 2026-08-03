@@ -217,6 +217,23 @@ trigger" -- `TERRAIN_TEST_CELL_SIZE` tripled (1.0 -> 3.0, tripling the physical 
 touching the fixed 16x16 heightmap resolution) and the gate's own click trigger now uses its real
 12-unit telecrystal radius instead of the building's ~5-unit visual box.
 
+**Real UX upgrade, same day, founder: "check the shankpit side of the codebase there is
+telecrystals the ux is good i want it like that circle showing cast radius cast bar ticks up":**
+the click-based trigger from the fix above was itself replaced entirely, ported from
+`apps/lobby/src/main.c`'s own already-shipped telecrystal UX (the older SHANKPIT-style client in
+this same repo) -- a real reference implementation, not redesigned from scratch. A pulsing
+world-space ring (`town_draw_gate_ring`, new `draw_mesh_lines` -- this client's 3D pass is
+shader-bound, not the legacy matrix stack apps/lobby's own ring uses, so the ring is a real mesh
+through the same pipeline instead of mixed-in immediate-mode calls) sits at the crystal's real
+radius (12 units, both directions, `server/telecrystal`'s own registry values), turning solid
+white when the player is inside it. Pressing G while in range starts a real cast
+(`town_gate_start_cast`) instead of an instant teleport -- a fill bar with a visible commit
+tick-mark (`town_draw_gate_overlay`) advances over 1000ms, the real travel/return call fires at
+the 600ms commit mark (matching the reference's own commit-before-bar-finishes feel), and leaving
+the ring before commit cancels the cast (`town_gate_tick`). Live-verified visually under Xvfb:
+screenshotted mid-cast showing the fill bar, commit marker, and "CASTING: TELEPORT MEADOW" text
+against the real in-range white ring.
+
 **Still not done, named rather than silently ignored**: this is a client-side render swap, not a
 protocol bridge -- the character's real backend session is still `apps2/mud`'s text MUD (position
 PATCHed via IDUNA, same as before), not actually inside `apps2/server-go`'s own UDP world. No

@@ -1,3 +1,28 @@
+## 2026-08-03 (14)
+
+- feat(battlegrounds_gui): real telecrystal cast UX, ported from apps/lobby -- founder: "check the
+  shankpit side of the codebase there is telecrystals the ux is good i want it like that circle
+  showing cast radius cast bar ticks up." Replaces the click-based Dragon Gate trigger entirely
+  with the same real mechanic `apps/lobby/src/main.c` (this repo's own older SHANKPIT-style
+  client) already ships: a pulsing world-space ring at the crystal's real interaction radius (12
+  units, both directions, `server/telecrystal`'s own registry values), turning solid white when
+  the player is inside it; pressing G while in range starts a real cast, not an instant teleport;
+  a fill bar with a commit tick-mark advances over 1000ms, the real travel/return call fires at
+  the 600ms commit mark, and leaving the ring before commit cancels the cast.
+  - New `draw_mesh_lines` (GL_LINE_LOOP twin of `draw_mesh`) -- this client's 3D pass is
+    shader-bound (uMVP uniform), not the legacy fixed-function matrix stack apps/lobby's own ring
+    uses, so the ring is a real mesh through the existing pipeline instead of mixed-in
+    immediate-mode calls that would need their own matrix-stack sync every frame.
+  - New `town_gate_current_crystal`/`town_gate_tick`/`town_gate_start_cast`/`town_draw_gate_ring`/
+    `town_draw_gate_overlay` -- scoped down from the reference's own generic N-crystal table to
+    this client's one real interactive gate, whose identity flips between the two real registry
+    entries (`TELECRYSTAL_ID_HANDINGTON_TO_MEADOW`/`TELECRYSTAL_ID_MEADOW_RETURN_HANDINGTON`)
+    depending on which zone is currently active, same "one gate, both directions" design the
+    click-based version already established.
+  - Live-verified visually under Xvfb: screenshotted mid-cast showing the fill bar, red commit
+    marker, and "CASTING: TELEPORT MEADOW" text against the real in-range white ring. `go vet`/
+    `go test ./...` and a direct `gcc` client build both clean.
+
 ## 2026-08-03 (13)
 
 - fix(battlegrounds_gui): founder tried the real teleport after the fizzle fix -- "it kind of

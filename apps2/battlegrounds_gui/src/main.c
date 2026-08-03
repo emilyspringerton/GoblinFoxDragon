@@ -1341,6 +1341,20 @@ static void draw_mesh(const Mesh *m) {
     glBindVertexArray_(0);
 }
 
+/* draw_mesh_lines: same VAO/VBO layout as draw_mesh, GL_LINE_LOOP instead of GL_TRIANGLES --
+ * upload_mesh doesn't care about draw mode (just uploads a 6-floats/vertex buffer), so this is
+ * the minimal addition needed for a world-space ring outline (telecrystal cast radius, see
+ * town_draw_gate_ring) through the same shader pipeline every other mesh in this client uses,
+ * rather than mixing in the legacy fixed-function immediate-mode calls apps/lobby's own
+ * telecrystal ring uses -- this client's 3D pass is shader-bound (uMVP uniform), not the legacy
+ * matrix stack, so glBegin/glVertex here would draw in the wrong space without also reloading
+ * the legacy PROJECTION/MODELVIEW matrices every frame, real complexity this avoids entirely. */
+static void draw_mesh_lines(const Mesh *m) {
+    glBindVertexArray_(m->vao);
+    glDrawArrays(GL_LINE_LOOP, 0, m->count);
+    glBindVertexArray_(0);
+}
+
 /* one box of a hero model, in hero-local space (dx/dy/dz offset from the hero's
    footprint, sx/sy/sz box scale) -- dy is measured from the ground, not from the
    hero's own translate, since hero translate is already y=0.5 (see caller) */
@@ -3639,6 +3653,162 @@ static void town_telecrystal_return(void) {
     combat_log_push("The crystal resonates... you are transported back to New Handington!");
 }
 
+/* ---------------- telecrystal cast UX (2026-08-03) ----------------
+ * Founder: "check the shankpit side of the codebase there is telecrystals the ux is good i want
+ * it like that circle showing cast radius cast bar ticks up... like that." Ported from the real,
+ * already-shipped reference in `apps/lobby/src/main.c` (GoblinFoxDragon's own older SHANKPIT-
+ * style client) -- TelecrystalDef/telecast_state/telecrystal_tick/draw_world_telecrystals/
+ * draw_telecrystal_overlay there. Same real mechanic, not reinvented: a world-space ring at the
+ * crystal's own real radius (server/telecrystal's real `Radius: 12` for both
+ * TELECRYSTAL_ID_HANDINGTON_TO_MEADOW and TELECRYSTAL_ID_MEADOW_RETURN_HANDINGTON, not a guess),
+ * pulsing when out of range and turning solid white when in range; pressing G while in range
+ * starts a cast (not an instant teleport); the cast bar fills over cast_total_ms with a visible
+ * "commit" tick mark at cast_commit_ms, where the real travel/return call actually fires (same
+ * "commit before the bar visually finishes" feel the reference has); leaving the ring before
+ * commit cancels the cast. Replaces the previous right-click-on-a-tiny-box trigger entirely --
+ * this IS the real crystal interaction now, not an alternate path.
+ *
+ * Scoped down from the reference's own generic N-crystal TELECRYSTAL_DEFS table: this client has
+ * exactly one real interactive gate (Dragon Gate), whose identity (position/radius/prompt/target)
+ * flips between the two real registry entries depending on g_dfzone_active -- same "one gate,
+ * both directions" design the click-based version already established, just carried into the
+ * cast system instead of duplicating a 2-entry table for it. */
+typedef struct { float x, z, radius; const char *prompt; } GateCrystalInfo;
+
+static GateCrystalInfo town_gate_current_crystal(void) {
+    GateCrystalInfo info;
+    if (g_dfzone_active) {
+        /* TELECRYSTAL_ID_MEADOW_RETURN_HANDINGTON: Position{0,2,0}, Radius 12 -- real registry
+           values, server/telecrystal/telecrystal.go. */
+        info.x = 0.0f; info.z = 0.0f; info.radius = 12.0f;
+        info.prompt = "G: RETURN TOWN";
+    } else {
+        /* TELECRYSTAL_ID_HANDINGTON_TO_MEADOW: Position{-40,0,-50}, Radius 12 -- same source. */
+        info.x = -40.0f; info.z = -50.0f; info.radius = 12.0f;
+        info.prompt = "G: TELEPORT MEADOW (STARTER ZONE)";
+    }
+    return info;
+}
+
+typedef enum { GATECAST_NONE = 0, GATECAST_ACTIVE } GateCastType;
+static GateCastType g_gatecast_type = GATECAST_NONE;
+static uint32_t g_gatecast_started_ms = 0;
+static uint32_t g_gatecast_commit_ms = 0;
+static uint32_t g_gatecast_total_ms = 0;
+static int g_gatecast_committed = 0;
+static int g_gate_in_range = 0;
+static Mesh g_gate_ring_mesh;
+static int g_gate_ring_ready = 0;
+
+/* town_gate_tick: called once per frame from Town's own render loop (same "rate-limited
+ * internally, safe to call every frame" convention chat_poll/town_poll_combat already use, minus
+ * the rate limit -- this is pure local state, no HTTP round trip except the one real commit
+ * call). Updates proximity, advances/cancels/commits the active cast. */
+static void town_gate_tick(uint32_t now) {
+    GateCrystalInfo info = town_gate_current_crystal();
+    float dx = g_town_x - info.x, dz = g_town_z - info.z;
+    g_gate_in_range = (dx * dx + dz * dz) <= (info.radius * info.radius);
+
+    if (g_gatecast_type == GATECAST_NONE) return;
+    uint32_t elapsed = now - g_gatecast_started_ms;
+    if (!g_gatecast_committed && !g_gate_in_range) {
+        g_gatecast_type = GATECAST_NONE;
+        combat_log_push("Teleport interrupted -- you left the crystal's range.");
+        return;
+    }
+    if (!g_gatecast_committed && elapsed >= g_gatecast_commit_ms) {
+        g_gatecast_committed = 1;
+        /* Fires the real, already-proven travel/return mechanism -- town_gate_tick doesn't PATCH
+           anything itself, it just decides *when* to call the functions the old click-based
+           trigger used to call immediately on click. */
+        if (g_dfzone_active) town_telecrystal_return();
+        else town_telecrystal_travel();
+        return;
+    }
+    if (elapsed >= g_gatecast_total_ms) {
+        g_gatecast_type = GATECAST_NONE;
+    }
+}
+
+/* town_gate_start_cast: the "G" key handler calls this -- SDL_KEYDOWN is itself edge-triggered
+ * (fires once per physical press, not held), so no separate debounce state is needed, same
+ * precedent every other one-shot Town keybind (F10, SPACE) in this file already relies on. */
+static void town_gate_start_cast(uint32_t now) {
+    if (g_gatecast_type != GATECAST_NONE || !g_gate_in_range) return;
+    g_gatecast_type = GATECAST_ACTIVE;
+    g_gatecast_started_ms = now;
+    g_gatecast_commit_ms = 600;
+    g_gatecast_total_ms = 1000;
+    g_gatecast_committed = 0;
+}
+
+/* town_draw_gate_ring: world-space cast-radius ring, drawn from the 3D pass alongside every other
+ * ground-plane element (town_draw_ground/town_draw_dfzone). Lazily builds a unit circle (radius
+ * 1) once and reuses it for both crystal identities via the model matrix's own scale -- same
+ * "build once, transform per-use" approach build_disc_mesh's own callers already rely on. */
+static void town_draw_gate_ring(GLint loc_mvp, GLint loc_model, GLint loc_color, Mat4 vp) {
+    if (!g_gate_ring_ready) {
+        const int segs = 40;
+        float verts[40 * 6];
+        for (int i = 0; i < segs; i++) {
+            float a = (float)i / (float)segs * 2.0f * (float)M_PI;
+            verts[i * 6 + 0] = cosf(a); verts[i * 6 + 1] = 0.0f; verts[i * 6 + 2] = sinf(a);
+            verts[i * 6 + 3] = 0.0f; verts[i * 6 + 4] = 1.0f; verts[i * 6 + 5] = 0.0f;
+        }
+        g_gate_ring_mesh = upload_mesh(verts, segs);
+        g_gate_ring_ready = 1;
+    }
+    GateCrystalInfo info = town_gate_current_crystal();
+    Mat4 t = mat4_translate(info.x, 0.35f, info.z); /* 0.35f ground clearance, same as apps/lobby's own ring */
+    Mat4 s = mat4_scale(info.radius, 1.0f, info.radius);
+    Mat4 model = mat4_multiply(&t, &s);
+    Mat4 mvp = mat4_multiply(&vp, &model);
+    glUniformMatrix4fv_(loc_mvp, 1, GL_FALSE, mvp.m);
+    glUniformMatrix4fv_(loc_model, 1, GL_FALSE, model.m);
+    if (g_gate_in_range) {
+        glUniform4f_(loc_color, 0.95f, 0.95f, 0.95f, 1.0f); /* solid white, same as reference's own in-range color */
+    } else {
+        float pulse = 0.35f + 0.25f * sinf((float)SDL_GetTicks() * 0.009f); /* same pulse formula as apps/lobby */
+        glUniform4f_(loc_color, 0.85f, 0.55f + pulse * 0.3f, 0.15f, 1.0f); /* amber pulse, Dragon Gate's own building color family */
+    }
+    draw_mesh_lines(&g_gate_ring_mesh);
+}
+
+/* town_draw_gate_overlay: 2D HUD overlay (prompt when in range, cast bar + commit tick-mark while
+ * casting) -- called from Town's own 2D pass, same "glUseProgram_(0)/ortho already set up by
+ * town_draw_hud" assumption chat_draw/combat_log_draw/ah_draw already make. */
+static void town_draw_gate_overlay(int win_w, int win_h) {
+    if (g_gatecast_type != GATECAST_NONE) {
+        uint32_t now = SDL_GetTicks();
+        uint32_t elapsed = now - g_gatecast_started_ms;
+        float t = g_gatecast_total_ms > 0 ? (float)elapsed / (float)g_gatecast_total_ms : 1.0f;
+        if (t > 1.0f) t = 1.0f;
+
+        char line[64];
+        snprintf(line, sizeof(line), "CASTING: %s", g_dfzone_active ? "RETURN TOWN" : "TELEPORT MEADOW");
+        glColor3f(0.95f, 0.9f, 0.25f);
+        draw_string(line, (float)win_w / 2.0f - 110.0f, (float)win_h / 2.0f + 70.0f, 8);
+
+        float bx = (float)win_w / 2.0f - 150.0f, by = (float)win_h / 2.0f + 46.0f, bw = 300.0f, bh = 16.0f;
+        glColor3f(0.1f, 0.1f, 0.12f);
+        glRectf(bx, by, bx + bw, by + bh);
+        glColor3f(0.95f, 0.85f, 0.2f);
+        glRectf(bx + 2.0f, by + 2.0f, bx + 2.0f + (bw - 4.0f) * t, by + bh - 2.0f);
+
+        float commit_t = g_gatecast_total_ms > 0 ? (float)g_gatecast_commit_ms / (float)g_gatecast_total_ms : 1.0f;
+        float marker_x = bx + bw * commit_t;
+        glColor3f(1.0f, 0.25f, 0.25f);
+        glBegin(GL_LINES);
+        glVertex2f(marker_x, by - 5.0f);
+        glVertex2f(marker_x, by + bh + 5.0f);
+        glEnd();
+    } else if (g_gate_in_range) {
+        GateCrystalInfo info = town_gate_current_crystal();
+        glColor3f(1.0f, 0.95f, 0.2f);
+        draw_string(info.prompt, (float)win_w / 2.0f - (float)strlen(info.prompt) * 3.0f, (float)win_h / 2.0f + 70.0f, 8);
+    }
+}
+
 /* town_send_command: POST to apps2/mud's own /api/town/command (real headless-session combat,
  * GoblinFoxDragon `3a2940d`), parse the "output" field, and push meaningful lines into the
  * SHARED combat log pane (combat_log_push -- the exact same ring buffer/pane Battlegrounds' own
@@ -4275,15 +4445,17 @@ int main(int argc, char *argv[]) {
                     if (!any_ready) town_load_terrain_test();
                     g_terrain_test_active = !g_terrain_test_active;
                 }
-                else if (te.type == SDL_KEYDOWN && te.key.keysym.sym == SDLK_g && g_dfzone_active) {
-                    /* Real Dragonfly zone return trip (2026-08-03). Deliberately a dedicated key,
-                       not "right-click anywhere" -- the whole point of getting here was a real,
-                       walkable zone, and hijacking every right-click as "return" would break the
-                       camera-drag control players need to actually look around it. Gated on
-                       g_dfzone_active so "G" is a no-op in Town/battlegrounds, no new collision
-                       with any existing binding. Announced in the zone-entry combat log message
-                       (town_telecrystal_travel) so it's discoverable, not a hidden keybind. */
-                    town_telecrystal_return();
+                else if (te.type == SDL_KEYDOWN && te.key.keysym.sym == SDLK_g) {
+                    /* Real telecrystal cast trigger (2026-08-03, founder: "check the shankpit
+                       side of the codebase there is telecrystals the ux is good... circle
+                       showing cast radius cast bar ticks up") -- ported from apps/lobby's own
+                       real telecrystal UX, see the "telecrystal cast UX" block above
+                       (town_gate_start_cast/town_gate_tick) for the full design. Replaces the
+                       old right-click-on-a-tiny-box instant trigger entirely: G while standing
+                       inside the ring starts a real cast, not an instant teleport. Works both
+                       directions (town_gate_current_crystal flips identity on g_dfzone_active) --
+                       a no-op if not in range, so this is safe to leave unconditional here. */
+                    town_gate_start_cast(now);
                 }
                 else if (te.type == SDL_MOUSEBUTTONDOWN && te.button.button == SDL_BUTTON_RIGHT) {
                     /* Auction House right-click (2026-08-02, founder: "have it be interractable
@@ -4291,7 +4463,9 @@ int main(int argc, char *argv[]) {
                        checked before starting a camera drag, same screen_to_ground ray-cast
                        click-to-move already uses. Any point within the building's own box
                        (town_building_at) opens it; right-click anywhere else still drags the
-                       camera exactly as before. */
+                       camera exactly as before. The Dragon Gate's own former right-click trigger
+                       lived here until 2026-08-03 -- replaced by the real cast UX above (G key +
+                       proximity ring), not click-based anymore. */
                     float gx, gz;
                     int opened = 0;
                     if (screen_to_ground(te.button.x, te.button.y, win_w, win_h, 60.0f, g_town_x, g_town_z, &gx, &gz)) {
@@ -4299,31 +4473,6 @@ int main(int argc, char *argv[]) {
                         if (bidx >= 0 && strcmp(TOWN_BUILDINGS[bidx].name, "Auction House") == 0) {
                             ah_open();
                             opened = 1;
-                        }
-                        else if (!g_dfzone_active) {
-                            /* Dragon Gate telecrystal trigger (BUGFIX 2026-08-03, founder: "it was
-                               hard to trigger the telecrystal and im not sure how it even was
-                               triggered"). Real bug: this used to require the click to land inside
-                               the building's own tiny visual box (half_w=half_d=2.4, a ~5-unit
-                               square) via town_building_at -- nothing like a usable interaction
-                               range, and completely different from how real telecrystals actually
-                               work server-side. server/telecrystal's own
-                               TELECRYSTAL_ID_HANDINGTON_TO_MEADOW carries a real Radius (12
-                               units) specifically for this -- checked directly against the gate's
-                               own real position here (same "client keeps its own copy of crystal
-                               data" convention town_telecrystal_travel's own values already use),
-                               independent of the building's tiny click box. Routed around
-                               apps2/mud's own broken `travel` dispatch (2026-08-03) -- see
-                               town_telecrystal_travel's own doc comment for the full deadlock
-                               investigation. Guarded on !g_dfzone_active since Town's own
-                               buildings aren't rendered once the real Dragonfly zone is active --
-                               the "G" key is the return trip from there. */
-                            const float gate_x = -40.0f, gate_z = -50.0f, gate_radius = 12.0f;
-                            float gdx = gx - gate_x, gdz = gz - gate_z;
-                            if (gdx * gdx + gdz * gdz <= gate_radius * gate_radius) {
-                                town_telecrystal_travel();
-                                opened = 1;
-                            }
                         }
                     }
                     if (!opened) {
@@ -4452,6 +4601,7 @@ int main(int argc, char *argv[]) {
 
                 chat_poll(now); /* rate-limited internally, safe to call every frame */
                 town_poll_combat(now); /* rate-limited internally, safe to call every frame */
+                town_gate_tick(now); /* pure local state (proximity + cast progress), safe every frame */
 
                 glViewport(0, 0, win_w, win_h);
                 glClearColor(0.5f, 0.75f, 0.92f, 1.0f); /* open-sky blue, distinct from battlegrounds' dark-green backdrop */
@@ -4485,6 +4635,7 @@ int main(int argc, char *argv[]) {
                     town_draw_worms(&vp, loc_mvp, loc_model, loc_color, &cube_mesh);
                 }
                 town_draw_terrain_test(loc_mvp, loc_model, loc_color, vp); /* F10 debug patches, independent of dfzone */
+                town_draw_gate_ring(loc_mvp, loc_model, loc_color, vp); /* real telecrystal cast-radius ring, both directions */
                 if (g_town_char_loaded) {
                     /* jump offset (and, Milestone 4, real terrain height on an F10 test patch)
                        applied by pre-multiplying vp with a world-space Y translate --
@@ -4504,6 +4655,7 @@ int main(int argc, char *argv[]) {
                 }
 
                 town_draw_hud(win_w, win_h, queue_host != NULL);
+                town_draw_gate_overlay(win_w, win_h); /* real telecrystal cast prompt/bar, same 2D pass as the HUD above */
                 if (!g_dfzone_active) town_draw_building_labels(&vp, win_w, win_h); /* New-Handington-specific */
                 chat_draw(win_w, win_h);
                 combat_log_draw(win_w, win_h);
