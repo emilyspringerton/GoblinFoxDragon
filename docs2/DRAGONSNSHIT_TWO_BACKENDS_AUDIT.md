@@ -58,6 +58,37 @@ confirmed via repo-wide grep, only the definition file references it. So there's
 other players' positions to a connected client today; each client only sees its own voxel-chunk
 stream, hit impacts, and chat.
 
+**Done, 2026-08-03 (real backend-unification slice, founder: "server-authoritative position"):**
+`PacketSnapshot` is now real, not just defined. New `integrateMovement`/`buildSnapshotPacket`
+(`apps2/server-go/snapshot.go`) give `clientInfo` a real, server-owned `pos`/`yaw`, integrated
+every `PacketUserCmd` from raw input (deliberately not trusting a client-reported position, a
+real cheat vector for an MMO) and broadcast to every other connected client roughly every 250ms
+from the main loop itself (not a new goroutine -- `clients`/`clientAddrs` have no real mutex
+protecting them yet, a pre-existing gap, and adding a second unsynchronized accessor would be a
+real new crash risk, not fixed here but not made worse either).
+
+**Real, non-trivial discovery made getting here**: no on-foot movement integration existed
+anywhere in this codebase family before this -- not even in SHANKPIT's own more mature sibling
+server, which is genuinely server-authoritative for hit detection but only continuously
+integrates movement for its racing minigame (`racing.go`'s own `applyRacingTick`, vehicle
+physics, the wrong shape for walking). `integrateMovement` is the first general-purpose one.
+`buildSnapshotPacket`'s own byte layout was verified against apps2/lobby's real, compiler-padded
+C struct sizes (a standalone `gcc`+`offsetof` probe, not assumed from the field list) -- `sizeof
+(NetHeader)=12`, `sizeof(NetPlayer)=44`, both with real alignment padding a naive field-order
+read would have missed. 7 new tests, including a byte-for-byte layout check. Live-verified: the
+real production `gfd-server-go.service` rebuilt, redeployed, and confirmed stable (no crash,
+including the zero-connected-clients case running the new broadcast path every ~250ms).
+
+**Still real, named gaps, not solved by this slice**: no collision against world geometry
+(`world.RayTrace` is still a stub, pre-existing, not touched here) -- a player's server-side
+position reflects what their input claims, not yet what's physically possible. FPS-specific
+`NetPlayer` fields this backend has no tracking for (weapon/ammo/shooting/vehicle/crouch/shield/
+hit-feedback) are zero-filled, not faked. Broadcast rate is ~4Hz (this loop's own natural 250ms
+cadence), well under SHANKPIT sibling's own 30Hz -- real, un-costly headroom for later, once a
+mutex-protected client map makes a dedicated ticker goroutine safe to add. Mobs are still not
+attempted (unchanged from this doc's own earlier text) -- this closes the *other players*
+visibility gap specifically, not the *mobs* one.
+
 ### A third piece, also found today: `apps2/lobby`
 An 884-line C/SDL2 client already being built against `apps2/server-go`'s exact protocol
 (`packages2/common`, `PacketConnect`, etc.) — a real, if much smaller and less complete, precedent

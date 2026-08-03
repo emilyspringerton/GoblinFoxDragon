@@ -97,6 +97,15 @@ type clientInfo struct {
 	// on respawn (see PacketRespawn's own handler) -- not written back to IDUNA yet, a further
 	// gap named there, not silently hidden.
 	currentXP int
+	// pos/yaw (backend-unification, 2026-08-03): real server-authoritative position, integrated
+	// from raw UserCmd input every tick by integrateMovement (snapshot.go) -- picked deliberately
+	// over trusting a client-reported position, a real cheat vector for an MMO. No collision
+	// against world geometry yet (world.RayTrace is a real stub, always returns false -- a
+	// pre-existing gap, not introduced here); this tracks *where input says a player went*, not
+	// yet *where they were physically allowed to go*. Broadcast to other clients via
+	// buildSnapshotPacket/PacketSnapshot, confirmed-unused until now.
+	pos system.Vec3
+	yaw float32
 }
 
 // wsChainState mirrors apps2/mud's own gw.mobChains, keyed by the TARGET client's slot
@@ -229,7 +238,53 @@ func main() {
 		}
 	}()
 
+	lastSnapshotBroadcast := time.Now()
+	const snapshotInterval = 250 * time.Millisecond // matches the read-loop's own natural poll cadence below -- see its own doc comment for why this isn't the higher SHANKPIT-sibling rate (33ms/30Hz)
+
 	for {
+		// Backend-unification, 2026-08-03: real player-position broadcast (PacketSnapshot,
+		// confirmed unused until now). Deliberately built and sent from THIS single-threaded
+		// main loop, not a new ticker goroutine like the World Crisis one above -- `clients`/
+		// `clientAddrs` have no real mutex protecting them today (the existing broadcast
+		// goroutine already reads them unsynchronized, a pre-existing, named, not-fixed-here
+		// race; see its own comment, "clients/clientAddrs are accessed from main loop; broadcast
+		// via channel" -- an intent that was only half-wired). Adding a THIRD unsynchronized
+		// accessor would be a real, new Go crash risk (concurrent map read/write panics), not
+		// just a style nit. Doing it here instead means it only ever runs where `clients` is
+		// already safely, singly owned. Real, honest tradeoff: ~4Hz (driven by this loop's own
+        // 250ms read-timeout cadence) instead of SHANKPIT sibling's own 30Hz -- a named,
+		// follow-on-able limitation, not silently accepted as good enough forever.
+		if time.Since(lastSnapshotBroadcast) >= snapshotInterval {
+			lastSnapshotBroadcast = time.Now()
+			all := make([]snapshotPeer, 0, len(clients))
+			for slot, info := range clients {
+				if _, ok := clientAddrs[slot]; !ok {
+					continue
+				}
+				peer := snapshotPeer{id: info.id, pos: info.pos, yaw: info.yaw}
+				if info.hpState != nil {
+					peer.health, peer.maxHP, peer.isKO = info.hpState.Current, info.hpState.Max, info.hpState.IsKO
+				}
+				all = append(all, peer)
+			}
+			for slot, info := range clients {
+				addr, ok := clientAddrs[slot]
+				if !ok {
+					continue
+				}
+				peers := make([]snapshotPeer, 0, len(all))
+				for _, peer := range all {
+					if peer.id != info.id {
+						peers = append(peers, peer)
+					}
+				}
+				if len(peers) == 0 {
+					continue
+				}
+				conn.WriteToUDP(buildSnapshotPacket(info.id, peers), addr)
+			}
+		}
+
 		conn.SetReadDeadline(time.Now().Add(250 * time.Millisecond))
 		n, remote, err := conn.ReadFromUDP(buf)
 		if err != nil {
@@ -304,6 +359,13 @@ func main() {
 			}
 			cmd := parseUserCmd(buf, netHeaderSize+1)
 			clientStore.Upsert(slot, cmd)
+			// Backend-unification, 2026-08-03: real server-authoritative position, integrated
+			// from this UserCmd's own raw input (see integrateMovement's own doc comment,
+			// snapshot.go, for the real yaw/forward convention this defines -- no existing
+			// on-foot movement precedent anywhere in this codebase family to match against).
+			info.pos = integrateMovement(info.pos, cmd, float64(cmd.Msec)/1000.0)
+			info.yaw = cmd.Yaw
+			clients[slot] = info
 			if cmd.Buttons&common.BtnAttack != 0 {
 				hit, pos, hitEntity := player.HandleShankFire(p, float64(cmd.Yaw), float64(cmd.Pitch), int(cmd.WeaponIdx))
 				if hit {

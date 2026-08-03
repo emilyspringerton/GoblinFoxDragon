@@ -1,3 +1,30 @@
+## 2026-08-03 (19)
+
+- feat(server-go): real backend-unification slice -- server-authoritative player position +
+  PacketSnapshot, closing the "other players visible to each other" gap
+  DRAGONSNSHIT_TWO_BACKENDS_AUDIT.md named as the natural next step. Founder picked
+  "server-authoritative position" explicitly over trusting client-reported position (a real
+  cheat vector for an MMO). New `apps2/server-go/snapshot.go`:
+  - `integrateMovement`: the first general-purpose on-foot movement integration anywhere in this
+    codebase family -- not even SHANKPIT's own more mature sibling server has one outside its
+    racing minigame's vehicle physics (`racing.go`'s `applyRacingTick`, the wrong shape for
+    walking). Defines the yaw/forward convention from scratch since no client (including
+    apps2/lobby, the one real client already speaking this protocol) does local movement
+    integration to match against.
+  - `buildSnapshotPacket`: matches apps2/lobby's real, compiler-padded C struct layout
+    byte-for-byte -- verified via a standalone `gcc`+`offsetof` probe (`sizeof(NetHeader)=12`,
+    `sizeof(NetPlayer)=44`), not assumed from the field list alone.
+  - Broadcast runs from the main read loop itself, not a new goroutine -- `clients`/`clientAddrs`
+    have no real mutex protecting them yet (pre-existing gap), and a second unsynchronized
+    accessor would be a real new crash risk. ~4Hz cadence (this loop's own 250ms poll timeout),
+    a named, real limitation vs. SHANKPIT sibling's own 30Hz.
+  - 7 new tests (movement math + a byte-for-byte wire-format check). `go build`/`go vet`/`go
+    test ./...` clean. Live-verified: real `gfd-server-go.service` rebuilt, redeployed, confirmed
+    stable including the zero-clients edge case.
+  - Named gaps, not solved here: no collision against world geometry (pre-existing stub, still a
+    stub); FPS-specific `NetPlayer` fields this backend doesn't track (weapon/ammo/vehicle/etc)
+    are zero-filled, not faked; mobs remain entirely out of scope (unchanged).
+
 ## 2026-08-03 (18)
 
 - ops: deployed the real `df-mc/dragonfly` fork (`emilyspringerton/dragonfly`, confirmed genuine
