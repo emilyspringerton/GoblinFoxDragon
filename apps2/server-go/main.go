@@ -130,6 +130,11 @@ func initCityState() {
 func main() {
 	worldapiPort := flag.Int("worldapi-port", 7070, "HTTP port for the worldapi /chunks endpoint (0 = disabled)")
 	trapxPort := flag.Int("trapx-port", 7071, "HTTP port for the TRAPX city-state API (0 = disabled)")
+	udpPort := flag.Int("udp-port", 6969, "UDP port for the real game protocol -- was hardcoded to "+
+		"6969, which SHANKPIT's own shank_server already occupies on this box (2026-08-03, founder: "+
+		"\"we need to get the dragonfly server seeded with a world... to debug\"); made configurable "+
+		"so a debug instance can run alongside SHANKPIT without a port conflict, default unchanged "+
+		"for anyone who wants the original behavior")
 	flag.Parse()
 
 	initCityState()
@@ -159,7 +164,7 @@ func main() {
 		}()
 	}
 
-	addr, err := net.ResolveUDPAddr("udp", ":6969")
+	addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", *udpPort))
 	if err != nil {
 		panic(err)
 	}
@@ -169,7 +174,7 @@ func main() {
 	}
 	defer conn.Close()
 
-	fmt.Println("Go backend listening on :6969")
+	fmt.Printf("Go backend listening on :%d\n", *udpPort)
 	authVerifier := idunaauth.NewVerifier()
 	idunaClient := idunaclient.New()
 	buf := make([]byte, 2048)

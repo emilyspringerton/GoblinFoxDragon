@@ -1,0 +1,48 @@
+# DragonsNShit real Go backend (apps2/server-go) -- user-level systemd unit (no sudo required)
+#
+# Deploy:
+#   mkdir -p ~/.config/systemd/user ~/.config/gfd-server-go
+#   cp ops/systemd/gfd-server-go.service ~/.config/systemd/user/
+#   # env file needs IDUNA_AGENT_NAME + IDUNA_AGENT_SECRET, same convention as gfd-mud's own
+#   GOWORK=off go build -o /home/fatbaby/GoblinFoxDragon/server-go ./apps2/server-go
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now gfd-server-go.service
+#
+# Added 2026-08-03 -- founder: "for now we need to get the dragonfly server seeded with a world"
+# (continuing the SMOOTH_TERRAIN_NORTHSTAR.md real-terrain-rendering work, and the separate
+# "warp from town to the zone backed by dragonfly" bridge question). This binary had never been
+# run under supervision before -- built, but always left on disk, same starting state gfd-mud.service
+# itself was in before 2026-07-23.
+#
+# Real port conflict found and fixed the same day: this binary used to hardcode UDP :6969 for its
+# own real game protocol, which SHANKPIT's own shank_server already occupies live on this box.
+# -udp-port is now a real flag (default unchanged at 6969 for anyone who wants the original
+# behavior) -- deployed here on 6970 specifically so this can run alongside SHANKPIT without
+# taking it down or fighting over the port.
+#
+# Real, honest gap, not fixed by this unit alone: a real Minecraft Bedrock client (founder asked
+# "can we... connect from my phones minecraft, to debug") CANNOT talk to this protocol regardless
+# of which port it's on -- this is a from-scratch custom UDP protocol (IDUNA-JWT auth, its own
+# packet format), not real Bedrock/RakNet networking. This unit gets the backend running and
+# serving real worldapi chunk data (GET /chunks on :7070) for GoblinFoxDragon's OWN clients to
+# consume -- SHANKPIT's apps/lobby already does; apps2/battlegrounds_gui's own smooth-terrain
+# render mode (SMOOTH_TERRAIN_NORTHSTAR.md, still NOT STARTED) is what would let Town's own client
+# do the same. Real Bedrock-protocol compatibility is a separate, much larger project, not this.
+
+[Unit]
+Description=DragonsNShit real Go backend (GoblinFoxDragon apps2/server-go) -- worldapi + UDP game protocol
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/fatbaby/GoblinFoxDragon
+EnvironmentFile=-%h/.config/gfd-server-go/env
+ExecStart=/home/fatbaby/GoblinFoxDragon/server-go -udp-port 6970 -worldapi-port 7070 -trapx-port 7071
+Restart=on-failure
+RestartSec=10s
+StandardOutput=append:/home/fatbaby/GoblinFoxDragon/var/logs/server-go.log
+StandardError=append:/home/fatbaby/GoblinFoxDragon/var/logs/server-go.log
+MemoryMax=512M
+
+[Install]
+WantedBy=default.target

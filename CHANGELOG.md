@@ -1,3 +1,28 @@
+## 2026-08-03 (4)
+
+- feat(server-go): get apps2/server-go running under supervision for the first time -- founder:
+  "for now we need to get the dragonfly server seeded with a world". The binary existed but had
+  never been run supervised; its hardcoded UDP `:6969` also collided with SHANKPIT's own live
+  `shank_server` (confirmed via `lsof -i :6969`, not `ss`, which didn't reveal the real listener).
+  Added a `-udp-port` flag (default unchanged at 6969) so it no longer has to fight SHANKPIT for
+  the port. New `ops/systemd/gfd-server-go.service` user unit, deployed on `:6970` (worldapi
+  `:7070`, trapx `:7071`). Live-verified: `GET /chunks?scene=0&cx=0&cz=0` returns real Meadow
+  block data (1308 blocks, correct grass/dirt/stone layering, 8 real oak-log tree blocks) --
+  "seeded with a world" is now literally true and running.
+- docs(smooth-terrain): amended SMOOTH_TERRAIN_NORTHSTAR.md (§3.5 Trees, §3.6 the Town<->Dragonfly
+  bridge open question, §3.7 explicitly-out-of-scope: world sculpting + real Bedrock connectivity)
+  in response to founder direction ("render the dragonfly biomes smooth with trees... like a nice
+  minecraft meadow biome but we render it with our frontend"). Added Milestone 0.5 (server-go
+  running + seeded, DONE).
+- docs(smooth-terrain): founder forked the real `github.com/df-mc/dragonfly` Bedrock server
+  library to `emilyspringerton/dragonfly`. Confirmed genuine and unmodified (zero commits ahead of
+  upstream `master`). Built and ran it vanilla: real RakNet/Bedrock listener on UDP `:19132`,
+  `mc-version=1.26.30` -- a real phone Minecraft client can connect to it today, unmodified, for
+  debug purposes. This answers "can I connect from my phone's minecraft, to debug" using vanilla
+  upstream content; getting GoblinFoxDragon's own Meadow content reachable the same way is a
+  separate, much larger integration (a custom world/chunk provider sourcing from
+  `server/worldapi`'s `ProceduralWorldStore`), not attempted here.
+
 ## 2026-08-03 (3)
 
 - fix(mud): REAL root cause of the gw.mu deadlock found and fixed -- founder: "pls fix" (not
