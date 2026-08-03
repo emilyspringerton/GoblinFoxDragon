@@ -3584,6 +3584,16 @@ static void town_sync_position(uint32_t now, int force) {
  * "client keeps its own copy of crystal data" convention apps/lobby's own TELECRYSTAL_DEFS
  * already established for the older SHANKPIT-lobby client, not a new pattern. Free (CastCost 0
  * server-side too), so there's no gold-deduction race to worry about doing this client-side. */
+
+/* Arrival banner (apps/lobby's own draw_travel_overlay/travel_overlay_text) -- the one piece of
+ * that reference's telecrystal UX not yet ported. Distinct from combat_log_push's own arrival
+ * message: this is a brief, large, screen-centered confirmation right at the moment of arrival,
+ * not a line in a scrolling log easy to miss mid-fight. Declared here (ahead of
+ * town_telecrystal_travel/return, which set it) rather than down with the rest of the gate-cast
+ * state, since those two functions are defined before that block. */
+static char g_travel_overlay_text[64] = "";
+static uint32_t g_travel_overlay_until_ms = 0;
+
 static void town_telecrystal_travel(void) {
     if (!g_town_char_loaded || !g_chat_jwt[0] || !g_town_char_id[0]) return;
     const int target_scene = 0;   /* Meadow -- SceneMeadow in server/telecrystal */
@@ -3621,6 +3631,8 @@ static void town_telecrystal_travel(void) {
         g_town_x = target_x;
         g_town_z = target_z;
         combat_log_push("The crystal resonates... you are transported to Meadow! (press G to return)");
+        snprintf(g_travel_overlay_text, sizeof(g_travel_overlay_text), "TRAVELING: MEADOW");
+        g_travel_overlay_until_ms = SDL_GetTicks() + 1400;
     } else {
         combat_log_push("The crystal resonates, but Meadow's own terrain won't load -- worldapi unreachable?");
     }
@@ -3651,6 +3663,8 @@ static void town_telecrystal_return(void) {
     g_town_x = target_x;
     g_town_z = target_z;
     combat_log_push("The crystal resonates... you are transported back to New Handington!");
+    snprintf(g_travel_overlay_text, sizeof(g_travel_overlay_text), "TRAVELING: NEW HANDINGTON");
+    g_travel_overlay_until_ms = SDL_GetTicks() + 1400;
 }
 
 /* ---------------- telecrystal cast UX (2026-08-03) ----------------
@@ -3700,6 +3714,14 @@ static int g_gate_in_range = 0;
 static Mesh g_gate_ring_mesh;
 static int g_gate_ring_ready = 0;
 static void town_gate_start_cast(uint32_t now); /* forward decl -- town_gate_tick calls this, defined just below it */
+
+static void town_draw_travel_overlay(int win_w, int win_h) {
+    uint32_t now = SDL_GetTicks();
+    if (g_travel_overlay_until_ms <= now) return;
+    glColor3f(0.9f, 0.9f, 0.2f);
+    draw_string(g_travel_overlay_text, (float)win_w / 2.0f - (float)strlen(g_travel_overlay_text) * 3.5f,
+                (float)win_h / 2.0f + 10.0f, 14);
+}
 
 /* town_gate_tick: called once per frame from Town's own render loop (same "rate-limited
  * internally, safe to call every frame" convention chat_poll/town_poll_combat already use, minus
@@ -4672,6 +4694,7 @@ int main(int argc, char *argv[]) {
 
                 town_draw_hud(win_w, win_h, queue_host != NULL);
                 town_draw_gate_overlay(win_w, win_h); /* real telecrystal cast prompt/bar, same 2D pass as the HUD above */
+                town_draw_travel_overlay(win_w, win_h); /* brief "TRAVELING: <destination>" banner right on arrival */
                 if (!g_dfzone_active) town_draw_building_labels(&vp, win_w, win_h); /* New-Handington-specific */
                 chat_draw(win_w, win_h);
                 combat_log_draw(win_w, win_h);

@@ -1,3 +1,13 @@
+## 2026-08-03 (16)
+
+- feat(battlegrounds_gui): telecrystal arrival banner, the last piece of apps/lobby's own
+  telecrystal UX ported over. New `town_draw_travel_overlay`/`g_travel_overlay_text` show a
+  brief, large, screen-centered "TRAVELING: MEADOW" / "TRAVELING: NEW HANDINGTON" banner right at
+  the moment of arrival (apps/lobby's own `draw_travel_overlay`/`travel_overlay_text`), distinct
+  from `combat_log_push`'s own arrival line -- a scrolling log entry, easy to miss mid-fight; the
+  banner isn't. Set at both real arrival points, 1.4s duration. Live-verified visually under
+  Xvfb. `go vet`/`go test ./...` and a direct `gcc` client build both clean.
+
 ## 2026-08-03 (15)
 
 - fix(battlegrounds_gui): telecrystal cast now auto-starts on ring entry, no key needed --

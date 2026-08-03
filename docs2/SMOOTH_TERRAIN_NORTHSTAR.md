@@ -242,6 +242,14 @@ expected path is now pure proximity -- walk in, the bar starts. Live-verified vi
 Xvfb: simulated walking from outside the ring to inside it and screenshotted the cast bar already
 progressing on arrival, no keypress simulated.
 
+**Reference UX port completed, same day**: the one remaining piece of `apps/lobby`'s own
+telecrystal UX not yet carried over -- a brief, large, screen-centered "TRAVELING: <destination>"
+banner right at the moment of arrival (`town_draw_travel_overlay`/`g_travel_overlay_text`,
+apps/lobby's own `draw_travel_overlay`/`travel_overlay_text`), distinct from
+`combat_log_push`'s own arrival line (a scrolling log entry, easy to miss mid-fight; the banner
+isn't). Set at both real arrival points (`town_telecrystal_travel`/`town_telecrystal_return`),
+1.4s duration. Live-verified visually under Xvfb.
+
 **Still not done, named rather than silently ignored**: this is a client-side render swap, not a
 protocol bridge -- the character's real backend session is still `apps2/mud`'s text MUD (position
 PATCHed via IDUNA, same as before), not actually inside `apps2/server-go`'s own UDP world. No
