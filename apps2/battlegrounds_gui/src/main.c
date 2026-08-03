@@ -3559,8 +3559,17 @@ static void town_telecrystal_travel(void) {
     snprintf(path, sizeof(path), "/api/v1/characters/%s/position", g_town_char_id);
     char resp[256];
     int status = 0;
+    /* BUGFIX 2026-08-03, founder: "its not working... it says the crystal fizzles travel fail" --
+       real root cause, not a network/auth problem: IDUNA's own handleUpdatePosition
+       (IDUNA/internal/http/handlers/mmo.go) returns 204 No Content on success
+       (w.WriteHeader(http.StatusNoContent)), not 200. This check was always wrong -- it just
+       never surfaced before, because town_sync_position (the only other caller of this exact
+       endpoint) never checks the status at all ("best-effort, silent-discard"). This was the
+       FIRST caller to actually validate the response, and it validated against the wrong code,
+       so every real travel attempt through the GUI reported failure even when IDUNA's own update
+       had genuinely succeeded. */
     if (http_patch_json(iduna_host, iduna_port, path, g_chat_jwt, body, resp, sizeof(resp), &status) != 0
-        || status != 200) {
+        || status != 204) {
         combat_log_push("The crystal fizzles -- travel failed.");
         return;
     }
@@ -3596,8 +3605,9 @@ static void town_telecrystal_return(void) {
     snprintf(path, sizeof(path), "/api/v1/characters/%s/position", g_town_char_id);
     char resp[256];
     int status = 0;
+    /* Same 204-not-200 fix as town_telecrystal_travel above -- see its own doc comment. */
     if (http_patch_json(iduna_host, iduna_port, path, g_chat_jwt, body, resp, sizeof(resp), &status) != 0
-        || status != 200) {
+        || status != 204) {
         combat_log_push("The crystal fizzles -- return failed.");
         return;
     }

@@ -1,3 +1,19 @@
+## 2026-08-03 (12)
+
+- fix(battlegrounds_gui): real root cause of "the crystal fizzles -- travel failed" -- founder hit
+  this immediately on trying the real Dragon Gate teleport. IDUNA's own `handleUpdatePosition`
+  (`IDUNA/internal/http/handlers/mmo.go`) returns **204 No Content** on success, not 200 --
+  `town_telecrystal_travel`/`town_telecrystal_return` were checking `status != 200`, so every
+  genuinely successful position update was reported as a failure. Never surfaced before because
+  the only other caller of this exact endpoint, `town_sync_position`, never checks the response
+  status at all ("best-effort, silent-discard" for ordinary movement sync) -- today's real
+  teleport work was the first caller to actually validate the response, against the wrong code.
+  Confirmed via direct code read (not guessed): player JWTs set `sub` to the player's own real
+  `player_id` (`player_email_auth.go`), matching `characters.player_id` by construction, so the
+  handler's ownership check isn't the failure mode for a player acting on their own character --
+  the 204-vs-200 mismatch is sufficient on its own to explain every observed failure. Fixed both
+  call sites to check `status != 204`.
+
 ## 2026-08-03 (11)
 
 - feat(battlegrounds_gui): real Town <-> Dragonfly zone teleport -- founder: "im expecting to
