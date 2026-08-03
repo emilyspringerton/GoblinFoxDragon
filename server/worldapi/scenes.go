@@ -251,18 +251,7 @@ func hillsChunk(chunkX, chunkZ int) []WorldBlock {
 		for x := 0; x < chunkSize; x++ {
 			wx := chunkX*chunkSize + x
 			wz := chunkZ*chunkSize + z
-			// Sinusoidal height: 4 ± 2 blocks variation
-			height := 4 + int(math.Round(
-				2.0*math.Sin(float64(wx)*0.35) +
-					1.5*math.Cos(float64(wz)*0.28) +
-					0.8*math.Sin(float64(wx+wz)*0.17),
-			))
-			if height < 2 {
-				height = 2
-			}
-			if height > 8 {
-				height = 8
-			}
+			height := hillsColumnHeight(wx, wz)
 			// Stone base
 			for y := 0; y <= height-2; y++ {
 				out = append(out, WorldBlock{X: wx, Y: y, Z: wz, BlockName: "minecraft:stone"})
@@ -276,6 +265,26 @@ func hillsChunk(chunkX, chunkZ int) []WorldBlock {
 		}
 	}
 	return out
+}
+
+// hillsColumnHeight returns the same sinusoidal height hillsChunk builds blocks up
+// to for world column (wx, wz), clamped to 2-8. Split out (SMOOTH_TERRAIN_NORTHSTAR.md
+// Milestone 1, "backend heightmap exposure") so the /heightmap endpoint and hillsChunk's
+// own block generation can never drift apart — one formula, two callers, not two copies
+// of the same math to keep in sync by hand.
+func hillsColumnHeight(wx, wz int) int {
+	height := 4 + int(math.Round(
+		2.0*math.Sin(float64(wx)*0.35)+
+			1.5*math.Cos(float64(wz)*0.28)+
+			0.8*math.Sin(float64(wx+wz)*0.17),
+	))
+	if height < 2 {
+		height = 2
+	}
+	if height > 8 {
+		height = 8
+	}
+	return height
 }
 
 // ── scene 2: stone caves ──────────────────────────────────────────────────────

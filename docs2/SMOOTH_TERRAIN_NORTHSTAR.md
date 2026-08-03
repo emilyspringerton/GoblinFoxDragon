@@ -79,6 +79,18 @@ Meadow, Swampville, the flat 200-series set-pieces) -- either a new endpoint
 additive field on the existing `/chunks` response. A genuinely 3D scene (Caves) has no single
 height-per-column and is explicitly out of scope for this doc -- see §4.
 
+**Done, 2026-08-03 (Milestone 1):** `GET /heightmap?scene=N&cx=X&cz=Z` shipped in
+`server/worldapi` (`heightmap.go`), returning `{"height": [uint8 x256], "biome": int}` -- biome is
+a single value for the whole chunk, not a 256-entry array, since `ProceduralWorldStore` has no
+per-column biome mixing to expose yet (would just be wasted bytes on the wire). Covers Meadow
+(flat, 4), Hills (real per-column variation, `hillsColumnHeight` split out of `hillsChunk` itself
+so the two can't drift apart), and Swampville (flat, water cells one block higher than dry land).
+Caves correctly returns 204 (no height-per-column view exists for it). Live-verified against the
+running `gfd-server-go.service`: Meadow returns a uniform `{4}`, Hills returns real min=2/max=8
+variation, Swamp returns both `{1,2}`, Caves 204. Test coverage includes a direct cross-check
+against `hillsChunk`'s own block output so the extracted height formula can't silently drift from
+the block generation it came from.
+
 ### 3.2 Client: heightfield mesh generator
 
 New function, same shape as `town_draw_ground`: for a chunk-sized grid, sample the heightmap at
@@ -194,7 +206,7 @@ design (§3.4).
 |---|---|---|---|
 | 0 | This northstar | Written, registered in golden-docs-index | DONE |
 | 0.5 | apps2/server-go running + seeded | Supervised (systemd), non-conflicting port, `/chunks` serves real block+tree data | DONE (2026-08-03) |
-| 1 | Backend heightmap exposure | New endpoint or field returns per-column height (+ biome id) for column-derived scenes (Hills first) | NOT STARTED |
+| 1 | Backend heightmap exposure | New endpoint or field returns per-column height (+ biome id) for column-derived scenes (Hills first) | DONE (2026-08-03) |
 | 2 | Client heightfield mesh | New mesh-gen function renders a smooth, interpolated (not stair-stepped) terrain surface for one test scene, reusing the existing pos+normal pipeline unchanged | NOT STARTED |
 | 3 | Biome flat-coloring | Terrain chunks colored by dominant biome, same flat-per-draw-call convention as Town's ground | NOT STARTED |
 | 4 | Movement/camera elevation awareness | WASD movement, click-to-move, and camera focus read real terrain height instead of assuming 0, for the same test scene | NOT STARTED |

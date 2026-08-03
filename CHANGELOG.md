@@ -1,3 +1,16 @@
+## 2026-08-03 (7)
+
+- feat(worldapi): ship Milestone 1 of SMOOTH_TERRAIN_NORTHSTAR.md -- backend heightmap exposure.
+  New `GET /heightmap?scene=N&cx=X&cz=Z` (`server/worldapi/heightmap.go`) returns
+  `{"height": [uint8 x256], "biome": int}` for Meadow (flat), Hills (real per-column variation --
+  `hillsColumnHeight` split out of `hillsChunk` so block generation and the heightmap endpoint
+  share one formula, can't drift apart), and Swampville (flat, water one block higher than land).
+  Caves correctly 204s -- it's a genuinely 3D solid grid with no single height per column. New
+  tests include a direct cross-check of the heightmap against `hillsChunk`'s own real block
+  output. Live-verified against the running `gfd-server-go.service`. `go vet`/`go test ./...`
+  clean (one pre-existing, unrelated `sync.RWMutex` copy warning in `apps2/server-go/main.go`,
+  confirmed via earlier `git stash` comparison this session, not touched here).
+
 ## 2026-08-03 (6)
 
 - docs(mud): confirmed Sunderworm crisis broadcasts reach Town's chat/combat-log pane -- an
