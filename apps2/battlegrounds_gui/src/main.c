@@ -2973,6 +2973,134 @@ static const TownBuilding TOWN_BUILDINGS[TOWN_BUILDING_COUNT] = {
 static int g_town_char_loaded = 0;
 static float town_q_peak_ms = 0.0f, town_w_peak_ms = 0.0f, town_r_peak_ms = 0.0f;
 
+/* Dragonfly worldapi's own heightmap port (SMOOTH_TERRAIN_NORTHSTAR.md Milestone 1,
+ * apps2/server-go's -worldapi-port flag, deployed at :7070 -- gfd-server-go.service). Same-box
+ * convention as TOWN_MUD_API_PORT just below: reuses iduna_host, a different port, not a second
+ * host-config surface. */
+#define TOWN_WORLDAPI_PORT 7070
+
+/* heightfield_sample: bilinear interpolation of a 16x16 per-column heightmap (worldapi's own
+ * GET /heightmap wire format, row-major x*16+z) at fractional source-grid coordinate (gx, gz).
+ * Clamped to the chunk's own edges -- no wraparound to a neighboring chunk, a real chunk-seam
+ * blending problem left for later (this milestone renders one chunk in isolation). */
+static float heightfield_sample(const unsigned char *heights, float gx, float gz) {
+    if (gx < 0.0f) gx = 0.0f; if (gx > 15.0f) gx = 15.0f;
+    if (gz < 0.0f) gz = 0.0f; if (gz > 15.0f) gz = 15.0f;
+    int x0 = (int)gx, z0 = (int)gz;
+    int x1 = x0 < 15 ? x0 + 1 : x0;
+    int z1 = z0 < 15 ? z0 + 1 : z0;
+    float tx = gx - (float)x0, tz = gz - (float)z0;
+    float h00 = heights[x0 * 16 + z0], h10 = heights[x1 * 16 + z0];
+    float h01 = heights[x0 * 16 + z1], h11 = heights[x1 * 16 + z1];
+    float h0 = h00 + (h10 - h00) * tx;
+    float h1 = h01 + (h11 - h01) * tx;
+    return h0 + (h1 - h0) * tz;
+}
+
+/* build_heightfield_mesh (SMOOTH_TERRAIN_NORTHSTAR.md Milestone 2, "client heightfield mesh"):
+ * samples a 16x16 worldapi heightmap at `subdiv`x resolution per source cell, bilinearly
+ * interpolating between samples (heightfield_sample) so slopes read as continuous rather than
+ * the stair-stepped per-block look this doc exists to move away from. Normals come from the
+ * local height gradient (finite differences), not a hardcoded +Y. Emits triangles through the
+ * exact same pos+normal (6 floats/vertex) layout every other mesh in this client already uses
+ * (upload_mesh/draw_mesh) -- no shader or pipeline change needed, per §3.2's own design.
+ * cell_size is the world-space size of one SOURCE heightmap cell (one Minecraft block width);
+ * height_scale converts a heightmap unit (a block count) into world-space Y. Returns vertex
+ * count and writes a heap-allocated vertex buffer to *out_verts (caller must free() it after
+ * upload_mesh copies it into a VBO -- same "build once, upload once" convention build_disc_mesh
+ * and every other static mesh in this file already follows, just heap-allocated here since the
+ * size depends on `subdiv`, not a compile-time constant). */
+static int build_heightfield_mesh(const unsigned char *heights, int subdiv,
+                                   float cell_size, float height_scale,
+                                   float **out_verts) {
+    const int grid = 16;
+    const int res = grid * subdiv;
+    const float step = 1.0f / (float)subdiv;
+    const float eps = 0.15f; /* gradient sample offset, in source-grid units */
+    int vert_count = res * res * 6; /* 2 tris/quad * 3 verts/tri */
+    float *verts = (float *)malloc(sizeof(float) * 6 * (size_t)vert_count);
+    int vi = 0;
+    for (int gz = 0; gz < res; gz++) {
+        for (int gx = 0; gx < res; gx++) {
+            float corner_gx[4] = {gx * step, (gx + 1) * step, (gx + 1) * step, gx * step};
+            float corner_gz[4] = {gz * step, gz * step, (gz + 1) * step, (gz + 1) * step};
+            float px[4], py[4], pz[4], nx[4], ny[4], nz[4];
+            for (int c = 0; c < 4; c++) {
+                float sgx = corner_gx[c], sgz = corner_gz[c];
+                float h = heightfield_sample(heights, sgx, sgz);
+                px[c] = (sgx - grid / 2.0f) * cell_size;
+                pz[c] = (sgz - grid / 2.0f) * cell_size;
+                py[c] = h * height_scale;
+
+                float hx0 = heightfield_sample(heights, sgx - eps, sgz);
+                float hx1 = heightfield_sample(heights, sgx + eps, sgz);
+                float hz0 = heightfield_sample(heights, sgx, sgz - eps);
+                float hz1 = heightfield_sample(heights, sgx, sgz + eps);
+                float dhdx = (hx1 - hx0) * height_scale / (2.0f * eps * cell_size);
+                float dhdz = (hz1 - hz0) * height_scale / (2.0f * eps * cell_size);
+                float len = sqrtf(dhdx * dhdx + 1.0f + dhdz * dhdz);
+                nx[c] = -dhdx / len; ny[c] = 1.0f / len; nz[c] = -dhdz / len;
+            }
+            static const int tri[6] = {0, 1, 2, 0, 2, 3};
+            for (int t = 0; t < 6; t++) {
+                int c = tri[t];
+                verts[vi++] = px[c]; verts[vi++] = py[c]; verts[vi++] = pz[c];
+                verts[vi++] = nx[c]; verts[vi++] = ny[c]; verts[vi++] = nz[c];
+            }
+        }
+    }
+    *out_verts = verts;
+    return vert_count;
+}
+
+/* ---------------- terrain test mode (2026-08-03, Milestone 2 validation) ----------------
+ * Founder's own northstar goal is smooth Dragonfly biomes rendered by this client -- but real
+ * in-game placement (Milestone 4: movement/camera reading real terrain height) is explicitly a
+ * separate, later milestone (§3.4/§5), and the Town<->Dragonfly bridge itself is still an open
+ * question (§3.6). This is deliberately just a debug toggle: F10 fetches Hills' real heightmap
+ * from worldapi (chunk 0,0) over HTTP, builds the mesh above, and renders it floating beside
+ * Town so the mesh-generation code can be seen and validated against real backend data -- not
+ * a real walkable zone, not wired into movement/collision. Lazy-loaded on first press so Town's
+ * own startup never depends on worldapi being reachable. */
+static Mesh g_terrain_test_mesh;
+static int g_terrain_test_ready = 0;
+static int g_terrain_test_active = 0;
+
+static void town_load_terrain_test(void) {
+    char resp[8192];
+    int status = 0;
+    if (http_get_json(iduna_host, TOWN_WORLDAPI_PORT, "/heightmap?scene=1&cx=0&cz=0", NULL,
+                       resp, sizeof(resp), &status) != 0 || status != 200) {
+        return;
+    }
+    unsigned char heights[256];
+    size_t found = 0;
+    if (!http_extract_json_uint8_array_field(resp, "height", heights, 256, &found) || found != 256) {
+        return;
+    }
+    float *verts = NULL;
+    int vert_count = build_heightfield_mesh(heights, 2 /* subdiv */, 1.0f /* cell_size */,
+                                             0.5f /* height_scale */, &verts);
+    g_terrain_test_mesh = upload_mesh(verts, vert_count);
+    free(verts);
+    g_terrain_test_ready = 1;
+}
+
+/* town_draw_terrain_test: floats the Hills test mesh well clear of Town's own footprint
+ * (ARENA_HALF_EXTENT * 2.2f is Town's own total ground span, see town_draw_ground) so it never
+ * overlaps or gets mistaken for real Town geometry. Flat grass-green uColor -- per-vertex biome
+ * coloring is §3.3's own separate, not-yet-built piece of work. */
+static void town_draw_terrain_test(GLint loc_mvp, GLint loc_model, GLint loc_color, Mat4 vp) {
+    if (!g_terrain_test_active || !g_terrain_test_ready) return;
+    float offset_x = ARENA_HALF_EXTENT * 2.2f + 24.0f;
+    Mat4 model = mat4_translate(offset_x, 0.0f, 0.0f);
+    Mat4 mvp = mat4_multiply(&vp, &model);
+    glUniformMatrix4fv_(loc_mvp, 1, GL_FALSE, mvp.m);
+    glUniformMatrix4fv_(loc_model, 1, GL_FALSE, model.m);
+    glUniform4f_(loc_color, 0.35f, 0.62f, 0.28f, 1.0f); /* grass green */
+    draw_mesh(&g_terrain_test_mesh);
+}
+
 /* town_draw_ground: NxN alternating grey/brown tiles spanning the exact same total footprint
  * (ARENA_HALF_EXTENT * 2.2f) as battlegrounds' own single-color ground plane just below in
  * main()'s "ground" block -- "same size as the battlegrounds scene," per the founder's own ask.
@@ -4093,6 +4221,7 @@ int main(int argc, char *argv[]) {
                 glUseProgram_(prog);
                 glUniform3f_(loc_light, 0.4f, 0.8f, 0.3f);
                 town_draw_ground(loc_mvp, loc_model, loc_color, vp, &plane_mesh);
+                town_draw_terrain_test(loc_mvp, loc_model, loc_color, vp);
                 town_draw_buildings(&vp, loc_mvp, loc_model, loc_color, &cube_mesh);
                 town_draw_worms(&vp, loc_mvp, loc_model, loc_color, &cube_mesh);
                 if (g_town_char_loaded) {
@@ -4230,6 +4359,13 @@ int main(int argc, char *argv[]) {
             }
             if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_F11) {
                 show_apm = !show_apm; /* S170-71: works in any mode, not gated on net_mode/observing */
+            }
+            if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_F10) {
+                /* SMOOTH_TERRAIN_NORTHSTAR.md Milestone 2 debug toggle, same "works in any mode"
+                   precedent as F11 above. Lazy-loads on first press (town_load_terrain_test),
+                   silently no-ops if worldapi isn't reachable -- see its own doc comment. */
+                if (!g_terrain_test_ready) town_load_terrain_test();
+                g_terrain_test_active = !g_terrain_test_active;
             }
             if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_h) {
                 show_ability_help = !show_ability_help; /* same "works in any mode" precedent as F11 above */

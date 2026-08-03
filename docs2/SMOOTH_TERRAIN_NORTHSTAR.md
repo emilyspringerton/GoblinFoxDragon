@@ -99,6 +99,21 @@ slopes read as continuous rather than stepped, compute each vertex's normal from
 gradient, and emit triangles through the existing `upload_mesh`/`draw_mesh` path -- no new GL
 state, no shader changes, same VAO/VBO layout every other mesh in this client already uses.
 
+**Done, 2026-08-03 (Milestone 2):** `build_heightfield_mesh` + `heightfield_sample`
+(`apps2/battlegrounds_gui/src/main.c`) fetch a real heightmap from the Milestone 1 `/heightmap`
+endpoint over HTTP (new `http_extract_json_uint8_array_field` in `http_client.h`), bilinearly
+interpolate at 2x the source resolution, derive per-vertex normals from finite-difference height
+gradients, and emit triangles through the exact same pos+normal `upload_mesh`/`draw_mesh` path
+every other mesh in this client uses -- no shader change. Wired as an F10 debug toggle
+(`town_load_terrain_test`/`town_draw_terrain_test`) that renders the real live Hills chunk (0,0)
+floating clear of Town's own footprint, not integrated into Town itself (Town stays flat by
+design, §3.4) and not wired into movement/collision (Milestone 4). Live-verified visually: built
+and ran the real client under Xvfb (`gcc` direct build, `sandertv`-free -- this is
+GoblinFoxDragon's own client, unrelated to the df-mc/dragonfly fork discussed in §3.7), connected
+to Town via a WOTAN dev-agent identity, screenshotted the F10 mesh -- a real smooth, continuously
+gradient-shaded rolling surface, not stair-stepped cubes, confirming both the interpolation and
+the normal-based lighting work correctly against real backend data.
+
 ### 3.3 Biome coloring (separable from elevation)
 
 Cheapest real option without touching the shared shader: flat color per mesh-chunk keyed off the
@@ -207,7 +222,7 @@ design (§3.4).
 | 0 | This northstar | Written, registered in golden-docs-index | DONE |
 | 0.5 | apps2/server-go running + seeded | Supervised (systemd), non-conflicting port, `/chunks` serves real block+tree data | DONE (2026-08-03) |
 | 1 | Backend heightmap exposure | New endpoint or field returns per-column height (+ biome id) for column-derived scenes (Hills first) | DONE (2026-08-03) |
-| 2 | Client heightfield mesh | New mesh-gen function renders a smooth, interpolated (not stair-stepped) terrain surface for one test scene, reusing the existing pos+normal pipeline unchanged | NOT STARTED |
+| 2 | Client heightfield mesh | New mesh-gen function renders a smooth, interpolated (not stair-stepped) terrain surface for one test scene, reusing the existing pos+normal pipeline unchanged | DONE (2026-08-03) |
 | 3 | Biome flat-coloring | Terrain chunks colored by dominant biome, same flat-per-draw-call convention as Town's ground | NOT STARTED |
 | 4 | Movement/camera elevation awareness | WASD movement, click-to-move, and camera focus read real terrain height instead of assuming 0, for the same test scene | NOT STARTED |
 | 5 | Smooth per-vertex biome blending (stretch) | New vertex-color attribute + shader variant blends biome color continuously across chunk/biome boundaries | NOT STARTED |

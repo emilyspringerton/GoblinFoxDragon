@@ -1,3 +1,21 @@
+## 2026-08-03 (8)
+
+- feat(battlegrounds_gui): ship Milestone 2 of SMOOTH_TERRAIN_NORTHSTAR.md -- client heightfield
+  mesh renderer. New `build_heightfield_mesh`/`heightfield_sample` (`src/main.c`) fetch a real
+  heightmap from the new `/heightmap` endpoint (Milestone 1) over HTTP, bilinearly interpolate at
+  2x source resolution, and derive per-vertex normals from finite-difference height gradients --
+  emitted through the exact same pos+normal `upload_mesh`/`draw_mesh` path every other mesh in
+  this client already uses, no shader changes. New `http_extract_json_uint8_array_field`
+  (`http_client.h`) parses the heightmap's numeric array field, same "controlled shape, not a real
+  parser" convention as the other extractors there. Wired as an F10 debug toggle
+  (`town_load_terrain_test`/`town_draw_terrain_test`) rendering the real live Hills chunk floating
+  clear of Town's own footprint -- deliberately not integrated into Town itself (stays flat by
+  design) and not wired into movement/collision (Milestone 4, later). Live-verified visually: built
+  and ran the real client under Xvfb, connected to Town via a WOTAN dev-agent identity, screenshot
+  of the F10 mesh shows a real smooth, continuously gradient-shaded rolling surface -- not
+  stair-stepped cubes -- confirming both interpolation and lighting work against real backend
+  data. `go vet`/`go test ./...` and a direct `gcc` build of the C client both clean.
+
 ## 2026-08-03 (7)
 
 - feat(worldapi): ship Milestone 1 of SMOOTH_TERRAIN_NORTHSTAR.md -- backend heightmap exposure.

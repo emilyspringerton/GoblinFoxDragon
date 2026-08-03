@@ -340,4 +340,39 @@ static int http_extract_json_double_field(const char *json, const char *field, d
     return 1;
 }
 
+// http_extract_json_uint8_array_field: same "controlled shape, not a real parser" scope as the
+// other extractors above, for a bare array of small non-negative integers
+// ("field":[1,2,3,...], e.g. worldapi's own GET /heightmap "height" field, server/worldapi/
+// worldapi.go's heightmapResponse). Stops at the first "]" or once out_count entries are read,
+// whichever comes first -- callers pass a fixed-size destination (worldapi's heightmap is always
+// exactly 256 entries, one 16x16 chunk) and get back how many it actually found. Returns 1 if the
+// field was found at all (even if it read fewer than out_count entries), 0 if the field itself
+// wasn't present.
+static int http_extract_json_uint8_array_field(const char *json, const char *field,
+                                                 unsigned char *out, size_t out_count,
+                                                 size_t *out_found) {
+    char needle[128];
+    snprintf(needle, sizeof(needle), "\"%s\"", field);
+    const char *p = strstr(json, needle);
+    if (!p) return 0;
+    p = strchr(p + strlen(needle), ':');
+    if (!p) return 0;
+    p++;
+    while (*p == ' ' || *p == '\t') p++;
+    if (*p != '[') return 0;
+    p++;
+    size_t n = 0;
+    while (*p && *p != ']' && n < out_count) {
+        while (*p == ' ' || *p == '\t' || *p == ',') p++;
+        if (*p == ']') break;
+        char *end = NULL;
+        long v = strtol(p, &end, 10);
+        if (end == p) break;
+        out[n++] = (unsigned char)v;
+        p = end;
+    }
+    if (out_found) *out_found = n;
+    return 1;
+}
+
 #endif
