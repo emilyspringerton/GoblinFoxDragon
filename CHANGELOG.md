@@ -1,3 +1,16 @@
+## 2026-08-03 (5)
+
+- test(mud): validated Meadow (scene 0) end-to-end through the real headless `/api/town/command`
+  path -- P2 from the founder's own sprint plan ("get telecrystal working and then we validate the
+  new zone"). Confirmed live: `look` shows real Meadow room text + 8 real worm mobs; `crystals`
+  lists the real telecrystal network with the return-to-New-Handington crystal in range;
+  `attack worm-meadow-0` lands a real 30-damage hit with TP gain (0→40) and a live world-crisis
+  event fired mid-fight ("Something vast burrows beneath the Worm Hut"), after which all Meadow
+  worms show `(burrowed)`; `north`/`south` correctly transition Meadow↔Hills and back; `say` works.
+  Known, already-documented gap, not rediscovered as new: `apps2/battlegrounds_gui`'s 3D view stays
+  New-Handington-specific after a real telecrystal travel -- this validation used the headless text
+  path specifically because it doesn't depend on that render gap.
+
 ## 2026-08-03 (4)
 
 - feat(server-go): get apps2/server-go running under supervision for the first time -- founder:
