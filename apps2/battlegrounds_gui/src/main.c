@@ -3064,9 +3064,26 @@ static int build_heightfield_mesh(const unsigned char *heights, int subdiv,
  * validated against real backend data -- not a real walkable zone, not wired into
  * movement/collision. Lazy-loaded on first press so Town's own startup never depends on worldapi
  * being reachable. */
-typedef struct { Mesh mesh; int scene; int ready; } TerrainTestPatch;
-static TerrainTestPatch g_terrain_test[3] = {{{0}, 0, 0}, {{0}, 1, 0}, {{0}, 3, 0}};
+/* heights/cell_size/height_scale kept alongside the uploaded GPU mesh (not just the VBO) so
+ * Milestone 4 (movement/camera elevation) can sample the same source data on the CPU every
+ * frame without a GPU readback -- build_heightfield_mesh's own cell_size/height_scale args are
+ * duplicated as TERRAIN_TEST_CELL_SIZE/TERRAIN_TEST_HEIGHT_SCALE below so mesh generation and
+ * height lookup can never disagree about what a heightmap unit means in world space. */
+#define TERRAIN_TEST_CELL_SIZE 1.0f
+#define TERRAIN_TEST_HEIGHT_SCALE 0.5f
+typedef struct { Mesh mesh; int scene; int ready; unsigned char heights[256]; } TerrainTestPatch;
+static TerrainTestPatch g_terrain_test[3] = {{{0}, 0, 0, {0}}, {{0}, 1, 0, {0}}, {{0}, 3, 0, {0}}};
 static int g_terrain_test_active = 0;
+
+/* terrain_test_offset_x: the one real source of each patch's world-space X placement -- both
+ * town_draw_terrain_test and terrain_test_height_at call this rather than each keeping their own
+ * copy of the spacing math, the same "one formula, two callers" discipline hillsColumnHeight's
+ * own doc comment (server/worldapi/scenes.go) uses for the identical reason: two copies of
+ * placement math WILL drift, and a drift here means the avatar floats over/sinks into terrain
+ * that's rendered a few units to the side of where movement thinks it is. */
+static float terrain_test_offset_x(int i) {
+    return ARENA_HALF_EXTENT * 2.2f + 24.0f + (float)i * 20.0f;
+}
 
 /* biome_color (SMOOTH_TERRAIN_NORTHSTAR.md §3.3, Milestone 3, "flat color per mesh-chunk keyed
  * off the dominant biome... same 'one uColor per draw call' convention Town's ground already
@@ -3092,14 +3109,14 @@ static void town_load_terrain_test(void) {
                            resp, sizeof(resp), &status) != 0 || status != 200) {
             continue;
         }
-        unsigned char heights[256];
         size_t found = 0;
-        if (!http_extract_json_uint8_array_field(resp, "height", heights, 256, &found) || found != 256) {
+        if (!http_extract_json_uint8_array_field(resp, "height", g_terrain_test[i].heights, 256, &found)
+            || found != 256) {
             continue;
         }
         float *verts = NULL;
-        int vert_count = build_heightfield_mesh(heights, 2 /* subdiv */, 1.0f /* cell_size */,
-                                                 0.5f /* height_scale */, &verts);
+        int vert_count = build_heightfield_mesh(g_terrain_test[i].heights, 2 /* subdiv */,
+                                                 TERRAIN_TEST_CELL_SIZE, TERRAIN_TEST_HEIGHT_SCALE, &verts);
         g_terrain_test[i].mesh = upload_mesh(verts, vert_count);
         free(verts);
         g_terrain_test[i].ready = 1;
@@ -3112,10 +3129,9 @@ static void town_load_terrain_test(void) {
  * or gets mistaken for real Town geometry. */
 static void town_draw_terrain_test(GLint loc_mvp, GLint loc_model, GLint loc_color, Mat4 vp) {
     if (!g_terrain_test_active) return;
-    float base_offset_x = ARENA_HALF_EXTENT * 2.2f + 24.0f;
     for (int i = 0; i < 3; i++) {
         if (!g_terrain_test[i].ready) continue;
-        float offset_x = base_offset_x + (float)i * 20.0f;
+        float offset_x = terrain_test_offset_x(i);
         Mat4 model = mat4_translate(offset_x, 0.0f, 0.0f);
         Mat4 mvp = mat4_multiply(&vp, &model);
         glUniformMatrix4fv_(loc_mvp, 1, GL_FALSE, mvp.m);
@@ -3125,6 +3141,30 @@ static void town_draw_terrain_test(GLint loc_mvp, GLint loc_model, GLint loc_col
         glUniform4f_(loc_color, r, g, b, 1.0f);
         draw_mesh(&g_terrain_test[i].mesh);
     }
+}
+
+/* terrain_test_height_at (SMOOTH_TERRAIN_NORTHSTAR.md §3.4, Milestone 4, "movement/camera
+ * elevation awareness... for the same test scene"): returns 1 and writes the real interpolated
+ * terrain height at world position (wx, wz) if it falls inside one of the F10 test patches
+ * (terrain_test_offset_x's own placement, +-8 either side -- half of the 16-unit*1.0 cell_size
+ * footprint every patch spans), 0 otherwise. Callers treat 0 as "use Town's own flat y=0" --
+ * Town itself is untouched, per §3.4's own "not attempted for Town, which stays flat by design."
+ * Samples the same CPU-side heights[] the GPU mesh was built from (heightfield_sample), so
+ * movement/camera can never see a different surface than what's actually rendered. */
+static int terrain_test_height_at(float wx, float wz, float *out_y) {
+    if (!g_terrain_test_active) return 0;
+    const float half = 8.0f * TERRAIN_TEST_CELL_SIZE; /* grid=16 cells, centered -> +-8 cells */
+    for (int i = 0; i < 3; i++) {
+        if (!g_terrain_test[i].ready) continue;
+        float lx = wx - terrain_test_offset_x(i);
+        float lz = wz;
+        if (lx < -half || lx > half || lz < -half || lz > half) continue;
+        float gx = lx / TERRAIN_TEST_CELL_SIZE + 8.0f;
+        float gz = lz / TERRAIN_TEST_CELL_SIZE + 8.0f;
+        *out_y = heightfield_sample(g_terrain_test[i].heights, gx, gz) * TERRAIN_TEST_HEIGHT_SCALE;
+        return 1;
+    }
+    return 0;
 }
 
 /* town_draw_ground: NxN alternating grey/brown tiles spanning the exact same total footprint
@@ -4240,7 +4280,12 @@ int main(int argc, char *argv[]) {
                 glClearColor(0.5f, 0.75f, 0.92f, 1.0f); /* open-sky blue, distinct from battlegrounds' dark-green backdrop */
                 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-                Mat4 view = mat4_orbit_view(g_town_x, 0.0f, g_town_z, cam_yaw, cam_pitch, cam_dist);
+                /* SMOOTH_TERRAIN_NORTHSTAR.md Milestone 4: camera focus and avatar height read
+                   real terrain height when standing on an F10 test patch, 0.0f (Town's own flat
+                   ground) everywhere else -- see terrain_test_height_at's own doc comment. */
+                float town_ground_y = 0.0f;
+                terrain_test_height_at(g_town_x, g_town_z, &town_ground_y);
+                Mat4 view = mat4_orbit_view(g_town_x, town_ground_y, g_town_z, cam_yaw, cam_pitch, cam_dist);
                 Mat4 proj = mat4_perspective(60.0f, (float)win_w / (float)win_h, 0.1f, 100.0f);
                 Mat4 vp = mat4_multiply(&proj, &view);
 
@@ -4251,14 +4296,17 @@ int main(int argc, char *argv[]) {
                 town_draw_buildings(&vp, loc_mvp, loc_model, loc_color, &cube_mesh);
                 town_draw_worms(&vp, loc_mvp, loc_model, loc_color, &cube_mesh);
                 if (g_town_char_loaded) {
-                    /* jump offset applied by pre-multiplying vp with a world-space Y translate --
+                    /* jump offset (and, Milestone 4, real terrain height on an F10 test patch)
+                       applied by pre-multiplying vp with a world-space Y translate --
                        mat4_translate(0,Y,0) * (vp * model) = (vp * model) shifted by (0,Y,0) in
                        world space, regardless of whatever squish/rotation is already baked into
                        draw_hero_model's own internal model matrix. Scoped to just this one draw
                        call (a local vp copy), not a change to draw_hero_model's shared signature
                        -- that function is also called from the real match renderer further down
-                       in this file, untouched here. */
-                    Mat4 jump_t = mat4_translate(0.0f, g_town_jump_y_offset, 0.0f);
+                       in this file, untouched here. town_ground_y is 0.0f (no-op) everywhere in
+                       Town outside a test patch, computed once above alongside the camera's own
+                       identical lookup so both agree on where the avatar's feet actually are. */
+                    Mat4 jump_t = mat4_translate(0.0f, town_ground_y + g_town_jump_y_offset, 0.0f);
                     Mat4 vp_avatar = mat4_multiply(&jump_t, &vp);
                     glUniform4f_(loc_color, 0.1f, 0.8f, 0.95f, 1.0f); /* same "my hero" cyan Battlegrounds uses */
                     draw_hero_model(town_hero_id_for_job(g_town_job), g_town_x, g_town_z,

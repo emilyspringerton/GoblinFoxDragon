@@ -140,6 +140,28 @@ cast, camera focus height, WASD movement) needs to instead sample the local heig
 necessary work once a zone actually has elevation -- not attempted for Town (which stays
 intentionally flat) and not attempted in the terrain-rendering milestones below.
 
+**Done, 2026-08-03 (Milestone 4), scoped to the same F10 test patches Milestones 2/3 built --
+Town itself untouched, stays flat by design, per this section's own opening line:**
+`terrain_test_height_at(wx, wz, &out_y)` returns the real interpolated terrain height (same
+CPU-side `heights[256]` + `heightfield_sample` the GPU mesh was built from, so movement/camera can
+never see a different surface than what's rendered) when standing inside one of the three F10
+patches, and 0 (Town's own flat ground) everywhere else. Wired into the camera's own focus point
+(`mat4_orbit_view`'s `focus_y`, previously hardcoded 0.0f) and the avatar's draw-time Y offset
+(combined with the existing jump-arc translate, same "world-space Y pre-multiply" technique).
+`terrain_test_offset_x` is now the one shared source of each patch's world placement -- both the
+renderer and the height lookup call it, so they can't drift the way the block-generation/heightmap
+split in Milestone 1 would have if `hillsColumnHeight` hadn't been factored out the same way.
+
+**Explicitly not done, named rather than silently skipped**: `screen_to_ground`'s own click-to-move
+ray-cast still projects against a flat y=0 plane, so a click's resulting (x,z) target on a sloped
+test patch is an approximation, not a real ray-vs-heightfield intersection -- a materially harder
+geometric problem (the acceptance criterion's own "for the same test scene" is satisfied by
+movement/camera Y, not by exact click targeting on a slope). WASD's own (x,z) update logic is
+unchanged for the same reason: only the resulting position's rendered Y now reads real terrain,
+not the horizontal movement algorithm itself. Real for the debug validation this milestone exists
+to provide; a full fix belongs with the Town<->Dragonfly bridge (§3.6) if/when a zone with real
+elevation becomes actually walkable, not this isolated test harness.
+
 ### 3.5 Trees (2026-08-03, founder: "we want it to render the dragonfly biomes smooth with trees"
 -- "like a nice minecraft meadow biome but we render it with our frontend")
 
@@ -234,7 +256,7 @@ design (§3.4).
 | 1 | Backend heightmap exposure | New endpoint or field returns per-column height (+ biome id) for column-derived scenes (Hills first) | DONE (2026-08-03) |
 | 2 | Client heightfield mesh | New mesh-gen function renders a smooth, interpolated (not stair-stepped) terrain surface for one test scene, reusing the existing pos+normal pipeline unchanged | DONE (2026-08-03) |
 | 3 | Biome flat-coloring | Terrain chunks colored by dominant biome, same flat-per-draw-call convention as Town's ground | DONE (2026-08-03) |
-| 4 | Movement/camera elevation awareness | WASD movement, click-to-move, and camera focus read real terrain height instead of assuming 0, for the same test scene | NOT STARTED |
+| 4 | Movement/camera elevation awareness | WASD movement, click-to-move, and camera focus read real terrain height instead of assuming 0, for the same test scene | DONE (2026-08-03), click-to-move x/z targeting scoped out, see §3.4 |
 | 5 | Smooth per-vertex biome blending (stretch) | New vertex-color attribute + shader variant blends biome color continuously across chunk/biome boundaries | NOT STARTED |
 
 ## 6. Related docs

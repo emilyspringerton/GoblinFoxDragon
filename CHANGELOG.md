@@ -1,3 +1,20 @@
+## 2026-08-03 (10)
+
+- feat(battlegrounds_gui): ship Milestone 4 of SMOOTH_TERRAIN_NORTHSTAR.md -- movement/camera
+  elevation awareness, scoped to the F10 test patches (Town itself untouched, stays flat by
+  design). New `terrain_test_height_at` samples the same CPU-side heights the GPU mesh was built
+  from and returns real terrain height when standing inside a test patch, 0 elsewhere. Wired into
+  camera focus (`mat4_orbit_view`'s `focus_y`, was hardcoded 0.0f) and the avatar's draw-time Y
+  (combined with the existing jump-arc translate). New `terrain_test_offset_x` is the one shared
+  source of each patch's world placement, used by both the renderer and the height lookup so they
+  can't drift apart. Explicitly not done, named rather than skipped: `screen_to_ground`'s
+  click-to-move ray-cast still targets a flat y=0 plane (real ray-vs-heightfield intersection is a
+  harder problem, out of scope here) and WASD's own (x,z) update logic is unchanged -- only the
+  resulting position's rendered Y now reads real terrain. Live-verified visually under Xvfb: the
+  camera correctly settles onto the real sloped terrain surface at the avatar's position instead
+  of floating above or clipping through it. `go vet`/`go test ./...` and a direct `gcc` client
+  build both clean.
+
 ## 2026-08-03 (9)
 
 - feat(battlegrounds_gui): ship Milestone 3 of SMOOTH_TERRAIN_NORTHSTAR.md -- biome flat-coloring.
