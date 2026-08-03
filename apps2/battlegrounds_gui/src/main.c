@@ -3612,7 +3612,7 @@ static int town_teleport_town_button_hit(float bx, float by, int win_w, int win_
     return bx >= x0 && bx <= x1 && by >= y0 && by <= y1;
 }
 
-static void town_draw_hud(int win_w, int win_h, int queue_available) {
+static void town_draw_hud(int win_w, int win_h, int queue_available, int player_lost) {
     glUseProgram_(0); /* legacy immediate-mode 2D pass -- see the match renderer's own identical
                           "2D HUD pass" comment; draw_string/glBegin below need the fixed-function
                           pipeline, not the custom GLSL program the checkerboard just used. */
@@ -3664,7 +3664,7 @@ static void town_draw_hud(int win_w, int win_h, int queue_available) {
         }
         draw_string(target_line, tiles_x0, tiles_y + tile_size + 10.0f, 10);
         glColor3f(0.5f, 0.55f, 0.55f);
-        if (g_dfzone_active) {
+        if (player_lost) {
             draw_string("TAB/SHIFT+TAB - cycle target   1 - attack   SPACE - jump   H - return to town",
                         tiles_x0 - 40.0f, tiles_y + tile_size + 28.0f, 8);
         } else {
@@ -3687,12 +3687,14 @@ static void town_draw_hud(int win_w, int win_h, int queue_available) {
     }
 
     /* Teleport-to-town button (2026-08-03, founder: "give me a teleport to town button under
-     * queue for battlegrounds") -- the same real, unconditional town_telecrystal_return the "H"
-     * emergency keybind already calls (2026-08-03, "i was in the meadow and closed the game -
-     * then... i was in the middle of nowhere not in town"), just with a real clickable affordance
-     * for it too, not keyboard-only. Only shown while actually in the Dragonfly Meadow zone
-     * (g_dfzone_active) -- there's nothing to "return" to from Town itself. */
-    if (g_dfzone_active) {
+     * queue for battlegrounds" -> later, live: "teleport to town button does not work... look
+     * into why i might not have seen the button"). Real root cause of the second report: this
+     * used to gate on g_dfzone_active alone (Meadow), but a real corrupted character was found
+     * live (test@test.com's TestWarrior: scene_id=4, real Town, pos_z=3977.48 -- thousands of
+     * units past TOWN_MOVE_HALF_EXTENT) who was just as lost while never setting g_dfzone_active
+     * at all. Now gated on town_player_lost (passed in as player_lost), which covers both real
+     * cases -- see that function's own doc comment. */
+    if (player_lost) {
         float x0, y0, x1, y1;
         town_teleport_town_button_rect(win_w, win_h, &x0, &y0, &x1, &y1);
         glEnable(GL_BLEND);
@@ -3909,6 +3911,37 @@ static void town_telecrystal_return(void) {
     g_town_target_index = -1; /* Meadow's real worm-meadow-N indices have no meaning against Town's ring */
     snprintf(g_travel_overlay_text, sizeof(g_travel_overlay_text), "TRAVELING: NEW HANDINGTON");
     g_travel_overlay_until_ms = SDL_GetTicks() + 1400;
+}
+
+/* town_player_lost/town_recenter_in_town (2026-08-03, founder, live: "teleport to town button
+ * does not work... look into why i might not have seen the button"). Real root cause of the
+ * "didn't see it" report: "H"/the button were both gated on g_dfzone_active alone (Meadow), on
+ * the assumption that being stuck outside Town could only mean "scene_id says Meadow" -- but a
+ * real corrupted character row was found live (`test@test.com`'s TestWarrior: scene_id=4, real
+ * Town, pos_z=3977.48 -- thousands of units past TOWN_MOVE_HALF_EXTENT, almost certainly drift
+ * from before that clamp existed, per its own doc comment). A player in THAT state is exactly as
+ * lost, but g_dfzone_active was never true for them, so the escape hatch never appeared.
+ * town_player_lost now covers both real cases: Meadow (unconditional, matches the original H/
+ * button intent) OR Town with a position outside its own real walkable bounds
+ * (TOWN_MOVE_HALF_EXTENT, the same real boundary click-to-move/WASD already clamp new movement
+ * to -- this just also catches OLD, already-corrupted positions that predate that clamp).
+ * town_recenter_in_town is the Town-side fix: unlike town_telecrystal_return (a real scene
+ * change, MEADOW_RETURN_HANDINGTON's own crystal), there's no scene to leave here -- just reset
+ * to a known-good real spot (the Dragon Gate's own position, same one a real Meadow return
+ * lands at) and force-sync it to IDUNA immediately (town_sync_position's own real PATCH
+ * mechanism) so a corrupted row like TestWarrior's can't come back on the next relaunch. */
+static int town_player_lost(void) {
+    if (g_dfzone_active) return 1;
+    return fabsf(g_town_x) > TOWN_MOVE_HALF_EXTENT || fabsf(g_town_z) > TOWN_MOVE_HALF_EXTENT;
+}
+
+static void town_recenter_in_town(uint32_t now) {
+    g_town_x = -40.0f;
+    g_town_z = -50.0f;
+    g_town_target_x = g_town_x;
+    g_town_target_z = g_town_z;
+    town_sync_position(now, 1 /* force -- don't wait for the normal 2s/moved-far-enough throttle */);
+    combat_log_push("You are recentered at the Dragon Gate.");
 }
 
 /* ---------------- telecrystal cast UX (2026-08-03) ----------------
@@ -4766,15 +4799,20 @@ int main(int argc, char *argv[]) {
                     /* Emergency return-to-town (2026-08-03, founder, live: "i was in the meadow
                        and closed the game - then the thing happened where i was in the middle of
                        nowhere not in town - dunno how i get so far away from town i guess we need
-                       a town teleport button"). G/the gate ring is range-gated by design (real
-                       telecrystal UX, see SDLK_g above) -- exactly the problem when you're
-                       actually lost: you can't walk back to a crystal you can't see and don't know
-                       the direction to. H bypasses range/ring state entirely and unconditionally
-                       calls the same real, already-proven town_telecrystal_return -- an escape
-                       hatch, not a replacement for the normal cast UX. Only wired for the Meadow
-                       side (g_dfzone_active) -- being "lost" in Town itself is a different,
-                       already-fixed bug (TOWN_MOVE_HALF_EXTENT's own doc comment). */
+                       a town teleport button" -> later, live again: "teleport to town button does
+                       not work... look into why i might not have seen the button"). G/the gate
+                       ring is range-gated by design (real telecrystal UX, see SDLK_g above) --
+                       exactly the problem when you're actually lost: you can't walk back to a
+                       crystal you can't see and don't know the direction to. H bypasses range/
+                       ring state entirely. Real root cause of the second report: this used to
+                       only handle the Meadow case (g_dfzone_active) on the assumption a bad-Town-
+                       position was already fixed by TOWN_MOVE_HALF_EXTENT's own movement clamp --
+                       that clamp stops *new* bad writes, but doesn't repair rows already
+                       corrupted before it existed (found live: test@test.com's TestWarrior,
+                       scene_id=4, pos_z=3977.48). town_player_lost/town_recenter_in_town now
+                       cover that case too -- see their own doc comment. */
                     if (g_dfzone_active) town_telecrystal_return();
+                    else if (town_player_lost()) town_recenter_in_town(now);
                 }
                 else if (te.type == SDL_MOUSEBUTTONDOWN && te.button.button == SDL_BUTTON_RIGHT) {
                     /* Auction House right-click (2026-08-02, founder: "have it be interractable
@@ -4828,11 +4866,14 @@ int main(int argc, char *argv[]) {
                             fprintf(stderr, "Failed to join a match via matchmaker at %s:%d\n",
                                     queue_host, queue_port);
                         }
-                    } else if (g_dfzone_active && town_teleport_town_button_hit(bx, by, win_w, win_h)) {
+                    } else if (town_player_lost() && town_teleport_town_button_hit(bx, by, win_w, win_h)) {
                         /* Real click affordance for the same emergency return "H" already does
                            (2026-08-03, founder: "give me a teleport to town button under queue for
-                           battlegrounds"). */
-                        town_telecrystal_return();
+                           battlegrounds" -> "teleport to town button does not work... look into
+                           why i might not have seen the button" -- town_player_lost covers the
+                           real Town-side case too now, see its own doc comment). */
+                        if (g_dfzone_active) town_telecrystal_return();
+                        else town_recenter_in_town(now);
                     } else {
                         /* Click-to-move (2026-08-02, "we need to be able to run around town") --
                            same screen_to_ground ray-cast Battlegrounds' own click-to-move uses,
@@ -4981,7 +5022,7 @@ int main(int argc, char *argv[]) {
                                      g_town_facing_rad, 1.0f, &vp, loc_mvp, loc_model, &cube_mesh);
                 }
 
-                town_draw_hud(win_w, win_h, queue_host != NULL);
+                town_draw_hud(win_w, win_h, queue_host != NULL, town_player_lost());
                 town_draw_gate_overlay(win_w, win_h); /* real telecrystal cast prompt/bar, same 2D pass as the HUD above */
                 town_draw_travel_overlay(win_w, win_h); /* brief "TRAVELING: <destination>" banner right on arrival */
                 if (!g_dfzone_active) town_draw_building_labels(&vp, win_w, win_h); /* New-Handington-specific */

@@ -1,3 +1,26 @@
+## 2026-08-03 (27)
+
+- fix(battlegrounds_gui): "TELEPORT TO TOWN"/"H" now also cover a stranded-in-Town position, not
+  just Meadow -- founder, live: "teleport to town button does not work... look into why i might
+  not have seen the button." Real root cause found live: `test@test.com`'s character
+  ("TestWarrior") had `scene_id=4` (real Town) but `pos_z=3977.48` -- thousands of units past
+  `TOWN_MOVE_HALF_EXTENT`, almost certainly drift from before that movement clamp existed (its own
+  doc comment: "could walk... thousands of units past the actual ground/building layout"). Both
+  "H" and the button were gated on `g_dfzone_active` alone (Meadow) on the assumption a bad-Town-
+  position was already a closed bug -- but that clamp only stops *new* bad writes, it never
+  repaired rows already corrupted before it landed, and this player's own row was exactly that.
+  New `town_player_lost()` (Meadow, unconditional -- OR Town with `|x|`/`|z|` past
+  `TOWN_MOVE_HALF_EXTENT`) and `town_recenter_in_town()` (resets to the real Dragon Gate spot and
+  force-syncs to IDUNA via the existing `town_sync_position`, so a corrupted row can't come back
+  on the next relaunch). `town_draw_hud` takes `player_lost` as a real parameter now instead of
+  computing it internally, avoiding a forward-declaration ordering issue (`town_player_lost` needs
+  `g_town_x`/`g_town_z`, declared after `town_draw_hud` in this file). Manually fixed
+  `test@test.com`'s live character via a direct IDUNA agent-JWT PATCH (IDUNA `var/iduna.db`:
+  scene_id=4, pos now (-40,0,-50), the real Dragon Gate spawn) while this fix was in flight.
+  `gcc -Wall -Wextra` clean. Live-verified via Xvfb: reproduced the exact real corrupted state
+  (scene 4, pos_z=3977.48) and confirmed both the button and the "H - return to town" HUD hint now
+  render, where neither did before.
+
 ## 2026-08-03 (26)
 
 - feat(battlegrounds_gui): real "TELEPORT TO TOWN" button -- founder: "give me a teleport to town
