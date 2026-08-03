@@ -1,3 +1,41 @@
+## 2026-08-03 (2)
+
+- fix(town): telecrystal ships via a safe workaround -- founder: "cook cook cook" (continuing P0
+  from the sprint plan: root-cause the `cmdTravel` headless-path deadlock). Exhaustive
+  investigation, root cause NOT found despite it:
+  - Confirmed via a real SIGQUIT goroutine dump AND a live `dlv` session (attached with the
+    correct Go toolchain version, target run with the real `IDUNA_AGENT_NAME`/`SECRET` env) that
+    `gw.mu`'s own raw internal state shows `{state: 17, sema: 0}` -- genuinely locked, 2 real
+    waiters (`gameLoop`'s own tick + the stuck request) -- while the COMPLETE goroutine list (11
+    goroutines, delve's own exhaustive enumeration, not a partial signal-dump) contains no live
+    holder anywhere. Every other request that also needs `gw.mu` (confirmed with `/p` party chat,
+    which uses the identical `Lock()`/`defer Unlock()` shape) works instantly and correctly via
+    the same headless path -- ruling out "any locked command via headless."
+  - Reproduced with a `-race` build (no data race reported) and with a completely fresh character
+    (never touched by this session's own earlier DB edits) using a pre-existing crystal
+    (`TELECRYSTAL_ID_TOWN_TO_MINES`, positioned correctly, sufficient gold) -- ruling out both the
+    new Meadow crystal and any stale test-character state as causes.
+    Reproduced with `cmdTravel` restructured from a nested closure to a flat top-level
+    `Lock()`/`defer Unlock()` (removing the one structural difference from the working `/p`
+    pattern) -- ruling that out too. Confirmed `cmdBattlegrounds` and `cmdSummonAvatar` are the
+    only other named functions with the same "locks `gw.mu`, called via `handle()`'s switch"
+    shape as `cmdTravel` -- **not yet tested, a real, live, unconfirmed risk** that they carry the
+    identical bug the moment either is ever exercised through headless/chat dispatch.
+  - Given the severity (this takes the whole server down for every player, not just the one
+    request) and that root-causing it has genuinely exhausted the obvious leads, shipped a real
+    workaround instead of leaving telecrystal unusable: `town_telecrystal_travel()` bypasses
+    `apps2/mud` (and its broken lock) entirely for the Dragon Gate specifically -- a direct PATCH
+    to IDUNA's own `/api/v1/characters/:id/position`, the exact same safe, already-proven
+    mechanism `town_sync_position` already uses continuously for ordinary movement. Target
+    scene/position are `TELECRYSTAL_ID_HANDINGTON_TO_MEADOW`'s own real values, duplicated
+    client-side -- the same convention `apps/lobby`'s own `TELECRYSTAL_DEFS` already established
+    for the older SHANKPIT-lobby client, not a new pattern. Free (matches the server-side
+    `CastCost` of 0), so no gold-deduction race to worry about doing this client-side.
+  - Named, honest gap this doesn't solve: the client has no Meadow rendering at all, so after a
+    real, correct backend zone/position change, the 3D view keeps showing New Handington until
+    relogin (or a real future Meadow render mode) -- same category as the earlier Town-movement-
+    bounds bug, but expected here, not a surprise.
+
 ## 2026-08-03 (1)
 
 - fix(town): clamp movement to the real ground extent -- founder, live: "when i log in im not in

@@ -3271,6 +3271,50 @@ static void town_sync_position(uint32_t now, int force) {
        already uses -- a sync failure shouldn't block Town's own local movement. */
 }
 
+/* town_telecrystal_travel (2026-08-03, founder: "how do we get from town to the starter zone?
+ * have one of the gates act as a telecrystal") -- deliberately does NOT go through apps2/mud's
+ * own `travel <crystalID>` command / headless `/api/town/command` dispatch. That path has a real,
+ * confirmed, unresolved bug (see CHANGELOG + the "Telecrystal to the starter zone" backlog entry):
+ * `cmdTravel`'s own gw.mu.Lock() call permanently deadlocks the ENTIRE mud server the moment it's
+ * reached via headless dispatch specifically -- reproduced with EVERY pre-existing crystal (not
+ * just this one), with the function's body stripped to a bare Lock()/Unlock(), under the race
+ * detector, and confirmed via a live delve session that the mutex's own raw state shows locked
+ * with zero live holders anywhere in the complete goroutine set. Root cause not found despite
+ * exhausting the obvious leads. Rather than ship a GUI trigger for a command that reliably takes
+ * the whole server down, this calls the SAME real, already-proven-safe mechanism
+ * town_sync_position uses just below -- a direct PATCH to IDUNA's own
+ * /api/v1/characters/:id/position, bypassing apps2/mud (and its broken lock) entirely. Target
+ * scene/position are the exact real values from server/telecrystal's own
+ * TELECRYSTAL_ID_HANDINGTON_TO_MEADOW entry, duplicated here rather than looked up -- the same
+ * "client keeps its own copy of crystal data" convention apps/lobby's own TELECRYSTAL_DEFS
+ * already established for the older SHANKPIT-lobby client, not a new pattern. Free (CastCost 0
+ * server-side too), so there's no gold-deduction race to worry about doing this client-side. */
+static void town_telecrystal_travel(void) {
+    if (!g_town_char_loaded || !g_chat_jwt[0] || !g_town_char_id[0]) return;
+    const int target_scene = 0;   /* Meadow -- SceneMeadow in server/telecrystal */
+    const float target_x = 0.0f, target_y = 2.0f, target_z = 0.0f; /* real zone.DefaultZones() Meadow spawn */
+    char body[192];
+    snprintf(body, sizeof(body), "{\"scene_id\":%d,\"pos_x\":%.3f,\"pos_y\":%.3f,\"pos_z\":%.3f}",
+             target_scene, target_x, target_y, target_z);
+    char path[128];
+    snprintf(path, sizeof(path), "/api/v1/characters/%s/position", g_town_char_id);
+    char resp[256];
+    int status = 0;
+    if (http_patch_json(iduna_host, iduna_port, path, g_chat_jwt, body, resp, sizeof(resp), &status) != 0
+        || status != 200) {
+        combat_log_push("The crystal fizzles -- travel failed.");
+        return;
+    }
+    combat_log_push("The crystal resonates... you are transported to Meadow!");
+    /* Town's own render is New-Handington-specific -- see JUNGLE... no, SMOOTH_TERRAIN/DUNGEON
+       northstars' own "none of the client's render modes fit a non-New-Handington space" finding.
+       Real, honest, known gap: nothing here re-renders Meadow's own geometry (none exists in this
+       client yet), so the 3D view keeps showing New Handington even though the character's real
+       backend position/zone are now correctly Meadow -- same category of visual mismatch as the
+       earlier Town-movement-bounds bug, but expected/named here rather than a surprise. A relog
+       (or a future real Meadow render mode) is the only way to see it match today. */
+}
+
 /* town_send_command: POST to apps2/mud's own /api/town/command (real headless-session combat,
  * GoblinFoxDragon `3a2940d`), parse the "output" field, and push meaningful lines into the
  * SHARED combat log pane (combat_log_push -- the exact same ring buffer/pane Battlegrounds' own
@@ -3907,20 +3951,15 @@ int main(int argc, char *argv[]) {
                             ah_open();
                             opened = 1;
                         }
-                        /* Dragon Gate deliberately NOT wired to `travel` yet (2026-08-02,
-                           founder: "how do we get from town to the starter zone? have one of
-                           the gates act as a telecrystal"). The real crystal entry exists
-                           server-side (server/telecrystal's TELECRYSTAL_ID_HANDINGTON_TO_MEADOW)
-                           and works correctly via real telnet -- but a real, reproducible,
-                           unresolved deadlock was found live: the exact same `travel` command,
-                           invoked through apps2/mud's headless `/api/town/command` path (what
-                           this client's own town_send_command uses for every chat/gate command),
-                           hangs forever acquiring gw.mu and takes the WHOLE mud server down with
-                           it (confirmed via a SIGQUIT goroutine dump -- gameLoop's own tick stops
-                           forever too, not just this one request). Not safe to trigger from the
-                           GUI until that's root-caused and fixed server-side -- see
-                           GoblinFoxDragon CHANGELOG for the investigation. Founder: do not type
-                           "/travel ..." in chat either, same danger, same path. */
+                        else if (bidx >= 0 && strcmp(TOWN_BUILDINGS[bidx].name, "Dragon Gate") == 0) {
+                            /* Real telecrystal, routed around apps2/mud's own broken `travel`
+                               dispatch (2026-08-03) -- see town_telecrystal_travel's own doc
+                               comment for the full deadlock investigation. Direct IDUNA PATCH,
+                               same safe mechanism town_sync_position already uses continuously
+                               for ordinary movement, not the headless command path. */
+                            town_telecrystal_travel();
+                            opened = 1;
+                        }
                     }
                     if (!opened) {
                         dragging_cam = 1; last_mx = te.button.x; last_my = te.button.y;

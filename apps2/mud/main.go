@@ -5328,17 +5328,15 @@ func cmdTravel(p *player, crystalID string) {
 	// deadlocks, not just this one request. defer here is real hardening regardless (a manual
 	// Unlock() would never fire on any future panic in this block), but does not fix the actual
 	// bug -- switched to defer anyway since it's strictly safer either way.
-	func() {
-		gw.mu.Lock()
-		defer gw.mu.Unlock()
-		broadcastZoneNoLock(p.zoneID, fmt.Sprintf("%s vanishes into a telecrystal.", p.name), p.slot)
-		_ = gw.zoneMgr.Transfer(p.slot, c.TargetScene)
-		p.combat.TargetMobID = ""
-		p.zoneID = c.TargetScene
-		p.pos = mob.Pos{X: c.SpawnPos.X, Y: c.SpawnPos.Y, Z: c.SpawnPos.Z}
-		syncChatSession(p)
-		broadcastZoneNoLock(p.zoneID, fmt.Sprintf("%s arrives via telecrystal.", p.name), p.slot)
-	}()
+	gw.mu.Lock()
+	defer gw.mu.Unlock()
+	broadcastZoneNoLock(p.zoneID, fmt.Sprintf("%s vanishes into a telecrystal.", p.name), p.slot)
+	_ = gw.zoneMgr.Transfer(p.slot, c.TargetScene)
+	p.combat.TargetMobID = ""
+	p.zoneID = c.TargetScene
+	p.pos = mob.Pos{X: c.SpawnPos.X, Y: c.SpawnPos.Y, Z: c.SpawnPos.Z}
+	syncChatSession(p)
+	broadcastZoneNoLock(p.zoneID, fmt.Sprintf("%s arrives via telecrystal.", p.name), p.slot)
 	cmdLook(p)
 }
 
