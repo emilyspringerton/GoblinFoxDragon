@@ -1,3 +1,41 @@
+## 2026-08-03 (3)
+
+- fix(mud): REAL root cause of the gw.mu deadlock found and fixed -- founder: "pls fix" (not
+  satisfied with the client-side workaround shipped a moment earlier). It was a plain,
+  garden-variety self-deadlock, not anything exotic: `handle()` itself already does
+  `gw.mu.Lock(); defer gw.mu.Unlock()` UNCONDITIONALLY right before its own dispatch switch (the
+  only exception is the `/p` party-chat shortcut, which returns early before ever reaching that
+  lock). `cmdTravel` then tried to acquire the exact same, non-reentrant `sync.Mutex` again on the
+  SAME goroutine -- Go doesn't detect or panic on this, it just blocks forever. This is exactly
+  why no "holder" ever showed up in any goroutine dump (SIGQUIT or live `dlv` inspection): the
+  holder WAS the stuck goroutine itself, one frame further up its own stack inside `handle()`, not
+  a separate one. It also explains why the earlier telnet A/B test looked like it worked: the
+  "crystal resonates" message is sent BEFORE the lock attempt, so the telnet client received it
+  before that same connection's own goroutine silently self-deadlocked afterward -- a follow-up
+  command on that same session would have shown it too; it was just never tried.
+  - Found via one precise structural test: an inline, trivial `gw.mu.Lock()` test case added
+    directly to `handle()`'s own switch hung identically to `cmdTravel` -- but the exact same code
+    moved to `/p`'s own position (before the switch, i.e. before the outer lock) worked. That
+    isolated it immediately.
+  - Real fix: removed `cmdTravel`'s own redundant `Lock()`/`Unlock()` entirely -- it's already
+    called from inside `handle()`'s own locked dispatch, same as every other `cmd*` function that
+    mutates `gw` state without locking (`cmdLook`, etc.).
+  - Audited every other `gw.mu.Lock()` call site in the file and found three more real instances
+    of the exact same bug, all fixed the same way: `cmdBattlegrounds` (re-locked to read
+    `gw.charIDBySlot`), `cmdSummonAvatar` (re-locked to read `gw.players`), and the `warcry`
+    ability case (called `broadcastZone`, the locking wrapper, instead of `broadcastZoneNoLock`).
+    All three were real, live, previously-undiscovered risks -- any of them could have taken the
+    whole server down the same way `cmdTravel` did, the moment anyone actually used them from
+    chat.
+  - Live-verified against the real production `gfd-mud.service`: two consecutive real telecrystal
+    trips (`TELECRYSTAL_ID_TOWN_TO_MINES` then `_MINES_RETURN_TOWN`), the new
+    `TELECRYSTAL_ID_HANDINGTON_TO_MEADOW`, and `battlegrounds` (ticket minting) -- all instant
+    (~0.015s), all correct, `gameLoop`'s own tick confirmed healthy throughout (real crisis/
+    faction-war events kept flowing).
+  - The client-side workaround from the previous entry (`town_telecrystal_travel`, direct IDUNA
+    PATCH bypassing `apps2/mud`) is left in place, not reverted -- it's simpler for the one Dragon
+    Gate case and does no harm now that the underlying path is actually safe too.
+
 ## 2026-08-03 (2)
 
 - fix(town): telecrystal ships via a safe workaround -- founder: "cook cook cook" (continuing P0

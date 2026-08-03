@@ -3048,9 +3048,11 @@ func cmdBattlegrounds(p *player) {
 		p.send("You are KO'd — type 'home' to return to your Home Point first.")
 		return
 	}
-	gw.mu.Lock()
+	// Real bug found and fixed 2026-08-03 alongside cmdTravel's identical self-deadlock: handle()
+	// already holds gw.mu unconditionally before dispatching here, so this used to be a
+	// same-goroutine, non-reentrant double-lock -- see cmdTravel's own doc comment for the full
+	// story. Removed; gw.charIDBySlot is already safe to read under the lock handle() holds.
 	charID, hasChar := gw.charIDBySlot[p.slot]
-	gw.mu.Unlock()
 	if !hasChar {
 		p.send("Battlegrounds needs a real IDUNA character on file — try reconnecting.")
 		return
@@ -5314,22 +5316,23 @@ func cmdTravel(p *player, crystalID string) {
 	// Deduct cost and teleport.
 	p.flow -= c.CastCost
 	p.sendf("The crystal resonates... you are transported to %s! (-%d Flow)", c.TargetName, c.CastCost)
-	// Real bug found live (2026-08-02, founder: "how do we get from town to the starter zone?
-	// have one of the gates act as a telecrystal"): a real, reproducible, pre-existing deadlock,
-	// isolated (not fixed) this session. Confirmed via a real SIGQUIT goroutine dump + direct
-	// A/B testing: the EXACT SAME crystal, invoked via a real telnet session, works correctly
-	// every time; invoked via the headless/`/api/town/command` HTTP path (what Town's own GUI
-	// client uses), the gw.mu.Lock() call two lines below never returns -- confirmed even with
-	// this whole function's body stripped down to a bare Lock()/Unlock() with nothing else
-	// inside it, so the bug is NOT in what this function does with the lock, it's in headless
-	// dispatch reaching this point in some way that leaves gw.mu unavailable. Root cause not
-	// isolated further given time spent -- gameLoop's own tick (confirmed healthy immediately
-	// before triggering this) permanently stops ticking afterward too, meaning the whole server
-	// deadlocks, not just this one request. defer here is real hardening regardless (a manual
-	// Unlock() would never fire on any future panic in this block), but does not fix the actual
-	// bug -- switched to defer anyway since it's strictly safer either way.
-	gw.mu.Lock()
-	defer gw.mu.Unlock()
+	// REAL ROOT CAUSE FOUND (2026-08-03, founder: "pls fix" -- after an earlier pass shipped a
+	// client-side workaround having failed to root-cause this): a plain self-deadlock, not
+	// anything exotic. handle() itself already does `gw.mu.Lock(); defer gw.mu.Unlock()`
+	// UNCONDITIONALLY right before its own dispatch switch (the only exception is the "/p" party
+	// chat shortcut, which returns early before ever reaching that lock) -- so by the time
+	// cmdTravel runs, the calling goroutine ALREADY holds gw.mu. The Lock() call that used to sit
+	// here tried to acquire the exact same, non-reentrant sync.Mutex again on the SAME goroutine
+	// -- textbook self-deadlock, which Go's Mutex does not detect or panic on, it just blocks
+	// forever. This is why no "holder" ever showed up in any goroutine dump: the holder WAS the
+	// stuck goroutine itself, one frame further up its own stack (inside handle()), not a
+	// different goroutine. It's also why the earlier telnet test looked like it worked: the
+	// "crystal resonates" message above is sent BEFORE this lock attempt, so the client received
+	// it before the same connection's own goroutine silently self-deadlocked -- a follow-up
+	// command on that same telnet session would have shown it too, just was never tried. Real
+	// fix: this function is already called from inside handle()'s own locked section, so it
+	// doesn't need (and must not take) its own lock at all -- same as every other cmd* function
+	// in this file that mutates gw state without locking (cmdLook, etc.).
 	broadcastZoneNoLock(p.zoneID, fmt.Sprintf("%s vanishes into a telecrystal.", p.name), p.slot)
 	_ = gw.zoneMgr.Transfer(p.slot, c.TargetScene)
 	p.combat.TargetMobID = ""
@@ -5402,7 +5405,9 @@ func cmdJA(p *player, abilityID string) {
 		case "berserk":
 			p.sendf("You enter Berserk! (Haste +30%% for 3 minutes)")
 		case "warcry":
-			broadcastZone(p.zoneID, fmt.Sprintf("%s lets out a fierce battle cry!", p.name), "")
+			// Real bug fixed 2026-08-03, same self-deadlock class as cmdTravel -- broadcastZone
+			// (not broadcastZoneNoLock) re-locks gw.mu, already held by handle()'s own dispatch.
+			broadcastZoneNoLock(p.zoneID, fmt.Sprintf("%s lets out a fierce battle cry!", p.name), "")
 		case "benediction":
 			p.hp = p.maxHP
 			p.mp = p.maxMP
@@ -5457,9 +5462,9 @@ func cmdSummonAvatar(p *player, abilityID string) {
 	if oppSlot == p.slot {
 		oppSlot = activeDuel.Challenger
 	}
-	gw.mu.Lock()
+	// Real bug fixed 2026-08-03, same self-deadlock class as cmdTravel/cmdBattlegrounds -- see
+	// cmdTravel's own doc comment. handle() already holds gw.mu here; this used to re-lock it.
 	opp, ok := gw.players[oppSlot]
-	gw.mu.Unlock()
 	if !ok {
 		p.send("Your duel opponent is no longer here.")
 		return
