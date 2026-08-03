@@ -3397,6 +3397,69 @@ static void town_draw_dfzone_trees(const Mat4 *vp, GLint loc_mvp, GLint loc_mode
     }
 }
 
+/* town_meadow_flower_positions (2026-08-03, founder: "add some block backed flowers to the
+ * meadow"). Mirrors `server/worldapi/scenes.go`'s own `meadowFlowers` exactly -- same hash, same
+ * real positions, same "kept in sync by hand" convention `town_meadow_tree_positions` already
+ * established. Real block-backed ground cover (`minecraft:poppy`/`minecraft:dandelion`, voxel ID
+ * 19 in `dragonfly_gen.go`), not decoration invented only on the render side. Returns up to 8
+ * (lx, lz) pairs in local chunk-grid coordinates. */
+static int town_meadow_flower_positions(int chunk_x, int chunk_z, int out_lx[8], int out_lz[8]) {
+    int h = chunk_x * 31 + chunk_z * 17;
+    int m = h % 5;
+    if (m < 0) m += 5;
+    switch (m) {
+        case 0:
+            out_lx[0]=0; out_lz[0]=5; out_lx[1]=3; out_lz[1]=9; out_lx[2]=7; out_lz[2]=1;
+            out_lx[3]=10; out_lz[3]=4; out_lx[4]=1; out_lz[4]=13; out_lx[5]=15; out_lz[5]=10;
+            out_lx[6]=6; out_lz[6]=7; out_lx[7]=11; out_lz[7]=15;
+            return 8;
+        case 1:
+            out_lx[0]=0; out_lz[0]=1; out_lx[1]=5; out_lz[1]=3; out_lx[2]=9; out_lz[2]=8;
+            out_lx[3]=12; out_lz[3]=0; out_lx[4]=1; out_lz[4]=10; out_lx[5]=15; out_lz[5]=6;
+            out_lx[6]=7; out_lz[6]=13; out_lx[7]=4; out_lz[7]=15;
+            return 8;
+        case 2:
+            out_lx[0]=0; out_lz[0]=3; out_lx[1]=6; out_lz[1]=1; out_lx[2]=9; out_lz[2]=6;
+            out_lx[3]=14; out_lz[3]=10; out_lx[4]=1; out_lz[4]=15; out_lx[5]=15; out_lz[5]=2;
+            out_lx[6]=4; out_lz[6]=7; out_lx[7]=12; out_lz[7]=13;
+            return 8;
+        case 3:
+            out_lx[0]=0; out_lz[0]=9; out_lx[1]=3; out_lz[1]=1; out_lx[2]=8; out_lz[2]=5;
+            out_lx[3]=15; out_lz[3]=3; out_lx[4]=1; out_lz[4]=14; out_lx[5]=10; out_lz[5]=8;
+            out_lx[6]=6; out_lz[6]=15; out_lx[7]=14; out_lz[7]=0;
+            return 8;
+        default:
+            out_lx[0]=0; out_lz[0]=0; out_lx[1]=4; out_lz[1]=2; out_lx[2]=9; out_lz[2]=15;
+            out_lx[3]=15; out_lz[3]=7; out_lx[4]=2; out_lz[4]=10; out_lx[5]=12; out_lz[5]=1;
+            out_lx[6]=7; out_lz[6]=13;
+            return 7;
+    }
+}
+
+/* town_draw_dfzone_flowers: real block-backed flowers, same stacked-primitive technique as trees
+ * (a thin green stem plus a small colored bloom), sitting at the zone's own real terrain height
+ * (dfzone_height_at) rather than assuming y=0. Alternates red (poppy) / yellow (dandelion) by
+ * index, matching meadowFlowers' own real block-name alternation server-side. */
+static void town_draw_dfzone_flowers(const Mat4 *vp, GLint loc_mvp, GLint loc_model, GLint loc_color, const Mesh *cube_mesh) {
+    if (!g_dfzone_active || !g_dfzone_ready || g_dfzone_scene != 0) return; /* Meadow only, see town_draw_dfzone_trees' own doc comment */
+    int lx[8], lz[8];
+    int n = town_meadow_flower_positions(0, 0, lx, lz);
+    for (int i = 0; i < n; i++) {
+        float wx = ((float)lx[i] - 8.0f) * TERRAIN_TEST_CELL_SIZE;
+        float wz = ((float)lz[i] - 8.0f) * TERRAIN_TEST_CELL_SIZE;
+        float wy = 0.0f;
+        dfzone_height_at(wx, wz, &wy);
+        glUniform4f_(loc_color, 0.2f, 0.45f, 0.15f, 1.0f); /* stem: green */
+        draw_hero_box(wx, wz, 0.0f, wy + 0.1f, 0.0f, 0.03f, 0.1f, 0.03f, 1.0f, vp, loc_mvp, loc_model, cube_mesh);
+        if (i % 2 == 0) {
+            glUniform4f_(loc_color, 0.85f, 0.1f, 0.15f, 1.0f); /* poppy: red */
+        } else {
+            glUniform4f_(loc_color, 0.95f, 0.85f, 0.1f, 1.0f); /* dandelion: yellow */
+        }
+        draw_hero_box(wx, wz, 0.0f, wy + 0.22f, 0.0f, 0.09f, 0.07f, 0.09f, 1.0f, vp, loc_mvp, loc_model, cube_mesh);
+    }
+}
+
 /* town_draw_ground: NxN alternating grey/brown tiles spanning the exact same total footprint
  * (ARENA_HALF_EXTENT * 2.2f) as battlegrounds' own single-color ground plane just below in
  * main()'s "ground" block -- "same size as the battlegrounds scene," per the founder's own ask.
@@ -4842,6 +4905,7 @@ int main(int argc, char *argv[]) {
                        Town's own render doesn't apply outside Town. */
                     town_draw_dfzone(loc_mvp, loc_model, loc_color, vp);
                     town_draw_dfzone_trees(&vp, loc_mvp, loc_model, loc_color, &cube_mesh);
+                    town_draw_dfzone_flowers(&vp, loc_mvp, loc_model, loc_color, &cube_mesh);
                     /* Real Meadow worms (2026-08-03, founder: "and we can fight worms in that new
                        area?") -- town_draw_worms itself resolves Town vs Meadow via
                        town_active_targets/g_dfzone_active, same shared function used below. */

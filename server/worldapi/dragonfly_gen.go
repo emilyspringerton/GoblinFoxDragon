@@ -31,6 +31,16 @@ var blockNameToID = map[string]uint16{
 	"minecraft:dark_oak_leaves":    18,
 	"minecraft:leaves":             18,
 	"minecraft:leaves2":            18,
+	// Flower ground cover (2026-08-03, founder: "add some block backed flowers to the meadow").
+	// New ID 19 -- SHANKPIT's own packages2/common/block_map.go (this table's real sync partner,
+	// see this var's own doc comment) has no flower content anywhere in its own scenes, so this ID
+	// is GoblinFoxDragon-only for now, an honest gap rather than a guessed cross-repo sync. Poppy
+	// and dandelion share one voxel ID (a real VoxelBlock consumer only needs "flower here," not
+	// which color) -- the color distinction lives in WorldBlock.BlockName for anything that reads
+	// the raw name, and in the client's own render logic (apps2/battlegrounds_gui's
+	// town_meadow_flower_positions, driven by array index, not this ID).
+	"minecraft:poppy":     19,
+	"minecraft:dandelion": 19,
 }
 
 // nameToBlockID converts a Dragonfly block name to a SHANKPIT block ID.

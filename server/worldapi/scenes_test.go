@@ -27,6 +27,38 @@ func TestProceduralWorldStore_Scene0Meadow(t *testing.T) {
 	}
 }
 
+// TestProceduralWorldStore_Scene0Meadow_Flowers (2026-08-03, founder: "add some block backed
+// flowers to the meadow") -- real, block-backed poppy/dandelion ground cover, not just decoration
+// invented on the render side. Checks both real block names appear and that no flower lands on a
+// tree's own trunk column (meadowFlowers' own doc comment: picked by hand to avoid exactly that).
+func TestProceduralWorldStore_Scene0Meadow_Flowers(t *testing.T) {
+	blocks := ProceduralWorldStore(0, 0, 0)
+	var hasPoppy, hasDandelion bool
+	treeCols := make(map[[2]int]bool)
+	for _, t := range meadowTrees(0, 0) {
+		treeCols[[2]int{t[0], t[1]}] = true
+	}
+	for _, b := range blocks {
+		switch b.BlockName {
+		case "minecraft:poppy":
+			hasPoppy = true
+		case "minecraft:dandelion":
+			hasDandelion = true
+		default:
+			continue
+		}
+		if treeCols[[2]int{b.X, b.Z}] {
+			t.Errorf("flower at (%d,%d) lands on a tree's own trunk column", b.X, b.Z)
+		}
+	}
+	if !hasPoppy {
+		t.Error("scene 0: expected at least one minecraft:poppy")
+	}
+	if !hasDandelion {
+		t.Error("scene 0: expected at least one minecraft:dandelion")
+	}
+}
+
 func TestProceduralWorldStore_Scene1Hills(t *testing.T) {
 	blocks := ProceduralWorldStore(1, 0, 0)
 	if len(blocks) == 0 {

@@ -1,3 +1,23 @@
+## 2026-08-03 (25)
+
+- feat(worldapi,server-go,battlegrounds_gui): block-backed flowers in Meadow -- founder: "add some
+  block backed flowers to the meadow." New `meadowFlowers` (server/worldapi/scenes.go), same
+  deterministic-per-chunk discipline as `meadowTrees` (5-8 real positions per chunk, hand-picked to
+  avoid landing on a tree's own trunk column), alternating real `minecraft:poppy`/
+  `minecraft:dandelion` blocks rooted at the real per-column terrain height. New voxel block ID 19
+  in `dragonfly_gen.go`'s `blockNameToID` (both flower types share it -- a real VoxelBlock consumer
+  only needs "flower here," the poppy/dandelion color distinction lives in `WorldBlock.BlockName`
+  and in the client's own render logic) -- SHANKPIT's own `block_map.go` has no flower content in
+  any of its own scenes, so this ID is GoblinFoxDragon-only for now, a named gap rather than a
+  guessed cross-repo sync. Client-side `town_meadow_flower_positions`/`town_draw_dfzone_flowers`
+  (apps2/battlegrounds_gui) mirror the real positions exactly and render a thin green stem plus a
+  small red/yellow bloom (same stacked-primitive technique as trees), sitting on the zone's own
+  real rolling terrain via `dfzone_height_at`. New `TestProceduralWorldStore_Scene0Meadow_Flowers`
+  (both real block names present, no flower on a tree's trunk column). `go test ./...` and `gcc
+  -Wall -Wextra` clean. Live-verified: `/chunks?scene=0&cx=0&cz=0` now returns 8 real block ID 19
+  entries; a debug-instrumented client build confirmed `town_draw_dfzone_flowers` firing every
+  frame with the correct real positions (temp instrumentation, fully reverted before commit).
+
 ## 2026-08-03 (24)
 
 - fix(battlegrounds_gui): relaunching while your last real position was in Meadow could strand you

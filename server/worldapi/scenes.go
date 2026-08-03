@@ -247,6 +247,19 @@ func meadowChunk(chunkX, chunkZ int) []WorldBlock {
 		wx, wz := chunkX*chunkSize+t[0], chunkZ*chunkSize+t[1]
 		out = append(out, worldTree(chunkX, chunkZ, t[0], t[1], meadowColumnHeight(wx, wz)+1)...)
 	}
+	// Flowers (2026-08-03, founder: "add some block backed flowers to the meadow") -- real
+	// single-block ground cover, same "rooted at the real height under its own (x,z)" discipline
+	// as trees just above, not a fixed grassY. Alternates poppy/dandelion by index for variety.
+	flowers := meadowFlowers(chunkX, chunkZ)
+	for i, f := range flowers {
+		wx, wz := chunkX*chunkSize+f[0], chunkZ*chunkSize+f[1]
+		flowerY := meadowColumnHeight(wx, wz) + 1
+		blockName := "minecraft:poppy"
+		if i%2 == 1 {
+			blockName = "minecraft:dandelion"
+		}
+		out = append(out, WorldBlock{X: wx, Y: flowerY, Z: wz, BlockName: blockName})
+	}
 	return out
 }
 
@@ -271,6 +284,28 @@ func meadowTrees(chunkX, chunkZ int) [][2]int {
 		return [][2]int{{5, 7}, {9, 12}, {2, 4}, {13, 10}, {7, 2}, {12, 14}}
 	default:
 		return [][2]int{{6, 6}, {10, 3}, {3, 11}, {13, 13}, {8, 8}}
+	}
+}
+
+// meadowFlowers returns this chunk's real flower spots, same deterministic-per-chunk
+// discipline as meadowTrees (apps2/battlegrounds_gui's own town_meadow_flower_positions mirrors
+// this exactly, "kept in sync by hand"). A separate coordinate set from meadowTrees within the
+// same bucket -- picked by hand to avoid landing a flower on a tree's own trunk column -- not a
+// second call into the same hash. Alternates two real block-backed flower types by index
+// (poppy/dandelion) rather than one repeated flower, so patches read as real ground cover.
+func meadowFlowers(chunkX, chunkZ int) [][2]int {
+	h := chunkX*31 + chunkZ*17
+	switch h % 5 {
+	case 0:
+		return [][2]int{{0, 5}, {3, 9}, {7, 1}, {10, 4}, {1, 13}, {15, 10}, {6, 7}, {11, 15}}
+	case 1:
+		return [][2]int{{0, 1}, {5, 3}, {9, 8}, {12, 0}, {1, 10}, {15, 6}, {7, 13}, {4, 15}}
+	case 2:
+		return [][2]int{{0, 3}, {6, 1}, {9, 6}, {14, 10}, {1, 15}, {15, 2}, {4, 7}, {12, 13}}
+	case 3:
+		return [][2]int{{0, 9}, {3, 1}, {8, 5}, {15, 3}, {1, 14}, {10, 8}, {6, 15}, {14, 0}}
+	default:
+		return [][2]int{{0, 0}, {4, 2}, {9, 15}, {15, 7}, {2, 10}, {12, 1}, {7, 13}}
 	}
 }
 
