@@ -3589,6 +3589,29 @@ static int town_queue_button_hit(float bx, float by, int win_w, int win_h) {
     return bx >= x0 && bx <= x1 && by >= y0 && by <= y1;
 }
 
+/* town_teleport_town_button_rect (2026-08-03, founder: "give me a teleport to town button under
+ * queue for battlegrounds") -- same x0/x1 as the queue button, directly below it in real screen
+ * position. This code's own Y convention has y increase upward from the bottom-left (mouse clicks
+ * are flipped to `win_h - button.y` at the one real call site below, matching town_queue_button_rect's
+ * own convention), so "below" the queue button on screen means a SMALLER y here, not larger --
+ * y1 sits one BTN_H+gap under the queue button's own y0. Same shared
+ * rect-function-for-both-draw-and-hit-test discipline town_queue_button_rect already established,
+ * so the drawn box and the click target can never drift apart. */
+static void town_teleport_town_button_rect(int win_w, int win_h, float *x0, float *y0, float *x1, float *y1) {
+    float qx0, qy0, qx1, qy1;
+    town_queue_button_rect(win_w, win_h, &qx0, &qy0, &qx1, &qy1);
+    *x0 = qx0;
+    *x1 = qx1;
+    *y1 = qy0 - 10.0f;
+    *y0 = *y1 - TOWN_QUEUE_BTN_H;
+}
+
+static int town_teleport_town_button_hit(float bx, float by, int win_w, int win_h) {
+    float x0, y0, x1, y1;
+    town_teleport_town_button_rect(win_w, win_h, &x0, &y0, &x1, &y1);
+    return bx >= x0 && bx <= x1 && by >= y0 && by <= y1;
+}
+
 static void town_draw_hud(int win_w, int win_h, int queue_available) {
     glUseProgram_(0); /* legacy immediate-mode 2D pass -- see the match renderer's own identical
                           "2D HUD pass" comment; draw_string/glBegin below need the fixed-function
@@ -3649,18 +3672,39 @@ static void town_draw_hud(int win_w, int win_h, int queue_available) {
         }
     }
 
-    if (!queue_available) return;
-    float x0, y0, x1, y1;
-    town_queue_button_rect(win_w, win_h, &x0, &y0, &x1, &y1);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glColor4f(0.15f, 0.35f, 0.2f, 0.9f);
-    glBegin(GL_QUADS);
-    glVertex2f(x0, y0); glVertex2f(x1, y0); glVertex2f(x1, y1); glVertex2f(x0, y1);
-    glEnd();
-    glDisable(GL_BLEND);
-    glColor3f(0.6f, 1.0f, 0.7f);
-    draw_string("QUEUE FOR BATTLEGROUNDS", x0 + 14.0f, y0 + TOWN_QUEUE_BTN_H / 2.0f - 4.0f, 10);
+    if (queue_available) {
+        float x0, y0, x1, y1;
+        town_queue_button_rect(win_w, win_h, &x0, &y0, &x1, &y1);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glColor4f(0.15f, 0.35f, 0.2f, 0.9f);
+        glBegin(GL_QUADS);
+        glVertex2f(x0, y0); glVertex2f(x1, y0); glVertex2f(x1, y1); glVertex2f(x0, y1);
+        glEnd();
+        glDisable(GL_BLEND);
+        glColor3f(0.6f, 1.0f, 0.7f);
+        draw_string("QUEUE FOR BATTLEGROUNDS", x0 + 14.0f, y0 + TOWN_QUEUE_BTN_H / 2.0f - 4.0f, 10);
+    }
+
+    /* Teleport-to-town button (2026-08-03, founder: "give me a teleport to town button under
+     * queue for battlegrounds") -- the same real, unconditional town_telecrystal_return the "H"
+     * emergency keybind already calls (2026-08-03, "i was in the meadow and closed the game -
+     * then... i was in the middle of nowhere not in town"), just with a real clickable affordance
+     * for it too, not keyboard-only. Only shown while actually in the Dragonfly Meadow zone
+     * (g_dfzone_active) -- there's nothing to "return" to from Town itself. */
+    if (g_dfzone_active) {
+        float x0, y0, x1, y1;
+        town_teleport_town_button_rect(win_w, win_h, &x0, &y0, &x1, &y1);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glColor4f(0.35f, 0.25f, 0.1f, 0.9f);
+        glBegin(GL_QUADS);
+        glVertex2f(x0, y0); glVertex2f(x1, y0); glVertex2f(x1, y1); glVertex2f(x0, y1);
+        glEnd();
+        glDisable(GL_BLEND);
+        glColor3f(1.0f, 0.8f, 0.4f);
+        draw_string("TELEPORT TO TOWN", x0 + 14.0f, y0 + TOWN_QUEUE_BTN_H / 2.0f - 4.0f, 10);
+    }
 }
 
 /* ---------------- Town avatar, movement, and the real character backend (2026-08-02) ----------------
@@ -4784,6 +4828,11 @@ int main(int argc, char *argv[]) {
                             fprintf(stderr, "Failed to join a match via matchmaker at %s:%d\n",
                                     queue_host, queue_port);
                         }
+                    } else if (g_dfzone_active && town_teleport_town_button_hit(bx, by, win_w, win_h)) {
+                        /* Real click affordance for the same emergency return "H" already does
+                           (2026-08-03, founder: "give me a teleport to town button under queue for
+                           battlegrounds"). */
+                        town_telecrystal_return();
                     } else {
                         /* Click-to-move (2026-08-02, "we need to be able to run around town") --
                            same screen_to_ground ray-cast Battlegrounds' own click-to-move uses,

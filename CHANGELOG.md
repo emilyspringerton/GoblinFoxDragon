@@ -1,3 +1,14 @@
+## 2026-08-03 (26)
+
+- feat(battlegrounds_gui): real "TELEPORT TO TOWN" button -- founder: "give me a teleport to town
+  button under queue for battlegrounds." Same real, unconditional `town_telecrystal_return` the
+  "H" emergency keybind already calls, now with a real clickable affordance too. New
+  `town_teleport_town_button_rect`/`_hit`, sharing `town_queue_button_rect`'s own real screen
+  position as its anchor so it always sits directly under "QUEUE FOR BATTLEGROUNDS" even if that
+  button's own position ever moves. Only shown while `g_dfzone_active` (Meadow) -- nothing to
+  "return" to from Town itself. `gcc -Wall -Wextra` clean. Live-verified via Xvfb screenshot: the
+  button renders directly beneath the queue button in the real top-right corner.
+
 ## 2026-08-03 (25)
 
 - feat(worldapi,server-go,battlegrounds_gui): block-backed flowers in Meadow -- founder: "add some
