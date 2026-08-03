@@ -3167,6 +3167,71 @@ static int terrain_test_height_at(float wx, float wz, float *out_y) {
     return 0;
 }
 
+/* ---------------- real Dragonfly zone rendering (2026-08-03) ----------------
+ * Founder: "im expecting to teleport from town to the new zone" -- the real gap
+ * town_telecrystal_travel's own doc comment named ("nothing here re-renders Meadow's own
+ * geometry... A relog (or a future real Meadow render mode) is the only way to see it match
+ * today"). This closes it using exactly the pieces SMOOTH_TERRAIN_NORTHSTAR.md's Milestones 2-4
+ * already built and live-verified (heightfield mesh, biome coloring, elevation-aware
+ * camera/avatar) -- not new rendering technology, just pointed at the real Dragon Gate
+ * interaction and drawn full-zone at the world origin instead of floating beside Town as an F10
+ * debug patch. When active, Town's own New-Handington-specific geometry (ground/buildings/worms)
+ * is not drawn -- they're a different, unrelated space, same reasoning DUNGEON/SMOOTH_TERRAIN
+ * both already established for why Town's own render doesn't apply elsewhere. */
+static Mesh g_dfzone_mesh;
+static unsigned char g_dfzone_heights[256];
+static int g_dfzone_scene = 0; /* Meadow -- the only real destination Dragon Gate offers today */
+static int g_dfzone_ready = 0;
+static int g_dfzone_active = 0;
+
+static void dfzone_load(void) {
+    char path[64];
+    snprintf(path, sizeof(path), "/heightmap?scene=%d&cx=0&cz=0", g_dfzone_scene);
+    char resp[8192];
+    int status = 0;
+    if (http_get_json(iduna_host, TOWN_WORLDAPI_PORT, path, NULL, resp, sizeof(resp), &status) != 0
+        || status != 200) {
+        return;
+    }
+    size_t found = 0;
+    if (!http_extract_json_uint8_array_field(resp, "height", g_dfzone_heights, 256, &found) || found != 256) {
+        return;
+    }
+    float *verts = NULL;
+    int vert_count = build_heightfield_mesh(g_dfzone_heights, 2 /* subdiv */,
+                                             TERRAIN_TEST_CELL_SIZE, TERRAIN_TEST_HEIGHT_SCALE, &verts);
+    g_dfzone_mesh = upload_mesh(verts, vert_count);
+    free(verts);
+    g_dfzone_ready = 1;
+}
+
+/* dfzone_height_at: same grid math as terrain_test_height_at, but centered at the world origin
+ * (the real telecrystal spawn is (0,2,0), matching server/telecrystal's own
+ * TELECRYSTAL_ID_HANDINGTON_TO_MEADOW.SpawnPos) instead of an offset debug position. Only one
+ * chunk (0,0) is loaded -- walking past its +-8 unit edge falls back to y=0, a real, named limit
+ * of "one chunk for now," not a silent wraparound or crash. */
+static int dfzone_height_at(float wx, float wz, float *out_y) {
+    if (!g_dfzone_active || !g_dfzone_ready) return 0;
+    const float half = 8.0f * TERRAIN_TEST_CELL_SIZE;
+    if (wx < -half || wx > half || wz < -half || wz > half) return 0;
+    float gx = wx / TERRAIN_TEST_CELL_SIZE + 8.0f;
+    float gz = wz / TERRAIN_TEST_CELL_SIZE + 8.0f;
+    *out_y = heightfield_sample(g_dfzone_heights, gx, gz) * TERRAIN_TEST_HEIGHT_SCALE;
+    return 1;
+}
+
+static void town_draw_dfzone(GLint loc_mvp, GLint loc_model, GLint loc_color, Mat4 vp) {
+    if (!g_dfzone_active || !g_dfzone_ready) return;
+    Mat4 model = mat4_translate(0.0f, 0.0f, 0.0f);
+    Mat4 mvp = mat4_multiply(&vp, &model);
+    glUniformMatrix4fv_(loc_mvp, 1, GL_FALSE, mvp.m);
+    glUniformMatrix4fv_(loc_model, 1, GL_FALSE, model.m);
+    float r, g, b;
+    biome_color(g_dfzone_scene, &r, &g, &b);
+    glUniform4f_(loc_color, r, g, b, 1.0f);
+    draw_mesh(&g_dfzone_mesh);
+}
+
 /* town_draw_ground: NxN alternating grey/brown tiles spanning the exact same total footprint
  * (ARENA_HALF_EXTENT * 2.2f) as battlegrounds' own single-color ground plane just below in
  * main()'s "ground" block -- "same size as the battlegrounds scene," per the founder's own ask.
@@ -3499,14 +3564,47 @@ static void town_telecrystal_travel(void) {
         combat_log_push("The crystal fizzles -- travel failed.");
         return;
     }
-    combat_log_push("The crystal resonates... you are transported to Meadow!");
-    /* Town's own render is New-Handington-specific -- see JUNGLE... no, SMOOTH_TERRAIN/DUNGEON
-       northstars' own "none of the client's render modes fit a non-New-Handington space" finding.
-       Real, honest, known gap: nothing here re-renders Meadow's own geometry (none exists in this
-       client yet), so the 3D view keeps showing New Handington even though the character's real
-       backend position/zone are now correctly Meadow -- same category of visual mismatch as the
-       earlier Town-movement-bounds bug, but expected/named here rather than a surprise. A relog
-       (or a future real Meadow render mode) is the only way to see it match today. */
+    /* 2026-08-03, founder: "im expecting to teleport from town to the new zone" -- this used to
+       stop here, leaving Town's own New-Handington geometry on screen despite the character's
+       real backend position now being Meadow (named gap, see git history for the old comment).
+       Closed: lazy-load the real Dragonfly Meadow heightmap (dfzone_load, worldapi scene 0) and
+       switch the client's own render mode, so the 3D view actually shows the destination instead
+       of requiring a relog to (still never) catch up. */
+    if (!g_dfzone_ready) dfzone_load();
+    if (g_dfzone_ready) {
+        g_dfzone_active = 1;
+        g_town_x = target_x;
+        g_town_z = target_z;
+        combat_log_push("The crystal resonates... you are transported to Meadow! (press G to return)");
+    } else {
+        combat_log_push("The crystal resonates, but Meadow's own terrain won't load -- worldapi unreachable?");
+    }
+}
+
+/* town_telecrystal_return: the reverse trip, real values from server/telecrystal's own
+ * TELECRYSTAL_ID_MEADOW_RETURN_HANDINGTON entry (SpawnPos {-40,0,-50}, matching the Dragon Gate's
+ * own real position in TOWN_BUILDINGS so arriving back lands you right where you left). Same
+ * direct-PATCH mechanism as the outbound trip, same reasoning for bypassing apps2/mud. */
+static void town_telecrystal_return(void) {
+    if (!g_town_char_loaded || !g_chat_jwt[0] || !g_town_char_id[0]) return;
+    const int target_scene = 4;   /* New Handington -- SceneNewHandington in server/telecrystal */
+    const float target_x = -40.0f, target_y = 0.0f, target_z = -50.0f; /* Dragon Gate's own real position */
+    char body[192];
+    snprintf(body, sizeof(body), "{\"scene_id\":%d,\"pos_x\":%.3f,\"pos_y\":%.3f,\"pos_z\":%.3f}",
+             target_scene, target_x, target_y, target_z);
+    char path[128];
+    snprintf(path, sizeof(path), "/api/v1/characters/%s/position", g_town_char_id);
+    char resp[256];
+    int status = 0;
+    if (http_patch_json(iduna_host, iduna_port, path, g_chat_jwt, body, resp, sizeof(resp), &status) != 0
+        || status != 200) {
+        combat_log_push("The crystal fizzles -- return failed.");
+        return;
+    }
+    g_dfzone_active = 0;
+    g_town_x = target_x;
+    g_town_z = target_z;
+    combat_log_push("The crystal resonates... you are transported back to New Handington!");
 }
 
 /* town_send_command: POST to apps2/mud's own /api/town/command (real headless-session combat,
@@ -4130,6 +4228,31 @@ int main(int argc, char *argv[]) {
                 else if (te.type == SDL_KEYDOWN && te.key.keysym.sym == SDLK_SPACE) {
                     if (g_town_jump_age_ms >= TOWN_JUMP_DURATION_MS) g_town_jump_age_ms = 0.0f;
                 }
+                else if (te.type == SDL_KEYDOWN && te.key.keysym.sym == SDLK_F10) {
+                    /* SMOOTH_TERRAIN_NORTHSTAR.md Milestone 2+3 debug toggle. BUGFIX 2026-08-03:
+                       this used to live in the battlegrounds-match `e`-scoped event loop further
+                       down in this file -- dead code for real Town play, since in_town's own
+                       `continue;` (this loop's own closing brace) skips that loop entirely
+                       whenever in_town is true. Every "live-verified under Xvfb" screenshot taken
+                       for Milestones 2-4 actually exercised a temporary test-only env-var hook
+                       that set the state directly, not this key -- the hook was removed before
+                       each commit as documented, but this real bug in the shipped key handler
+                       went unnoticed until wiring the real Dragon Gate teleport surfaced it.
+                       Moved here, into Town's own `te`-scoped loop, where it's actually reachable. */
+                    int any_ready = g_terrain_test[0].ready || g_terrain_test[1].ready || g_terrain_test[2].ready;
+                    if (!any_ready) town_load_terrain_test();
+                    g_terrain_test_active = !g_terrain_test_active;
+                }
+                else if (te.type == SDL_KEYDOWN && te.key.keysym.sym == SDLK_g && g_dfzone_active) {
+                    /* Real Dragonfly zone return trip (2026-08-03). Deliberately a dedicated key,
+                       not "right-click anywhere" -- the whole point of getting here was a real,
+                       walkable zone, and hijacking every right-click as "return" would break the
+                       camera-drag control players need to actually look around it. Gated on
+                       g_dfzone_active so "G" is a no-op in Town/battlegrounds, no new collision
+                       with any existing binding. Announced in the zone-entry combat log message
+                       (town_telecrystal_travel) so it's discoverable, not a hidden keybind. */
+                    town_telecrystal_return();
+                }
                 else if (te.type == SDL_MOUSEBUTTONDOWN && te.button.button == SDL_BUTTON_RIGHT) {
                     /* Auction House right-click (2026-08-02, founder: "have it be interractable
                        on right click (the whole auction house building for now is fine)") --
@@ -4145,12 +4268,15 @@ int main(int argc, char *argv[]) {
                             ah_open();
                             opened = 1;
                         }
-                        else if (bidx >= 0 && strcmp(TOWN_BUILDINGS[bidx].name, "Dragon Gate") == 0) {
+                        else if (bidx >= 0 && strcmp(TOWN_BUILDINGS[bidx].name, "Dragon Gate") == 0 && !g_dfzone_active) {
                             /* Real telecrystal, routed around apps2/mud's own broken `travel`
                                dispatch (2026-08-03) -- see town_telecrystal_travel's own doc
                                comment for the full deadlock investigation. Direct IDUNA PATCH,
                                same safe mechanism town_sync_position already uses continuously
-                               for ordinary movement, not the headless command path. */
+                               for ordinary movement, not the headless command path. Guarded on
+                               !g_dfzone_active since Town's own buildings (including this one)
+                               aren't rendered/clickable once the real Dragonfly zone is active --
+                               the "G" key is the return trip from there, see its own handler. */
                             town_telecrystal_travel();
                             opened = 1;
                         }
@@ -4281,20 +4407,33 @@ int main(int argc, char *argv[]) {
                 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
                 /* SMOOTH_TERRAIN_NORTHSTAR.md Milestone 4: camera focus and avatar height read
-                   real terrain height when standing on an F10 test patch, 0.0f (Town's own flat
-                   ground) everywhere else -- see terrain_test_height_at's own doc comment. */
+                   real terrain height when standing on an F10 test patch OR the real Dragonfly
+                   zone (dfzone_height_at, 2026-08-03's own real teleport work), 0.0f (Town's own
+                   flat ground) everywhere else -- see each function's own doc comment. The two
+                   never overlap spatially (test patches sit far off to the side, dfzone is at the
+                   origin), so trying both in sequence is unambiguous. */
                 float town_ground_y = 0.0f;
-                terrain_test_height_at(g_town_x, g_town_z, &town_ground_y);
+                if (!dfzone_height_at(g_town_x, g_town_z, &town_ground_y)) {
+                    terrain_test_height_at(g_town_x, g_town_z, &town_ground_y);
+                }
                 Mat4 view = mat4_orbit_view(g_town_x, town_ground_y, g_town_z, cam_yaw, cam_pitch, cam_dist);
                 Mat4 proj = mat4_perspective(60.0f, (float)win_w / (float)win_h, 0.1f, 100.0f);
                 Mat4 vp = mat4_multiply(&proj, &view);
 
                 glUseProgram_(prog);
                 glUniform3f_(loc_light, 0.4f, 0.8f, 0.3f);
-                town_draw_ground(loc_mvp, loc_model, loc_color, vp, &plane_mesh);
-                town_draw_terrain_test(loc_mvp, loc_model, loc_color, vp);
-                town_draw_buildings(&vp, loc_mvp, loc_model, loc_color, &cube_mesh);
-                town_draw_worms(&vp, loc_mvp, loc_model, loc_color, &cube_mesh);
+                if (g_dfzone_active) {
+                    /* Real Dragonfly zone (Dragon Gate teleport) -- New Handington's own
+                       ground/buildings/worms are a different, unrelated space while this is
+                       active, same reasoning DUNGEON/SMOOTH_TERRAIN already established for why
+                       Town's own render doesn't apply outside Town. */
+                    town_draw_dfzone(loc_mvp, loc_model, loc_color, vp);
+                } else {
+                    town_draw_ground(loc_mvp, loc_model, loc_color, vp, &plane_mesh);
+                    town_draw_buildings(&vp, loc_mvp, loc_model, loc_color, &cube_mesh);
+                    town_draw_worms(&vp, loc_mvp, loc_model, loc_color, &cube_mesh);
+                }
+                town_draw_terrain_test(loc_mvp, loc_model, loc_color, vp); /* F10 debug patches, independent of dfzone */
                 if (g_town_char_loaded) {
                     /* jump offset (and, Milestone 4, real terrain height on an F10 test patch)
                        applied by pre-multiplying vp with a world-space Y translate --
@@ -4314,7 +4453,7 @@ int main(int argc, char *argv[]) {
                 }
 
                 town_draw_hud(win_w, win_h, queue_host != NULL);
-                town_draw_building_labels(&vp, win_w, win_h);
+                if (!g_dfzone_active) town_draw_building_labels(&vp, win_w, win_h); /* New-Handington-specific */
                 chat_draw(win_w, win_h);
                 combat_log_draw(win_w, win_h);
                 ah_draw(win_w, win_h);
@@ -4433,15 +4572,6 @@ int main(int argc, char *argv[]) {
             }
             if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_F11) {
                 show_apm = !show_apm; /* S170-71: works in any mode, not gated on net_mode/observing */
-            }
-            if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_F10) {
-                /* SMOOTH_TERRAIN_NORTHSTAR.md Milestone 2+3 debug toggle, same "works in any
-                   mode" precedent as F11 above. Lazy-loads on first press (town_load_terrain_test
-                   checks each patch's own .ready internally), silently no-ops any biome whose
-                   fetch fails -- see its own doc comment. */
-                int any_ready = g_terrain_test[0].ready || g_terrain_test[1].ready || g_terrain_test[2].ready;
-                if (!any_ready) town_load_terrain_test();
-                g_terrain_test_active = !g_terrain_test_active;
             }
             if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_h) {
                 show_ability_help = !show_ability_help; /* same "works in any mode" precedent as F11 above */

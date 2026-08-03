@@ -1,3 +1,27 @@
+## 2026-08-03 (11)
+
+- feat(battlegrounds_gui): real Town <-> Dragonfly zone teleport -- founder: "im expecting to
+  teleport from town to the new zone." `town_telecrystal_travel` used to stop at the IDUNA
+  position PATCH, leaving Town's own geometry on screen (a named gap in its own old doc comment).
+  Now it also lazy-loads the real Dragonfly Meadow heightmap (`dfzone_load`, worldapi scene 0) and
+  switches the client's render mode (`g_dfzone_active`): Town's ground/buildings/worms/building-
+  labels stop drawing, `town_draw_dfzone` draws the real live heightfield mesh (reusing
+  Milestones 2-4's pipeline unchanged) at the world origin, camera/avatar height follow it
+  (`dfzone_height_at`). New "G" key is the return trip (`town_telecrystal_return`, real
+  `TELECRYSTAL_ID_MEADOW_RETURN_HANDINGTON` values) -- a dedicated key rather than hijacking
+  right-click, which players need for camera control while exploring the new zone.
+- fix(battlegrounds_gui): real bug found while wiring the above -- the F10 debug toggle shipped in
+  Milestone 2 lived in the battlegrounds-match event loop (`e`-scoped), which Town's own render
+  branch's `continue;` skips entirely whenever `in_town` is true. F10 was dead code for real Town
+  play; every "live-verified under Xvfb" screenshot for Milestones 2-4 actually exercised a
+  temporary test-only env-var hook that set state directly, not the real key (the hook was
+  removed before each commit as documented, but the real key handler itself was never reachable
+  in Town). Moved into Town's own `te`-scoped event loop, where it's now actually reachable.
+- Live-verified visually under Xvfb: screenshotted Town's checkerboard/buildings genuinely
+  disappearing and the real Meadow terrain filling the screen at the destination, confirming the
+  render-mode swap and worldapi fetch both work end to end. `go vet`/`go test ./...` and a direct
+  `gcc` client build both clean.
+
 ## 2026-08-03 (10)
 
 - feat(battlegrounds_gui): ship Milestone 4 of SMOOTH_TERRAIN_NORTHSTAR.md -- movement/camera

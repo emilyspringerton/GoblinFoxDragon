@@ -183,7 +183,7 @@ billboards were the right call for DUNGEON_NORTHSTAR's mobs specifically because
 *moving creatures* needing cheap animation frames; a tree is static world dressing, closer in kind
 to a building than a monster.
 
-### 3.6 The Town <-> Dragonfly bridge (open question, not resolved here)
+### 3.6 The Town <-> Dragonfly bridge
 
 Founder: "ok so can we warp from town to the zone backed by dragonfly?" Real gap found while
 scoping this: Town's own Dragon Gate (this session's telecrystal work) currently sends a character
@@ -191,13 +191,30 @@ to `apps2/mud`'s own "Meadow" -- real backend state, but a TEXT-ONLY MUD zone wi
 relationship to `server/worldapi`'s Dragonfly-voxel "Meadow." They share a name and a scene-ID
 convention (0) but are served by two completely separate backends
 (`docs2/DRAGONSNSHIT_TWO_BACKENDS_AUDIT.md`'s own finding: apps2/mud and apps2/server-go "don't
-share state at all"). A real bridge needs, at minimum: (a) this terrain-rendering work landing in
-`apps2/battlegrounds_gui` at all (§3.1-3.4, all still NOT STARTED), and (b) a real answer to
-whether a Town character's own session can move into `apps2/server-go`'s own UDP protocol
-world -- a genuine protocol switch, not just a position update -- or whether the two backends need
-real unification first (the two-backends audit's own closing recommendation: "port apps2/mud's
-RPG logic to run inside apps2/server-go's loop"). Not designed here; flagged honestly as the real
-open question this doc's own title question raises.
+share state at all").
+
+**Done, 2026-08-03 -- the RENDER side of this bridge, not a backend unification:** founder: "im
+expecting to teleport from town to the new zone." `town_telecrystal_travel` used to stop at the
+IDUNA position PATCH, leaving Town's own New-Handington geometry on screen (the exact gap its own
+old doc comment named). Now it also lazy-loads the real Dragonfly Meadow heightmap (`dfzone_load`,
+worldapi scene 0) and switches the client's own render mode (`g_dfzone_active`) -- Town's
+ground/buildings/worms stop drawing, `town_draw_dfzone` draws the real live heightfield mesh
+(Milestones 2-4's own pipeline, unchanged) at the world origin instead, and camera/avatar height
+follow it (`dfzone_height_at`). A dedicated "G" key is the return trip
+(`town_telecrystal_return`, the real `TELECRYSTAL_ID_MEADOW_RETURN_HANDINGTON` values). Live-
+verified visually under Xvfb: Town's checkerboard and buildings genuinely disappear and the real
+Meadow terrain fills the screen at the destination.
+
+**Still not done, named rather than silently ignored**: this is a client-side render swap, not a
+protocol bridge -- the character's real backend session is still `apps2/mud`'s text MUD (position
+PATCHed via IDUNA, same as before), not actually inside `apps2/server-go`'s own UDP world. No
+mobs, other players, or `apps2/mud` combat/chat sync render in the Dragonfly zone -- it's a real,
+walkable, correctly-elevated space with nothing populated in it yet, same honest scope as an
+empty stage. Only one chunk (0,0) loads -- walking past its edge has no more terrain (falls back
+to Town's own y=0 convention, `dfzone_height_at` returns 0 outside the loaded chunk, not a
+crash). A genuine backend unification (the two-backends audit's own closing recommendation: "port
+apps2/mud's RPG logic to run inside apps2/server-go's loop") is still not attempted -- this closes
+the *visual* mismatch the founder was actually pointing at, not the deeper architecture question.
 
 ### 3.7 Explicitly out of scope, named rather than silently ignored
 
