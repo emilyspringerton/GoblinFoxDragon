@@ -123,6 +123,16 @@ across biome edges needs a new per-vertex-color attribute and a shader variant t
 it -- a real, separable second piece of work, not required for "smooth terrain" itself (elevation
 is the part that reads as "blocky" today; flat-shaded color regions do not).
 
+**Done, 2026-08-03 (Milestone 3):** `biome_color` (`apps2/battlegrounds_gui/src/main.c`) maps
+worldapi's own `scene`/biome id to a flat RGB per draw call -- Meadow grass green, Hills olive,
+Swampville muddy brown-green, unknown scenes a neutral grey fallback. The F10 debug scene (§3.2's
+own Milestone 2 work) now fetches and renders all three column-derived biomes side by side rather
+than a single hardcoded green, so the coloring is real per-biome data, not a placeholder. No new
+enum needed -- reuses worldapi's own informal "sceneID is the biome selector" convention (§1)
+rather than inventing a second one client-side. Live-verified visually under Xvfb: all three
+patches render simultaneously with visibly distinct hues, confirming `biome_color` is actually
+driven by each patch's own real `scene` field, not hardcoded.
+
 ### 3.4 Movement, camera, click-to-move
 
 Every place `main.c` currently assumes ground is y=0 (avatar rendering, `screen_to_ground`'s ray
@@ -223,7 +233,7 @@ design (§3.4).
 | 0.5 | apps2/server-go running + seeded | Supervised (systemd), non-conflicting port, `/chunks` serves real block+tree data | DONE (2026-08-03) |
 | 1 | Backend heightmap exposure | New endpoint or field returns per-column height (+ biome id) for column-derived scenes (Hills first) | DONE (2026-08-03) |
 | 2 | Client heightfield mesh | New mesh-gen function renders a smooth, interpolated (not stair-stepped) terrain surface for one test scene, reusing the existing pos+normal pipeline unchanged | DONE (2026-08-03) |
-| 3 | Biome flat-coloring | Terrain chunks colored by dominant biome, same flat-per-draw-call convention as Town's ground | NOT STARTED |
+| 3 | Biome flat-coloring | Terrain chunks colored by dominant biome, same flat-per-draw-call convention as Town's ground | DONE (2026-08-03) |
 | 4 | Movement/camera elevation awareness | WASD movement, click-to-move, and camera focus read real terrain height instead of assuming 0, for the same test scene | NOT STARTED |
 | 5 | Smooth per-vertex biome blending (stretch) | New vertex-color attribute + shader variant blends biome color continuously across chunk/biome boundaries | NOT STARTED |
 

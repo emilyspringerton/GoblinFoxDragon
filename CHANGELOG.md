@@ -1,3 +1,15 @@
+## 2026-08-03 (9)
+
+- feat(battlegrounds_gui): ship Milestone 3 of SMOOTH_TERRAIN_NORTHSTAR.md -- biome flat-coloring.
+  New `biome_color` maps worldapi's own `scene`/biome id to a flat RGB per draw call (Meadow
+  grass green, Hills olive, Swampville muddy brown-green, unknown scenes grey). The F10 debug
+  scene (Milestone 2) now fetches and renders all three column-derived biomes side by side
+  instead of a single hardcoded green, so the milestone's own real terrain-test scaffolding is
+  the proof, not new throwaway code. No new client-side biome enum -- reuses worldapi's own
+  informal "sceneID is the biome selector" convention. Live-verified visually under Xvfb: all
+  three patches render simultaneously with visibly distinct hues driven by each patch's own real
+  `scene` field. `go vet`/`go test ./...` and a direct `gcc` client build both clean.
+
 ## 2026-08-03 (8)
 
 - feat(battlegrounds_gui): ship Milestone 2 of SMOOTH_TERRAIN_NORTHSTAR.md -- client heightfield

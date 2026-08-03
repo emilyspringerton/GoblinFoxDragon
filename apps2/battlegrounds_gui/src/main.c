@@ -3053,52 +3053,78 @@ static int build_heightfield_mesh(const unsigned char *heights, int subdiv,
     return vert_count;
 }
 
-/* ---------------- terrain test mode (2026-08-03, Milestone 2 validation) ----------------
+/* ---------------- terrain test mode (2026-08-03, Milestone 2+3 validation) ----------------
  * Founder's own northstar goal is smooth Dragonfly biomes rendered by this client -- but real
  * in-game placement (Milestone 4: movement/camera reading real terrain height) is explicitly a
  * separate, later milestone (§3.4/§5), and the Town<->Dragonfly bridge itself is still an open
- * question (§3.6). This is deliberately just a debug toggle: F10 fetches Hills' real heightmap
- * from worldapi (chunk 0,0) over HTTP, builds the mesh above, and renders it floating beside
- * Town so the mesh-generation code can be seen and validated against real backend data -- not
- * a real walkable zone, not wired into movement/collision. Lazy-loaded on first press so Town's
- * own startup never depends on worldapi being reachable. */
-static Mesh g_terrain_test_mesh;
-static int g_terrain_test_ready = 0;
+ * question (§3.6). This is deliberately just a debug toggle: F10 fetches worldapi's real
+ * heightmap for each of the three column-derived biomes (chunk 0,0) over HTTP, builds one mesh
+ * per biome, and renders all three side by side floating beside Town so both the mesh-generation
+ * code (Milestone 2) and the biome-coloring (Milestone 3, biome_color below) can be seen and
+ * validated against real backend data -- not a real walkable zone, not wired into
+ * movement/collision. Lazy-loaded on first press so Town's own startup never depends on worldapi
+ * being reachable. */
+typedef struct { Mesh mesh; int scene; int ready; } TerrainTestPatch;
+static TerrainTestPatch g_terrain_test[3] = {{{0}, 0, 0}, {{0}, 1, 0}, {{0}, 3, 0}};
 static int g_terrain_test_active = 0;
 
-static void town_load_terrain_test(void) {
-    char resp[8192];
-    int status = 0;
-    if (http_get_json(iduna_host, TOWN_WORLDAPI_PORT, "/heightmap?scene=1&cx=0&cz=0", NULL,
-                       resp, sizeof(resp), &status) != 0 || status != 200) {
-        return;
+/* biome_color (SMOOTH_TERRAIN_NORTHSTAR.md §3.3, Milestone 3, "flat color per mesh-chunk keyed
+ * off the dominant biome... same 'one uColor per draw call' convention Town's ground already
+ * uses"): sceneID is worldapi's own biome selector (see server/worldapi's own doc comment, "the
+ * closest thing to a biome selector today") -- no new enum needed on the client side, matching
+ * that same informal convention rather than inventing a second, redundant one. */
+static void biome_color(int scene, float *r, float *g, float *b) {
+    switch (scene) {
+        case 0: *r = 0.35f; *g = 0.62f; *b = 0.28f; break; /* Meadow: grass green */
+        case 1: *r = 0.45f; *g = 0.55f; *b = 0.30f; break; /* Hills: olive */
+        case 3: *r = 0.42f; *g = 0.40f; *b = 0.22f; break; /* Swampville: muddy brown-green */
+        default: *r = 0.5f; *g = 0.5f; *b = 0.5f; break;   /* unknown: neutral grey */
     }
-    unsigned char heights[256];
-    size_t found = 0;
-    if (!http_extract_json_uint8_array_field(resp, "height", heights, 256, &found) || found != 256) {
-        return;
-    }
-    float *verts = NULL;
-    int vert_count = build_heightfield_mesh(heights, 2 /* subdiv */, 1.0f /* cell_size */,
-                                             0.5f /* height_scale */, &verts);
-    g_terrain_test_mesh = upload_mesh(verts, vert_count);
-    free(verts);
-    g_terrain_test_ready = 1;
 }
 
-/* town_draw_terrain_test: floats the Hills test mesh well clear of Town's own footprint
- * (ARENA_HALF_EXTENT * 2.2f is Town's own total ground span, see town_draw_ground) so it never
- * overlaps or gets mistaken for real Town geometry. Flat grass-green uColor -- per-vertex biome
- * coloring is §3.3's own separate, not-yet-built piece of work. */
+static void town_load_terrain_test(void) {
+    for (int i = 0; i < 3; i++) {
+        char path[64];
+        snprintf(path, sizeof(path), "/heightmap?scene=%d&cx=0&cz=0", g_terrain_test[i].scene);
+        char resp[8192];
+        int status = 0;
+        if (http_get_json(iduna_host, TOWN_WORLDAPI_PORT, path, NULL,
+                           resp, sizeof(resp), &status) != 0 || status != 200) {
+            continue;
+        }
+        unsigned char heights[256];
+        size_t found = 0;
+        if (!http_extract_json_uint8_array_field(resp, "height", heights, 256, &found) || found != 256) {
+            continue;
+        }
+        float *verts = NULL;
+        int vert_count = build_heightfield_mesh(heights, 2 /* subdiv */, 1.0f /* cell_size */,
+                                                 0.5f /* height_scale */, &verts);
+        g_terrain_test[i].mesh = upload_mesh(verts, vert_count);
+        free(verts);
+        g_terrain_test[i].ready = 1;
+    }
+}
+
+/* town_draw_terrain_test: floats each biome's test mesh well clear of Town's own footprint
+ * (ARENA_HALF_EXTENT * 2.2f is Town's own total ground span, see town_draw_ground), spaced out
+ * along X so all three are visible side by side, each colored by biome_color -- never overlaps
+ * or gets mistaken for real Town geometry. */
 static void town_draw_terrain_test(GLint loc_mvp, GLint loc_model, GLint loc_color, Mat4 vp) {
-    if (!g_terrain_test_active || !g_terrain_test_ready) return;
-    float offset_x = ARENA_HALF_EXTENT * 2.2f + 24.0f;
-    Mat4 model = mat4_translate(offset_x, 0.0f, 0.0f);
-    Mat4 mvp = mat4_multiply(&vp, &model);
-    glUniformMatrix4fv_(loc_mvp, 1, GL_FALSE, mvp.m);
-    glUniformMatrix4fv_(loc_model, 1, GL_FALSE, model.m);
-    glUniform4f_(loc_color, 0.35f, 0.62f, 0.28f, 1.0f); /* grass green */
-    draw_mesh(&g_terrain_test_mesh);
+    if (!g_terrain_test_active) return;
+    float base_offset_x = ARENA_HALF_EXTENT * 2.2f + 24.0f;
+    for (int i = 0; i < 3; i++) {
+        if (!g_terrain_test[i].ready) continue;
+        float offset_x = base_offset_x + (float)i * 20.0f;
+        Mat4 model = mat4_translate(offset_x, 0.0f, 0.0f);
+        Mat4 mvp = mat4_multiply(&vp, &model);
+        glUniformMatrix4fv_(loc_mvp, 1, GL_FALSE, mvp.m);
+        glUniformMatrix4fv_(loc_model, 1, GL_FALSE, model.m);
+        float r, g, b;
+        biome_color(g_terrain_test[i].scene, &r, &g, &b);
+        glUniform4f_(loc_color, r, g, b, 1.0f);
+        draw_mesh(&g_terrain_test[i].mesh);
+    }
 }
 
 /* town_draw_ground: NxN alternating grey/brown tiles spanning the exact same total footprint
@@ -4361,10 +4387,12 @@ int main(int argc, char *argv[]) {
                 show_apm = !show_apm; /* S170-71: works in any mode, not gated on net_mode/observing */
             }
             if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_F10) {
-                /* SMOOTH_TERRAIN_NORTHSTAR.md Milestone 2 debug toggle, same "works in any mode"
-                   precedent as F11 above. Lazy-loads on first press (town_load_terrain_test),
-                   silently no-ops if worldapi isn't reachable -- see its own doc comment. */
-                if (!g_terrain_test_ready) town_load_terrain_test();
+                /* SMOOTH_TERRAIN_NORTHSTAR.md Milestone 2+3 debug toggle, same "works in any
+                   mode" precedent as F11 above. Lazy-loads on first press (town_load_terrain_test
+                   checks each patch's own .ready internally), silently no-ops any biome whose
+                   fetch fails -- see its own doc comment. */
+                int any_ready = g_terrain_test[0].ready || g_terrain_test[1].ready || g_terrain_test[2].ready;
+                if (!any_ready) town_load_terrain_test();
                 g_terrain_test_active = !g_terrain_test_active;
             }
             if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_h) {
