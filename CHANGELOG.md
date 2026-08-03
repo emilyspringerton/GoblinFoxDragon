@@ -1,3 +1,16 @@
+## 2026-08-03 (18)
+
+- ops: deployed the real `df-mc/dragonfly` fork (`emilyspringerton/dragonfly`, confirmed genuine
+  earlier today) as a persistent, supervised service -- founder's original ask ("connect from my
+  phones minecraft, to debug") was only tested manually once before; now a user-level systemd
+  unit (`dragonfly-debug.service`, deployed locally, not committed into that repo -- see
+  SMOOTH_TERRAIN_NORTHSTAR.md's own note on why) keeps the real RakNet/Bedrock listener on UDP
+  `:19132` running continuously with auto-restart. Confirmed listening and logging real startup
+  under supervision. Serves vanilla dragonfly content only (not GoblinFoxDragon's own Meadow --
+  that needs a separate, much larger world-provider integration, still not attempted). WAN
+  reachability from outside this box's own LAN was NOT verified -- no sudo access this session to
+  check firewall/security-group state, named as a real open gap rather than assumed working.
+
 ## 2026-08-03 (17)
 
 - feat(battlegrounds_gui): real trees in the Dragonfly zone -- closes the founder's own original

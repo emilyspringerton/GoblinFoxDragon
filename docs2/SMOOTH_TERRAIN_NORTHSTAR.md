@@ -312,6 +312,21 @@ wiring player movement/interaction through dragonfly's own entity/handler model.
 estimated here -- flagged as the real next open question if Bedrock-client debug access to actual
 GoblinFoxDragon content (not vanilla dragonfly content) becomes a priority.
 
+**Deployed persistently, 2026-08-03 (later the same day):** the vanilla test run above was a
+one-off manual process, gone the moment the terminal closed. Made it real: a user-level systemd
+unit (`~/.config/systemd/user/dragonfly-debug.service`, not committed anywhere -- see below)
+builds and supervises `~/dragonfly`'s own binary, restarting on failure, so the real RakNet
+listener on UDP `:19132` is up continuously, not just while someone is watching. Confirmed
+listening (`ss -ulnp`) and logging real startup (`mc-version=1.26.30`) under supervision.
+**Explicitly not done, named rather than assumed**: WAN/firewall reachability from a real phone on
+a different network was NOT verified -- this box's inbound UDP :19132 firewall/security-group
+state is unknown (no sudo access to check from this session), so "works on the same LAN" is
+confirmed, "works from anywhere" is not. The systemd unit and its own deploy instructions live
+locally only, not committed into `~/dragonfly` itself -- that's the founder's own personal fork of
+a real external open-source project (`df-mc/dragonfly`), and build binaries/service units have no
+business in that repo's git history (matching the same reasoning `world`/`players`/`resources`
+are already gitignored there upstream).
+
 ## 4. What this is not
 
 Not a general voxel/marching-cubes renderer -- true overhangs, caves, and arbitrary 3D voxel
