@@ -1,3 +1,20 @@
+## 2026-08-03 (20)
+
+- feat(server-go,worldapi): real Y-axis ground collision -- the smaller, more directly-connected
+  half of "no collision against world geometry" named as a gap in the previous slice. New
+  `worldapi.ColumnHeight` (single-column version of the already-tested `HeightmapChunk`, so a
+  per-player per-tick lookup doesn't have to generate all 256 columns of its chunk just to read
+  one). `apps2/server-go`'s new `groundClampY` calls it directly (same process, no HTTP round
+  trip) right after `integrateMovement`, so a player's real server-side Y now agrees with actual
+  terrain instead of drifting wherever spawn/portal last left it. Hardcodes scene 0 (Meadow) --
+  matches this backend's own existing single-scene reality; Meadow's real height (4) already
+  matched the client's own hardcoded `groundY = 4` fallback, not a coincidence. 5 new tests
+  (including a real negative-coordinate floor-division regression -- `ColumnHeight`'s own chunk
+  math needed real floor division, not Go's truncating `/`, since world coordinates go negative
+  routinely). `go build`/`go vet`/`go test ./...` clean. Live-verified: real
+  `gfd-server-go.service` rebuilt, redeployed, confirmed stable. Still not done: horizontal wall
+  collision (`world.RayTrace` itself, unchanged stub) -- vertical grounding only, by design.
+
 ## 2026-08-03 (19)
 
 - feat(server-go): real backend-unification slice -- server-authoritative player position +

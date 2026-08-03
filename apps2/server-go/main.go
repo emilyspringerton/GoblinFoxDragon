@@ -364,6 +364,7 @@ func main() {
 			// snapshot.go, for the real yaw/forward convention this defines -- no existing
 			// on-foot movement precedent anywhere in this codebase family to match against).
 			info.pos = integrateMovement(info.pos, cmd, float64(cmd.Msec)/1000.0)
+			info.pos = groundClampY(info.pos) // real Y-axis ground collision, see its own doc comment (snapshot.go)
 			info.yaw = cmd.Yaw
 			clients[slot] = info
 			if cmd.Buttons&common.BtnAttack != 0 {

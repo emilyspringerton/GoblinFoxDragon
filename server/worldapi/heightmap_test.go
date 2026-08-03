@@ -68,3 +68,53 @@ func TestHeightmapChunk_Swamp_WaterHigherThanLand(t *testing.T) {
 		}
 	}
 }
+
+// TestColumnHeight_MatchesHeightmapChunk cross-checks ColumnHeight (the new single-column
+// lookup, added for apps2/server-go's own real ground collision) against HeightmapChunk (the
+// already-tested whole-chunk version) across several chunks including negative coordinates --
+// the two must never disagree, since they're describing the same real terrain to two different
+// callers (one HTTP client, one same-process Go caller).
+func TestColumnHeight_MatchesHeightmapChunk(t *testing.T) {
+	for _, scene := range []int{0, 1, 3} {
+		for _, chunk := range [][2]int{{0, 0}, {2, -3}, {-1, -1}, {5, 4}} {
+			chunkX, chunkZ := chunk[0], chunk[1]
+			want, wantOK := HeightmapChunk(scene, chunkX, chunkZ)
+			if !wantOK {
+				t.Fatalf("scene %d chunk (%d,%d): HeightmapChunk unexpectedly not ok", scene, chunkX, chunkZ)
+			}
+			for lx := 0; lx < 16; lx++ {
+				for lz := 0; lz < 16; lz++ {
+					wx, wz := chunkX*16+lx, chunkZ*16+lz
+					got, gotOK := ColumnHeight(scene, wx, wz)
+					if !gotOK {
+						t.Fatalf("scene %d (%d,%d): ColumnHeight unexpectedly not ok", scene, wx, wz)
+					}
+					if got != want[lx*16+lz] {
+						t.Fatalf("scene %d world(%d,%d) [chunk (%d,%d) local (%d,%d)]: "+
+							"ColumnHeight=%d, HeightmapChunk=%d", scene, wx, wz, chunkX, chunkZ,
+							lx, lz, got, want[lx*16+lz])
+					}
+				}
+			}
+		}
+	}
+}
+
+func TestColumnHeight_Caves_NotSupported(t *testing.T) {
+	_, ok := ColumnHeight(2, 0, 0)
+	if ok {
+		t.Fatal("scene 2 (caves): expected ok=false")
+	}
+}
+
+func TestFloorDiv16_NegativeCoordinates(t *testing.T) {
+	cases := []struct{ v, want int }{
+		{0, 0}, {15, 0}, {16, 1}, {31, 1}, {32, 2},
+		{-1, -1}, {-16, -1}, {-17, -2}, {-32, -2}, {-33, -3},
+	}
+	for _, c := range cases {
+		if got := floorDiv16(c.v); got != c.want {
+			t.Errorf("floorDiv16(%d) = %d, want %d", c.v, got, c.want)
+		}
+	}
+}

@@ -136,6 +136,29 @@ func TestBuildSnapshotPacket_EmptyPeers(t *testing.T) {
 	}
 }
 
+func TestGroundClampY_MeadowSetsRealHeight(t *testing.T) {
+	pos := system.Vec3{X: 3, Y: 999, Z: -7} // Y=999 simulates drift with no prior clamping
+	got := groundClampY(pos)
+	if got.Y != 4 {
+		t.Fatalf("expected Meadow ground height 4 (scene 0, matches ColumnHeight/proceduralChunk's "+
+			"own groundY convention), got Y=%.2f", got.Y)
+	}
+	if got.X != pos.X || got.Z != pos.Z {
+		t.Fatalf("expected X/Z untouched by ground clamping, got (%.2f,%.2f), want (%.2f,%.2f)",
+			got.X, got.Z, pos.X, pos.Z)
+	}
+}
+
+func TestGroundClampY_NegativeCoordinates(t *testing.T) {
+	// Real regression coverage for floorDiv16-class bugs -- negative world coordinates are
+	// routine here (origin-centered coordinate system), not an edge case to skip.
+	pos := system.Vec3{X: -20.7, Y: 0, Z: -33.2}
+	got := groundClampY(pos)
+	if got.Y != 4 {
+		t.Fatalf("expected Meadow ground height 4 at negative coordinates, got Y=%.2f", got.Y)
+	}
+}
+
 func TestBuildSnapshotPacket_CapsAt255Peers(t *testing.T) {
 	peers := make([]snapshotPeer, 300)
 	for i := range peers {

@@ -43,3 +43,40 @@ func HeightmapChunk(sceneID, chunkX, chunkZ int) (heights [256]uint8, ok bool) {
 		return zero, false
 	}
 }
+
+// ColumnHeight returns the real generated surface height for a single world column (wx, wz) --
+// the same per-column math HeightmapChunk uses, without generating the other 255 columns of the
+// chunk it belongs to (backend-unification, 2026-08-03, real Y-axis ground collision in
+// apps2/server-go -- a per-tick, per-player lookup, wasteful to route through the whole-chunk
+// HeightmapChunk for). Same scene support as HeightmapChunk (Meadow/Hills/Swampville; Caves
+// returns ok=false, no single height per column).
+func ColumnHeight(sceneID, wx, wz int) (height uint8, ok bool) {
+	switch sceneID {
+	case 0: // Meadow -- flat
+		return 4, true
+	case 1: // Hills -- real per-column variation
+		return uint8(hillsColumnHeight(wx, wz)), true
+	case 3: // Swampville -- flat, water cells one block higher
+		chunkX, chunkZ := floorDiv16(wx), floorDiv16(wz)
+		lx, lz := wx-chunkX*16, wz-chunkZ*16
+		waterSet := swampWaterCells(chunkX, chunkZ)
+		if waterSet[lx*16+lz] {
+			return 2, true
+		}
+		return 1, true
+	default:
+		return 0, false
+	}
+}
+
+// floorDiv16 is real floor division by 16 -- Go's own `/` truncates toward zero for negative
+// operands (same as C), which gives the wrong chunk for negative world coordinates (wx=-1 should
+// be chunk -1, truncating division gives chunk 0). World columns go negative routinely (this is
+// an origin-centered coordinate system, confirmed by every scenes_test.go/heightmap_test.go case
+// already using negative chunk coords), so this isn't an edge case to skip.
+func floorDiv16(v int) int {
+	if v >= 0 {
+		return v / 16
+	}
+	return -((-v + 15) / 16)
+}

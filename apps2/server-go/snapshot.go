@@ -7,6 +7,7 @@ import (
 
 	"dragonsnshit/packages2/common"
 	"dragonsnshit/server/system"
+	"dragonsnshit/server/worldapi"
 )
 
 // walkSpeed is Minecraft's own real sprint speed (5.6 blocks/sec) -- not an arbitrary number,
@@ -40,6 +41,29 @@ func integrateMovement(pos system.Vec3, cmd common.UserCmd, dt float64) system.V
 
 	pos.X += dx
 	pos.Z += dz
+	return pos
+}
+
+// groundClampY (backend-unification, 2026-08-03): real Y-axis ground collision -- the first
+// piece of "collision" this backend has ever had (world.RayTrace, used for hit detection, is
+// still a real, unchanged stub that always returns no-hit; this doesn't touch that). Reuses
+// worldapi.ColumnHeight directly, same process, no HTTP round-trip -- the exact same real
+// terrain-height data SMOOTH_TERRAIN_NORTHSTAR.md's own client-side rendering already uses, so a
+// player's real server-side Y now agrees with the real ground instead of drifting wherever
+// spawn/portal last left it (this backend's own actual prior behavior -- info.pos.Y was never
+// touched outside those two places before today). Vertical only -- no horizontal wall collision,
+// a genuinely smaller, honestly-scoped first slice, not a full physics system. Hardcodes scene 0
+// (Meadow) -- this backend has no per-client scene tracking at all yet (unchanged, named
+// elsewhere in DRAGONSNSHIT_TWO_BACKENDS_AUDIT.md), matching the same implicit assumption
+// proceduralChunk's own client-side fallback generator already makes (groundY = 4, the exact
+// real value worldapi.ColumnHeight(0, ...) returns for Meadow -- not a coincidence, the same
+// real ground this whole system has always implicitly agreed on, just not expressed formally
+// until worldapi.ColumnHeight existed).
+func groundClampY(pos system.Vec3) system.Vec3 {
+	h, ok := worldapi.ColumnHeight(0, int(math.Floor(pos.X)), int(math.Floor(pos.Z)))
+	if ok {
+		pos.Y = float64(h)
+	}
 	return pos
 }
 

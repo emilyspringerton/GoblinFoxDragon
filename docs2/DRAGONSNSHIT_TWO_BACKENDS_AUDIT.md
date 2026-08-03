@@ -89,6 +89,25 @@ mutex-protected client map makes a dedicated ticker goroutine safe to add. Mobs 
 attempted (unchanged from this doc's own earlier text) -- this closes the *other players*
 visibility gap specifically, not the *mobs* one.
 
+**Done, same day: real Y-axis ground collision (the smaller, more directly-connected half of
+"no collision against world geometry" above).** New `worldapi.ColumnHeight`
+(`server/worldapi/heightmap.go`) -- a single-column version of the already-tested
+`HeightmapChunk`, added specifically so a per-player, per-tick lookup doesn't have to generate
+all 256 columns of the chunk it belongs to just to read one. `apps2/server-go`'s new
+`groundClampY` (`snapshot.go`) calls it directly (same process, no HTTP round-trip) right after
+`integrateMovement`, so a player's real server-side Y now agrees with the actual terrain instead
+of drifting wherever spawn/portal last left it (this backend's own real prior behavior --
+`info.pos.Y` was never touched outside those two moments before today). Hardcodes scene 0
+(Meadow) -- matches this backend's own existing no-multi-scene-tracking reality, and Meadow's
+real height (4) turns out to already match `proceduralChunk`'s own client-side fallback
+generator's hardcoded `groundY = 4` -- not a coincidence, the same real ground this system always
+implicitly agreed on, just not expressed formally until now. 5 new tests (2 in `server-go`, 3 in
+`worldapi` including a real negative-coordinate floor-division regression test --
+`ColumnHeight`'s own chunk math needed real floor division, not Go's truncating `/`, since world
+coordinates go negative routinely here). Live-verified: `gfd-server-go.service` rebuilt,
+redeployed, confirmed stable. **Still not done**: horizontal wall collision (`world.RayTrace`
+itself, still a stub) -- this closes vertical grounding only, a deliberately smaller first slice.
+
 ### A third piece, also found today: `apps2/lobby`
 An 884-line C/SDL2 client already being built against `apps2/server-go`'s exact protocol
 (`packages2/common`, `PacketConnect`, etc.) — a real, if much smaller and less complete, precedent
