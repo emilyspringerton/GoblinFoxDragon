@@ -1,3 +1,20 @@
+## 2026-08-03 (17)
+
+- feat(battlegrounds_gui): real trees in the Dragonfly zone -- closes the founder's own original
+  ask from earlier today ("render the dragonfly biomes smooth with trees"), only half-delivered
+  until now (smooth terrain since Milestone 2, trees never actually rendered). New
+  `town_meadow_tree_positions` mirrors `server/worldapi/scenes.go`'s own `meadowTrees` hash
+  (`chunkX*31 + chunkZ*17` mod 5) directly in C rather than fetching/parsing the full `/chunks`
+  block list (~1300 objects for one chunk, real parsing complexity for already-deterministic
+  data) -- same "client keeps its own copy of world data" convention this session's telecrystal
+  work already established. `town_draw_dfzone_trees` reuses `draw_hero_box` -- the same
+  stacked-primitive technique every hero/worm/building in this client already uses -- for a thin
+  trunk plus two tapering canopy tiers, sitting at the zone's own real terrain height
+  (`dfzone_height_at`) rather than assuming y=0. Meadow only (Hills has none by design,
+  Swampville isn't offered as a real destination here). Live-verified visually under Xvfb:
+  screenshotted a real tree standing in the Meadow zone at its correct deterministic position.
+  `go vet`/`go test ./...` and a direct `gcc` client build both clean.
+
 ## 2026-08-03 (16)
 
 - feat(battlegrounds_gui): telecrystal arrival banner, the last piece of apps/lobby's own

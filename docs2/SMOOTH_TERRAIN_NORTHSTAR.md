@@ -183,6 +183,21 @@ billboards were the right call for DUNGEON_NORTHSTAR's mobs specifically because
 *moving creatures* needing cheap animation frames; a tree is static world dressing, closer in kind
 to a building than a monster.
 
+**Done, 2026-08-03**: `town_draw_dfzone_trees` (`apps2/battlegrounds_gui/src/main.c`) closes this
+-- the founder's own original request ("smooth biomes with trees") was only half-delivered until
+now (smooth terrain: yes since Milestone 2; trees: not until this). Rather than fetch and parse
+the full `/chunks` block list (an array of ~1300 objects for one Meadow chunk, real parsing
+complexity for data whose positions are already fully deterministic), `town_meadow_tree_positions`
+mirrors `meadowTrees`'s own hash (`chunkX*31 + chunkZ*17`, mod 5) directly in C -- same "client
+keeps its own copy of world data" convention this session's telecrystal work already established
+twice over (`town_telecrystal_travel`'s own copied crystal values, `apps/lobby`'s own
+`TELECRYSTAL_DEFS`). Each tree reuses `draw_hero_box` -- the exact stacked-primitive technique
+every hero/worm/building in this client already uses -- for a thin trunk plus two tapering canopy
+tiers, sitting at the zone's own real terrain height (`dfzone_height_at`) rather than assuming
+y=0. Meadow only (Hills has none by design, Swampville isn't offered as a real destination here).
+Live-verified visually under Xvfb: screenshotted a real tree standing in the Meadow zone at its
+correct deterministic position.
+
 ### 3.6 The Town <-> Dragonfly bridge
 
 Founder: "ok so can we warp from town to the zone backed by dragonfly?" Real gap found while

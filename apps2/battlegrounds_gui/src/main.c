@@ -3268,6 +3268,52 @@ static void town_draw_dfzone(GLint loc_mvp, GLint loc_model, GLint loc_color, Ma
     draw_mesh(&g_dfzone_mesh);
 }
 
+/* town_meadow_tree_positions (2026-08-03, founder's own original ask: "render the dragonfly
+ * biomes smooth with trees" -- delivered smooth terrain in Milestones 2-4, never actually
+ * rendered the trees). Mirrors `server/worldapi/scenes.go`'s own `meadowTrees` exactly -- same
+ * deterministic hash (chunkX*31 + chunkZ*17, mod 5) -- so trees render at the exact chunk-local
+ * positions the real backend generates them at, not just "some trees somewhere." Meadow only:
+ * Hills has none by design (open sightlines, its own doc comment), Swampville has its own
+ * mangrove variant but isn't offered as a real Dragon Gate destination. Returns up to 3 (lx, lz)
+ * pairs in local chunk-grid coordinates (0-15, same convention `heightfield_sample` uses). */
+static int town_meadow_tree_positions(int chunk_x, int chunk_z, int out_lx[3], int out_lz[3]) {
+    int h = chunk_x * 31 + chunk_z * 17;
+    int m = h % 5;
+    if (m < 0) m += 5; /* C's % can be negative for a negative h; kept correct for future chunks beyond (0,0) */
+    switch (m) {
+        case 0: out_lx[0] = 4; out_lz[0] = 4; out_lx[1] = 12; out_lz[1] = 11; return 2;
+        case 1: out_lx[0] = 7; out_lz[0] = 3; return 1;
+        case 2: out_lx[0] = 2; out_lz[0] = 9; out_lx[1] = 13; out_lz[1] = 5; out_lx[2] = 8; out_lz[2] = 13; return 3;
+        case 3: out_lx[0] = 5; out_lz[0] = 7; return 1;
+        default: return 0;
+    }
+}
+
+/* town_draw_dfzone_trees: real trees, not billboards -- §3.5's own design ("a tree should be a
+ * small procedural mesh, cylinder-ish trunk + a faceted/rounded canopy blob, built the same way
+ * [as every other model in this client], not a billboard"). Reuses draw_hero_box, the exact same
+ * stacked-primitive silhouette technique every hero/worm/building in this client already uses --
+ * a thin trunk plus two tapering canopy tiers reads as roughly conical/rounded without needing
+ * new geometry or a shader change. Positioned at the real deterministic tree spots, sitting at
+ * the zone's own real terrain height (dfzone_height_at) rather than assuming y=0. */
+static void town_draw_dfzone_trees(const Mat4 *vp, GLint loc_mvp, GLint loc_model, GLint loc_color, const Mesh *cube_mesh) {
+    if (!g_dfzone_active || !g_dfzone_ready || g_dfzone_scene != 0) return; /* Meadow only, see own doc comment above */
+    int lx[3], lz[3];
+    int n = town_meadow_tree_positions(0, 0, lx, lz);
+    for (int i = 0; i < n; i++) {
+        float wx = ((float)lx[i] - 8.0f) * TERRAIN_TEST_CELL_SIZE;
+        float wz = ((float)lz[i] - 8.0f) * TERRAIN_TEST_CELL_SIZE;
+        float wy = 0.0f;
+        dfzone_height_at(wx, wz, &wy);
+        glUniform4f_(loc_color, 0.35f, 0.22f, 0.1f, 1.0f); /* trunk: brown */
+        draw_hero_box(wx, wz, 0.0f, wy + 0.55f, 0.0f, 0.14f, 0.55f, 0.14f, 1.0f, vp, loc_mvp, loc_model, cube_mesh);
+        glUniform4f_(loc_color, 0.16f, 0.4f, 0.14f, 1.0f); /* canopy tier 1: dark green, wide */
+        draw_hero_box(wx, wz, 0.0f, wy + 1.35f, 0.0f, 0.6f, 0.5f, 0.6f, 1.0f, vp, loc_mvp, loc_model, cube_mesh);
+        glUniform4f_(loc_color, 0.22f, 0.5f, 0.18f, 1.0f); /* canopy tier 2: lighter green, narrower -- tapers the silhouette */
+        draw_hero_box(wx, wz, 0.0f, wy + 1.95f, 0.0f, 0.38f, 0.38f, 0.38f, 1.0f, vp, loc_mvp, loc_model, cube_mesh);
+    }
+}
+
 /* town_draw_ground: NxN alternating grey/brown tiles spanning the exact same total footprint
  * (ARENA_HALF_EXTENT * 2.2f) as battlegrounds' own single-color ground plane just below in
  * main()'s "ground" block -- "same size as the battlegrounds scene," per the founder's own ask.
@@ -4667,6 +4713,7 @@ int main(int argc, char *argv[]) {
                        active, same reasoning DUNGEON/SMOOTH_TERRAIN already established for why
                        Town's own render doesn't apply outside Town. */
                     town_draw_dfzone(loc_mvp, loc_model, loc_color, vp);
+                    town_draw_dfzone_trees(&vp, loc_mvp, loc_model, loc_color, &cube_mesh);
                 } else {
                     town_draw_ground(loc_mvp, loc_model, loc_color, vp, &plane_mesh);
                     town_draw_buildings(&vp, loc_mvp, loc_model, loc_color, &cube_mesh);
