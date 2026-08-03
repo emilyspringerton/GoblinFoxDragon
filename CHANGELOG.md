@@ -1,3 +1,25 @@
+## 2026-08-03 (21)
+
+- feat(server-go): real entity hit detection for hitscan shooting -- checked SHANKPIT's own
+  sibling repo first (it's described as genuinely server-authoritative): its `world.RayTrace` is
+  real, but only does ray-vs-player-sphere intersection, never voxel/wall raycasting. Neither
+  sibling has real wall collision. That also means GoblinFoxDragon's own hitscan shooting
+  (`BtnAttack`/`HandleShankFire`) could never hit *anything* before today, not just "no wall
+  collision" -- genuinely no hit detection at all, on any client's shots, ever. Ported SHANKPIT's
+  own real `gameWorld`/`gameEntityHit` directly (ray-vs-sphere intersection, chest-height
+  approximation, `hitboxRadius=0.4`), dropping only its sceneID cross-scene guard (this backend
+  has no scene tracking at all). Also fixed a real, separate bug found in the process: every
+  client's shots used to fire through one single, shared, static player stub created once at
+  startup (position always the literal origin) -- now a real per-shot player uses the actual
+  shooter's own real, tracked position. New `Vec3.Sub`/`Dot`/`Len` (this repo's own copy only
+  ever needed `Add`/`Mul` before). 10 new tests (3 in `server/system`, 7 in `server-go` covering
+  on-axis hit, off-axis miss, self-exclusion, behind-shooter/beyond-range exclusion,
+  closest-of-multiple, zero-length ray). `go build`/`go vet`/`go test ./...` clean. Live-verified:
+  real `gfd-server-go.service` rebuilt, redeployed, confirmed stable. Still not done, matching
+  SHANKPIT's own real precedent rather than a new corner cut: no real damage applied on hit yet
+  (`nopEntity.Hurt` still a no-op there too); voxel/wall raycasting remains completely unbuilt in
+  both sibling repos.
+
 ## 2026-08-03 (20)
 
 - feat(server-go,worldapi): real Y-axis ground collision -- the smaller, more directly-connected

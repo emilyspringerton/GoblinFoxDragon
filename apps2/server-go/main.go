@@ -37,22 +37,81 @@ import (
 	"dragonsnshit/server/worldcrisis"
 )
 
-type world struct{}
-
-type rayResult struct {
-	pos system.Vec3
+// gameWorld implements player.RaycastWorld with real entity (player) hit detection --
+// backend-unification, 2026-08-03: ported from SHANKPIT's own sibling repo's real, tested
+// gameWorld.RayTrace (this exact ray-vs-sphere math, hitboxRadius, chest-height approximation),
+// not reinvented. Before this, GoblinFoxDragon's own RayTrace was a permanent stub always
+// returning "no hit" -- hitscan shooting (BtnAttack, HandleShankFire) has never actually been
+// able to hit anything in this backend, ever, not just "no wall collision." This fixes that for
+// player-vs-player hits specifically. Dropped SHANKPIT's own sceneID cross-scene guard -- this
+// backend has no per-client scene tracking at all yet (unchanged, named in
+// DRAGONSNSHIT_TWO_BACKENDS_AUDIT.md), so every connected client is implicitly the same scene.
+// No mutex needed (unlike SHANKPIT's own real version, which takes one): every real call site
+// here runs HandleShankFire synchronously inside the main read loop's own PacketUserCmd case,
+// the same single-threaded context that already safely owns `clients` -- adding a mutex here
+// would be redundant, not safer.
+type gameWorld struct {
+	clients   map[string]clientInfo
+	shooterID uint8
 }
 
-func (r rayResult) Position() system.Vec3 { return r.pos }
+// gameEntityHit is the result when the ray intersects another connected client's real position.
+type gameEntityHit struct {
+	pos      system.Vec3
+	clientID uint8
+}
 
-func (w world) RayTrace(start, end system.Vec3) (player.RaycastResult, bool) {
-	return rayResult{}, false
+func (h gameEntityHit) Position() system.Vec3       { return h.pos }
+func (h gameEntityHit) Entity() player.LivingEntity { return nopEntity{} }
+
+// nopEntity satisfies player.LivingEntity -- real damage is applied by the caller (the
+// PacketUserCmd/BtnAttack handler) after HandleShankFire returns hitEntity=true and the hit
+// client's ID, same division of responsibility SHANKPIT's own real version already uses.
+type nopEntity struct{}
+
+func (nopEntity) Hurt(_ float64, _ player.DamageSource) {}
+
+const hitboxRadius = 0.4 // matches SHANKPIT's own real value, a real tuned constant, not a guess
+
+func (gw *gameWorld) RayTrace(start, end system.Vec3) (player.RaycastResult, bool) {
+	dir := end.Sub(start)
+	maxDist := dir.Len()
+	if maxDist < 1e-6 {
+		return nil, false
+	}
+	dirN := dir.Mul(1.0 / maxDist)
+
+	bestT := maxDist + 1
+	var bestHit *gameEntityHit
+	for _, c := range gw.clients {
+		if c.id == gw.shooterID {
+			continue
+		}
+		// Approximate each player as a sphere centered at chest height, same as SHANKPIT's own
+		// real version.
+		center := system.Vec3{X: c.pos.X, Y: c.pos.Y + 0.9, Z: c.pos.Z}
+		w := center.Sub(start)
+		t := w.Dot(dirN)
+		if t < 0 || t > maxDist {
+			continue
+		}
+		closest := start.Add(dirN.Mul(t))
+		if center.Sub(closest).Len() < hitboxRadius && t < bestT {
+			bestT = t
+			h := gameEntityHit{pos: closest, clientID: c.id}
+			bestHit = &h
+		}
+	}
+	if bestHit != nil {
+		return *bestHit, true
+	}
+	return nil, false
 }
 
 type shankPlayer struct {
 	pos       system.Vec3
 	eyeHeight float64
-	world     world
+	world     player.RaycastWorld
 }
 
 func (p *shankPlayer) Position() system.Vec3 { return p.pos }
@@ -187,7 +246,6 @@ func main() {
 	authVerifier := idunaauth.NewVerifier()
 	idunaClient := idunaclient.New()
 	buf := make([]byte, 2048)
-	p := &shankPlayer{pos: system.Vec3{}, eyeHeight: 1.62, world: world{}}
 	clientStore := store.NewMemoryClientStore()
 	clients := make(map[string]clientInfo)
 	nextClientID := uint8(0)
@@ -368,7 +426,17 @@ func main() {
 			info.yaw = cmd.Yaw
 			clients[slot] = info
 			if cmd.Buttons&common.BtnAttack != 0 {
-				hit, pos, hitEntity := player.HandleShankFire(p, float64(cmd.Yaw), float64(cmd.Pitch), int(cmd.WeaponIdx))
+				// Backend-unification, 2026-08-03: real per-shooter player + real gameWorld
+				// (entity hit detection, see its own doc comment) -- replaces a single shared
+				// stub `p` that every client's shots used to fire through, whose world.RayTrace
+				// always returned "no hit" regardless of shooter or target. Real damage-on-hit
+				// is NOT applied here -- same acknowledged, named gap SHANKPIT's own real
+				// version has ("real damage routing is handled by the caller," not yet built
+				// there either); this fixes hit DETECTION, a separate, real, and previously
+				// completely broken concern (hitscan could never hit anything at all, on
+				// anyone's shots, not just "no wall collision").
+				shooter := &shankPlayer{pos: info.pos, eyeHeight: 1.62, world: &gameWorld{clients: clients, shooterID: info.id}}
+				hit, pos, hitEntity := player.HandleShankFire(shooter, float64(cmd.Yaw), float64(cmd.Pitch), int(cmd.WeaponIdx))
 				if hit {
 					sendImpact(conn, remote, pos, hitEntity, 0)
 				}

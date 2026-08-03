@@ -108,6 +108,32 @@ coordinates go negative routinely here). Live-verified: `gfd-server-go.service` 
 redeployed, confirmed stable. **Still not done**: horizontal wall collision (`world.RayTrace`
 itself, still a stub) -- this closes vertical grounding only, a deliberately smaller first slice.
 
+**Done, same day: real entity hit detection (not the wall/voxel raycast named above -- a
+different, adjacent gap found while scoping it).** Checked SHANKPIT's own sibling repo first,
+since it's described as genuinely server-authoritative: it turns out `world.RayTrace` being a
+permanent stub isn't unique to GoblinFoxDragon -- SHANKPIT's own version is real, but ONLY does
+ray-vs-player-sphere intersection (`gameWorld.RayTrace`, real, tested, already shipped there);
+neither sibling has ever done real voxel/wall raycasting. That also means hitscan shooting
+(`BtnAttack`/`HandleShankFire`) in GoblinFoxDragon's own `apps2/server-go` could never hit
+*anything at all* before today -- not "no wall collision," genuinely no hit detection of any
+kind, on any client's shots, ever. Ported SHANKPIT's own real `gameWorld`/`gameEntityHit` (ray-
+vs-sphere intersection, chest-height approximation, `hitboxRadius=0.4`) directly -- same math,
+not reinvented, dropping only SHANKPIT's own sceneID cross-scene guard (this backend has no
+per-client scene tracking at all). Also fixed a real, separate bug found in the process: every
+client's shots used to fire through one single, shared, static `shankPlayer` stub created once at
+startup (`pos: system.Vec3{}` -- literally the origin, for every shooter, forever) -- now a real
+per-shot player is constructed from the actual shooter's own real, tracked position. New
+`Vec3.Sub`/`Dot`/`Len` (this repo's own copy only ever needed `Add`/`Mul` before -- SHANKPIT's own
+copy already had all five). 10 new tests (3 in `system`, 7 in `server-go` covering the real
+hit-detection geometry: on-axis hit, off-axis miss, self-exclusion, behind-shooter exclusion,
+beyond-range exclusion, closest-of-multiple-targets, zero-length ray). Live-verified: rebuilt,
+redeployed, confirmed stable. **Still not done, scope matches SHANKPIT's own real precedent, not
+silently expanded**: hit detection doesn't yet apply real damage (`nopEntity.Hurt` is still a
+no-op) -- SHANKPIT's own real version has the identical gap, "damage routing handled by the
+caller" not yet built there either, so this isn't a new corner cut, it's the same honest boundary
+already established. Voxel/wall raycasting (bullets stopping at walls) remains completely
+unbuilt in both sibling repos.
+
 ### A third piece, also found today: `apps2/lobby`
 An 884-line C/SDL2 client already being built against `apps2/server-go`'s exact protocol
 (`packages2/common`, `PacketConnect`, etc.) — a real, if much smaller and less complete, precedent
