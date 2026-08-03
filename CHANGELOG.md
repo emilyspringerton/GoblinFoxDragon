@@ -1,3 +1,43 @@
+## 2026-08-03 (28)
+
+- feat(battlegrounds_gui): real worm silhouette + nameplates/health bars -- founder: "the worms
+  look like 3 little poops on the ground next to eachother not like a worm ... have the worms
+  more worm like and like slightly floating in the air or something - bigger - like a lot bigger"
+  + "we also need nameplates and health bars like in battlegrounds." The old shape (3 flat,
+  monotonically-shrinking boxes almost at ground level) read as debris, not a creature. New:
+  `WORM_SEG_COUNT` 5 segments arched into a real worm curve (peaks at the middle segment, tapers
+  at both ends -- a real "rearing up mid-crawl" silhouette, not just bigger boxes), each segment
+  up to ~4x the old max half-extent, floating at `WORM_FLOAT_Y` (1.1 units) above real ground
+  instead of sitting on it, plus two small eye-dots on the head segment for a "this end is the
+  front" cue. New `town_draw_worm_nameplates` (called from `town_draw_hud`, which now takes `vp`
+  as a real parameter) -- same real technique Battlegrounds' own per-hero floating health bars
+  use (`world_to_screen` projecting a world anchor into 2D HUD space, black-bg + colored-fill bar,
+  name above it). The bar is honest, not faked live data: apps2/mud still has no HTTP surface for
+  real mob HP (same gap `town_draw_worms`' own doc comment already names for position), so it
+  always draws full/green -- "a worm is here and alive," not a live-HP claim. `gcc -Wall -Wextra`
+  clean. Live-verified via Xvfb: nameplates+bars render correctly above both worms in frame; the
+  new silhouette reads as a rounded, floating creature at real in-game camera distances, not flat
+  debris.
+
+- feat(battlegrounds_gui): Meadow zone expanded to a real golden-ratio rectangle -- founder:
+  "expand the zone have it be the golden ratio but on the long ways have it like 4x as big as it
+  is currently." Was a uniform 80x80 square (16 cells * one shared `TERRAIN_TEST_CELL_SIZE` 5.0
+  applied to both axes). New `DFZONE_CELL_SIZE_X`/`DFZONE_CELL_SIZE_Z`: long axis (X) is 320 units
+  (4x the old real footprint), short axis (Z) is the long axis divided by the real golden ratio
+  phi ((1+sqrt(5))/2 = 1.6180339887..., not a rounded guess) -- ~197.75 units. F10's own debug
+  test patches stay square (`TERRAIN_TEST_CELL_SIZE` untouched, unaffected) -- this only reshapes
+  the real dfzone the founder actually plays in. `build_heightfield_mesh` now takes separate
+  `cell_size_x`/`cell_size_z` params instead of one shared value (both mesh-position and normal-
+  gradient math updated per axis); `dfzone_height_at`'s own bounds check and grid-space conversion
+  are rectangular now (`half_x`/`half_z`); `town_move_half_extent` split into
+  `town_move_half_extent_x`/`_z` (both real click-to-move and WASD clamp call sites updated --
+  a single shared half-extent would clamp the short axis too late or the long axis too early);
+  tree/flower world-position math updated to the same per-axis conversion. Real Meadow worm
+  positions (`MEADOW_TARGET_X/Z`, max +-35) and the telecrystal spawn (0,2,0) all still comfortably
+  fit the new bounds (half_x=160, half_z=~98.9), no changes needed there. `gcc -Wall -Wextra`
+  clean. Live-verified via Xvfb: same camera position now shows real content (trees) much farther
+  out than before, ground renders continuously with no edge/gap, matching the real ~4x expansion.
+
 ## 2026-08-03 (27)
 
 - fix(battlegrounds_gui): "TELEPORT TO TOWN"/"H" now also cover a stranded-in-Town position, not

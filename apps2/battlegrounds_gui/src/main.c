@@ -3058,7 +3058,7 @@ static float heightfield_sample(const unsigned char *heights, float gx, float gz
  * and every other static mesh in this file already follows, just heap-allocated here since the
  * size depends on `subdiv`, not a compile-time constant). */
 static int build_heightfield_mesh(const unsigned char *heights, int subdiv,
-                                   float cell_size, float height_scale,
+                                   float cell_size_x, float cell_size_z, float height_scale,
                                    float **out_verts) {
     const int grid = 16;
     const int res = grid * subdiv;
@@ -3075,16 +3075,16 @@ static int build_heightfield_mesh(const unsigned char *heights, int subdiv,
             for (int c = 0; c < 4; c++) {
                 float sgx = corner_gx[c], sgz = corner_gz[c];
                 float h = heightfield_sample(heights, sgx, sgz);
-                px[c] = (sgx - grid / 2.0f) * cell_size;
-                pz[c] = (sgz - grid / 2.0f) * cell_size;
+                px[c] = (sgx - grid / 2.0f) * cell_size_x;
+                pz[c] = (sgz - grid / 2.0f) * cell_size_z;
                 py[c] = h * height_scale;
 
                 float hx0 = heightfield_sample(heights, sgx - eps, sgz);
                 float hx1 = heightfield_sample(heights, sgx + eps, sgz);
                 float hz0 = heightfield_sample(heights, sgx, sgz - eps);
                 float hz1 = heightfield_sample(heights, sgx, sgz + eps);
-                float dhdx = (hx1 - hx0) * height_scale / (2.0f * eps * cell_size);
-                float dhdz = (hz1 - hz0) * height_scale / (2.0f * eps * cell_size);
+                float dhdx = (hx1 - hx0) * height_scale / (2.0f * eps * cell_size_x);
+                float dhdz = (hz1 - hz0) * height_scale / (2.0f * eps * cell_size_z);
                 float len = sqrtf(dhdx * dhdx + 1.0f + dhdz * dhdz);
                 nx[c] = -dhdx / len; ny[c] = 1.0f / len; nz[c] = -dhdz / len;
             }
@@ -3132,6 +3132,21 @@ static int build_heightfield_mesh(const unsigned char *heights, int subdiv,
  * gentle roll (up to 3 world units of Y swing) without turning Meadow into Hills. */
 #define TERRAIN_TEST_CELL_SIZE 5.0f
 #define TERRAIN_TEST_HEIGHT_SCALE 1.5f
+
+/* DFZONE_CELL_SIZE_X/Z (2026-08-03, founder: "expand the zone have it be the golden ratio but on
+ * the long ways have it like 4 x as big as it is currently") -- the real dfzone Meadow zone (F10's
+ * own debug test patches above stay square, TERRAIN_TEST_CELL_SIZE unchanged; this only reshapes
+ * the zone the founder actually plays in). Was a uniform 80x80 square (16 cells *
+ * TERRAIN_TEST_CELL_SIZE 5.0, both axes sharing one constant). Long axis (X) is now 4x that real
+ * footprint, 320 units; short axis (Z) is the long axis divided by the real golden ratio phi
+ * ((1+sqrt(5))/2 = 1.6180339887..., not a rounded guess), ~197.75 units. Heightmap resolution
+ * stays 16x16 (worldapi's own real chunk size, unchanged) -- only the world-space size of each
+ * cell grows, independently per axis now via build_heightfield_mesh's own separate cell_size_x/
+ * cell_size_z params, instead of one shared value applied symmetrically. */
+#define DFZONE_LONG_SIDE 320.0f
+#define DFZONE_CELL_SIZE_X (DFZONE_LONG_SIDE / 16.0f)                  /* 20.0 -- the long axis */
+#define DFZONE_CELL_SIZE_Z (DFZONE_LONG_SIDE / 1.6180339887f / 16.0f)  /* ~12.36 -- short axis, real phi */
+
 typedef struct { Mesh mesh; int scene; int ready; unsigned char heights[256]; } TerrainTestPatch;
 static TerrainTestPatch g_terrain_test[3] = {{{0}, 0, 0, {0}}, {{0}, 1, 0, {0}}, {{0}, 3, 0, {0}}};
 static int g_terrain_test_active = 0;
@@ -3180,7 +3195,8 @@ static void town_load_terrain_test(void) {
         }
         float *verts = NULL;
         int vert_count = build_heightfield_mesh(g_terrain_test[i].heights, 2 /* subdiv */,
-                                                 TERRAIN_TEST_CELL_SIZE, TERRAIN_TEST_HEIGHT_SCALE, &verts);
+                                                 TERRAIN_TEST_CELL_SIZE, TERRAIN_TEST_CELL_SIZE,
+                                                 TERRAIN_TEST_HEIGHT_SCALE, &verts);
         g_terrain_test[i].mesh = upload_mesh(verts, vert_count);
         free(verts);
         g_terrain_test[i].ready = 1;
@@ -3288,7 +3304,8 @@ static void dfzone_load(void) {
     }
     float *verts = NULL;
     int vert_count = build_heightfield_mesh(g_dfzone_heights, 2 /* subdiv */,
-                                             TERRAIN_TEST_CELL_SIZE, TERRAIN_TEST_HEIGHT_SCALE, &verts);
+                                             DFZONE_CELL_SIZE_X, DFZONE_CELL_SIZE_Z,
+                                             TERRAIN_TEST_HEIGHT_SCALE, &verts);
     g_dfzone_mesh = upload_mesh(verts, vert_count);
     free(verts);
     g_dfzone_ready = 1;
@@ -3301,25 +3318,35 @@ static void dfzone_load(void) {
  * of "one chunk for now," not a silent wraparound or crash. */
 static int dfzone_height_at(float wx, float wz, float *out_y) {
     if (!g_dfzone_active || !g_dfzone_ready) return 0;
-    const float half = 8.0f * TERRAIN_TEST_CELL_SIZE;
-    if (wx < -half || wx > half || wz < -half || wz > half) return 0;
-    float gx = wx / TERRAIN_TEST_CELL_SIZE + 8.0f;
-    float gz = wz / TERRAIN_TEST_CELL_SIZE + 8.0f;
+    /* Rectangular bounds now (2026-08-03, golden-ratio zone expansion) -- half_x/half_z instead of
+       one shared half, since DFZONE_CELL_SIZE_X != DFZONE_CELL_SIZE_Z. */
+    const float half_x = 8.0f * DFZONE_CELL_SIZE_X;
+    const float half_z = 8.0f * DFZONE_CELL_SIZE_Z;
+    if (wx < -half_x || wx > half_x || wz < -half_z || wz > half_z) return 0;
+    float gx = wx / DFZONE_CELL_SIZE_X + 8.0f;
+    float gz = wz / DFZONE_CELL_SIZE_Z + 8.0f;
     *out_y = heightfield_sample(g_dfzone_heights, gx, gz) * TERRAIN_TEST_HEIGHT_SCALE;
     return 1;
 }
 
-/* town_move_half_extent (BUGFIX 2026-08-03, founder: "i fell off of it its just a green plane
+/* town_move_half_extent_x/z (BUGFIX 2026-08-03, founder: "i fell off of it its just a green plane
  * floating in the air") -- the real, same-class bug TOWN_MOVE_HALF_EXTENT itself was created to
  * fix (see its own doc comment, "floating in a blue abyss"), just not caught for the Dragonfly
  * zone case: click-to-move/WASD were clamping to TOWN_MOVE_HALF_EXTENT (~57 units) unconditionally
- * even while standing on the real dfzone mesh, which only actually spans +-8*TERRAIN_TEST_CELL_SIZE
- * (24 units at the current scale) -- easily walkable straight off the edge into nothing, same
- * "no ground renders past a hard-coded bound" failure mode as the original bug. This is now the
- * single real source both movement clamp call sites read, matching that same fix's own
- * "one shared constant, not two copies that can drift" discipline. */
-static float town_move_half_extent(void) {
-    return g_dfzone_active ? (8.0f * TERRAIN_TEST_CELL_SIZE) : TOWN_MOVE_HALF_EXTENT;
+ * even while standing on the real dfzone mesh, which only actually spans the mesh's own real
+ * bounds -- easily walkable straight off the edge into nothing, same "no ground renders past a
+ * hard-coded bound" failure mode as the original bug. Split into separate X/Z functions
+ * 2026-08-03 (golden-ratio zone expansion, founder: "expand the zone... on the long ways have it
+ * like 4x as big") -- the dfzone footprint is a real rectangle now (DFZONE_CELL_SIZE_X !=
+ * DFZONE_CELL_SIZE_Z), so a single shared half-extent would either clamp the short axis too late
+ * (walk off the real edge) or the long axis too early (invisible wall short of the real edge).
+ * Both real movement-clamp call sites read these, matching town_move_half_extent's own original
+ * "one shared source, not two copies that can drift" discipline, just per-axis now. */
+static float town_move_half_extent_x(void) {
+    return g_dfzone_active ? (8.0f * DFZONE_CELL_SIZE_X) : TOWN_MOVE_HALF_EXTENT;
+}
+static float town_move_half_extent_z(void) {
+    return g_dfzone_active ? (8.0f * DFZONE_CELL_SIZE_Z) : TOWN_MOVE_HALF_EXTENT;
 }
 
 static void town_draw_dfzone(GLint loc_mvp, GLint loc_model, GLint loc_color, Mat4 vp) {
@@ -3384,8 +3411,8 @@ static void town_draw_dfzone_trees(const Mat4 *vp, GLint loc_mvp, GLint loc_mode
     int lx[6], lz[6];
     int n = town_meadow_tree_positions(0, 0, lx, lz);
     for (int i = 0; i < n; i++) {
-        float wx = ((float)lx[i] - 8.0f) * TERRAIN_TEST_CELL_SIZE;
-        float wz = ((float)lz[i] - 8.0f) * TERRAIN_TEST_CELL_SIZE;
+        float wx = ((float)lx[i] - 8.0f) * DFZONE_CELL_SIZE_X;
+        float wz = ((float)lz[i] - 8.0f) * DFZONE_CELL_SIZE_Z;
         float wy = 0.0f;
         dfzone_height_at(wx, wz, &wy);
         glUniform4f_(loc_color, 0.35f, 0.22f, 0.1f, 1.0f); /* trunk: brown */
@@ -3445,8 +3472,8 @@ static void town_draw_dfzone_flowers(const Mat4 *vp, GLint loc_mvp, GLint loc_mo
     int lx[8], lz[8];
     int n = town_meadow_flower_positions(0, 0, lx, lz);
     for (int i = 0; i < n; i++) {
-        float wx = ((float)lx[i] - 8.0f) * TERRAIN_TEST_CELL_SIZE;
-        float wz = ((float)lz[i] - 8.0f) * TERRAIN_TEST_CELL_SIZE;
+        float wx = ((float)lx[i] - 8.0f) * DFZONE_CELL_SIZE_X;
+        float wz = ((float)lz[i] - 8.0f) * DFZONE_CELL_SIZE_Z;
         float wy = 0.0f;
         dfzone_height_at(wx, wz, &wy);
         glUniform4f_(loc_color, 0.2f, 0.45f, 0.15f, 1.0f); /* stem: green */
@@ -3494,19 +3521,37 @@ static void town_draw_ground(GLint loc_mvp, GLint loc_model, GLint loc_color, Ma
 /* town_draw_worms (2026-08-02, founder: "implement the starter area worm" -> "where's my starter
  * zone outside of town with the worms?" -> a ring of TOWN_TARGET_COUNT, not one; extended
  * 2026-08-03, founder: "and we can fight worms in that new area?" -> real Meadow worms once
- * g_dfzone_active): draws whichever target set town_active_targets resolves -- Town's own
- * decorative TOWN_TARGET_* ring (server/mob/worm.go's TownSquareWormSpawns(), zone 4, no HTTP
- * surface for live position/HP so this stays a positional placeholder, same honest "inert for
- * now" scope as M5's ability panes) or Meadow's real MEADOW_TARGET_* worms (the SAME
- * server-authoritative MeadowWormSpawns() mobs the MUD's own telnet players have fought since
- * before this GUI zone existed -- equally decorative on the render side, since apps2/mud still has
- * no live mob-state HTTP surface, but every "1" attack against one of these lands on the real,
- * live mob). Meadow worms sit on the zone's own real rolling terrain (dfzone_height_at, same
- * "positioned at real terrain height, not y=0" discipline town_draw_dfzone_trees already uses);
- * Town's ground is flat by design, so ground_y is always 0 there. The currently Tab-selected
+ * g_dfzone_active; reshaped the same day, founder: "the worms look like 3 little poops on the
+ * ground next to eachother not like a worm ... have the worms more worm like and like slightly
+ * floating in the air or something - bigger - like a lot bigger"): draws whichever target set
+ * town_active_targets resolves -- Town's own decorative TOWN_TARGET_* ring (server/mob/worm.go's
+ * TownSquareWormSpawns(), zone 4, no HTTP surface for live position/HP so this stays a positional
+ * placeholder, same honest "inert for now" scope as M5's ability panes) or Meadow's real
+ * MEADOW_TARGET_* worms (the SAME server-authoritative MeadowWormSpawns() mobs the MUD's own
+ * telnet players have fought since before this GUI zone existed). Meadow worms sit on the zone's
+ * own real rolling terrain (dfzone_height_at, same "positioned at real terrain height, not y=0"
+ * discipline town_draw_dfzone_trees already uses); Town's ground is flat by design, so ground_y
+ * is always 0 there.
+ *
+ * The original shape (3 flat, monotonically-shrinking boxes sitting almost at ground level) read
+ * as debris, not a creature -- the real fix isn't just "make it bigger," it's a real silhouette:
+ * 5 segments arched into a real worm curve (WORM_SEG_DY peaks at the middle segment, tapers back
+ * down at both ends, the same "worm rearing up mid-crawl" shape a real earthworm makes), each
+ * segment noticeably bigger than the old ones (WORM_SEG_SIZE, up to ~4x the old max half-extent),
+ * and the whole body floats at WORM_FLOAT_Y above real ground instead of sitting on it -- "slightly
+ * floating," a deliberate stylization (matches this client's own small-creature-with-personality
+ * convention, see the head's own two eye-dots below), not a physics bug. The currently Tab-selected
  * target (g_town_target_index) is drawn brighter -- the one real visual affordance for "what am I
  * about to attack." Reuses draw_hero_box, the same stacked-box silhouette primitive every hero
- * model already uses. */
+ * model already uses; nameplate/health bar for these live in town_draw_worm_nameplates (2D pass,
+ * called from town_draw_hud), same split Battlegrounds' own hero model vs. floating health bar
+ * already has. */
+#define WORM_SEG_COUNT 5
+static const float WORM_SEG_DX[WORM_SEG_COUNT]   = {-1.0f, -0.5f, 0.0f, 0.5f, 1.0f};
+static const float WORM_SEG_DY[WORM_SEG_COUNT]   = { 0.0f,  0.3f, 0.45f, 0.3f, 0.05f}; /* arches up through the middle, dips back down at the head */
+static const float WORM_SEG_SIZE[WORM_SEG_COUNT] = { 0.4f,  0.6f, 0.7f, 0.6f, 0.5f};   /* tapers at both ends, widest mid-body */
+#define WORM_FLOAT_Y 1.1f /* how far above real ground the whole body hovers */
+
 static void town_draw_worms(const Mat4 *vp, GLint loc_mvp, GLint loc_model, GLint loc_color, const Mesh *cube_mesh) {
     int count;
     const char *const *names;
@@ -3516,17 +3561,26 @@ static void town_draw_worms(const Mat4 *vp, GLint loc_mvp, GLint loc_model, GLin
         float wx = tx[i], wz = tz[i];
         float ground_y = 0.0f;
         if (g_dfzone_active) dfzone_height_at(wx, wz, &ground_y);
-        if (i == g_town_target_index) {
-            glUniform4f_(loc_color, 0.85f, 0.65f, 0.15f, 1.0f); /* selected: amber highlight */
-        } else {
-            glUniform4f_(loc_color, 0.5f, 0.38f, 0.16f, 1.0f); /* earthy worm brown */
+        float base_y = ground_y + WORM_FLOAT_Y;
+        int selected = (i == g_town_target_index);
+        for (int s = 0; s < WORM_SEG_COUNT; s++) {
+            if (selected) {
+                glUniform4f_(loc_color, 0.85f, 0.65f, 0.15f, 1.0f); /* selected: amber highlight, overrides body/head color */
+            } else if (s == WORM_SEG_COUNT - 1) {
+                glUniform4f_(loc_color, 0.55f, 0.3f, 0.3f, 1.0f); /* head: darker dusty red-brown, distinct from the body */
+            } else {
+                glUniform4f_(loc_color, 0.78f, 0.48f, 0.42f, 1.0f); /* body: dusty earthworm pink-brown */
+            }
+            float sz = WORM_SEG_SIZE[s];
+            draw_hero_box(wx, wz, WORM_SEG_DX[s], base_y + WORM_SEG_DY[s], 0.0f, sz, sz * 0.85f, sz, 1.0f,
+                          vp, loc_mvp, loc_model, cube_mesh);
         }
-        draw_hero_box(wx, wz, 0.5f, ground_y + 0.18f, 0.0f, 0.35f, 0.18f, 0.22f, 1.0f,
-                      vp, loc_mvp, loc_model, cube_mesh);
-        draw_hero_box(wx, wz, 0.0f, ground_y + 0.16f, 0.0f, 0.3f, 0.16f, 0.2f, 1.0f,
-                      vp, loc_mvp, loc_model, cube_mesh);
-        draw_hero_box(wx, wz, -0.45f, ground_y + 0.14f, 0.0f, 0.22f, 0.14f, 0.16f, 1.0f,
-                      vp, loc_mvp, loc_model, cube_mesh);
+        /* Two small eye-dots on the head segment -- the one real "this end is the front" cue a
+           worm's own symmetric segment shape doesn't otherwise give at a glance. */
+        if (!selected) glUniform4f_(loc_color, 0.05f, 0.05f, 0.05f, 1.0f);
+        float head_y = base_y + WORM_SEG_DY[WORM_SEG_COUNT - 1];
+        draw_hero_box(wx, wz, 1.2f, head_y + 0.12f, 0.18f, 0.06f, 0.06f, 0.06f, 1.0f, vp, loc_mvp, loc_model, cube_mesh);
+        draw_hero_box(wx, wz, 1.2f, head_y + 0.12f, -0.18f, 0.06f, 0.06f, 0.06f, 1.0f, vp, loc_mvp, loc_model, cube_mesh);
     }
 }
 
@@ -3612,7 +3666,7 @@ static int town_teleport_town_button_hit(float bx, float by, int win_w, int win_
     return bx >= x0 && bx <= x1 && by >= y0 && by <= y1;
 }
 
-static void town_draw_hud(int win_w, int win_h, int queue_available, int player_lost) {
+static void town_draw_hud(int win_w, int win_h, int queue_available, int player_lost, const Mat4 *vp) {
     glUseProgram_(0); /* legacy immediate-mode 2D pass -- see the match renderer's own identical
                           "2D HUD pass" comment; draw_string/glBegin below need the fixed-function
                           pipeline, not the custom GLSL program the checkerboard just used. */
@@ -3706,6 +3760,45 @@ static void town_draw_hud(int win_w, int win_h, int queue_available, int player_
         glDisable(GL_BLEND);
         glColor3f(1.0f, 0.8f, 0.4f);
         draw_string("TELEPORT TO TOWN", x0 + 14.0f, y0 + TOWN_QUEUE_BTN_H / 2.0f - 4.0f, 10);
+    }
+
+    /* town_draw_worm_nameplates (2026-08-03, founder: "we also need nameplates and health bars
+     * like in battlegrounds") -- same real technique Battlegrounds' own per-hero floating health
+     * bars use (world_to_screen projecting a world-space anchor into this HUD's own 2D pixel
+     * space, black-background bar + colored fill, name drawn above it), reused here rather than
+     * inventing a second bar style. The bar itself is honest, not faked live data: apps2/mud
+     * still has no HTTP surface for real mob HP (town_draw_worms' own doc comment names this same
+     * gap for position), so this always draws full/green -- "a worm is here and alive," the same
+     * scope worm targeting itself has always been, not a claim of live HP tracking. Anchored
+     * above WORM_FLOAT_Y's own real float height plus the arch's own peak, so the bar sits above
+     * the actual (now much taller) worm model, not clipping through it. */
+    if (g_town_char_loaded) {
+        int count;
+        const char *const *names;
+        const float *tx, *tz;
+        town_active_targets(&count, &names, &tx, &tz);
+        for (int i = 0; i < count; i++) {
+            float wx = tx[i], wz = tz[i];
+            float ground_y = 0.0f;
+            if (g_dfzone_active) dfzone_height_at(wx, wz, &ground_y);
+            float anchor_y = ground_y + WORM_FLOAT_Y + 0.45f + 0.6f + 0.5f; /* float height + arch peak + mid-segment half-height + clearance */
+            float sx, sy;
+            if (!world_to_screen(vp, wx, anchor_y, wz, win_w, win_h, &sx, &sy)) continue;
+            if (sx < -60 || sx > win_w + 60 || sy < -30 || sy > win_h + 30) continue;
+            float bw = 34.0f, bh = 4.0f;
+            glColor3f(0.1f, 0.1f, 0.1f);
+            glBegin(GL_QUADS);
+            glVertex2f(sx - bw / 2, sy); glVertex2f(sx + bw / 2, sy);
+            glVertex2f(sx + bw / 2, sy + bh); glVertex2f(sx - bw / 2, sy + bh);
+            glEnd();
+            glColor3f(i == g_town_target_index ? 0.95f : 0.3f, i == g_town_target_index ? 0.75f : 0.85f, i == g_town_target_index ? 0.2f : 0.3f);
+            glBegin(GL_QUADS);
+            glVertex2f(sx - bw / 2, sy); glVertex2f(sx + bw / 2, sy);
+            glVertex2f(sx + bw / 2, sy + bh); glVertex2f(sx - bw / 2, sy + bh);
+            glEnd();
+            glColor3f(i == g_town_target_index ? 1.0f : 0.85f, i == g_town_target_index ? 0.85f : 0.85f, i == g_town_target_index ? 0.5f : 0.75f);
+            draw_string(names[i], sx - (float)strlen(names[i]) * 2.8f, sy + bh + 4.0f, 7);
+        }
     }
 }
 
@@ -4891,13 +4984,15 @@ int main(int argc, char *argv[]) {
                                nothing 3D renders nearby (a floating building-name label can still
                                project onto screen from any distance since it's a 2D overlay, which
                                is exactly what read as "white writing in the distance" with
-                               everything else gone). Clamped to town_move_half_extent(), matching
-                               whichever real rendered ground's own half-extent is currently
-                               active -- Town's own, or the Dragonfly zone's, see its own doc
-                               comment for the real bug this closes there too. */
-                            float move_half = town_move_half_extent();
-                            g_town_target_x = fmaxf(-move_half, fminf(move_half, gx));
-                            g_town_target_z = fmaxf(-move_half, fminf(move_half, gz));
+                               everything else gone). Clamped to town_move_half_extent_x/z,
+                               matching whichever real rendered ground's own half-extent is
+                               currently active -- Town's own (square), or the Dragonfly zone's
+                               (a real rectangle since the golden-ratio expansion), see their own
+                               doc comment for the real bug this closes there too. */
+                            float move_half_x = town_move_half_extent_x();
+                            float move_half_z = town_move_half_extent_z();
+                            g_town_target_x = fmaxf(-move_half_x, fminf(move_half_x, gx));
+                            g_town_target_z = fmaxf(-move_half_z, fminf(move_half_z, gz));
                         }
                     }
                 }
@@ -4924,11 +5019,13 @@ int main(int argc, char *argv[]) {
                         /* Same clamp as click-to-move above, same real bug -- WASD held long
                            enough is actually the more likely way to reach an absurd position
                            (thousands of units), since it compounds every ~100ms with no cap.
-                           town_move_half_extent() picks the right bound for whichever ground is
-                           actually rendered right now (Town's own, or the Dragonfly zone's). */
-                        float wasd_move_half = town_move_half_extent();
-                        g_town_target_x = fmaxf(-wasd_move_half, fminf(wasd_move_half, g_town_x + dir_x * TOWN_WASD_LOOKAHEAD));
-                        g_town_target_z = fmaxf(-wasd_move_half, fminf(wasd_move_half, g_town_z + dir_z * TOWN_WASD_LOOKAHEAD));
+   town_move_half_extent_x/z pick the right bound for whichever ground is
+                           actually rendered right now (Town's own, or the Dragonfly zone's real
+                           rectangle). */
+                        float wasd_move_half_x = town_move_half_extent_x();
+                        float wasd_move_half_z = town_move_half_extent_z();
+                        g_town_target_x = fmaxf(-wasd_move_half_x, fminf(wasd_move_half_x, g_town_x + dir_x * TOWN_WASD_LOOKAHEAD));
+                        g_town_target_z = fmaxf(-wasd_move_half_z, fminf(wasd_move_half_z, g_town_z + dir_z * TOWN_WASD_LOOKAHEAD));
                         last_town_wasd_ms = now;
                     }
                 }
@@ -5022,7 +5119,7 @@ int main(int argc, char *argv[]) {
                                      g_town_facing_rad, 1.0f, &vp, loc_mvp, loc_model, &cube_mesh);
                 }
 
-                town_draw_hud(win_w, win_h, queue_host != NULL, town_player_lost());
+                town_draw_hud(win_w, win_h, queue_host != NULL, town_player_lost(), &vp);
                 town_draw_gate_overlay(win_w, win_h); /* real telecrystal cast prompt/bar, same 2D pass as the HUD above */
                 town_draw_travel_overlay(win_w, win_h); /* brief "TRAVELING: <destination>" banner right on arrival */
                 if (!g_dfzone_active) town_draw_building_labels(&vp, win_w, win_h); /* New-Handington-specific */
