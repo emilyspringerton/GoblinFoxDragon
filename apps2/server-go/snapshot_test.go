@@ -136,12 +136,15 @@ func TestBuildSnapshotPacket_EmptyPeers(t *testing.T) {
 	}
 }
 
+// TestGroundClampY_MeadowSetsRealHeight -- Meadow is a real gentle roll now (2026-08-03,
+// founder: "meadows are not completely flat my bro"), range [3,5], not a hardcoded flat 4.
+// Checks the real range rather than an exact value the terrain generator no longer guarantees
+// at any specific column.
 func TestGroundClampY_MeadowSetsRealHeight(t *testing.T) {
 	pos := system.Vec3{X: 3, Y: 999, Z: -7} // Y=999 simulates drift with no prior clamping
 	got := groundClampY(pos)
-	if got.Y != 4 {
-		t.Fatalf("expected Meadow ground height 4 (scene 0, matches ColumnHeight/proceduralChunk's "+
-			"own groundY convention), got Y=%.2f", got.Y)
+	if got.Y < 3 || got.Y > 5 {
+		t.Fatalf("expected Meadow ground height in [3,5] (gentle roll), got Y=%.2f", got.Y)
 	}
 	if got.X != pos.X || got.Z != pos.Z {
 		t.Fatalf("expected X/Z untouched by ground clamping, got (%.2f,%.2f), want (%.2f,%.2f)",

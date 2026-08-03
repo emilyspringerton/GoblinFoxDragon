@@ -1,3 +1,99 @@
+## 2026-08-03 (24)
+
+- fix(battlegrounds_gui): relaunching while your last real position was in Meadow could strand you
+  "in the middle of nowhere" -- founder, live: "i was in the meadow and closed the game - then the
+  thing happened where i was in the middle of nowhere not in town - dunno how i get so far away
+  from town i guess we need a town teleport button." Real root cause: `town_fetch_character` (runs
+  once on launch) loaded `pos_x`/`pos_z` straight into `g_town_x`/`g_town_z` without ever reading
+  `scene_id`, and `g_dfzone_active` always starts false on a fresh process -- so a character whose
+  real last position was real Meadow-space coordinates (up to +-35 units, MEADOW_TARGET_X/Z's own
+  range) had those same raw numbers rendered as if they were Town coordinates, landing the avatar
+  and camera orbit far outside Town's own much smaller real footprint. Same unresolved gap
+  `town_telecrystal_travel`'s own doc comment already named ("requiring a relog to (still never)
+  catch up"). Fixed: `town_fetch_character` now reads the real `scene_id` and switches into dfzone
+  render mode to match before seeding position, instead of assuming Town. Also added the founder's
+  own proposed fix as a real safety net: "H" now unconditionally calls the same, already-proven
+  `town_telecrystal_return` regardless of range/ring state -- G/the gate ring stays real,
+  proximity-gated telecrystal UX (SHANKPIT-ported, "the ux is good... circle showing cast
+  radius"), but H is the "I'm lost, get me out" escape hatch that doesn't require finding your way
+  back to a crystal you can't see. HUD control-hint line shows "H - return to town" while in
+  Meadow. `gcc -Wall -Wextra` clean.
+
+## 2026-08-03 (23)
+
+- fix(battlegrounds_gui): Town's own avatar was invisible after teleporting into the real
+  Dragonfly Meadow zone -- founder: "my avatar is not visible in the meadow scene that i
+  tele[p]orted to." Root-caused via controlled Xvfb+screenshot A/B tests (marker boxes at known
+  Y/scale, isolating the one real variable): `draw_hero_model`'s Town-avatar call pre-multiplied
+  the camera's own `vp` matrix with a world-space jump/terrain-height translation
+  (`vp_avatar = jump_t * vp`) and passed that AS `vp` into a function that internally computes
+  `mvp = vp * model` -- putting the translation in clip-space (post-projection) instead of
+  world-space (pre-projection), which does not correspond to a uniform shift under perspective
+  projection (translation doesn't commute with a projection matrix through the perspective
+  divide). Fixed by adding a real `hero_y` parameter to `draw_hero_model`, threaded through the
+  `BOX` macro's own `dy` (the MODEL side of the transform, mathematically correct); the
+  `jump_t`/`vp_avatar` construction is gone entirely, `vp` itself now passes through every caller
+  unmodified. Battlegrounds' own hero/clone rendering (the other 2 call sites) pass `hero_y=0.0f`,
+  preserving prior behavior exactly. Live-verified via Xvfb screenshot: avatar renders correctly,
+  centered, on terrain.
+
+- feat(battlegrounds_gui): real Meadow worm combat in the Dragonfly-backed dfzone -- founder:
+  "and we can fight worms in that new area?" -> "do the engineering work to fix that first."
+  `town_telecrystal_travel`/`return` used to bypass apps2/mud entirely (a direct PATCH to IDUNA's
+  own position endpoint) because `cmdTravel` had a real self-deadlock reached via headless
+  dispatch; that bug is already fixed (GoblinFoxDragon `15ea788`, same-day), but the client bypass
+  was never updated to match. That's the real reason Meadow's worms were unreachable: IDUNA said
+  scene_id=0 and the client happily rendered Meadow's terrain, but the LIVE headless MUD session
+  backing real combat never actually left New Handington, since only `cmdTravel`'s own
+  `gw.zoneMgr.Transfer` call registers a real zone change. Fixed: both functions now dispatch the
+  real `travel <crystalID>` MUD command via a new shared `town_mud_command` helper (also used by
+  `town_send_command`), checking the real response text ("...transported to MEADOW!") for success
+  instead of an IDUNA HTTP status code. Confirmed end-to-end BEFORE writing any render code: a
+  direct `/api/town/command` probe against a real IDUNA-backed test character (travel, look,
+  attack) landed a correct hit against a live `worm-meadow-0`. Added `MEADOW_TARGET_*` (mirrors
+  `server/mob/worm.go`'s real `MeadowWormSpawns()` positions/order exactly, same "kept in sync by
+  hand" convention `TOWN_TARGET_*` already established) and `town_active_targets`, which every
+  Tab-cycle/HUD-label/"1"-attack/`town_draw_worms` call site now goes through instead of a
+  hand-copied `g_dfzone_active` check -- closes a real stale-index OOB read too, since Town's ring
+  (4) and Meadow's ring (8) are different lengths. `town_draw_worms` now draws whichever target
+  set is active, sitting Meadow's worms on the zone's own real rolling terrain
+  (`dfzone_height_at`, same discipline `town_draw_dfzone_trees` already used) instead of y=0.
+  `g_town_target_index` resets to -1 on every real zone transition. `go test ./...` clean.
+
+- feat(worldapi,battlegrounds_gui): denser Meadow tree cover -- founder: "i dont see any updates
+  yet expanding our meadow scene adding more trees." `meadowTrees` (server/worldapi/scenes.go)
+  topped out at 3 trees per chunk (one hash bucket, h%5==4, had none at all); every bucket now
+  returns 5-6 real, reproducible positions, no bare bucket left.
+  `town_meadow_tree_positions` (apps2/battlegrounds_gui) mirrors the new positions exactly, same
+  "kept in sync by hand" convention its own doc comment already names.
+
+- feat(battlegrounds_gui): bumped `TERRAIN_TEST_CELL_SIZE` 3.0 -> 5.0 and
+  `TERRAIN_TEST_HEIGHT_SCALE` 0.5 -> 1.5 -- founder: "also the scene seems quite small" (CELL_SIZE
+  had already been bumped once this same day for the same feedback) plus "meadows are not
+  completely flat my bro"'s real height data (range 3-5) reading as basically flat again once the
+  zone's physical footprint grew (only 1 world unit of Y variation across an 80-unit-wide zone at
+  the old 0.5 scale). 80x80 footprint now comfortably covers every real Meadow worm spawn (up to
+  +-35 units out, previously standing past the mesh's own edge on the y=0 fallback); 1.5 gives up
+  to 3 world units of real Y swing, a real, visible gentle roll without turning Meadow into Hills.
+  `terrain_test_offset_x`'s own spacing formula already scales with `TERRAIN_TEST_CELL_SIZE`
+  (fixed in an earlier pass), so F10 debug-patch overlap needed no further change.
+
+## 2026-08-03 (22)
+
+- feat(worldapi,server-go): Meadow's real gentle-roll elevation -- founder: "meadows are not
+  completely flat my bro," correcting a real design choice (a hardcoded flat height=4), not a
+  rendering bug. New `meadowColumnHeight` (server/worldapi/scenes.go): gentle sine-based roll,
+  range [3,5], shared by both `meadowChunk`'s real block generation AND `heightmap.go`'s
+  `HeightmapChunk`/`ColumnHeight` -- one real formula, not two copies that can drift (this
+  session's own established discipline). 3 dependent tests updated to assert the real [3,5] range
+  instead of an exact value the generator no longer guarantees at any specific column
+  (`TestHeightmapChunk_Meadow_Flat` replaced by `TestHeightmapChunk_Meadow_GentleRoll` +
+  `TestHeightmapChunk_Meadow_MatchesBlockGeneration`; `TestHeightmapEndpoint_returnsHeights`;
+  `apps2/server-go`'s `TestGroundClampY_MeadowSetsRealHeight`). `GOWORK=off go test ./...` clean
+  across the whole module. Live-verified: `server-go` rebuilt, redeployed to the live process,
+  confirmed via `curl /heightmap` returning real height variation (min 4 / max 5) instead of a
+  uniform value.
+
 ## 2026-08-03 (21)
 
 - feat(server-go): real entity hit detection for hitscan shooting -- checked SHANKPIT's own

@@ -2,14 +2,60 @@ package worldapi
 
 import "testing"
 
-func TestHeightmapChunk_Meadow_Flat(t *testing.T) {
+// TestHeightmapChunk_Meadow_GentleRoll (2026-08-03, founder: "meadows are not completely flat
+// my bro") -- Meadow used to be perfectly flat (height 4 everywhere); now a real, gentle roll,
+// range 3-5, much subtler than Hills' own range (2-8). This replaces the old
+// TestHeightmapChunk_Meadow_Flat, which asserted the flat behavior this fix deliberately removed.
+func TestHeightmapChunk_Meadow_GentleRoll(t *testing.T) {
 	heights, ok := HeightmapChunk(0, 0, 0)
 	if !ok {
 		t.Fatal("scene 0 (meadow): expected ok=true")
 	}
+	minH, maxH := uint8(255), uint8(0)
 	for i, h := range heights {
-		if h != 4 {
-			t.Fatalf("scene 0 (meadow): column %d: expected height 4, got %d", i, h)
+		if h < 3 || h > 5 {
+			t.Fatalf("scene 0 (meadow): column %d: expected height in [3,5] (gentle roll), got %d", i, h)
+		}
+		if h < minH {
+			minH = h
+		}
+		if h > maxH {
+			maxH = h
+		}
+	}
+	if minH == maxH {
+		t.Fatalf("scene 0 (meadow): expected real height variation across the chunk, got a uniform %d everywhere", minH)
+	}
+}
+
+// TestHeightmapChunk_Meadow_MatchesBlockGeneration cross-checks the heightmap against
+// meadowChunk's own real block output, same discipline TestHeightmapChunk_Hills_MatchesBlockGeneration
+// already established -- catches drift between meadowColumnHeight and the block generation it
+// was split out of.
+func TestHeightmapChunk_Meadow_MatchesBlockGeneration(t *testing.T) {
+	const chunkX, chunkZ = 2, -3
+	heights, ok := HeightmapChunk(0, chunkX, chunkZ)
+	if !ok {
+		t.Fatal("scene 0 (meadow): expected ok=true")
+	}
+	blocks := ProceduralWorldStore(0, chunkX, chunkZ)
+	wantByColumn := make(map[[2]int]int)
+	for _, b := range blocks {
+		if b.BlockName == "minecraft:grass_block" {
+			lx, lz := b.X-chunkX*16, b.Z-chunkZ*16
+			wantByColumn[[2]int{lx, lz}] = b.Y
+		}
+	}
+	if len(wantByColumn) != 256 {
+		t.Fatalf("expected 256 grass columns, got %d", len(wantByColumn))
+	}
+	for lx := 0; lx < 16; lx++ {
+		for lz := 0; lz < 16; lz++ {
+			want := wantByColumn[[2]int{lx, lz}]
+			got := int(heights[lx*16+lz])
+			if got != want {
+				t.Fatalf("column (%d,%d): heightmap=%d, block generation=%d", lx, lz, got, want)
+			}
 		}
 	}
 }

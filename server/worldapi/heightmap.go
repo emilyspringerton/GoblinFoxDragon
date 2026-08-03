@@ -14,9 +14,14 @@ package worldapi
 func HeightmapChunk(sceneID, chunkX, chunkZ int) (heights [256]uint8, ok bool) {
 	const chunkSize = 16
 	switch sceneID {
-	case 0: // Meadow -- flat, see meadowChunk's own grassY
-		for i := range heights {
-			heights[i] = 4
+	case 0: // Meadow -- real gentle rolling terrain, shares meadowChunk's own formula (2026-08-03,
+		// founder: "meadows are not completely flat my bro" -- no longer a hardcoded flat 4)
+		for lz := 0; lz < chunkSize; lz++ {
+			for lx := 0; lx < chunkSize; lx++ {
+				wx := chunkX*chunkSize + lx
+				wz := chunkZ*chunkSize + lz
+				heights[lx*chunkSize+lz] = uint8(meadowColumnHeight(wx, wz))
+			}
 		}
 		return heights, true
 	case 1: // Hills -- real per-column variation, shares hillsChunk's own formula
@@ -52,8 +57,8 @@ func HeightmapChunk(sceneID, chunkX, chunkZ int) (heights [256]uint8, ok bool) {
 // returns ok=false, no single height per column).
 func ColumnHeight(sceneID, wx, wz int) (height uint8, ok bool) {
 	switch sceneID {
-	case 0: // Meadow -- flat
-		return 4, true
+	case 0: // Meadow -- real gentle rolling terrain, shares meadowChunk's own formula
+		return uint8(meadowColumnHeight(wx, wz)), true
 	case 1: // Hills -- real per-column variation
 		return uint8(hillsColumnHeight(wx, wz)), true
 	case 3: // Swampville -- flat, water cells one block higher

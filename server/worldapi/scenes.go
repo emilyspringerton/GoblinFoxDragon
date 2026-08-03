@@ -196,47 +196,81 @@ func urbanWarehouseWalls(chunkX, chunkZ int) []WorldBlock {
 // ── scene 0: flat meadow ──────────────────────────────────────────────────────
 
 // meadowChunk generates a flat grassy meadow: stone base, dirt layer, grass surface, sparse trees.
+// meadowColumnHeight (2026-08-03, founder: "meadows are not completely flat my bro" -- real,
+// grounded feedback, correcting a real design choice, not a rendering bug: meadowChunk had
+// always used a hardcoded flat grassY=4 for every column, both here and in the heightmap
+// exposure that mirrors it). A gentle rolling terrain, much subtler than hillsColumnHeight's own
+// dramatic variation (amplitude ~3, range 2-8) -- meadows should read as a soft, walkable roll,
+// not hills. Range 3-5, centered on the original flat height so existing content built around
+// "meadow height 4" (worldTree's own base, apps2/battlegrounds_gui's own client fallback
+// groundY=4) stays reasonable, not shifted wholesale.
+func meadowColumnHeight(wx, wz int) int {
+	height := 4 + int(math.Round(
+		0.8*math.Sin(float64(wx)*0.15)+
+			0.6*math.Cos(float64(wz)*0.13),
+	))
+	if height < 3 {
+		height = 3
+	}
+	if height > 5 {
+		height = 5
+	}
+	return height
+}
+
 func meadowChunk(chunkX, chunkZ int) []WorldBlock {
 	const (
 		chunkSize = 16
 		stoneTop  = 2 // stone from y=0..stoneTop
 		dirtY     = 3
-		grassY    = 4
 	)
 	out := make([]WorldBlock, 0, 512)
 	for z := 0; z < chunkSize; z++ {
 		for x := 0; x < chunkSize; x++ {
 			wx := chunkX*chunkSize + x
 			wz := chunkZ*chunkSize + z
+			grassY := meadowColumnHeight(wx, wz)
 			for y := 0; y <= stoneTop; y++ {
 				out = append(out, WorldBlock{X: wx, Y: y, Z: wz, BlockName: "minecraft:stone"})
 			}
-			out = append(out, WorldBlock{X: wx, Y: dirtY, Z: wz, BlockName: "minecraft:dirt"})
+			for y := stoneTop + 1; y < grassY; y++ {
+				out = append(out, WorldBlock{X: wx, Y: y, Z: wz, BlockName: "minecraft:dirt"})
+			}
 			out = append(out, WorldBlock{X: wx, Y: grassY, Z: wz, BlockName: "minecraft:grass_block"})
 		}
 	}
-	// Trees: slightly more than procedural
+	// Trees: slightly more than procedural. Rooted at the real height under each tree's own
+	// (x,z), not a fixed grassY -- otherwise trees would float above or sink into the now-real
+	// rolling ground.
 	trees := meadowTrees(chunkX, chunkZ)
 	for _, t := range trees {
-		out = append(out, worldTree(chunkX, chunkZ, t[0], t[1], grassY+1)...)
+		wx, wz := chunkX*chunkSize+t[0], chunkZ*chunkSize+t[1]
+		out = append(out, worldTree(chunkX, chunkZ, t[0], t[1], meadowColumnHeight(wx, wz)+1)...)
 	}
 	return out
 }
 
+// meadowTrees returns this chunk's real tree spots, deterministic per (chunkX, chunkZ) so a
+// client asking for the same chunk twice always gets the same forest (apps2/battlegrounds_gui's
+// own town_meadow_tree_positions mirrors this exactly, hash and all -- "kept in sync by hand" per
+// its own doc comment). Density bumped 2026-08-03, founder: "i dont see any updates yet expanding
+// our meadow scene adding more trees" -- the original 5-bucket table topped out at 3 trees per
+// chunk (and one bucket, h%5==4, had none at all), which read as "empty field," not "meadow." Every
+// bucket now returns 5-6 trees with no bare bucket, still the same real, reproducible hash.
 func meadowTrees(chunkX, chunkZ int) [][2]int {
 	// Use a deterministic per-chunk hash to scatter trees
 	h := chunkX*31 + chunkZ*17
 	switch h % 5 {
 	case 0:
-		return [][2]int{{4, 4}, {12, 11}}
+		return [][2]int{{2, 2}, {4, 11}, {9, 3}, {12, 9}, {6, 14}, {14, 5}}
 	case 1:
-		return [][2]int{{7, 3}}
+		return [][2]int{{3, 6}, {8, 2}, {11, 12}, {5, 9}, {14, 14}, {2, 13}}
 	case 2:
-		return [][2]int{{2, 9}, {13, 5}, {8, 13}}
+		return [][2]int{{2, 9}, {13, 5}, {8, 13}, {5, 2}, {11, 8}, {3, 14}}
 	case 3:
-		return [][2]int{{5, 7}}
+		return [][2]int{{5, 7}, {9, 12}, {2, 4}, {13, 10}, {7, 2}, {12, 14}}
 	default:
-		return nil
+		return [][2]int{{6, 6}, {10, 3}, {3, 11}, {13, 13}, {8, 8}}
 	}
 }
 

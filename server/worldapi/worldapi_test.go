@@ -67,8 +67,11 @@ func TestHeightmapEndpoint_returnsHeights(t *testing.T) {
 	if got.Biome != 0 {
 		t.Fatalf("expected biome 0, got %d", got.Biome)
 	}
-	if got.Height[0] != 4 {
-		t.Fatalf("expected meadow height 4, got %d", got.Height[0])
+	// Meadow is a real gentle roll now (2026-08-03, founder: "meadows are not completely flat
+	// my bro"), not a hardcoded flat 4 -- just check it's in the real, documented range rather
+	// than asserting an exact value the terrain generator no longer guarantees at column 0.
+	if got.Height[0] < 3 || got.Height[0] > 5 {
+		t.Fatalf("expected meadow height in [3,5] (gentle roll), got %d", got.Height[0])
 	}
 }
 
