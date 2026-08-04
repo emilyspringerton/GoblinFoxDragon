@@ -3032,7 +3032,7 @@ typedef struct {
     float half_w, half_h, half_d;
     float r, g, b;
 } TownBuilding;
-#define TOWN_BUILDING_COUNT 25
+#define TOWN_BUILDING_COUNT 26
 /* Doubled 2026-08-02, founder: "double the size of the town and the buildings" -- every
  * position AND every half-extent scaled x2 (both the layout's own spacing and each building's
  * physical size double, matching "town and the buildings" literally rather than just spreading
@@ -3064,6 +3064,14 @@ static const TownBuilding TOWN_BUILDINGS[TOWN_BUILDING_COUNT] = {
     {"Worm Hut",              10.0f,    30.0f, 2.8f, 2.2f, 2.8f,  0.5f,  0.38f, 0.16f},
     {"Dragon Gate",          -40.0f,   -50.0f, 2.4f, 5.2f, 2.4f,  0.85f, 0.65f, 0.15f},
     {"Diamond Gate",          40.0f,    70.0f, 2.4f, 5.2f, 2.4f,  0.85f, 0.65f, 0.15f},
+    /* Home Point Crystal (2026-08-04, founder: "rig up home point like wow a crystal in town and
+       we will have other crystals so you can move your respawn") -- a thin plinth here (this
+       building's own generic box render, town_draw_buildings), with the real, nicer faceted
+       crystal spire drawn as a separate custom model on top (town_draw_home_crystal, its own doc
+       comment has the real "why not just a box" reasoning) -- same "small placeholder plinth +
+       real custom shape drawn alongside" pattern Worm Hut already established for the worms
+       themselves. Clear central spot near the real Town spawn point, easy to find on arrival. */
+    {"Home Point Crystal",    0.0f,    10.0f, 1.0f, 0.2f, 1.0f,  0.3f,  0.15f, 0.45f},
 };
 
 /* g_town_char_loaded and the town_*_peak_ms trio are declared here (ahead of town_draw_hud,
@@ -3086,6 +3094,18 @@ static char g_town_job[16] = "WAR";
    this early (same reason g_town_job is) -- the worm-nameplate code above town_draw_hud's own
    definition needs g_target_hp/maxhp below before it exists. */
 static int g_town_hp = 1, g_town_maxhp = 1;
+/* g_town_ko_respawn_sent (2026-08-04, founder, live: "dragonsnshit i think i am dead? i have no
+   health and combat against worms stopped working... i think i died and theres no respawn") --
+   real, confirmed root cause: apps2/mud's own tickAll skips ALL combat resolution for a KO'd
+   player (`if p.homePoint.IsKO || p.combat.TargetMobID == "" { continue }`), which is exactly
+   what "combat stopped working" was -- a real, correct server-side KO gate, just with no
+   client-side recovery path wired to it. Real fix lives next to town_sync_position's own call
+   site: once g_town_hp hits 0, auto-send the real "home" command (matching this game's own
+   "no penalty" respawn design) instead of leaving the player stuck. This flag guards against
+   re-sending "home" every frame while still 0 HP (a real server round-trip is needed before
+   g_town_hp reflects the post-respawn HP) and resets the moment g_town_hp is ever seen above 0
+   again, so a later real death is handled the same way. */
+static int g_town_ko_respawn_sent = 0;
 /* g_target_hp/maxhp (2026-08-04, same founder report -- "the worm health bar does not update"):
    apps2/mud has no per-hit mob-HP field in melee combat text ("You hit for 30 damage" carries no
    HP), so this is filled by a separate periodic silent "look" poll (town_poll_target_hp) rather
@@ -3639,6 +3659,16 @@ static void town_draw_worms(const Mat4 *vp, GLint loc_mvp, GLint loc_model, GLin
     const float *tx, *tz;
     town_active_targets(&count, &names, &tx, &tz);
     for (int i = 0; i < count; i++) {
+        /* Real bug found live (2026-08-04, founder: "combat against worms stopped working (it
+           was workin for a bit! but dead worms didnt disappear)") -- the worm ring is a fixed,
+           always-present decorative array (MEADOW_TARGET_NAMES/TOWN_TARGET_NAMES), never filtered
+           by real HP before this, so a killed worm just kept rendering (and stayed clickable/
+           targetable in town_worm_hit_test below) forever, looking exactly like "combat stopped
+           working" -- you could keep attacking a real corpse. g_target_hp[i] == 0 is the real,
+           confirmed-dead signal (town_poll_target_hp's own periodic "look" poll); -1 (not yet
+           polled) is deliberately NOT treated as dead here, so a worm still renders normally
+           before its first real HP read lands. */
+        if (i < 8 && g_target_hp[i] == 0) continue;
         float wx = tx[i], wz = tz[i];
         float ground_y = 0.0f;
         if (g_dfzone_active) dfzone_height_at(wx, wz, &ground_y);
@@ -3665,6 +3695,40 @@ static void town_draw_worms(const Mat4 *vp, GLint loc_mvp, GLint loc_model, GLin
     }
 }
 
+/* town_draw_home_crystal (2026-08-04, founder: "rig up home point like wow a crystal in town and
+ * we will have other crystals so you can move your respawn" -> "use the arena mobba fountain
+ * model as the homepoint crystal (make it look a little nicer)"). Same real base+pillar silhouette
+ * concept the arena's own healing fountains already established (a box base + a bright box
+ * pillar, S170-147) -- but "a little nicer" earned two real, cheap upgrades a plain single pillar
+ * doesn't have: two overlapping pillars rotated 45° apart (an octagonal cross-section reads as a
+ * real faceted crystal, not a foursquare pillar) across three tapering tiers instead of one
+ * fixed-width shaft, and a real pulsing glow (sinf-driven brightness) instead of a flat color --
+ * the same "alive, magical" read a real respawn-bind object should have that a static color
+ * can't give. Position is TOWN_BUILDINGS' own "Home Point Crystal" entry (real position, real
+ * right-click hit-testing reused, not a second position source) -- this function only draws the
+ * nicer shape on top of that entry's own small plinth. */
+static void town_draw_home_crystal(const Mat4 *vp, GLint loc_mvp, GLint loc_model, GLint loc_color, const Mesh *cube_mesh) {
+    float cx = TOWN_BUILDINGS[TOWN_BUILDING_COUNT - 1].x;
+    float cz = TOWN_BUILDINGS[TOWN_BUILDING_COUNT - 1].z;
+    float pulse = sinf((float)SDL_GetTicks() * 0.0025f) * 0.5f + 0.5f; /* 0..1 breathing glow, same idiom the ability-tile cooldown pulses already use elsewhere in this file */
+
+    /* Three tapering tiers, each a pair of boxes rotated 45 deg apart -- an octagonal silhouette
+       reading as "cut gem," not a plain square pillar. */
+    const float tier_y[3]    = {0.6f, 1.5f, 2.2f};
+    const float tier_size[3] = {0.55f, 0.38f, 0.2f};
+    for (int t = 0; t < 3; t++) {
+        float base_r = 0.35f + pulse * 0.25f;
+        float base_g = 0.15f + pulse * 0.15f;
+        float base_b = 0.75f + pulse * 0.25f; /* violet-blue, brightening/dimming with the real pulse */
+        glUniform4f_(loc_color, base_r, base_g, base_b, 1.0f);
+        draw_hero_box_facing(cx, cz, 0.0f, 0.0f, tier_y[t], 0.0f, tier_size[t], tier_size[t] * 0.9f, tier_size[t], 1.0f, vp, loc_mvp, loc_model, cube_mesh);
+        draw_hero_box_facing(cx, cz, 0.7853982f, 0.0f, tier_y[t], 0.0f, tier_size[t], tier_size[t] * 0.9f, tier_size[t], 1.0f, vp, loc_mvp, loc_model, cube_mesh); /* pi/4 = 45 deg */
+    }
+    /* Small bright core at the very tip -- the one "this is the magic focus" highlight point. */
+    glUniform4f_(loc_color, 0.75f + pulse * 0.25f, 0.6f + pulse * 0.3f, 1.0f, 1.0f);
+    draw_hero_box(cx, cz, 0.0f, 2.7f, 0.0f, 0.1f, 0.1f, 0.1f, 1.0f, vp, loc_mvp, loc_model, cube_mesh);
+}
+
 /* town_worm_hit_test (2026-08-03, founder: "switch right click to attack move/interact") -- which
  * of town_active_targets' own worms, if any, a real screen-space click landed on. Same real
  * technique the box-select code uses for its own per-unit screen position (world_to_screen against
@@ -3682,6 +3746,7 @@ static int town_worm_hit_test(int mx, int my, int win_w, int win_h) {
     int best = -1;
     float best_dist_sq = 26.0f * 26.0f; /* click radius, generous enough for the now-much-bigger worm model without overlapping neighbors at this ring's real spacing */
     for (int i = 0; i < count; i++) {
+        if (i < 8 && g_target_hp[i] == 0) continue; /* real dead worm -- see town_draw_worms' own doc comment */
         float wx = tx[i], wz = tz[i];
         float ground_y = 0.0f;
         if (g_dfzone_active) dfzone_height_at(wx, wz, &ground_y);
@@ -3969,6 +4034,7 @@ static void town_draw_hud(int win_w, int win_h, int queue_available, int player_
         const float *tx, *tz;
         town_active_targets(&count, &names, &tx, &tz);
         for (int i = 0; i < count; i++) {
+            if (i < 8 && g_target_hp[i] == 0) continue; /* real dead worm -- see town_draw_worms' own doc comment */
             float wx = tx[i], wz = tz[i];
             float ground_y = 0.0f;
             if (g_dfzone_active) dfzone_height_at(wx, wz, &ground_y);
@@ -5802,6 +5868,17 @@ int main(int argc, char *argv[]) {
                                    antidote/hi-potion) is thematically a potions shop already. */
                                 townshop_open();
                                 handled = 1;
+                            } else if (bidx >= 0 && strcmp(TOWN_BUILDINGS[bidx].name, "Home Point Crystal") == 0) {
+                                /* Home Point bind (2026-08-04, founder: "rig up home point like
+                                   wow a crystal in town and we will have other crystals so you
+                                   can move your respawn") -- real "sethome" command, already
+                                   fully implemented server-side (apps2/mud's own cmdSetHome, binds
+                                   to the player's current real zone+position); this is purely the
+                                   real UI front-end onto it a crystal-shaped landmark gives, same
+                                   "real backend already exists, add the real client trigger"
+                                   pattern the job-change/shop NPCs above already established. */
+                                town_send_command("sethome");
+                                handled = 1;
                             }
                         }
                         if (!handled) {
@@ -5976,6 +6053,18 @@ int main(int argc, char *argv[]) {
                 town_sync_position(now, 0);
                 town_cast_tick(); /* real cast timer -- fires/cancels off THIS frame's final, real position */
 
+                /* Real KO auto-respawn (2026-08-04) -- see g_town_ko_respawn_sent's own doc
+                   comment for the full real root cause. g_town_hp starts at 1 (its own real
+                   "not yet synced" sentinel, see its own declaration) so this deliberately never
+                   fires before a real status line has actually landed at least once. */
+                if (g_town_char_loaded && g_town_hp == 0 && g_town_maxhp > 1 && !g_town_ko_respawn_sent) {
+                    g_town_ko_respawn_sent = 1;
+                    combat_log_push("You are KO'd. Returning to your Home Point...");
+                    town_send_command("home");
+                } else if (g_town_hp > 0) {
+                    g_town_ko_respawn_sent = 0;
+                }
+
                 /* Real arrival check for the run-up-and-attack sequence (2026-08-04, founder,
                    live: "then i manually run up to it i expect auto attacks to start... auto
                    attacks never start") -- fires every frame regardless of how the player got
@@ -6069,6 +6158,7 @@ int main(int argc, char *argv[]) {
                     town_draw_ground(loc_mvp, loc_model, loc_color, vp, &plane_mesh);
                     town_draw_buildings(&vp, loc_mvp, loc_model, loc_color, &cube_mesh);
                     town_draw_worms(&vp, loc_mvp, loc_model, loc_color, &cube_mesh);
+                    town_draw_home_crystal(&vp, loc_mvp, loc_model, loc_color, &cube_mesh);
                 }
                 town_draw_terrain_test(loc_mvp, loc_model, loc_color, vp); /* F10 debug patches, independent of dfzone */
                 town_draw_gate_ring(loc_mvp, loc_model, loc_color, vp); /* real telecrystal cast-radius ring, both directions */
