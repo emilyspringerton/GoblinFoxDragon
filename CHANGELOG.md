@@ -1,3 +1,18 @@
+## 2026-08-04 (9)
+
+- fix(mud): auto-recover a KO'd character on the next real command, not just "home". Founder,
+  live: "i believe i am dead" -> "yea i logged in as most recent client - i think im dead so
+  nothing works but it doesnt respawn me" -> "ensuring my character gets moved to the home point
+  if im dead on login". A headless session survives client reconnects as long as it hasn't been
+  idle-evicted -- `getOrCreateHeadlessPlayer` used to just hand back the same still-KO'd player
+  struct with no recovery at all. Extracted `cmdHome`'s real logic into `performHomeRespawn` and
+  call it whenever an existing session is picked back up with `IsKO` still true. Live-verified
+  against an isolated test instance (separate port, real IDUNA backend, live service untouched
+  during testing): killed a disposable character via real combat, confirmed a genuine KO, then
+  issued a normal follow-up command with no "home" in it -- the real respawn fired automatically
+  before the command even dispatched. Deployed to the live service. `go test ./...` (GOWORK=off)
+  passes.
+
 ## 2026-08-04 (8)
 
 - feat(battlegrounds_gui): dead worms disappear, KO auto-respawn, Home Point Crystal. Founder,
