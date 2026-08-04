@@ -1,5 +1,18 @@
 # GoblinFoxDragon
 
+## Current Status (2026-08-04)
+
+Real, playable: `apps2/mud` (server-authoritative MUD combat backend, real jobs/spells/aggro) +
+`apps2/battlegrounds_gui` (bespoke SDL2/GL client, not the real Bedrock client) rendering Town,
+Meadow, and a separate MOBA-style Battlegrounds arena mode. `apps2/server-go` serves the real
+Bedrock-protocol voxel backend (`:6969`) plus a real `/heightmap` HTTP API (`:7070`, also consumed
+by `WEAKNIGHT_BEDROCK_RACERS`). Recent real fixes: dead-worm visibility, KO auto-respawn + a real
+Home Point Crystal, and auto-recovery of a KO'd character on the next command (not just typing
+`home`) — see `CHANGELOG.md` for the full trail. See `docs/NORTHSTAR.md` for the fuller
+architecture picture (dated 2026-06-14, now stale in places relative to the above).
+
+---
+
 **GoblinFoxDragon** is the studio/system umbrella for a set of connected game experiments and online world projects.
 
 This repo is where we build, test, and iterate on the shared tech stack behind those projects.
