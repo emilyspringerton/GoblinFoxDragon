@@ -1,3 +1,29 @@
+## 2026-08-04 (4)
+
+- feat(battlegrounds_gui): real run-up-then-attack on right-click, matching Battlegrounds -- founder,
+  live: "if i right click on a worm i expect to run up to it and start attacking just like how it
+  works in battlegrounds" -> "i right click the worm turns yellow and i dont run uo to it" ->
+  "then i manually run up to it i expect auto attacks to start... auto attacks never start."
+  Real root cause: right-click's worm-attack branch fired the real MUD `attack` command
+  immediately from wherever the player was standing -- the MUD's own auto-approach closes the
+  distance server-side (real, already proven working), but nothing ever moved the CLIENT's own
+  avatar to match, so the player watched themselves stand still through a fight that was
+  genuinely happening with zero visible feedback. New `g_town_pending_attack_index`: right-click
+  on a worm now sets a real movement target stopped `TOWN_MELEE_APPROACH_DIST` (1.8, inside
+  `server/mob/worm.go`'s own real `WormMeleeRange` 2.0) short of it, and a new per-frame arrival
+  check fires the real attack command the moment actual proximity is reached -- checked against
+  real distance every frame regardless of how the player got close, so this covers both
+  click-to-approach AND plain manual WASD walking, closing both reports at once. Verified with a
+  real, rigorous, end-to-end test this time, not "the logic looks right": a synthetic SDL
+  right-click injected at a worm's own true screen position (10+ world units away, so the walk was
+  genuinely exercised), polled every 500ms for the client's own avatar position converging on the
+  correct stop-short point over ~4.5 real seconds, confirmed the pending-attack flag clearing
+  exactly on arrival, then independently confirmed via a direct `/api/town/command` probe against
+  the real MUD that the attack command actually landed -- real damage, a real kill, real XP and
+  loot, not simulated or assumed. `gcc -Wall -Wextra` clean, `go test ./...` clean (no Go changes).
+  All temp debug instrumentation and the disposable test character used for verification fully
+  reverted/deleted before commit.
+
 ## 2026-08-04 (3)
 
 - fix(battlegrounds_gui): GL_DEPTH_TEST never re-enabled after Town's own 2D HUD pass -- founder,

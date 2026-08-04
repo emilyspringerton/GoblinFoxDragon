@@ -2973,6 +2973,27 @@ static const float TOWN_TARGET_Z[TOWN_TARGET_COUNT] = {30.0f, 30.0f, 33.0f, 27.0
 /* -1 = no target selected. Tab/Shift+Tab cycle (2026-08-02, founder: "add tab and shift tab to
  * cycle through targets like wow"). */
 static int g_town_target_index = -1;
+/* g_town_pending_attack_index (2026-08-04, founder, live: "if i right click on a worm i expect to
+ * run up to it and start attacking just like how it works in battlegrounds" -> "i right click the
+ * worm turns yellow and i dont run uo to it" -> "then i manually run up to it i expect auto
+ * attacks to start... auto attacks never start"). Real gap: right-click's own worm-attack branch
+ * used to fire the real MUD "attack" command immediately on click, from wherever the player
+ * happened to be standing -- the MUD's own real auto-approach then closes the distance
+ * server-side, but nothing ever moves the CLIENT's own avatar to match, so the player watches
+ * themselves stand still while a fight (that IS real) happens with no visible feedback. Fixed by
+ * splitting the click into two real steps, matching what Battlegrounds' own right-click-a-unit
+ * already does: set a real movement target toward the worm (see the worm-hit branch below) AND
+ * record the pending attack here; the per-frame movement block (this file's own "move toward
+ * target" code) checks real proximity every frame regardless of how the player got close --
+ * click-to-approach OR manual WASD, either one -- and fires the real "attack" command the moment
+ * they're actually in melee range. -1 = no pending attack. */
+static int g_town_pending_attack_index = -1;
+/* TOWN_MELEE_APPROACH_DIST: real world-space distance the run-up-and-attack movement target stops
+ * short of the worm, and the real proximity threshold the per-frame arrival check fires the attack
+ * command at. 1.8 -- inside server/mob/worm.go's own real WormMeleeRange (2.0), so "the client
+ * thinks we've arrived" always agrees with "the MUD will actually let us swing," not a guessed
+ * number that could send the attack command just outside real melee range. */
+#define TOWN_MELEE_APPROACH_DIST 1.8f
 
 /* Meadow's real starter-zone worms (2026-08-03, founder: "and we can fight worms in that new
  * area?" -> "do the engineering work to fix that first"): mirrored by hand from server/mob/
@@ -5033,11 +5054,33 @@ int main(int argc, char *argv[]) {
                                 const char *const *tgt_names;
                                 const float *tgt_x, *tgt_z;
                                 town_active_targets(&tgt_count, &tgt_names, &tgt_x, &tgt_z);
-                                char cmd[80];
-                                snprintf(cmd, sizeof(cmd), "attack %s", tgt_names[hit]);
-                                town_send_command(cmd);
+                                (void)tgt_names;
+                                /* Real run-up-then-attack (2026-08-04, founder, live: "if i right
+                                   click on a worm i expect to run up to it and start attacking
+                                   just like how it works in battlegrounds") -- doesn't fire the
+                                   attack command from wherever the player happens to be standing
+                                   anymore. Sets a real movement target stopped just short of the
+                                   worm (TOWN_MELEE_APPROACH_DIST, real slack over WormMeleeRange)
+                                   and records the pending attack; the per-frame movement block
+                                   fires the real command once actual proximity is reached -- see
+                                   g_town_pending_attack_index's own doc comment for the full real
+                                   root cause and why this also covers manually walking up. */
+                                float wx = tgt_x[hit], wz = tgt_z[hit];
+                                float adx = wx - g_town_x, adz = wz - g_town_z;
+                                float alen = sqrtf(adx * adx + adz * adz);
+                                if (alen > TOWN_MELEE_APPROACH_DIST) {
+                                    g_town_target_x = wx - adx / alen * TOWN_MELEE_APPROACH_DIST;
+                                    g_town_target_z = wz - adz / alen * TOWN_MELEE_APPROACH_DIST;
+                                } else {
+                                    g_town_target_x = g_town_x;
+                                    g_town_target_z = g_town_z;
+                                }
+                                g_town_pending_attack_index = hit;
                                 handled = 1;
                             }
+                        }
+                        if (!handled) {
+                            g_town_pending_attack_index = -1; /* clicking empty ground cancels any pending approach-and-attack */
                         }
                         if (!handled && screen_to_ground(te.button.x, te.button.y, win_w, win_h, 60.0f, g_town_x, g_town_z, &gx, &gz)) {
                             /* Real bug found live (2026-08-03, founder: "when i log in im not in
@@ -5152,6 +5195,32 @@ int main(int argc, char *argv[]) {
                 update_facing_from_motion(g_town_x, g_town_z, &g_town_prev_facing_x, &g_town_prev_facing_z,
                                            &g_town_prev_facing_valid, &g_town_facing_rad);
                 town_sync_position(now, 0);
+
+                /* Real arrival check for the run-up-and-attack sequence (2026-08-04, founder,
+                   live: "then i manually run up to it i expect auto attacks to start... auto
+                   attacks never start") -- fires every frame regardless of how the player got
+                   close (the click-to-approach movement target just above, OR plain WASD),
+                   checking REAL current distance to the target's own real world position, not
+                   whether a movement target was ever reached exactly (WASD never sets one). See
+                   g_town_pending_attack_index's own doc comment for the full real root cause. */
+                if (g_town_pending_attack_index >= 0) {
+                    int pa_count;
+                    const char *const *pa_names;
+                    const float *pa_x, *pa_z;
+                    town_active_targets(&pa_count, &pa_names, &pa_x, &pa_z);
+                    if (g_town_pending_attack_index >= pa_count) {
+                        g_town_pending_attack_index = -1; /* target set changed under us (zone switch) -- abandon, don't attack the wrong roster */
+                    } else {
+                        float pdx = pa_x[g_town_pending_attack_index] - g_town_x;
+                        float pdz = pa_z[g_town_pending_attack_index] - g_town_z;
+                        if (sqrtf(pdx * pdx + pdz * pdz) <= TOWN_MELEE_APPROACH_DIST + 0.15f) {
+                            char cmd[80];
+                            snprintf(cmd, sizeof(cmd), "attack %s", pa_names[g_town_pending_attack_index]);
+                            town_send_command(cmd);
+                            g_town_pending_attack_index = -1;
+                        }
+                    }
+                }
 
                 /* Jump (2026-08-02, founder: "add jump space bar") -- purely cosmetic vertical
                    bounce, see g_town_jump_y_offset's own doc comment. Sine arc so it eases in/out
