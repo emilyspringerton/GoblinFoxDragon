@@ -1,3 +1,23 @@
+## 2026-08-04 (3)
+
+- fix(battlegrounds_gui): GL_DEPTH_TEST never re-enabled after Town's own 2D HUD pass -- founder,
+  live: "its really laggy in the meadow and in the town" + "the 3d stff looks a little weird
+  buildings showing through eachother etc." Real root cause: `glEnable(GL_DEPTH_TEST)` was only
+  ever called ONCE, at startup, before Town's own render loop begins. Every 2D HUD pass this same
+  loop calls each frame (`town_draw_hud`/`combat_log_draw`/`chat_draw`/`ah_draw`, etc.) disables it
+  for their own ortho overlay, and nothing in Town's own loop ever turned it back on before the
+  NEXT frame's 3D pass -- so from frame 2 of the whole session onward, every 3D draw (avatar,
+  terrain, buildings, worms, trees) rendered with depth testing OFF. This explains both real
+  reports from the same root cause: wrong occlusion (painter's-algorithm-only draw-call ordering
+  instead of real depth comparison -- "buildings showing through each other") AND real GPU
+  overdraw cost (disabling depth testing also disables early-Z hardware culling, so every
+  fragment of every overlapping triangle gets fully shaded even when hidden behind something
+  else -- worse the more geometry is on screen, and this session added a lot: bigger worms,
+  trees, flowers, nameplates). Battlegrounds' own separate loop already re-enables this every
+  frame; Town's loop just never got the same treatment. Fixed with one `glEnable(GL_DEPTH_TEST)`
+  at the start of Town's own 3D pass, matching Battlegrounds' own convention. `gcc -Wall -Wextra`
+  clean, `go test ./...` clean (no Go changes).
+
 ## 2026-08-04 (2)
 
 - fix(battlegrounds_gui): real click-to-ground bug -- founder, live: "click to move doesnt work in

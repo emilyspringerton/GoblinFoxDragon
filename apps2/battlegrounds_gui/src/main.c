@@ -5188,6 +5188,19 @@ int main(int argc, char *argv[]) {
                 Mat4 vp = mat4_multiply(&proj, &view);
                 g_last_vp = vp; /* same "next frame's click hit-test reads last frame's vp" convention Battlegrounds' own g_last_vp already established -- Town's own right-click worm hit-test needs it too */
 
+                /* BUGFIX 2026-08-04, founder, live: "the 3d stff looks a little weird buildings
+                   showing through eachother" -- real root cause: glEnable(GL_DEPTH_TEST) was only
+                   ever called ONCE, at startup, before this whole loop begins. Every 2D HUD pass
+                   this same loop calls each frame (town_draw_hud/town_draw_gate_overlay/chat_draw/
+                   combat_log_draw/ah_draw, all the way down at the bottom of this frame) disables
+                   it for their own ortho overlay and NOTHING here ever turned it back on before
+                   the NEXT frame's own 3D pass -- so from frame 2 onward, every single 3D draw
+                   this whole session (avatar, terrain, buildings, worms, trees) rendered with
+                   depth testing OFF, painter's-algorithm-only draw-call-order instead of real
+                   occlusion. Battlegrounds' own loop already re-enables this every frame (its own
+                   glEnable(GL_DEPTH_TEST) further down in this file) -- Town's loop just never
+                   got the same treatment. */
+                glEnable(GL_DEPTH_TEST);
                 glUseProgram_(prog);
                 glUniform3f_(loc_light, 0.4f, 0.8f, 0.3f);
                 if (g_dfzone_active) {
