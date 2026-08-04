@@ -1,3 +1,33 @@
+## 2026-08-04 (5)
+
+- fix(battlegrounds_gui): decode real JSON escapes in http_extract_json_string_field, add
+  floating damage popups -- founder, live: "ok progress we run up to our guy now but there
+  are still no visible auto attacking going on." Real root cause, found by reading the shared
+  JSON string decoder's own source after a raw debug dump showed decoded MUD output containing
+  the literal two-character sequence "rn" in place of every real line break: the decoder used to
+  skip the backslash on any `\`-escape and copy whatever character followed it literally --
+  correct by accident for `\"` and `\\` (the escaped character IS the real character), silently
+  wrong for `\r`/`\n`/`\t`, where the character after the backslash is a letter standing in for a
+  real control byte. Every real multi-line MUD response (apps2/mud's own `\r\n`-separated combat
+  text) decoded to plain "rn" instead of a real line break, so `town_mud_command`'s own
+  `\r\n`-based line-splitting saw the entire response as one unsplittable blob -- this had been
+  silently corrupting the combat log all session, which is the real reason combat feedback never
+  read as "visible" even once the run-up fix (2026-08-04 (4)) landed. Real fix: decode the
+  standard JSON escapes (`\n`, `\r`, `\t`, `\"`, `\\`, `\/`) to their real bytes instead of
+  stripping-and-copying-literally. New floating damage-popup feature (`town_spawn_damage_popup`/
+  `town_draw_damage_popups`, a 12-slot ring buffer) parses the same now-correctly-split lines for
+  the MUD's own real "You hit for N damage"/"[!] `<mob>` hits you for N damage" text and spawns a
+  rising WoW/LoL-style number over the real hit's own position. Verified two ways: a standalone
+  unit test compiled directly against the fixed function, showing byte-level real CRLF output
+  (`strstr(out, "\r\n")` finds real matches, hexdump confirms real 0x0D/0x0A bytes) where the old
+  code produced none; and a full live end-to-end run via synthetic SDL right-click injection
+  against a real worm fight under Xvfb -- the combat log pane rendered clean, individually split
+  lines for the first time this session, damage popups fired with amounts matching the real MUD
+  text exactly (30 outgoing, 8 incoming), through an actual kill with real XP and loot. All temp
+  debug instrumentation and every disposable test character from this debugging arc (including
+  three left over from earlier in the session) reverted/deleted before commit. `gcc -Wall -Wextra`
+  clean; no Go changes in this repo, so `go test ./...` doesn't apply here.
+
 ## 2026-08-04 (4)
 
 - feat(battlegrounds_gui): real run-up-then-attack on right-click, matching Battlegrounds -- founder,
