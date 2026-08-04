@@ -4728,6 +4728,220 @@ static void ah_draw(int win_w, int win_h) {
     }
 }
 
+/* ---------------- Job-change menu (2026-08-04) ----------------
+ * Founder, live: "maybe pivot? add an npc in town that lets player change jobs" -- server/job/
+ * job.go's own real 22-job list, mirrored here as a static array (real game content, doesn't
+ * change at runtime, same convention MEADOW_TARGET_NAMES already established for worm.go's own
+ * spawn list) rather than fetched over HTTP -- there's nothing to fetch, `setjob <ID>` already
+ * works for all 22 real jobs server-side (apps2/mud's own cmdSetJob), this menu is purely a real
+ * UI front-end onto that existing command. Reuses ah_draw's exact panel look (same colors/layout
+ * constants) for visual consistency, but as its own separate state -- simpler than AH's multi-
+ * screen browse depth, one flat list, Enter sends the real command and closes. Opens on
+ * right-clicking the "Guild House" building, the one already-drawn Town building whose own blue
+ * guild coloring fits a job-change NPC thematically. */
+#define JOB_MENU_COUNT 22
+static const char *JOB_MENU_IDS[JOB_MENU_COUNT] = {
+    "WAR", "MNK", "WHM", "BLM", "RDM", "THF", "PLD", "DRK", "BST", "BRD", "RNG",
+    "SAM", "NIN", "DRG", "SMN", "BLU", "COR", "PUP", "DNC", "SCH", "GEO", "RUN"
+};
+static int g_jobmenu_open = 0;
+static int g_jobmenu_selected = 0;
+
+static void jobmenu_open(void) { g_jobmenu_open = 1; g_jobmenu_selected = 0; }
+static void jobmenu_close(void) { g_jobmenu_open = 0; }
+
+static void jobmenu_handle_enter(void) {
+    if (g_jobmenu_selected < 0 || g_jobmenu_selected >= JOB_MENU_COUNT) return;
+    char cmd[32];
+    snprintf(cmd, sizeof(cmd), "setjob %s", JOB_MENU_IDS[g_jobmenu_selected]);
+    town_send_command(cmd); /* real setjob -- result lands in the combat log, same as any other command */
+    jobmenu_close();
+}
+
+static void jobmenu_draw(int win_w, int win_h) {
+    if (!g_jobmenu_open) return;
+    float panel_w = 260.0f, row_h = 18.0f;
+    float panel_h = 60.0f + row_h * (float)JOB_MENU_COUNT;
+    float x0 = (float)win_w / 2.0f - panel_w / 2.0f;
+    float y0 = (float)win_h / 2.0f - panel_h / 2.0f;
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glColor4f(0.04f, 0.05f, 0.06f, 0.94f);
+    glRectf(x0, y0, x0 + panel_w, y0 + panel_h);
+    glDisable(GL_BLEND);
+    glColor3f(0.25f, 0.35f, 0.75f); /* Guild House's own blue */
+    glLineWidth(2.0f);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(x0, y0); glVertex2f(x0 + panel_w, y0);
+    glVertex2f(x0 + panel_w, y0 + panel_h); glVertex2f(x0, y0 + panel_h);
+    glEnd();
+    glLineWidth(1.0f);
+
+    glColor3f(0.7f, 0.75f, 1.0f);
+    draw_string("CHANGE JOB", x0 + 16.0f, y0 + panel_h - 24.0f, 12);
+    glColor3f(0.5f, 0.55f, 0.55f);
+    draw_string("UP/DOWN - select   ENTER - confirm   ESC - close", x0 + 16.0f, y0 + panel_h - 42.0f, 7);
+
+    float row_y = y0 + panel_h - 64.0f;
+    for (int i = 0; i < JOB_MENU_COUNT; i++) {
+        if (i == g_jobmenu_selected) {
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            glColor4f(0.25f, 0.35f, 0.75f, 0.55f);
+            glRectf(x0 + 8.0f, row_y - 4.0f, x0 + panel_w - 8.0f, row_y + row_h - 6.0f);
+            glDisable(GL_BLEND);
+            glColor3f(0.85f, 0.88f, 1.0f);
+        } else {
+            glColor3f(0.75f, 0.75f, 0.78f);
+        }
+        draw_string(JOB_MENU_IDS[i], x0 + 16.0f, row_y, 9);
+        row_y -= row_h;
+    }
+}
+
+/* ---------------- Town shop menu (2026-08-04) ----------------
+ * Founder, live: "put a fuew basic items into the shops in town and build a npc buy sell ui
+ * similar to the auction house ui." Wired to the real 'shop'/'shop buy <id>'/'shop sell <id>'
+ * commands (apps2/mud's own cmdShopList/cmdShopBuy/cmdShopSell) against the new Quartermaster
+ * NPC (zone 4). Row parsing is its own function, not ah_parse_rows -- the shop's own line shape
+ * embeds the real item id in a trailing "(shop buy <id>)" hint rather than a leading "[id]"
+ * bracket, so it needs a different extraction rule; everything else (fetch-then-parse, panel
+ * look, up/down/enter/esc) mirrors the Auction House menu's own established pattern. TOWNSHOP_SELL
+ * reuses the exact same fetched rows as TOWNSHOP_MAIN (the vendor's own catalog is the only real
+ * item-id list this client has -- there's no client-side name-to-id table to parse a real
+ * 'inventory' listing's item NAMES back into real ids) and just sends 'shop sell' instead of
+ * 'shop buy' on Enter; selling something you don't actually own already gets a real, graceful
+ * "You don't have any X" from cmdShopSell, not a crash or a bad client-side guess. */
+#define TOWNSHOP_ROW_MAX 96
+#define TOWNSHOP_ID_MAX 40
+#define TOWNSHOP_MAX_ROWS 16
+typedef enum { TOWNSHOP_CLOSED = 0, TOWNSHOP_MAIN, TOWNSHOP_SELL } TownShopScreen;
+static TownShopScreen g_townshop_screen = TOWNSHOP_CLOSED;
+static int g_townshop_selected = 0;
+static char g_townshop_rows[TOWNSHOP_MAX_ROWS][TOWNSHOP_ROW_MAX];
+static char g_townshop_row_ids[TOWNSHOP_MAX_ROWS][TOWNSHOP_ID_MAX];
+static int g_townshop_row_count = 0;
+
+static void townshop_parse_rows(const char *text) {
+    g_townshop_row_count = 0;
+    char buf[4096];
+    snprintf(buf, sizeof(buf), "%s", text);
+    char *line = buf;
+    while (line && *line && g_townshop_row_count < TOWNSHOP_MAX_ROWS) {
+        char *nl = strstr(line, "\r\n");
+        if (nl) *nl = '\0';
+        char *trimmed = line;
+        while (*trimmed == ' ' || *trimmed == '\t') trimmed++;
+        size_t tlen = strlen(trimmed);
+        while (tlen > 0 && (trimmed[tlen - 1] == ' ' || trimmed[tlen - 1] == '\t')) trimmed[--tlen] = '\0';
+        const char *needle = "(shop buy ";
+        char *idstart = strstr(trimmed, needle);
+        if (idstart) {
+            idstart += strlen(needle);
+            char *idend = strchr(idstart, ')');
+            if (idend && idend > idstart) {
+                size_t idlen = (size_t)(idend - idstart);
+                if (idlen >= TOWNSHOP_ID_MAX) idlen = TOWNSHOP_ID_MAX - 1;
+                memcpy(g_townshop_row_ids[g_townshop_row_count], idstart, idlen);
+                g_townshop_row_ids[g_townshop_row_count][idlen] = '\0';
+                snprintf(g_townshop_rows[g_townshop_row_count], TOWNSHOP_ROW_MAX, "%s", trimmed);
+                g_townshop_row_count++;
+            }
+        }
+        line = nl ? nl + 2 : NULL;
+    }
+}
+
+static int townshop_fetch(const char *command, char *out_text, size_t out_text_len) {
+    if (!g_town_char_id[0]) return 0;
+    char cmd_esc[128];
+    json_escape_into(command, cmd_esc, sizeof(cmd_esc));
+    char body[256];
+    snprintf(body, sizeof(body), "{\"character_id\":\"%s\",\"command\":\"%s\"}", g_town_char_id, cmd_esc);
+    char resp[4096];
+    int status = 0;
+    if (http_post_json(iduna_host, TOWN_MUD_API_PORT, "/api/town/command", NULL, body, resp, sizeof(resp), &status) != 0) return 0;
+    if (status != 200) return 0;
+    return http_extract_json_string_field(resp, "output", out_text, out_text_len);
+}
+
+static void townshop_refresh(void) {
+    char text[4096];
+    if (townshop_fetch("shop", text, sizeof(text))) {
+        townshop_parse_rows(text);
+    } else {
+        g_townshop_row_count = 0;
+    }
+}
+
+static void townshop_open(void) {
+    g_townshop_screen = TOWNSHOP_MAIN;
+    g_townshop_selected = 0;
+    townshop_refresh();
+}
+
+static void townshop_close(void) { g_townshop_screen = TOWNSHOP_CLOSED; }
+
+static void townshop_toggle_mode(void) {
+    g_townshop_screen = (g_townshop_screen == TOWNSHOP_MAIN) ? TOWNSHOP_SELL : TOWNSHOP_MAIN;
+    g_townshop_selected = 0;
+    townshop_refresh(); /* prices can move with district pressure -- refetch on every toggle, cheap and always current */
+}
+
+static void townshop_handle_enter(void) {
+    if (g_townshop_selected < 0 || g_townshop_selected >= g_townshop_row_count) return;
+    if (!g_townshop_row_ids[g_townshop_selected][0]) return;
+    char cmd[64];
+    snprintf(cmd, sizeof(cmd), "%s %s", g_townshop_screen == TOWNSHOP_SELL ? "shop sell" : "shop buy", g_townshop_row_ids[g_townshop_selected]);
+    town_send_command(cmd);
+    townshop_refresh(); /* refresh so flow/quantity feedback (via the combat log) is followed by a live re-list */
+}
+
+static void townshop_draw(int win_w, int win_h) {
+    if (g_townshop_screen == TOWNSHOP_CLOSED) return;
+    float panel_w = 480.0f, row_h = 20.0f;
+    float panel_h = 76.0f + row_h * (float)(g_townshop_row_count > 0 ? g_townshop_row_count : 1);
+    float x0 = (float)win_w / 2.0f - panel_w / 2.0f;
+    float y0 = (float)win_h / 2.0f - panel_h / 2.0f;
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glColor4f(0.04f, 0.05f, 0.06f, 0.94f);
+    glRectf(x0, y0, x0 + panel_w, y0 + panel_h);
+    glDisable(GL_BLEND);
+    glColor3f(0.25f, 0.55f, 0.25f); /* shop-green, matching this file's own building-category color */
+    glLineWidth(2.0f);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(x0, y0); glVertex2f(x0 + panel_w, y0);
+    glVertex2f(x0 + panel_w, y0 + panel_h); glVertex2f(x0, y0 + panel_h);
+    glEnd();
+    glLineWidth(1.0f);
+
+    glColor3f(0.6f, 0.95f, 0.6f);
+    draw_string(g_townshop_screen == TOWNSHOP_SELL ? "QUARTERMASTER -- SELL" : "QUARTERMASTER -- BUY", x0 + 16.0f, y0 + panel_h - 24.0f, 12);
+    glColor3f(0.5f, 0.55f, 0.55f);
+    draw_string("UP/DOWN - select   ENTER - confirm   TAB - buy/sell   ESC - close", x0 + 16.0f, y0 + panel_h - 42.0f, 7);
+
+    float row_y = y0 + panel_h - 68.0f;
+    for (int i = 0; i < g_townshop_row_count; i++) {
+        if (i == g_townshop_selected) {
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            glColor4f(0.25f, 0.55f, 0.25f, 0.55f);
+            glRectf(x0 + 8.0f, row_y - 4.0f, x0 + panel_w - 8.0f, row_y + row_h - 6.0f);
+            glDisable(GL_BLEND);
+            glColor3f(0.85f, 1.0f, 0.85f);
+        } else {
+            glColor3f(0.8f, 0.8f, 0.78f);
+        }
+        draw_string(g_townshop_rows[i], x0 + 16.0f, row_y, 9);
+        row_y -= row_h;
+    }
+    if (g_townshop_row_count == 0) {
+        glColor3f(0.6f, 0.6f, 0.6f);
+        draw_string("(nothing here)", x0 + 16.0f, row_y, 9);
+    }
+}
+
 int main(int argc, char *argv[]) {
     /* No srand() call existed anywhere in this file before -- mint_ticket_fallback's own
        rand()-based nonce (used only when IDUNA isn't reachable) was silently using the default
@@ -4988,6 +5202,41 @@ int main(int argc, char *argv[]) {
                     }
                     continue;
                 }
+                /* Job-change menu and Town shop menu, same "checked first, consume every event
+                   while focused" precedence as the AH block just above -- same real bug class it
+                   already found (chat/WASD would otherwise steal these keystrokes). */
+                if (g_jobmenu_open) {
+                    if (te.type == SDL_QUIT) { running = 0; }
+                    else if (te.type == SDL_KEYDOWN) {
+                        if (te.key.keysym.sym == SDLK_UP) {
+                            g_jobmenu_selected = (g_jobmenu_selected - 1 + JOB_MENU_COUNT) % JOB_MENU_COUNT;
+                        } else if (te.key.keysym.sym == SDLK_DOWN) {
+                            g_jobmenu_selected = (g_jobmenu_selected + 1) % JOB_MENU_COUNT;
+                        } else if (te.key.keysym.sym == SDLK_RETURN || te.key.keysym.sym == SDLK_KP_ENTER) {
+                            jobmenu_handle_enter();
+                        } else if (te.key.keysym.sym == SDLK_ESCAPE) {
+                            jobmenu_close();
+                        }
+                    }
+                    continue;
+                }
+                if (g_townshop_screen != TOWNSHOP_CLOSED) {
+                    if (te.type == SDL_QUIT) { running = 0; }
+                    else if (te.type == SDL_KEYDOWN) {
+                        if (te.key.keysym.sym == SDLK_UP) {
+                            g_townshop_selected = (g_townshop_row_count > 0) ? (g_townshop_selected - 1 + g_townshop_row_count) % g_townshop_row_count : 0;
+                        } else if (te.key.keysym.sym == SDLK_DOWN) {
+                            g_townshop_selected = (g_townshop_row_count > 0) ? (g_townshop_selected + 1) % g_townshop_row_count : 0;
+                        } else if (te.key.keysym.sym == SDLK_RETURN || te.key.keysym.sym == SDLK_KP_ENTER) {
+                            townshop_handle_enter();
+                        } else if (te.key.keysym.sym == SDLK_TAB) {
+                            townshop_toggle_mode();
+                        } else if (te.key.keysym.sym == SDLK_ESCAPE) {
+                            townshop_close();
+                        }
+                    }
+                    continue;
+                }
                 /* C/Y/T also open chat, alongside Enter (2026-08-02, founder: "the reason the
                    auction house menu doesnt work is im trying to hit enter but that is
                    triggering chat can we get a different hotkey than enter to start a chat enter
@@ -5123,6 +5372,21 @@ int main(int argc, char *argv[]) {
                             int bidx = town_building_at(gx, gz);
                             if (bidx >= 0 && strcmp(TOWN_BUILDINGS[bidx].name, "Auction House") == 0) {
                                 ah_open();
+                                handled = 1;
+                            } else if (bidx >= 0 && strcmp(TOWN_BUILDINGS[bidx].name, "Guild House") == 0) {
+                                /* Job-change NPC (2026-08-04, founder: "add an npc in town that
+                                   lets player change jobs") -- Guild House reused rather than a
+                                   new building, same real "for now, no new geometry" scope this
+                                   file's own TOWN_BUILDINGS doc comment already set for Auction
+                                   House/Police before a real per-building function existed. */
+                                jobmenu_open();
+                                handled = 1;
+                            } else if (bidx >= 0 && strcmp(TOWN_BUILDINGS[bidx].name, "Potions") == 0) {
+                                /* Town shop NPC (2026-08-04, founder: "build a npc buy sell ui
+                                   similar to the auction house ui") -- Potions reused for the same
+                                   reason Guild House was above; its own catalog (echo-drop/
+                                   antidote/hi-potion) is thematically a potions shop already. */
+                                townshop_open();
                                 handled = 1;
                             }
                         }
@@ -5393,6 +5657,8 @@ int main(int argc, char *argv[]) {
                 chat_draw(win_w, win_h);
                 combat_log_draw(win_w, win_h);
                 ah_draw(win_w, win_h);
+                jobmenu_draw(win_w, win_h);
+                townshop_draw(win_w, win_h);
 
                 SDL_GL_SwapWindow(win);
                 SDL_Delay(16);
