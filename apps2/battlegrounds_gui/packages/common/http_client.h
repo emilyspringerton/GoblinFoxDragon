@@ -274,11 +274,25 @@ static int http_patch_json(const char *host, int port, const char *path,
 #endif
 
 // http_extract_json_string_field is a minimal, non-general JSON scanner:
-// finds "field":"value" (string field only, single level of backslash
-// escapes skipped rather than decoded) and copies value into out
-// (NUL-terminated, truncated to out_len-1). Returns 1 if found, 0 if not.
-// Deliberately not a real JSON parser — used only against IDUNA's own
-// controlled response shape, never adversarial input.
+// finds "field":"value" (string field only) and copies the real, unescaped
+// value into out (NUL-terminated, truncated to out_len-1). Returns 1 if
+// found, 0 if not. Deliberately not a real JSON parser — used only against
+// IDUNA's own controlled response shape, never adversarial input.
+//
+// BUGFIX 2026-08-04, found live investigating "no visible auto attacking":
+// this used to just SKIP the backslash on any escape ("single level of
+// backslash escapes skipped rather than decoded") and copy whatever
+// character followed it literally -- correct by accident for \" and \\
+// (the escaped character IS the real character there), silently wrong for
+// \n/\r/\t, where the character after the backslash is a LETTER standing in
+// for a real control byte, not the byte itself. A real response containing
+// "\r\n"-separated lines (apps2/mud's own real combat text, one line per
+// server message) decoded to the literal two-character sequence "rn" in
+// place of every real line break -- confirmed live via a raw debug dump,
+// not guessed. Every consumer that then split on a real "\r\n" substring
+// (town_mud_command's own line-by-line combat-log/damage-popup parsing)
+// silently saw the entire multi-line response as one unsplittable blob.
+// Real fix: decode the standard JSON escapes to their real bytes.
 static int http_extract_json_string_field(const char *json, const char *field,
                                            char *out, size_t out_len) {
     char needle[128];
@@ -293,7 +307,22 @@ static int http_extract_json_string_field(const char *json, const char *field,
     p++;
     size_t i = 0;
     while (*p && *p != '"' && i < out_len - 1) {
-        if (*p == '\\' && *(p + 1)) p++;
+        if (*p == '\\' && *(p + 1)) {
+            char esc = *(p + 1);
+            char real;
+            switch (esc) {
+                case 'n': real = '\n'; break;
+                case 'r': real = '\r'; break;
+                case 't': real = '\t'; break;
+                case '"': real = '"'; break;
+                case '\\': real = '\\'; break;
+                case '/': real = '/'; break;
+                default: real = esc; break; /* unrecognized escape -- fall back to the literal char, same as the old behavior */
+            }
+            out[i++] = real;
+            p += 2;
+            continue;
+        }
         out[i++] = *p++;
     }
     out[i] = '\0';

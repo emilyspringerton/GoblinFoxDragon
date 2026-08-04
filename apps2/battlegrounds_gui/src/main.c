@@ -3753,6 +3753,60 @@ static int town_teleport_town_button_hit(float bx, float by, int win_w, int win_
     return bx >= x0 && bx <= x1 && by >= y0 && by <= y1;
 }
 
+/* Floating damage popups (2026-08-04, founder, live: "ok progress we run up to our guy now but
+ * there are still no visible auto attacking going on") -- real combat has always been happening
+ * server-side once the attack command lands (already proven: real damage, real kills, real XP),
+ * but the only feedback was small text in the combat log pane, easy to miss while actually
+ * watching the fight play out in 3D. This is the same real WoW/LoL floating-combat-text
+ * convention, driven off the REAL numbers the MUD's own response text already contains -- not a
+ * cosmetic timer or a guess, town_mud_command's own line-parsing loop (further down) spawns one
+ * of these every time it sees a real "You hit for N damage" or "N hits you for N damage" line.
+ * Fixed-size ring buffer, oldest slot silently reused once full (a missed pop-up during a
+ * heavy fight is a lot less bad than an unbounded allocation). */
+#define TOWN_DAMAGE_POPUP_MAX 12
+#define TOWN_DAMAGE_POPUP_LIFETIME_MS 1100
+typedef struct {
+    float wx, wy, wz;
+    int amount;
+    int is_incoming; /* 1 = damage TO the player (red), 0 = damage BY the player (gold) */
+    uint32_t spawn_ms;
+    int active;
+} TownDamagePopup;
+static TownDamagePopup g_town_damage_popups[TOWN_DAMAGE_POPUP_MAX];
+static int g_town_damage_popup_next = 0;
+
+static void town_spawn_damage_popup(float wx, float wy, float wz, int amount, int is_incoming) {
+    TownDamagePopup *p = &g_town_damage_popups[g_town_damage_popup_next];
+    g_town_damage_popup_next = (g_town_damage_popup_next + 1) % TOWN_DAMAGE_POPUP_MAX;
+    p->wx = wx; p->wy = wy; p->wz = wz;
+    p->amount = amount;
+    p->is_incoming = is_incoming;
+    p->spawn_ms = SDL_GetTicks();
+    p->active = 1;
+}
+
+static void town_draw_damage_popups(int win_w, int win_h, const Mat4 *vp) {
+    uint32_t now = SDL_GetTicks();
+    for (int i = 0; i < TOWN_DAMAGE_POPUP_MAX; i++) {
+        TownDamagePopup *p = &g_town_damage_popups[i];
+        if (!p->active) continue;
+        uint32_t age = now - p->spawn_ms;
+        if (age > TOWN_DAMAGE_POPUP_LIFETIME_MS) {
+            p->active = 0;
+            continue;
+        }
+        float t = (float)age / (float)TOWN_DAMAGE_POPUP_LIFETIME_MS;
+        float rise = t * 1.6f; /* floats upward over its own lifetime -- real WoW/LoL convention */
+        float sx, sy;
+        if (!world_to_screen(vp, p->wx, p->wy + rise, p->wz, win_w, win_h, &sx, &sy)) continue;
+        char buf[16];
+        snprintf(buf, sizeof(buf), "-%d", p->amount);
+        if (p->is_incoming) glColor3f(1.0f, 0.3f, 0.25f);
+        else glColor3f(1.0f, 0.95f, 0.5f);
+        draw_string(buf, sx - (float)strlen(buf) * 3.2f, sy, 11);
+    }
+}
+
 static void town_draw_hud(int win_w, int win_h, int queue_available, int player_lost, const Mat4 *vp) {
     glUseProgram_(0); /* legacy immediate-mode 2D pass -- see the match renderer's own identical
                           "2D HUD pass" comment; draw_string/glBegin below need the fixed-function
@@ -3887,6 +3941,7 @@ static void town_draw_hud(int win_w, int win_h, int queue_available, int player_
             draw_string(names[i], sx - (float)strlen(names[i]) * 2.8f, sy + bh + 4.0f, 7);
         }
     }
+    town_draw_damage_popups(win_w, win_h, vp); /* real combat feedback -- see its own doc comment */
 }
 
 /* ---------------- Town avatar, movement, and the real character backend (2026-08-02) ----------------
@@ -4354,6 +4409,31 @@ static int town_mud_command(const char *command, char *out_buf, size_t out_buf_s
         int is_prompt = (tlen == 1 && trimmed[0] == '>');
         if (tlen > 0 && !is_status_line && !is_prompt) {
             combat_log_push(trimmed);
+            /* Real floating damage popups (2026-08-04, founder, live: "no visible auto attacking
+               going on") -- parsed straight from the MUD's own real combat text, the same two
+               real message shapes cmdAttack/EvtMobAttack actually send ("You hit for N damage",
+               "<mob> hits you for N damage"), not a guessed format. Outgoing hits are anchored at
+               the current target's own real position; incoming hits at the player's own real
+               position -- both via town_active_targets/dfzone_height_at, the same real position
+               source everything else in this file already uses. */
+            int dmg;
+            if (sscanf(trimmed, "You hit for %d damage", &dmg) == 1) {
+                int tc; const char *const *tn; const float *tx, *tz;
+                town_active_targets(&tc, &tn, &tx, &tz);
+                if (g_town_target_index >= 0 && g_town_target_index < tc) {
+                    float wx = tx[g_town_target_index], wz = tz[g_town_target_index];
+                    float gy = 0.0f;
+                    if (g_dfzone_active) dfzone_height_at(wx, wz, &gy);
+                    town_spawn_damage_popup(wx, gy + WORM_FLOAT_Y + 1.0f, wz, dmg, 0);
+                }
+            } else {
+                char mob_name[64];
+                if (sscanf(trimmed, "[!] %63s hits you for %d damage", mob_name, &dmg) == 2) {
+                    float gy = 0.0f;
+                    if (g_dfzone_active) dfzone_height_at(g_town_x, g_town_z, &gy);
+                    town_spawn_damage_popup(g_town_x, gy + 2.0f, g_town_z, dmg, 1);
+                }
+            }
         }
         line = nl ? nl + 2 : NULL;
     }
