@@ -5456,8 +5456,17 @@ int main(int argc, char *argv[]) {
     }
 #endif
 
-    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
+    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER);
     audio_init();
+    /* Real Xbox controller support (2026-08-04, founder: "ensure we have controller mappings for
+     * all games") -- same pattern already proven in WEAKNIGHT_BEDROCK_RACERS/shankpit-460/
+     * SHANKPIT. One pad shared across Town, Meadow, and the Arena's own separate movement code --
+     * each reads it directly rather than duplicating open/close logic per scene. Keyboard/mouse
+     * remain the real fallback whenever no controller is connected. */
+    SDL_GameController *g_gfd_pad = NULL;
+    for (int gi = 0; gi < SDL_NumJoysticks(); gi++) {
+        if (SDL_IsGameController(gi)) { g_gfd_pad = SDL_GameControllerOpen(gi); if (g_gfd_pad) break; }
+    }
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
@@ -6009,6 +6018,15 @@ int main(int argc, char *argv[]) {
                 const Uint8 *town_wasd_keys = SDL_GetKeyboardState(NULL);
                 int town_fwd_in = town_wasd_keys[SDL_SCANCODE_W] - town_wasd_keys[SDL_SCANCODE_S];
                 int town_right_in = town_wasd_keys[SDL_SCANCODE_D] - town_wasd_keys[SDL_SCANCODE_A];
+                if (g_gfd_pad && town_fwd_in == 0 && town_right_in == 0) {
+                    /* Real left-stick fallback -- only when the keyboard gave nothing this frame,
+                       so a player mixing keyboard+pad never fights themselves. */
+                    float glx = (float)SDL_GameControllerGetAxis(g_gfd_pad, SDL_CONTROLLER_AXIS_LEFTX) / 32767.0f;
+                    float gly = (float)SDL_GameControllerGetAxis(g_gfd_pad, SDL_CONTROLLER_AXIS_LEFTY) / 32767.0f;
+                    const float GFD_STICK_DEADZONE = 0.25f;
+                    if (fabsf(glx) > GFD_STICK_DEADZONE) town_right_in = (glx > 0) ? 1 : -1;
+                    if (fabsf(gly) > GFD_STICK_DEADZONE) town_fwd_in = (gly < 0) ? 1 : -1;
+                }
                 if ((town_fwd_in || town_right_in) && now - last_town_wasd_ms >= 100) {
                     float yaw = cam_yaw * (float)M_PI / 180.0f;
                     float ground_fwd_x = -sinf(yaw), ground_fwd_z = -cosf(yaw);
@@ -6222,6 +6240,11 @@ int main(int argc, char *argv[]) {
 
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
+            if(e.type == SDL_CONTROLLERDEVICEADDED && !g_gfd_pad) g_gfd_pad = SDL_GameControllerOpen(e.cdevice.which);
+            if(e.type == SDL_CONTROLLERDEVICEREMOVED && g_gfd_pad
+               && e.cdevice.which == SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(g_gfd_pad))) {
+                SDL_GameControllerClose(g_gfd_pad); g_gfd_pad = NULL;
+            }
             /* Chat input, checked first and unconditionally: while focused, this consumes every
                event itself (continue, below) so ability casts/WASD/camera drag etc. never also
                react to the same keystrokes a player is typing into chat -- a real, easy-to-miss
@@ -6834,6 +6857,13 @@ int main(int argc, char *argv[]) {
             const Uint8 *wasd_keys = SDL_GetKeyboardState(NULL);
             int fwd_in = wasd_keys[SDL_SCANCODE_W] - wasd_keys[SDL_SCANCODE_S];
             int right_in = wasd_keys[SDL_SCANCODE_D] - wasd_keys[SDL_SCANCODE_A];
+            if (g_gfd_pad && fwd_in == 0 && right_in == 0) {
+                float glx = (float)SDL_GameControllerGetAxis(g_gfd_pad, SDL_CONTROLLER_AXIS_LEFTX) / 32767.0f;
+                float gly = (float)SDL_GameControllerGetAxis(g_gfd_pad, SDL_CONTROLLER_AXIS_LEFTY) / 32767.0f;
+                const float GFD_STICK_DEADZONE = 0.25f;
+                if (fabsf(glx) > GFD_STICK_DEADZONE) right_in = (glx > 0) ? 1 : -1;
+                if (fabsf(gly) > GFD_STICK_DEADZONE) fwd_in = (gly < 0) ? 1 : -1;
+            }
             if ((fwd_in || right_in) && now - last_wasd_send_ms >= 100) {
                 float yaw = cam_yaw * (float)M_PI / 180.0f;
                 float ground_fwd_x = -sinf(yaw), ground_fwd_z = -cosf(yaw);
