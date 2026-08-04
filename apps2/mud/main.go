@@ -2369,6 +2369,14 @@ func handle(p *player, line string) {
 			return
 		}
 		p.homePoint.SetHome(p.zoneID, p.pos)
+		/* Real persistence (2026-08-04, founder: "iterate" -- this used to only ever mutate the
+		   in-memory struct above, so a custom Home Point silently reverted to unset on every
+		   fresh session). Best-effort, same silent-discard-on-failure convention every other
+		   idunaclient call site in this file already uses -- a sync failure shouldn't block the
+		   player's own real, already-applied in-memory sethome. */
+		if charID := gw.charIDBySlot[p.slot]; charID != "" {
+			_ = gw.iduna.UpdateHome(charID, p.zoneID, p.pos.X, p.pos.Y, p.pos.Z)
+		}
 		p.sendf("Home Point registered at %s.", zoneName(p.zoneID))
 	case "home":
 		cmdHome(p)
@@ -7117,6 +7125,17 @@ func getOrCreateHeadlessPlayer(characterID string) (*player, error) {
 	}
 	if ch.GoldBalance > 0 {
 		p.flow = ch.GoldBalance
+	}
+	// Real Home Point restore (2026-08-04, founder: "iterate" -- gap found live earlier the same
+	// day: sethome only ever mutated this in-memory struct, never IDUNA, so a custom Home Point
+	// silently reverted to unset on every fresh session (idle eviction, service restart). Now
+	// that IDUNA actually persists+returns home_scene_id/home_pos_x/y/z (mmo.go's own new
+	// handleUpdateHome/characterResponse fields), seed it back here. Guarded on "not the exact
+	// default row" rather than a real is-set flag (the schema has none) -- a false negative here
+	// (a real home genuinely set at Meadow's own literal origin) just means that one edge case
+	// falls back to the same "no home set" behavior as before, not a regression.
+	if ch.HomeSceneID != 0 || ch.HomePosX != 0 || ch.HomePosY != 0 || ch.HomePosZ != 0 {
+		p.homePoint.SetHome(ch.HomeSceneID, mob.Pos{X: ch.HomePosX, Y: ch.HomePosY, Z: ch.HomePosZ})
 	}
 	// Baseline for runHeadlessCommand's own delta-sync -- matches what was just loaded from
 	// IDUNA, so the very first sync check doesn't false-positive on values that haven't

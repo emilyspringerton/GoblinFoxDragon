@@ -37,6 +37,10 @@ type Character struct {
 	CurrentXP   int     `json:"current_xp"`
 	JobMain     string  `json:"job_main"`
 	JobSub      string  `json:"job_sub"`
+	HomeSceneID int     `json:"home_scene_id"`
+	HomePosX    float64 `json:"home_pos_x"`
+	HomePosY    float64 `json:"home_pos_y"`
+	HomePosZ    float64 `json:"home_pos_z"`
 }
 
 // Client calls the IDUNA MMO API.
@@ -148,6 +152,31 @@ func (c *Client) GetCharacter(characterID string) (*Character, error) {
 		return nil, fmt.Errorf("idunaclient: GetCharacter decode: %w", err)
 	}
 	return &ch, nil
+}
+
+// UpdateHome patches the character's real, persisted Home Point (2026-08-04, founder: "iterate" --
+// real gap found live earlier the same day: sethome only ever mutated apps2/mud's own in-memory
+// homePoint struct, never IDUNA, so a custom Home Point silently reverted to unset on every fresh
+// session. Same shape as UpdatePosition.
+func (c *Client) UpdateHome(characterID string, sceneID int, x, y, z float64) error {
+	body, _ := json.Marshal(map[string]interface{}{
+		"scene_id": sceneID, "pos_x": x, "pos_y": y, "pos_z": z,
+	})
+	req, _ := http.NewRequest(http.MethodPatch,
+		c.baseURL+"/api/v1/characters/"+characterID+"/home",
+		bytes.NewReader(body))
+	resp, err := c.do(req)
+	if err != nil {
+		return fmt.Errorf("idunaclient: UpdateHome: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return ErrNotFound
+	}
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+	return nil
 }
 
 // UpdatePosition patches the character's scene_id and position.
