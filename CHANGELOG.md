@@ -1,3 +1,36 @@
+## 2026-08-04 (7)
+
+- feat(battlegrounds_gui): character screen (P), real self/worm nameplates, job-aware ability bar,
+  cast timer with 94% move-cancel, click-to-target, /cast slash routing. Real founder feedback
+  chain: "we need a character screen /check but a hotkey for your own character p" -> "it will
+  show equiped equipment job level etc stats" -> "now that im blm im expecting 1 2 3 to be
+  differebnt spells" -> "if i click on a enemy it targets it and hiting the hotkey casts a spell"
+  -> "there will be cast timer and if the player moves before 94% casted then the cast cancels" ->
+  "also give a slash command in the chat for casting the same spells" -> "the worm health bar does
+  not update - i dont even have a healthbar in town" -> "i should have my name and health over my
+  head just like the enemies." Fixed a real g_town_job staleness bug (job-change menu never
+  updated the client's own notion of the job). New: left-click sets a real client+server target
+  separate from right-click's attack-move; a client-side cast-timer (town_start_cast/
+  town_cast_tick) gates real spells behind a visible progress bar and cancels on real displacement
+  before 94% progress; a job-aware 1/2/3 ability bar (BLM: Fire/Poison/Clear Mind; other jobs use
+  this session's earlier starter-kit work); /cast fire|poison|cure in chat now routes through the
+  same cast-timer instead of a second instant path; real self HP (parsed from the status line
+  every response already carries) and real per-target worm HP (new periodic silent "look" poll)
+  replace the old static full bars; a new floating self nameplate; a new read-only character
+  screen fetching real "status"+"gear" output. Verified live under Xvfb against the running
+  gfd-mud.service with fresh, isolated disposable accounts -- caught and fixed two real
+  test-environment bugs along the way (a stale movement-target causing a false cast-cancel, and
+  confirmation that Town's WASD reads real OS key state rather than the event queue). End-to-end:
+  job-aware tiles matched exactly, a real Fire cast dealt real damage and killed its target, a
+  second cast was correctly cancelled by real displacement, character screen rendered real
+  stats/equipment. Also investigated live: founder report "auto attacking does not work on the
+  second worm in town" -- reproduced the exact sequence under Xvfb, both worms worked correctly
+  end-to-end; a live Sunderworm World Crisis event with several very-high-HP mobs was active in
+  Town during the investigation, a more likely explanation than a reproducible client bug. No fix
+  applied; flagged in the backlog for a repeat report outside a crisis window. All disposable test
+  accounts and temp debug instrumentation cleaned up before commit. `gcc -Wall` clean.
+  GoblinFoxDragon `3e5aebb`.
+
 ## 2026-08-04 (6)
 
 - feat(mud, battlegrounds_gui): founder pivot -- job-change NPC, BLM Poison starter spell, starter
