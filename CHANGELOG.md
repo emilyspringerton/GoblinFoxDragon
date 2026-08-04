@@ -1,3 +1,24 @@
+## 2026-08-04 (8)
+
+- feat(battlegrounds_gui): dead worms disappear, KO auto-respawn, Home Point Crystal. Founder,
+  live: "dragonsnshit i think i am dead? i have no health and combat against worms stopped working
+  (it was workin for a bit! but dead worms didnt disappear) i think i died and theres no respawn
+  rig up home point like wow a crystal in town and we will have other crystals so you can move your
+  respawn" -> "use the arena mobba fountain model as the homepoint crystal (make it look a little
+  nicer)". `town_draw_worms`/`town_worm_hit_test`/the worm nameplate loop now skip any worm at
+  `g_target_hp[i] == 0` instead of leaving corpses rendered and re-targetable forever. New
+  `g_town_ko_respawn_sent`-gated auto-respawn: the moment a real status-line parse reports
+  `g_town_hp == 0`, the client auto-sends the MUD's own already-implemented `home` command
+  (`sethome`/`home` existed server-side all session, just never wired to auto-fire). Live-verified
+  end-to-end against a real KO'd disposable test character: HP 0/90 -> client polled real hp=0 for
+  3 consecutive real polls -> auto `home` fired -> character actually respawned at HP 1/90 with
+  real XP loss, confirming a genuine server-side respawn, not a client display artifact. New Home
+  Point Crystal in Town: 3-tier, 45-degree-rotated-pair faceted silhouette with a real
+  sine-pulsing glow, modeled on the arena's own healing-fountain build (S170-147) per the founder's
+  direction; right-click sends the real `sethome` command (curl-verified: "Home Point registered
+  at Meadow"). Screenshot-confirmed rendering under Xvfb. All temp test instrumentation and the
+  disposable test character were removed/deleted before commit.
+
 ## 2026-08-04 (7)
 
 - feat(battlegrounds_gui): character screen (P), real self/worm nameplates, job-aware ability bar,
