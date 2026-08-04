@@ -1,3 +1,11 @@
+## 2026-08-04 (10)
+- fix(mud): sethome now actually persists to IDUNA and reloads on a fresh session. Real gap:
+  sethome only mutated the in-memory homePoint struct -- a custom Home Point silently reverted to
+  unset on every fresh session (idle eviction, service restart). New idunaclient.UpdateHome,
+  called from cmdSetHome; getOrCreateHeadlessPlayer seeds homePoint from IDUNA's real persisted
+  value on session creation. Live-verified: sethome -> real DB row confirmed; restarted
+  gfd-mud.service -> status correctly showed the Home Point restored, not lost.
+
 ## 2026-08-04 (9)
 
 - fix(mud): auto-recover a KO'd character on the next real command, not just "home". Founder,
