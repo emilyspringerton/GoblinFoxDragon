@@ -1,3 +1,21 @@
+## 2026-08-04 (1)
+
+- ops/investigation: right-click attack confirmed working via a clean character; test@test.com's
+  own character found in a real, unresolved bad state -- founder, live: "ok i just tested again -
+  combat against worms does not work - right click on worm i should run up and start attacking -
+  currently nothing happens when i run up to it besides it does turn yellow." Verified the
+  right-click -> town_worm_hit_test -> town_send_command pipeline is genuinely correct: created a
+  disposable test character, `attack worm-meadow-2` produced a real, normal fight ("You hit for 30
+  damage" / "worm-meadow-2 hits you for 8 damage"), then deleted the disposable character. The
+  real character (TestWarrior) was separately found repeatedly dying within seconds of every
+  revive (`home`, HP:1/90) with ZERO combat text ever appearing in three separate polling passes --
+  a live `nm-king-worm` NM (800 HP, 60 dmg/hit, AggroRange 15/LeashRange 40) is present in this
+  Meadow instance and is the strong suspect, but the silent-death mechanism itself (real damage
+  code at `apps2/mud/main.go`'s `EvtMobAttack` handler does send a message on every path) was
+  never actually caught in the act -- flagged as a real, separate, unresolved bug for a future
+  session, not guessed at further here. Character revived one final time (HP:1/90) before handing
+  back to the founder. No source changes this pass.
+
 ## 2026-08-03 (30)
 
 - fix(battlegrounds_gui): position sync silently reverted Meadow's real scene_id back to Town on
