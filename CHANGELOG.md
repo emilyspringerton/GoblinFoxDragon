@@ -1,3 +1,30 @@
+## 2026-08-04 (6)
+
+- feat(mud, battlegrounds_gui): founder pivot -- job-change NPC, BLM Poison starter spell, starter
+  ability kits, Town shop. Real chain of founder real-time direction: "maybe pivot? add an npc in
+  town that lets player change jobs" -> "implement blm with a starter fireball and poison spells"
+  -> "ensure spell casting works o n the worms and puts them into combat" -> "we will map out more
+  expanded abilities once we get our systems working underneath" -> "and then add a couple starter
+  kits 2 abilities per job to the basic jobs" -> "put a fuew basic items into the shops in town and
+  build a npc buy sell ui similar to the auction house ui." Six real pieces, server first:
+  (1) fixed `cmdCastBlackMagic`/the WHM `dia` case directly mutating mob HP instead of calling the
+  real `reg.Hit` (server/mob/mob.go) -- every existing BLM nuke silently bypassed mob aggro before
+  this, not just a hypothetical new spell would have; (2) added "poison" as BLM's second starter
+  spell on the now-fixed path; (3) 2 real starter abilities each for MNK/BLM/RDM/THF (the FFXI
+  starter jobs that had none -- only WAR/WHM/SMN did before); (4) a real Town vendor NPC
+  (Quartermaster, zone 4) with a starter item catalog -- Town had no vendor at all; (5) a
+  job-change menu in battlegrounds_gui (Guild House building, real `setjob` dispatch); (6) a Town
+  shop buy/sell menu (Potions building, modeled on the Auction House UI, real `shop`/`shop buy`/
+  `shop sell` dispatch). Every piece verified live against the running gfd-mud.service / a real
+  Xvfb-driven client, not asserted: poison casting a real worm and setting its aggro flag, Chakra
+  healing a real nonzero amount after real damage, Convert's HP/MP trade, the job-change menu
+  actually flipping a character's real job (confirmed via a direct `jobs` probe), and a full shop
+  buy-then-sell round-trip moving real flow (5000 -> 4950 -> 4975). All disposable test characters
+  and temp debug instrumentation cleaned up before each commit. `go build/test/vet/gofmt` and
+  `gcc -Wall -Wextra` all clean; GitHub Actions Windows build confirmed green with a real
+  non-expired artifact. Commits: `1bba8da` (aggro fix + poison + abilities), `6f56b67` (Town
+  vendor), `5d1a2e7` (client UIs). Apple #12013.
+
 ## 2026-08-04 (5)
 
 - fix(battlegrounds_gui): decode real JSON escapes in http_extract_json_string_field, add
