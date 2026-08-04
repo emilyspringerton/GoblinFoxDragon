@@ -3072,6 +3072,33 @@ static const TownBuilding TOWN_BUILDINGS[TOWN_BUILDING_COUNT] = {
  * g_town_char_loaded's fuller doc comment further down, next to where it's actually set. */
 static int g_town_char_loaded = 0;
 static float town_q_peak_ms = 0.0f, town_w_peak_ms = 0.0f, town_r_peak_ms = 0.0f;
+/* g_town_job moved up here too (2026-08-04) -- town_draw_hud's own ability tiles now read it
+   directly for their real per-job labels, same "needed before town_draw_hud exists" reason
+   g_town_char_loaded is already up here. Real doc comment (the by-player fetch, setjob's own
+   optimistic update) stays down at town_fetch_character's own declaration site below. */
+static char g_town_job[16] = "WAR";
+/* g_town_hp/maxhp (2026-08-04, founder: "i should have my name and health over my head just like
+   the enemies") -- parsed from the real "[ Lv.X  HP:A/B  MP:C/D  TP:E ...]" status line every
+   single command response already carries (town_mud_command's own line loop, see there), not a
+   separate poll -- this line was already arriving with every response, just discarded before
+   this existed. Starts at 1/1 (not 0/0) so the very first frame before any real response has
+   landed doesn't draw an empty/dead-looking bar over a character who's actually alive. Declared
+   this early (same reason g_town_job is) -- the worm-nameplate code above town_draw_hud's own
+   definition needs g_target_hp/maxhp below before it exists. */
+static int g_town_hp = 1, g_town_maxhp = 1;
+/* g_target_hp/maxhp (2026-08-04, same founder report -- "the worm health bar does not update"):
+   apps2/mud has no per-hit mob-HP field in melee combat text ("You hit for 30 damage" carries no
+   HP), so this is filled by a separate periodic silent "look" poll (town_poll_target_hp) rather
+   than parsed inline like the player's own HP above. Sized for the larger of the two real target
+   rings (MEADOW_TARGET_COUNT, 8) -- Town's own 4-entry ring never indexes past its own count. -1
+   means "not yet known," the worm nameplates fall back to the old honest-full bar for those, same
+   real behavior as before this existed. */
+static int g_target_hp[8], g_target_maxhp[8];
+/* g_town_x/y/z moved up here too (2026-08-04) -- the self-nameplate code in town_draw_hud (below)
+   needs the player's own real position before that function's own real definition; the rest of
+   Town's avatar/movement state (facing, jump, sync) stays down with its own real doc comment,
+   only these three needed to move. */
+static float g_town_x = 0.0f, g_town_y = 0.0f, g_town_z = 0.0f;
 
 /* Dragonfly worldapi's own heightmap port (SMOOTH_TERRAIN_NORTHSTAR.md Milestone 1,
  * apps2/server-go's -worldapi-port flag, deployed at :7070 -- gfd-server-go.service). Same-box
@@ -3807,6 +3834,14 @@ static void town_draw_damage_popups(int win_w, int win_h, const Mat4 *vp) {
     }
 }
 
+/* Forward-declared: real definitions live with the rest of the cast-timer system, after
+   town_send_command (which they call) -- town_draw_hud needs them earlier, for the ability
+   tiles' own real per-job labels and the cast-progress bar above them. */
+static int town_ability_for_slot(const char *job, int slot, char *out_cmd, size_t out_cmd_len,
+                                  char *out_label, size_t out_label_len,
+                                  int *out_is_cast, uint32_t *out_cast_ms);
+static void town_draw_cast_bar(float center_x, float bar_y);
+
 static void town_draw_hud(int win_w, int win_h, int queue_available, int player_lost, const Mat4 *vp) {
     glUseProgram_(0); /* legacy immediate-mode 2D pass -- see the match renderer's own identical
                           "2D HUD pass" comment; draw_string/glBegin below need the fixed-function
@@ -3835,12 +3870,24 @@ static void town_draw_hud(int win_w, int win_h, int queue_available, int player_
         float tiles_total_w = tile_pitch * 2.0f + tile_size;
         float tiles_x0 = (float)win_w / 2.0f - tiles_total_w / 2.0f;
         float tiles_y = 90.0f;
-        draw_ability_tile(tiles_x0, tiles_y, tile_size, 0, &town_q_peak_ms,
-                           0, 0, "1", "Attack", 0.3f, 0.7f, 1.0f);
-        draw_ability_tile(tiles_x0 + tile_pitch, tiles_y, tile_size, 0, &town_w_peak_ms,
-                           0, 0, "2", "(unassigned)", 0.7f, 0.3f, 1.0f);
-        draw_ability_tile(tiles_x0 + tile_pitch * 2.0f, tiles_y, tile_size, 0, &town_r_peak_ms,
-                           0, 0, "3", "(unassigned)", 1.0f, 0.85f, 0.2f);
+        /* Real per-job labels (2026-08-04, founder: "now that im blm im expecting 1 2 3 to be
+           differebnt spells") -- town_ability_for_slot's own doc comment has the real mapping;
+           an unassigned slot keeps the same "(unassigned)" label every job used to show here. */
+        const char *slot_keys[3] = {"1", "2", "3"};
+        const float slot_r[3] = {0.3f, 0.7f, 1.0f}, slot_g[3] = {0.7f, 0.3f, 0.85f}, slot_b[3] = {1.0f, 1.0f, 0.2f};
+        float *slot_peak[3] = {&town_q_peak_ms, &town_w_peak_ms, &town_r_peak_ms};
+        for (int slot_i = 0; slot_i < 3; slot_i++) {
+            char slot_cmd[80], slot_label[32];
+            int slot_is_cast; uint32_t slot_cast_ms;
+            const char *label = "(unassigned)";
+            if (town_ability_for_slot(g_town_job, slot_i, slot_cmd, sizeof(slot_cmd),
+                                       slot_label, sizeof(slot_label), &slot_is_cast, &slot_cast_ms)) {
+                label = slot_label;
+            }
+            draw_ability_tile(tiles_x0 + tile_pitch * (float)slot_i, tiles_y, tile_size, 0, slot_peak[slot_i],
+                               0, 0, slot_keys[slot_i], label, slot_r[slot_i], slot_g[slot_i], slot_b[slot_i]);
+        }
+        town_draw_cast_bar((float)win_w / 2.0f, tiles_y + tile_size + 18.0f);
 
         /* Target readout + control hints (2026-08-02, "add tab and shift tab to cycle through
            targets like wow"): directly above the ability bar, same "put the info near the thing
@@ -3907,12 +3954,15 @@ static void town_draw_hud(int win_w, int win_h, int queue_available, int player_
      * like in battlegrounds") -- same real technique Battlegrounds' own per-hero floating health
      * bars use (world_to_screen projecting a world-space anchor into this HUD's own 2D pixel
      * space, black-background bar + colored fill, name drawn above it), reused here rather than
-     * inventing a second bar style. The bar itself is honest, not faked live data: apps2/mud
-     * still has no HTTP surface for real mob HP (town_draw_worms' own doc comment names this same
-     * gap for position), so this always draws full/green -- "a worm is here and alive," the same
-     * scope worm targeting itself has always been, not a claim of live HP tracking. Anchored
-     * above WORM_FLOAT_Y's own real float height plus the arch's own peak, so the bar sits above
-     * the actual (now much taller) worm model, not clipping through it. */
+     * inventing a second bar style. Real fill now (2026-08-04, founder: "the worm health bar does
+     * not update"): g_target_hp/maxhp, refreshed by town_poll_target_hp's own periodic silent
+     * "look" poll (apps2/mud has no per-hit mob-HP field to parse inline, unlike the player's own
+     * status line). Falls back to the original full/green bar only while a target's real HP
+     * hasn't been polled yet (g_target_hp[i] < 0) -- "a worm is here and alive," not a claim of
+     * live tracking, same honest scope the original always had, just narrower now that live
+     * tracking mostly exists. Anchored above WORM_FLOAT_Y's own real float height plus the arch's
+     * own peak, so the bar sits above the actual (now much taller) worm model, not clipping
+     * through it. */
     if (g_town_char_loaded) {
         int count;
         const char *const *names;
@@ -3927,18 +3977,56 @@ static void town_draw_hud(int win_w, int win_h, int queue_available, int player_
             if (!world_to_screen(vp, wx, anchor_y, wz, win_w, win_h, &sx, &sy)) continue;
             if (sx < -60 || sx > win_w + 60 || sy < -30 || sy > win_h + 30) continue;
             float bw = 34.0f, bh = 4.0f;
+            float hp_pct = 1.0f;
+            if (i < 8 && g_target_hp[i] >= 0 && g_target_maxhp[i] > 0) {
+                hp_pct = (float)g_target_hp[i] / (float)g_target_maxhp[i];
+                if (hp_pct < 0.0f) hp_pct = 0.0f;
+                if (hp_pct > 1.0f) hp_pct = 1.0f;
+            }
             glColor3f(0.1f, 0.1f, 0.1f);
             glBegin(GL_QUADS);
             glVertex2f(sx - bw / 2, sy); glVertex2f(sx + bw / 2, sy);
             glVertex2f(sx + bw / 2, sy + bh); glVertex2f(sx - bw / 2, sy + bh);
             glEnd();
             glColor3f(i == g_town_target_index ? 0.95f : 0.3f, i == g_town_target_index ? 0.75f : 0.85f, i == g_town_target_index ? 0.2f : 0.3f);
+            float fill_x1 = sx - bw / 2 + bw * hp_pct;
+            glBegin(GL_QUADS);
+            glVertex2f(sx - bw / 2, sy); glVertex2f(fill_x1, sy);
+            glVertex2f(fill_x1, sy + bh); glVertex2f(sx - bw / 2, sy + bh);
+            glEnd();
+            glColor3f(i == g_town_target_index ? 1.0f : 0.85f, i == g_town_target_index ? 0.85f : 0.85f, i == g_town_target_index ? 0.5f : 0.75f);
+            draw_string(names[i], sx - (float)strlen(names[i]) * 2.8f, sy + bh + 4.0f, 7);
+        }
+    }
+    /* Real self nameplate (2026-08-04, founder: "i should have my name and health over my head
+       just like the enemies") -- same technique/style as the worm nameplates just above, anchored
+       over the player's own avatar model instead. g_town_hp/maxhp come from the real status line
+       every command response already carries (see their own declaration doc comment). */
+    if (g_town_char_loaded) {
+        float self_ground_y = 0.0f;
+        if (g_dfzone_active) dfzone_height_at(g_town_x, g_town_z, &self_ground_y); /* same real per-frame ground lookup the worm nameplates above use -- Town itself is flat (0) by design */
+        float anchor_y = self_ground_y + 1.9f; /* avatar model height + clearance, same real anchor style as the worm nameplates */
+        float sx, sy;
+        if (world_to_screen(vp, g_town_x, anchor_y, g_town_z, win_w, win_h, &sx, &sy) &&
+            sx >= -60 && sx <= win_w + 60 && sy >= -30 && sy <= win_h + 30) {
+            float bw = 34.0f, bh = 4.0f;
+            float hp_pct = g_town_maxhp > 0 ? (float)g_town_hp / (float)g_town_maxhp : 1.0f;
+            if (hp_pct < 0.0f) hp_pct = 0.0f;
+            if (hp_pct > 1.0f) hp_pct = 1.0f;
+            glColor3f(0.1f, 0.1f, 0.1f);
             glBegin(GL_QUADS);
             glVertex2f(sx - bw / 2, sy); glVertex2f(sx + bw / 2, sy);
             glVertex2f(sx + bw / 2, sy + bh); glVertex2f(sx - bw / 2, sy + bh);
             glEnd();
-            glColor3f(i == g_town_target_index ? 1.0f : 0.85f, i == g_town_target_index ? 0.85f : 0.85f, i == g_town_target_index ? 0.5f : 0.75f);
-            draw_string(names[i], sx - (float)strlen(names[i]) * 2.8f, sy + bh + 4.0f, 7);
+            glColor3f(0.2f, 0.85f, 0.3f); /* real friendly-green, distinct from worms' amber/red */
+            float fill_x1 = sx - bw / 2 + bw * hp_pct;
+            glBegin(GL_QUADS);
+            glVertex2f(sx - bw / 2, sy); glVertex2f(fill_x1, sy);
+            glVertex2f(fill_x1, sy + bh); glVertex2f(sx - bw / 2, sy + bh);
+            glEnd();
+            glColor3f(0.6f, 0.9f, 1.0f);
+            const char *self_name = g_chat_display_name[0] ? g_chat_display_name : "You";
+            draw_string(self_name, sx - (float)strlen(self_name) * 2.8f, sy + bh + 4.0f, 7);
         }
     }
     town_draw_damage_popups(win_w, win_h, vp); /* real combat feedback -- see its own doc comment */
@@ -3959,8 +4047,6 @@ static void town_draw_hud(int win_w, int win_h, int queue_available, int player_
  * play nice" -- whichever of Town's own client or a live apps2/mud telnet session last PATCHes
  * position wins, no conflict resolution beyond that. Not solved here, by choice. */
 static char g_town_char_id[64] = "";
-static char g_town_job[16] = "WAR";
-static float g_town_x = 0.0f, g_town_y = 0.0f, g_town_z = 0.0f;
 static float g_town_target_x = 0.0f, g_town_target_z = 0.0f;
 static float g_town_facing_rad = 0.0f;
 static float g_town_prev_facing_x = 0.0f, g_town_prev_facing_z = 0.0f;
@@ -4407,6 +4493,18 @@ static int town_mud_command(const char *command, char *out_buf, size_t out_buf_s
         while (tlen > 0 && (trimmed[tlen - 1] == ' ' || trimmed[tlen - 1] == '\t')) trimmed[--tlen] = '\0';
         int is_status_line = (strncmp(trimmed, "[ Lv.", 5) == 0);
         int is_prompt = (tlen == 1 && trimmed[0] == '>');
+        if (is_status_line) {
+            /* Real self HP (2026-08-04, founder: "i should have my name and health over my head
+               just like the enemies") -- every single response already carries this line, just
+               discarded before this existed; a single space in a scanf format matches any run of
+               real whitespace, so this tolerates the slight spacing drift already visible across
+               different real response captures this session without needing an exact match. */
+            int hp, maxhp;
+            if (sscanf(trimmed, "[ Lv.%*d HP:%d/%d", &hp, &maxhp) == 2) {
+                g_town_hp = hp;
+                g_town_maxhp = maxhp;
+            }
+        }
         if (tlen > 0 && !is_status_line && !is_prompt) {
             combat_log_push(trimmed);
             /* Real floating damage popups (2026-08-04, founder, live: "no visible auto attacking
@@ -4445,6 +4543,130 @@ static void town_send_command(const char *command) {
     town_mud_command(command, out, sizeof(out));
 }
 
+/* Real spell-cast timer (2026-08-04, founder, live: "there will be a cast timer and if the player
+ * moves before 94% casted then the cast cancels") -- apps2/mud's own "cast <spell>" resolves
+ * instantly server-side, no real cast delay at all; this is a client-side gate in front of it,
+ * matching the real WoW/FFXI feel the founder described: press the spell, watch a bar fill, real
+ * movement before it's mostly done cancels the cast and the "cast" command is simply never sent
+ * (not a server-side interrupt -- apps2/mud has no notion of an in-progress cast to interrupt, and
+ * building that out is real scope beyond what was asked for here). Melee attack and job abilities
+ * (ja) stay instant, same real FFXI convention (job abilities have no cast bar) -- only spells
+ * that actually cost MP go through this. One cast at a time; a second hotkey press while already
+ * casting is just ignored until the current one resolves or gets interrupted. */
+#define TOWN_CAST_CANCEL_THRESHOLD 0.94f
+#define TOWN_CAST_MOVE_EPSILON 0.05f
+static int g_cast_active = 0;
+static uint32_t g_cast_start_ms = 0;
+static uint32_t g_cast_duration_ms = 0;
+static char g_cast_cmd[80] = "";
+static char g_cast_label[32] = "";
+static float g_cast_start_x = 0.0f, g_cast_start_z = 0.0f;
+
+static void town_start_cast(const char *cmd, const char *label, uint32_t duration_ms) {
+    if (g_cast_active) return;
+    snprintf(g_cast_cmd, sizeof(g_cast_cmd), "%s", cmd);
+    snprintf(g_cast_label, sizeof(g_cast_label), "%s", label);
+    g_cast_duration_ms = duration_ms;
+    g_cast_start_ms = SDL_GetTicks();
+    g_cast_start_x = g_town_x;
+    g_cast_start_z = g_town_z;
+    g_cast_active = 1;
+}
+
+/* town_cast_tick: called once per frame (right after that frame's own movement is fully resolved,
+ * so g_town_x/z reflect real, final position) -- fires the real command on completion, cancels on
+ * real displacement past TOWN_CAST_MOVE_EPSILON before TOWN_CAST_CANCEL_THRESHOLD progress. */
+static void town_cast_tick(void) {
+    if (!g_cast_active) return;
+    uint32_t now = SDL_GetTicks();
+    uint32_t elapsed = now - g_cast_start_ms;
+    float progress = g_cast_duration_ms > 0 ? (float)elapsed / (float)g_cast_duration_ms : 1.0f;
+    float mdx = g_town_x - g_cast_start_x, mdz = g_town_z - g_cast_start_z;
+    float moved = sqrtf(mdx * mdx + mdz * mdz);
+    if (progress < TOWN_CAST_CANCEL_THRESHOLD && moved > TOWN_CAST_MOVE_EPSILON) {
+        combat_log_push("Casting interrupted!");
+        g_cast_active = 0;
+        return;
+    }
+    if (progress >= 1.0f) {
+        town_send_command(g_cast_cmd);
+        g_cast_active = 0;
+    }
+}
+
+/* town_draw_cast_bar: real progress fill, same amber-on-dark idiom the AH/shop/job menus already
+ * use for "the thing currently happening." Inert (draws nothing) when no cast is active -- called
+ * unconditionally from town_draw_hud every frame, same as ah_draw's own always-called, self-
+ * gating shape. */
+static void town_draw_cast_bar(float center_x, float bar_y) {
+    if (!g_cast_active) return;
+    uint32_t now = SDL_GetTicks();
+    uint32_t elapsed = now - g_cast_start_ms;
+    float progress = g_cast_duration_ms > 0 ? (float)elapsed / (float)g_cast_duration_ms : 1.0f;
+    if (progress > 1.0f) progress = 1.0f;
+    float bar_w = 180.0f, bar_h = 14.0f;
+    float x0 = center_x - bar_w / 2.0f;
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glColor4f(0.05f, 0.05f, 0.05f, 0.85f);
+    glRectf(x0, bar_y, x0 + bar_w, bar_y + bar_h);
+    glColor4f(0.85f, 0.65f, 0.15f, 0.9f);
+    glRectf(x0, bar_y, x0 + bar_w * progress, bar_y + bar_h);
+    glDisable(GL_BLEND);
+    glColor3f(0.3f, 0.25f, 0.1f);
+    glLineWidth(1.0f);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(x0, bar_y); glVertex2f(x0 + bar_w, bar_y);
+    glVertex2f(x0 + bar_w, bar_y + bar_h); glVertex2f(x0, bar_y + bar_h);
+    glEnd();
+    glColor3f(0.95f, 0.9f, 0.75f);
+    draw_string(g_cast_label, x0 + 4.0f, bar_y + bar_h + 4.0f, 8);
+}
+
+/* town_ability_for_slot: job-aware 1/2/3 ability bar (2026-08-04, founder, live: "now that im blm
+ * im expecting 1 2 3 to be differebnt spells") -- until this, every job's bar was hardcoded to
+ * "1=Attack, 2/3=unassigned" regardless of job, exactly right for a melee job and exactly wrong
+ * for a caster (BLM's real starter spells -- fire/poison, 2026-08-04's own earlier pivot -- were
+ * completely unreachable from the ability bar). Returns 0 if nothing's assigned for this slot on
+ * this job (caller renders "(unassigned)", same as every job before this existed). is_cast marks a
+ * real MP spell that must go through town_start_cast; melee attack and job abilities are real
+ * FFXI instant actions. Job coverage matches this session's own earlier starter-kit work
+ * (WAR/WHM/SMN/MNK/BLM/RDM/THF) -- any other job still falls through to "Attack only," same as
+ * before, since they have no real starter kit yet either. */
+static int town_ability_for_slot(const char *job, int slot, char *out_cmd, size_t out_cmd_len,
+                                  char *out_label, size_t out_label_len,
+                                  int *out_is_cast, uint32_t *out_cast_ms) {
+    *out_is_cast = 0;
+    *out_cast_ms = 0;
+    if (strcmp(job, "BLM") == 0) {
+        if (slot == 0) { snprintf(out_cmd, out_cmd_len, "cast fire"); snprintf(out_label, out_label_len, "Fire"); *out_is_cast = 1; *out_cast_ms = 2000; return 1; }
+        if (slot == 1) { snprintf(out_cmd, out_cmd_len, "cast poison"); snprintf(out_label, out_label_len, "Poison"); *out_is_cast = 1; *out_cast_ms = 2000; return 1; }
+        if (slot == 2) { snprintf(out_cmd, out_cmd_len, "ja clear_mind"); snprintf(out_label, out_label_len, "Clear Mind"); return 1; }
+        return 0;
+    }
+    if (slot == 0) { snprintf(out_cmd, out_cmd_len, "attack"); snprintf(out_label, out_label_len, "Attack"); return 1; }
+    if (strcmp(job, "WAR") == 0) {
+        if (slot == 1) { snprintf(out_cmd, out_cmd_len, "ja provoke"); snprintf(out_label, out_label_len, "Provoke"); return 1; }
+        if (slot == 2) { snprintf(out_cmd, out_cmd_len, "ja berserk"); snprintf(out_label, out_label_len, "Berserk"); return 1; }
+    } else if (strcmp(job, "MNK") == 0) {
+        if (slot == 1) { snprintf(out_cmd, out_cmd_len, "ja chakra"); snprintf(out_label, out_label_len, "Chakra"); return 1; }
+        if (slot == 2) { snprintf(out_cmd, out_cmd_len, "ja boost"); snprintf(out_label, out_label_len, "Boost"); return 1; }
+    } else if (strcmp(job, "WHM") == 0) {
+        if (slot == 1) { snprintf(out_cmd, out_cmd_len, "cast cure"); snprintf(out_label, out_label_len, "Cure"); *out_is_cast = 1; *out_cast_ms = 2000; return 1; }
+        if (slot == 2) { snprintf(out_cmd, out_cmd_len, "ja benediction"); snprintf(out_label, out_label_len, "Benediction"); return 1; }
+    } else if (strcmp(job, "RDM") == 0) {
+        if (slot == 1) { snprintf(out_cmd, out_cmd_len, "ja convert"); snprintf(out_label, out_label_len, "Convert"); return 1; }
+        if (slot == 2) { snprintf(out_cmd, out_cmd_len, "ja chainspell"); snprintf(out_label, out_label_len, "Chainspell"); return 1; }
+    } else if (strcmp(job, "THF") == 0) {
+        if (slot == 1) { snprintf(out_cmd, out_cmd_len, "ja sneak_attack"); snprintf(out_label, out_label_len, "Sneak Attack"); return 1; }
+        if (slot == 2) { snprintf(out_cmd, out_cmd_len, "ja trick_attack"); snprintf(out_label, out_label_len, "Trick Attack"); return 1; }
+    } else if (strcmp(job, "SMN") == 0) {
+        if (slot == 1) { snprintf(out_cmd, out_cmd_len, "ja summon_zagan"); snprintf(out_label, out_label_len, "Summon Zagan"); return 1; }
+        if (slot == 2) { snprintf(out_cmd, out_cmd_len, "ja summon_beleth"); snprintf(out_label, out_label_len, "Summon Beleth"); return 1; }
+    }
+    return 0;
+}
+
 /* town_poll_combat: throttled drain (empty command) so background auto-attack ticks -- "You hit
  * for N damage," the worm's own retaliation, kill/XP/loot messages -- show up in the combat log
  * even when the player isn't actively pressing anything. Same ~1.5s cadence as chat_poll. */
@@ -4453,6 +4675,52 @@ static void town_poll_combat(uint32_t now) {
     if (!g_town_char_id[0] || now - g_town_last_combat_poll_ms < 1500) return;
     g_town_last_combat_poll_ms = now;
     town_send_command("");
+}
+
+/* Forward-declared: real definition lives with the rest of the Town shop menu, further down --
+   town_poll_target_hp needs it here too, for a real per-worm HP refresh without duplicating its
+   tiny POST-and-extract body a third time. */
+static int townshop_fetch(const char *command, char *out_text, size_t out_text_len);
+
+/* town_poll_target_hp: real per-target HP (2026-08-04, founder: "the worm health bar does not
+ * update"). apps2/mud's own melee combat text carries no mob-HP field ("You hit for 30 damage"
+ * has none), unlike the player's own status line above -- so this is a separate, silent "look"
+ * poll (townshop_fetch, not town_mud_command -- doesn't touch the combat log or the "output"
+ * field's line-by-line side effects, just the raw text) parsing each real
+ * "[worm-id] kind  HP:A/B" line apps2/mud's own real zone listing already sends. Matched against
+ * whichever target ring is actually active (town_active_targets) by real name, not by scanning
+ * order, since "look"'s own creature listing order isn't guaranteed stable frame to frame (a real,
+ * observed live behavior this session -- the same zone printed its worms in a different order
+ * across repeated "look" calls). Same ~2s cadence as town_sync_position's own throttle -- frequent
+ * enough that a health bar visibly moves during a real fight, not so frequent it doubles the
+ * request volume for no real benefit. */
+static uint32_t g_town_last_hp_poll_ms = 0;
+static void town_poll_target_hp(uint32_t now) {
+    if (!g_town_char_id[0] || now - g_town_last_hp_poll_ms < 2000) return;
+    g_town_last_hp_poll_ms = now;
+    char text[4096];
+    if (!townshop_fetch("look", text, sizeof(text))) return;
+    int tc; const char *const *tn; const float *tx, *tz;
+    town_active_targets(&tc, &tn, &tx, &tz);
+    char *line = text;
+    while (line && *line) {
+        char *nl = strstr(line, "\r\n");
+        if (nl) *nl = '\0';
+        char name[64];
+        int hp, maxhp;
+        if (sscanf(line, " [%63[^]]] %*s HP:%d/%d", name, &hp, &maxhp) == 3) {
+            char *rb = strchr(name, ']'); /* sscanf's own %[^]] already stops at ']', defensive only */
+            if (rb) *rb = '\0';
+            for (int i = 0; i < tc && i < 8; i++) {
+                if (strcmp(tn[i], name) == 0) {
+                    g_target_hp[i] = hp;
+                    g_target_maxhp[i] = maxhp;
+                    break;
+                }
+            }
+        }
+        line = nl ? nl + 2 : NULL;
+    }
 }
 
 /* chat_send_or_command (2026-08-02, founder: "i want you to sync up town with the MUD" ->
@@ -4468,7 +4736,17 @@ static void town_poll_combat(uint32_t now) {
  * character to route a command through (bots/--ticket launches) or the line isn't a command. */
 static void chat_send_or_command(const char *text) {
     if (text[0] == '/' && text[1] != '\0' && g_town_char_id[0]) {
-        town_send_command(text + 1); /* strip the leading '/' -- handle()'s own dispatch doesn't expect it */
+        const char *cmd = text + 1; /* strip the leading '/' -- handle()'s own dispatch doesn't expect it */
+        /* Real spells typed as a slash command (2026-08-04, founder: "also give a slash command
+           in the chat for casting the same spells") route through the same cast-timer as the
+           ability-bar hotkeys, not a second, instant path -- otherwise chat would be a real way to
+           skip the cast time this same session just added. Only the specific spells that actually
+           have a cast bar today (town_ability_for_slot's own real durations); every other "/"
+           command (attack, ja, look, inventory, ...) keeps going straight through unchanged. */
+        if (strcmp(cmd, "cast fire") == 0) { if (g_town_target_index >= 0) town_start_cast("cast fire", "Fire", 2000); return; }
+        if (strcmp(cmd, "cast poison") == 0) { if (g_town_target_index >= 0) town_start_cast("cast poison", "Poison", 2000); return; }
+        if (strcmp(cmd, "cast cure") == 0) { if (g_town_target_index >= 0) town_start_cast("cast cure", "Cure", 2000); return; }
+        town_send_command(cmd);
     } else {
         chat_send(text);
     }
@@ -4755,6 +5033,14 @@ static void jobmenu_handle_enter(void) {
     char cmd[32];
     snprintf(cmd, sizeof(cmd), "setjob %s", JOB_MENU_IDS[g_jobmenu_selected]);
     town_send_command(cmd); /* real setjob -- result lands in the combat log, same as any other command */
+    /* Real bug found live (2026-08-04, founder: "ok i think job change may have worked not sure")
+       -- setjob was a real, correct server call, but nothing client-side ever updated g_town_job
+       to match, so the ability bar (and every future thing keyed on job) kept showing the OLD
+       job's kit until a relog re-fetched it fresh. Optimistic local update: the server call above
+       already succeeded or failed synchronously (its own real response already landed in the
+       combat log either way), so mirroring it here is the same "trust the command we just sent"
+       assumption every other optimistic client-side update in this file already makes. */
+    snprintf(g_town_job, sizeof(g_town_job), "%s", JOB_MENU_IDS[g_jobmenu_selected]);
     jobmenu_close();
 }
 
@@ -4942,6 +5228,93 @@ static void townshop_draw(int win_w, int win_h) {
     }
 }
 
+/* ---------------- Character screen (2026-08-04) ----------------
+ * Founder, live: "we need a character screen /check but a hotkey for your own character p" ->
+ * "it will show equiped equipment job level etc stats." Real, not invented: fetches apps2/mud's
+ * own "status" (job/level/HP/MP/TP/skills) and "gear" (equipped items + stat totals) command
+ * output and displays it verbatim, same real-data-not-guessed convention every other menu in this
+ * file already follows. Read-only (no selection/Enter action, unlike AH/shop/job-menu) -- P
+ * toggles it open, ESC closes, same panel look as the rest. */
+#define CHARINFO_LINE_MAX 96
+#define CHARINFO_MAX_LINES 40
+static int g_charinfo_open = 0;
+static char g_charinfo_lines[CHARINFO_MAX_LINES][CHARINFO_LINE_MAX];
+static int g_charinfo_line_count = 0;
+
+/* charinfo_append_lines: same real line-splitting/noise-filtering shape town_mud_command's own
+ * combat-log parser and ah_parse_rows both already use -- appends into the shared buffer rather
+ * than resetting it, so "status" then "gear" land as one continuous, real character sheet. */
+static void charinfo_append_lines(const char *text) {
+    char buf[4096];
+    snprintf(buf, sizeof(buf), "%s", text);
+    char *line = buf;
+    while (line && *line && g_charinfo_line_count < CHARINFO_MAX_LINES) {
+        char *nl = strstr(line, "\r\n");
+        if (nl) *nl = '\0';
+        char *trimmed = line;
+        while (*trimmed == ' ' || *trimmed == '\t') trimmed++;
+        size_t tlen = strlen(trimmed);
+        while (tlen > 0 && (trimmed[tlen - 1] == ' ' || trimmed[tlen - 1] == '\t')) trimmed[--tlen] = '\0';
+        int is_status_line = (strncmp(trimmed, "[ Lv.", 5) == 0);
+        int is_prompt = (tlen == 1 && trimmed[0] == '>');
+        if (tlen > 0 && !is_status_line && !is_prompt) {
+            snprintf(g_charinfo_lines[g_charinfo_line_count], CHARINFO_LINE_MAX, "%s", trimmed);
+            g_charinfo_line_count++;
+        }
+        line = nl ? nl + 2 : NULL;
+    }
+}
+
+static void charinfo_open(void) {
+    g_charinfo_open = 1;
+    g_charinfo_line_count = 0;
+    char text[4096];
+    if (townshop_fetch("status", text, sizeof(text))) charinfo_append_lines(text);
+    if (g_charinfo_line_count < CHARINFO_MAX_LINES) {
+        snprintf(g_charinfo_lines[g_charinfo_line_count], CHARINFO_LINE_MAX, " ");
+        g_charinfo_line_count++;
+    }
+    if (townshop_fetch("gear", text, sizeof(text))) charinfo_append_lines(text);
+}
+
+static void charinfo_close(void) { g_charinfo_open = 0; }
+
+static void charinfo_draw(int win_w, int win_h) {
+    if (!g_charinfo_open) return;
+    float panel_w = 420.0f, row_h = 16.0f;
+    float panel_h = 60.0f + row_h * (float)(g_charinfo_line_count > 0 ? g_charinfo_line_count : 1);
+    float x0 = (float)win_w / 2.0f - panel_w / 2.0f;
+    float y0 = (float)win_h / 2.0f - panel_h / 2.0f;
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glColor4f(0.04f, 0.05f, 0.06f, 0.94f);
+    glRectf(x0, y0, x0 + panel_w, y0 + panel_h);
+    glDisable(GL_BLEND);
+    glColor3f(0.55f, 0.5f, 0.2f); /* amber, matching the AH panel -- "your own info," not a shop/job action */
+    glLineWidth(2.0f);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(x0, y0); glVertex2f(x0 + panel_w, y0);
+    glVertex2f(x0 + panel_w, y0 + panel_h); glVertex2f(x0, y0 + panel_h);
+    glEnd();
+    glLineWidth(1.0f);
+
+    glColor3f(0.9f, 0.85f, 0.5f);
+    draw_string("CHARACTER", x0 + 16.0f, y0 + panel_h - 22.0f, 12);
+    glColor3f(0.5f, 0.55f, 0.55f);
+    draw_string("P / ESC - close", x0 + 16.0f, y0 + panel_h - 38.0f, 7);
+
+    float row_y = y0 + panel_h - 58.0f;
+    glColor3f(0.82f, 0.82f, 0.8f);
+    for (int i = 0; i < g_charinfo_line_count; i++) {
+        draw_string(g_charinfo_lines[i], x0 + 16.0f, row_y, 8);
+        row_y -= row_h;
+    }
+    if (g_charinfo_line_count == 0) {
+        glColor3f(0.6f, 0.6f, 0.6f);
+        draw_string("(no data)", x0 + 16.0f, row_y, 9);
+    }
+}
+
 int main(int argc, char *argv[]) {
     /* No srand() call existed anywhere in this file before -- mint_ticket_fallback's own
        rand()-based nonce (used only when IDUNA isn't reachable) was silently using the default
@@ -5117,6 +5490,7 @@ int main(int argc, char *argv[]) {
     uint32_t last_town_wasd_ms = 0; /* Town's own WASD throttle, separate from battlegrounds' above */
 
     if (in_town) town_fetch_character(); /* once -- see its own doc comment */
+    for (int hpi = 0; hpi < 8; hpi++) { g_target_hp[hpi] = -1; g_target_maxhp[hpi] = -1; }
 
     while (running) {
         uint32_t now = SDL_GetTicks();
@@ -5237,6 +5611,16 @@ int main(int argc, char *argv[]) {
                     }
                     continue;
                 }
+                if (g_charinfo_open) {
+                    /* Character screen (2026-08-04) -- same "checked first, consume every event"
+                       precedence as every other menu above; read-only, so only P/ESC do anything. */
+                    if (te.type == SDL_QUIT) { running = 0; }
+                    else if (te.type == SDL_KEYDOWN &&
+                             (te.key.keysym.sym == SDLK_ESCAPE || te.key.keysym.sym == SDLK_p)) {
+                        charinfo_close();
+                    }
+                    continue;
+                }
                 /* C/Y/T also open chat, alongside Enter (2026-08-02, founder: "the reason the
                    auction house menu doesnt work is im trying to hit enter but that is
                    triggering chat can we get a different hotkey than enter to start a chat enter
@@ -5278,20 +5662,42 @@ int main(int argc, char *argv[]) {
                         g_town_target_index = (g_town_target_index + 1) % tgt_count;
                     }
                 }
-                else if (te.type == SDL_KEYDOWN && te.key.keysym.sym == SDLK_1) {
-                    /* "1" -- same ability-slot keybind Battlegrounds already uses (Q/W/E rebound
-                       to 1/2/3 this same fork), founder: "unify battlegrounds combat with the
-                       mud combat" -- the real MUD attack command, not a separate control scheme.
-                       Real Meadow worm targets once g_dfzone_active (town_active_targets), same
-                       "1" key, same town_send_command dispatch -- unified, not a second path. */
-                    if (g_town_target_index >= 0) {
-                        int tgt_count;
-                        const char *const *tgt_names;
-                        const float *tgt_x, *tgt_z;
-                        town_active_targets(&tgt_count, &tgt_names, &tgt_x, &tgt_z);
-                        char cmd[80];
-                        snprintf(cmd, sizeof(cmd), "attack %s", tgt_names[g_town_target_index]);
-                        town_send_command(cmd);
+                else if (te.type == SDL_KEYDOWN &&
+                         (te.key.keysym.sym == SDLK_1 || te.key.keysym.sym == SDLK_2 || te.key.keysym.sym == SDLK_3)) {
+                    /* "1"/"2"/"3" -- same ability-slot keybind Battlegrounds already uses (Q/W/E
+                       rebound to 1/2/3 this same fork), now job-aware (2026-08-04, founder, live:
+                       "now that im blm im expecting 1 2 3 to be differebnt spells") --
+                       town_ability_for_slot's own doc comment has the real per-job mapping. Melee
+                       attack and job abilities dispatch instantly, same real town_send_command
+                       path this key always used; real MP spells go through town_start_cast's own
+                       cast-timer instead of firing immediately. */
+                    int slot = (int)(te.key.keysym.sym - SDLK_1);
+                    char base_cmd[80], label[32];
+                    int is_cast; uint32_t cast_ms;
+                    if (town_ability_for_slot(g_town_job, slot, base_cmd, sizeof(base_cmd),
+                                               label, sizeof(label), &is_cast, &cast_ms)) {
+                        if (strcmp(base_cmd, "attack") == 0) {
+                            if (g_town_target_index >= 0) {
+                                int tgt_count;
+                                const char *const *tgt_names;
+                                const float *tgt_x, *tgt_z;
+                                town_active_targets(&tgt_count, &tgt_names, &tgt_x, &tgt_z);
+                                char cmd[80];
+                                snprintf(cmd, sizeof(cmd), "attack %s", tgt_names[g_town_target_index]);
+                                town_send_command(cmd);
+                            }
+                        } else if (is_cast) {
+                            /* Real spells require a target both for UX clarity here and because
+                               apps2/mud's own cast handlers read p.combat.TargetMobID -- same
+                               "No target" gate the pre-existing melee "1" key already had. */
+                            if (g_town_target_index >= 0) town_start_cast(base_cmd, label, cast_ms);
+                        } else {
+                            /* Job abilities (ja) -- some need a target (provoke), most don't
+                               (berserk/chakra/convert/...); apps2/mud's own cmdJA already handles
+                               "no target" gracefully per-ability, so this always dispatches rather
+                               than duplicating that per-ability knowledge client-side. */
+                            town_send_command(base_cmd);
+                        }
                     }
                 }
                 else if (te.type == SDL_KEYDOWN && te.key.keysym.sym == SDLK_SPACE) {
@@ -5342,6 +5748,14 @@ int main(int argc, char *argv[]) {
                        cover that case too -- see their own doc comment. */
                     if (g_dfzone_active) town_telecrystal_return();
                     else if (town_player_lost()) town_recenter_in_town(now);
+                }
+                else if (te.type == SDL_KEYDOWN && te.key.keysym.sym == SDLK_p) {
+                    /* Character screen (2026-08-04, founder: "we need a character screen /check
+                       but a hotkey for your own character p") -- same "P opens/closes character
+                       pane" convention WoW itself uses. Reached this far down only when nothing
+                       else (AH/job-menu/shop/character screen itself) is already open, matching
+                       G/H's own precedence just above. */
+                    charinfo_open();
                 }
                 else if (te.type == SDL_MOUSEBUTTONDOWN && te.button.button == SDL_BUTTON_RIGHT) {
                     /* Real right-click = attack-move/interact (2026-08-03, founder: "switch right
@@ -5485,6 +5899,27 @@ int main(int argc, char *argv[]) {
                            real Town-side case too now, see its own doc comment). */
                         if (g_dfzone_active) town_telecrystal_return();
                         else town_recenter_in_town(now);
+                    } else {
+                        /* Real click-to-target (2026-08-04, founder: "if i click on a enemy it
+                           targets it and hitting the hotkey casts a spell") -- left was UI-buttons-
+                           only before this; a worm hit under the cursor now sets the real target,
+                           client AND server side (the real "target <name>" command, same one Tab-
+                           cycling and the "1" key already assume is set), WITHOUT moving or
+                           attacking -- that's still right-click's own job. Lets a caster target a
+                           worm from range and cast on it without walking into melee range first,
+                           the real WoW-style split right-click's attack-move already covers for
+                           melee but never gave casters an equivalent. */
+                        int hit = town_worm_hit_test(te.button.x, te.button.y, win_w, win_h);
+                        if (hit >= 0) {
+                            g_town_target_index = hit;
+                            int tgt_count;
+                            const char *const *tgt_names;
+                            const float *tgt_x, *tgt_z;
+                            town_active_targets(&tgt_count, &tgt_names, &tgt_x, &tgt_z);
+                            char cmd[80];
+                            snprintf(cmd, sizeof(cmd), "target %s", tgt_names[hit]);
+                            town_send_command(cmd);
+                        }
                     }
                 }
             }
@@ -5539,6 +5974,7 @@ int main(int argc, char *argv[]) {
                 update_facing_from_motion(g_town_x, g_town_z, &g_town_prev_facing_x, &g_town_prev_facing_z,
                                            &g_town_prev_facing_valid, &g_town_facing_rad);
                 town_sync_position(now, 0);
+                town_cast_tick(); /* real cast timer -- fires/cancels off THIS frame's final, real position */
 
                 /* Real arrival check for the run-up-and-attack sequence (2026-08-04, founder,
                    live: "then i manually run up to it i expect auto attacks to start... auto
@@ -5580,6 +6016,7 @@ int main(int argc, char *argv[]) {
 
                 chat_poll(now); /* rate-limited internally, safe to call every frame */
                 town_poll_combat(now); /* rate-limited internally, safe to call every frame */
+                town_poll_target_hp(now); /* real worm HP, same "rate-limited internally" shape */
                 town_gate_tick(now); /* pure local state (proximity + cast progress), safe every frame */
 
                 glViewport(0, 0, win_w, win_h);
@@ -5659,6 +6096,7 @@ int main(int argc, char *argv[]) {
                 ah_draw(win_w, win_h);
                 jobmenu_draw(win_w, win_h);
                 townshop_draw(win_w, win_h);
+                charinfo_draw(win_w, win_h);
 
                 SDL_GL_SwapWindow(win);
                 SDL_Delay(16);
