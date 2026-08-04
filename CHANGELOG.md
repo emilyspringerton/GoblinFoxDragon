@@ -1,3 +1,6 @@
+## 2026-08-04 (11)
+- feat(input): real Xbox controller support for Town/Meadow + Arena movement. SDL_GameController, hot-plug, keyboard fallback. Left stick overrides only when keyboard gave nothing that frame across both real movement systems in this file. gcc -Wall clean, smoke-tested live under Xvfb.
+
 ## 2026-08-04 (10)
 - fix(mud): sethome now actually persists to IDUNA and reloads on a fresh session. Real gap:
   sethome only mutated the in-memory homePoint struct -- a custom Home Point silently reverted to
