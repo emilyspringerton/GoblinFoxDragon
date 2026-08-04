@@ -270,6 +270,14 @@ type VendorItem struct {
 
 // npcVendorCatalog maps NPC ID → items for sale.
 var npcVendorCatalog = map[string][]VendorItem{
+	// Town starter shop (2026-08-04, founder, live: "put a fuew basic items into the shops in
+	// town") -- a few basic, low-price items so a brand-new character can gear up for the Meadow
+	// before ever leaving Town, same real items the Meadow/Hills/Swamp vendors already carry.
+	"quartermaster": {
+		{ID: "echo-drop", Price: 50},
+		{ID: "antidote", Price: 80},
+		{ID: "hi-potion", Price: 250},
+	},
 	"guildmaster": {
 		{ID: "echo-drop", Price: 50},
 		{ID: "antidote", Price: 80},
@@ -407,6 +415,21 @@ var npcs = []npcDef{
 		Name:        "Guildmaster",
 		ZoneID:      0, // Meadow — San d'Oria territory
 		Greeting:    "Welcome, adventurer. I have work for those bold enough to take it.",
+		MinFameRank: 0,
+		FameNation:  fame.Sandoria,
+	},
+	{
+		// Town vendor (2026-08-04, founder, live: "put a fuew basic items into the shops in
+		// town") -- zone 4 (New Handington, battlegrounds_gui's own Town scene) had no vendor
+		// NPC at all before this (zoneVendorNPC(4) returned nil); Meadow/Hills/Swamp each already
+		// had one. FameNation is a real struct field but MinFameRank 0 means it never actually
+		// gates this NPC -- New Handington isn't one of the three FFXI nations, so Sandoria here
+		// is just a required-but-inert placeholder, same non-choice this file's own zone-4 worm
+		// spawns already made when SceneID had to point somewhere.
+		ID:          "quartermaster",
+		Name:        "Quartermaster",
+		ZoneID:      4, // Town / New Handington
+		Greeting:    "Welcome to New Handington. Stock up before you head out to the Meadow.",
 		MinFameRank: 0,
 		FameNation:  fame.Sandoria,
 	},
