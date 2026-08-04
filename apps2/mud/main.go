@@ -4421,6 +4421,22 @@ func cmdHome(p *player) {
 		p.prompt()
 		return
 	}
+	performHomeRespawn(p)
+}
+
+// performHomeRespawn does the real KO->Home Point recovery (matches cmdHome's own real logic
+// exactly) -- extracted (2026-08-04, founder: "ensuring my character gets moved to the home point
+// if im dead on login") so it can also fire automatically, not just off a player-typed "home"
+// command. Real gap found live: a headless session (apps2/battlegrounds_gui's own real client
+// path, not raw telnet) survives across client reconnects as long as it hasn't been idle-evicted
+// -- if the founder's own client quits and relaunches while their in-memory session is still
+// IsKO'd, getOrCreateHeadlessPlayer used to just hand the same still-dead player struct straight
+// back with no recovery at all, leaving them stuck until either they happened to type "home"
+// themselves or the client's own polling loop caught a real hp==0 status line and auto-sent it --
+// neither of which is guaranteed to happen promptly (or ever, if the player doesn't know the
+// command) right when a fresh client session begins. Caller must hold gw.mu, same as every other
+// gw-state-mutating function in this file.
+func performHomeRespawn(p *player) {
 	if !p.homePoint.HasHome() {
 		// No home set: respawn at zone 0 default with no penalty.
 		p.homePoint.IsKO = false
@@ -7025,6 +7041,16 @@ func disconnectHeadlessSession(slot string, p *player) {
 func getOrCreateHeadlessPlayer(characterID string) (*player, error) {
 	slot := "headless:" + characterID
 	if p, ok := gw.players[slot]; ok {
+		// Real auto-recovery on reconnect (2026-08-04, founder: "ensuring my character gets moved
+		// to the home point if im dead on login" -- live, after "i believe i am dead" / "i think im
+		// dead so nothing works but it doesnt respawn me"). A headless session survives a client
+		// quit/relaunch as long as it hasn't been idle-evicted, so a player who was genuinely KO'd
+		// last session and reconnects would otherwise just get handed back the same still-dead
+		// player struct with no recovery at all -- see performHomeRespawn's own doc comment for the
+		// full real gap this closes.
+		if p.homePoint.IsKO {
+			performHomeRespawn(p)
+		}
 		return p, nil
 	}
 	// Symmetric to handleConn's own telnet-conflict check (M4): if this same character is
