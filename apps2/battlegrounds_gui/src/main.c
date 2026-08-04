@@ -5716,6 +5716,18 @@ int main(int argc, char *argv[]) {
                     SDL_StartTextInput();
                     continue;
                 }
+                /* "/" also opens chat, pre-seeded with "/" itself -- for quick MUD slash-commands
+                   (2026-08-04, founder: "also / should start the chat with slash for the user to
+                   enter quick / commands"). Same "checked first, no separate double-typed slash"
+                   shape as Enter/C/Y/T just above: SDL_StartTextInput() is only enabled AFTER this
+                   keydown is consumed, so this same "/" press never also lands as a TEXTINPUT
+                   event the way Enter/C/Y/T never leak their own character in. */
+                if (te.type == SDL_KEYDOWN && te.key.keysym.sym == SDLK_SLASH && g_chat_jwt[0]) {
+                    chat_input_active = 1;
+                    snprintf(chat_input_buf, sizeof(chat_input_buf), "/");
+                    SDL_StartTextInput();
+                    continue;
+                }
                 if (te.type == SDL_QUIT) { running = 0; }
                 else if (te.type == SDL_WINDOWEVENT && te.window.event == SDL_WINDOWEVENT_RESIZED) {
                     win_w = te.window.data1; win_h = te.window.data2;
@@ -6289,6 +6301,14 @@ int main(int argc, char *argv[]) {
                 g_chat_jwt[0]) {
                 chat_input_active = 1;
                 chat_input_buf[0] = '\0';
+                SDL_StartTextInput();
+                continue;
+            }
+            /* "/" also opens chat here, pre-seeded with "/" -- same quick-slash-command binding
+               Town's own chat-open just got, see that block's own doc comment. */
+            if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_SLASH && g_chat_jwt[0]) {
+                chat_input_active = 1;
+                snprintf(chat_input_buf, sizeof(chat_input_buf), "/");
                 SDL_StartTextInput();
                 continue;
             }
