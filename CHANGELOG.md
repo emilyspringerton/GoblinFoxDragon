@@ -1,3 +1,28 @@
+## 2026-08-04 (2)
+
+- fix(battlegrounds_gui): real click-to-ground bug -- founder, live: "click to move doesnt work in
+  meadow either" -> "ok i understand you checked and you think its fine but its not fixed try
+  harder." Real root cause, found by re-examining `screen_to_ground` (used by click-to-move AND
+  the new right-click building/worm hit-tests, all of it): it has always solved the mouse ray
+  against a hardcoded y=0 ground plane, correct for Town (flat by design) but never actually
+  correct for Meadow, whose real terrain has gentle rolling elevation (world-space range
+  ~4.5-7.5 once `TERRAIN_TEST_HEIGHT_SCALE` hit 1.5). A ray solved against y=0 crosses a plane
+  several units below the real ground the player is standing on, landing every click on the wrong
+  world point -- small enough to go unnoticed at the old, flatter/smaller scale, large enough to
+  matter once the terrain-height and golden-ratio zone-size work landed. Live-verified the actual
+  math: at the real Meadow ground height (7.5), the OLD y=0-only solve would have resolved a
+  screen-center click to a point roughly *twice* as far from the player as it should be -- not a
+  subtle drift, a real, large mispositioning on every single click. Fixed with real iterative
+  refinement (not a guess): solve against y=0 for an initial estimate, then re-solve against the
+  REAL terrain height at that point via `dfzone_height_at`, repeating up to 4 times until it
+  converges onto the actual surface. Only engages in the Dragonfly zone (`g_dfzone_active`) --
+  Town's own y=0 ground is untouched. `g_dfzone_active`'s declaration moved earlier in the file
+  (screen_to_ground needed it before its old declaration point) with a forward declaration for
+  `dfzone_height_at`, real definitions unchanged. `gcc -Wall -Wextra` clean. Live-verified via a
+  debug-instrumented build: confirmed the real ground height (7.5) and confirmed the fixed
+  function now resolves a center-screen click to a sensible nearby point instead of an
+  overshoot (temp instrumentation fully reverted before commit).
+
 ## 2026-08-04 (1)
 
 - ops/investigation: right-click attack confirmed working via a clean character; test@test.com's

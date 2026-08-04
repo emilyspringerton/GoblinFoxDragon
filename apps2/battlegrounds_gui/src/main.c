@@ -2776,7 +2776,26 @@ static void camera_basis(float focus_x, float focus_z,
     *up_z = *right_x * *fwd_y - *right_y * *fwd_x;
 }
 
-/* Intersects the mouse ray with the y=0 ground plane. Returns 1 on hit. */
+/* g_dfzone_active / dfzone_height_at forward declaration -- moved/declared here (real definitions
+   stay where they were, see g_dfzone_ready and friends further down) purely so screen_to_ground
+   just below can reach them; C requires this file's own top-to-bottom declaration order. */
+static int g_dfzone_active = 0;
+static int dfzone_height_at(float wx, float wz, float *out_y);
+
+/* Intersects the mouse ray with the ground. BUGFIX 2026-08-04, founder, live: "click to move
+ * doesn't work in meadow either" -- this always solved for the y=0 plane, real and correct for
+ * Town (flat by design), but Meadow's own real terrain has never actually sat at y=0: gentle
+ * rolling elevation (server/worldapi's own meadowColumnHeight, world-space range ~4.5-7.5 once
+ * TERRAIN_TEST_HEIGHT_SCALE hit 1.5). A camera ray solved against y=0 crosses a plane several
+ * units BELOW the real ground the player is standing on, landing click-to-move (and the worm/
+ * building hit-tests built on top of this same function) on the wrong world point entirely --
+ * this bug predates today, just was small enough to go unnoticed before the terrain/zone-scale
+ * work made the gap between "assumed" and "real" ground height large enough to matter. Fixed with
+ * a real iterative refinement (not a guess): solve against y=0 first for an initial (x,z), then
+ * re-solve against the REAL terrain height at that (x,z) via dfzone_height_at, repeating a few
+ * times so the answer converges onto the actual surface instead of an assumed flat plane. Only
+ * engages in the Dragonfly zone (g_dfzone_active) -- Town's own y=0 ground is untouched, exactly
+ * the discipline this whole terrain system has held to throughout. */
 static int screen_to_ground(int mx, int my, int w, int h, float fov_deg,
                              float focus_x, float focus_z, float *out_x, float *out_z) {
     float eye_x, eye_y, eye_z, fx, fy, fz, rx, ry, rz, ux, uy, uz;
@@ -2789,10 +2808,23 @@ static int screen_to_ground(int mx, int my, int w, int h, float fov_deg,
     float dy = fy + ndc_x * tan_fov * aspect * ry + ndc_y * tan_fov * uy;
     float dz = fz + ndc_x * tan_fov * aspect * rz + ndc_y * tan_fov * uz;
     if (fabsf(dy) < 1e-5f) return 0;
-    float t = -eye_y / dy;
+    float ground_y = 0.0f;
+    float t = (ground_y - eye_y) / dy;
     if (t <= 0) return 0;
     *out_x = eye_x + t * dx;
     *out_z = eye_z + t * dz;
+    if (g_dfzone_active) {
+        for (int i = 0; i < 4; i++) {
+            float real_y;
+            if (!dfzone_height_at(*out_x, *out_z, &real_y)) break; /* off the loaded mesh -- keep the last real estimate */
+            if (fabsf(real_y - ground_y) < 0.01f) break; /* converged */
+            ground_y = real_y;
+            t = (ground_y - eye_y) / dy;
+            if (t <= 0) break;
+            *out_x = eye_x + t * dx;
+            *out_z = eye_z + t * dz;
+        }
+    }
     return 1;
 }
 
@@ -3262,7 +3294,8 @@ static Mesh g_dfzone_mesh;
 static unsigned char g_dfzone_heights[256];
 static int g_dfzone_scene = 0; /* Meadow -- the only real destination Dragon Gate offers today */
 static int g_dfzone_ready = 0;
-static int g_dfzone_active = 0;
+/* g_dfzone_active is declared earlier in this file now (right before screen_to_ground, which
+   needs it) -- see that declaration's own doc comment. */
 
 /* town_active_targets: resolves the real Tab/1-key target set for whichever zone is actually on
  * screen (2026-08-03, founder: "and we can fight worms in that new area?") -- Town's own
