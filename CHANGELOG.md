@@ -1,4 +1,5 @@
 ## 2026-08-04 (11)
+- "/" opens Town/in-match chat pre-seeded with "/" for quick MUD slash-commands (5fae09d) (sess-20260723-2347-df115bd5)
 - feat(input): real Xbox controller support for Town/Meadow + Arena movement. SDL_GameController, hot-plug, keyboard fallback. Left stick overrides only when keyboard gave nothing that frame across both real movement systems in this file. gcc -Wall clean, smoke-tested live under Xvfb.
 
 ## 2026-08-04 (10)
