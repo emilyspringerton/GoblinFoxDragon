@@ -85,9 +85,9 @@ func (c *CharJob) CombinedStats() (Stats, error) {
 // ── Job abilities + recast (S82-03) ──────────────────────────────────────────
 
 var (
-	ErrAbilityOnRecast     = errors.New("ability is still on recast")
-	ErrAbilityUnknown      = errors.New("unknown ability ID")
-	ErrAbilityLevelGated   = errors.New("character level too low for this ability")
+	ErrAbilityOnRecast   = errors.New("ability is still on recast")
+	ErrAbilityUnknown    = errors.New("unknown ability ID")
+	ErrAbilityLevelGated = errors.New("character level too low for this ability")
 )
 
 // Ability defines a job ability with recast time and minimum level.
@@ -175,12 +175,12 @@ func (r *RecastTracker) RecastRemaining(abilityID string, now time.Time) (time.D
 // WarriorAbilities returns the sample ability set for WAR.
 func WarriorAbilities() []Ability {
 	return []Ability{
-		{ID: "provoke",       Job: WAR, Recast: 30 * time.Second, MinLevel: 5},
-		{ID: "berserk",       Job: WAR, Recast: 3 * time.Minute,  MinLevel: 10},
-		{ID: "warcry",        Job: WAR, Recast: 5 * time.Minute,  MinLevel: 20},
-		{ID: "aggressor",     Job: WAR, Recast: 5 * time.Minute,  MinLevel: 25},
-		{ID: "defenders",     Job: WAR, Recast: 5 * time.Minute,  MinLevel: 30},
-		{ID: "mighty_strikes",Job: WAR, Recast: 60 * time.Minute, MinLevel: 15},
+		{ID: "provoke", Job: WAR, Recast: 30 * time.Second, MinLevel: 5},
+		{ID: "berserk", Job: WAR, Recast: 3 * time.Minute, MinLevel: 10},
+		{ID: "warcry", Job: WAR, Recast: 5 * time.Minute, MinLevel: 20},
+		{ID: "aggressor", Job: WAR, Recast: 5 * time.Minute, MinLevel: 25},
+		{ID: "defenders", Job: WAR, Recast: 5 * time.Minute, MinLevel: 30},
+		{ID: "mighty_strikes", Job: WAR, Recast: 60 * time.Minute, MinLevel: 15},
 	}
 }
 
@@ -198,8 +198,8 @@ func WarriorAbilities() []Ability {
 // REDGARDEN kit ported 1:1.
 func SummonerAbilities() []Ability {
 	return []Ability{
-		{ID: "summon_zagan",   Job: SMN, Recast: 3 * time.Minute, MinLevel: 5},
-		{ID: "summon_beleth",  Job: SMN, Recast: 3 * time.Minute, MinLevel: 10},
+		{ID: "summon_zagan", Job: SMN, Recast: 3 * time.Minute, MinLevel: 5},
+		{ID: "summon_beleth", Job: SMN, Recast: 3 * time.Minute, MinLevel: 10},
 		{ID: "summon_vassago", Job: SMN, Recast: 3 * time.Minute, MinLevel: 15},
 	}
 }
@@ -208,6 +208,47 @@ func SummonerAbilities() []Ability {
 func WhiteMageAbilities() []Ability {
 	return []Ability{
 		{ID: "benediction", Job: WHM, Recast: 60 * time.Minute, MinLevel: 50},
-		{ID: "holy_water",  Job: WHM, Recast: 10 * time.Minute, MinLevel: 15},
+		{ID: "holy_water", Job: WHM, Recast: 10 * time.Minute, MinLevel: 15},
+	}
+}
+
+// Starter kits (2026-08-04, founder, live: "and then add a couple starter kits 2 abilities per
+// job to the basic jobs") -- abilitiesForJob (apps2/mud/main.go) only had real sets for
+// WAR/WHM/SMN before this; MNK/BLM/RDM/THF, the rest of FFXI's original 6 starting jobs, returned
+// nil. Real FFXI level-1 ability parity where it exists (MonkAbilities' Chakra/Boost, ThiefAbilities'
+// Sneak Attack/Trick Attack, RedMageAbilities' Convert are all real Lv1 FFXI job abilities);
+// BlackMageAbilities takes the same honest liberty this file's own SummonerAbilities doc comment
+// already takes ("a real, honestly-scoped simplification") since BLM's own first real FFXI job
+// ability (Elemental Seal) doesn't unlock until Lv11 -- too high to serve as a starter kit here.
+
+// MonkAbilities returns the starter ability set for MNK.
+func MonkAbilities() []Ability {
+	return []Ability{
+		{ID: "chakra", Job: MNK, Recast: 5 * time.Minute, MinLevel: 1},
+		{ID: "boost", Job: MNK, Recast: 30 * time.Second, MinLevel: 1},
+	}
+}
+
+// BlackMageAbilities returns the starter ability set for BLM.
+func BlackMageAbilities() []Ability {
+	return []Ability{
+		{ID: "clear_mind", Job: BLM, Recast: 3 * time.Minute, MinLevel: 1},
+		{ID: "elemental_seal", Job: BLM, Recast: 5 * time.Minute, MinLevel: 5},
+	}
+}
+
+// RedMageAbilities returns the starter ability set for RDM.
+func RedMageAbilities() []Ability {
+	return []Ability{
+		{ID: "convert", Job: RDM, Recast: 5 * time.Minute, MinLevel: 1},
+		{ID: "chainspell", Job: RDM, Recast: 20 * time.Minute, MinLevel: 15},
+	}
+}
+
+// ThiefAbilities returns the starter ability set for THF.
+func ThiefAbilities() []Ability {
+	return []Ability{
+		{ID: "sneak_attack", Job: THF, Recast: 1 * time.Minute, MinLevel: 1},
+		{ID: "trick_attack", Job: THF, Recast: 1 * time.Minute, MinLevel: 1},
 	}
 }

@@ -5372,6 +5372,14 @@ func abilitiesForJob(jobID string) []job.Ability {
 		return job.WhiteMageAbilities()
 	case job.SMN:
 		return job.SummonerAbilities()
+	case job.MNK:
+		return job.MonkAbilities()
+	case job.BLM:
+		return job.BlackMageAbilities()
+	case job.RDM:
+		return job.RedMageAbilities()
+	case job.THF:
+		return job.ThiefAbilities()
 	default:
 		return nil
 	}
@@ -5414,6 +5422,54 @@ func cmdJA(p *player, abilityID string) {
 			p.sendf("Benediction! HP and MP fully restored.")
 		case "summon_zagan", "summon_beleth", "summon_vassago":
 			cmdSummonAvatar(p, abilityID)
+		case "chakra":
+			// Real FFXI MNK Lv1 ability: self-heal HP with no MP cost.
+			healed := p.maxHP / 10
+			if healed < 10 {
+				healed = 10
+			}
+			if p.hp+healed > p.maxHP {
+				healed = p.maxHP - p.hp
+			}
+			p.hp += healed
+			p.sendf("Chakra! +%d HP. (HP: %d/%d)", healed, p.hp, p.maxHP)
+		case "boost":
+			p.sendf("Boost! Your next attack will land harder.")
+		case "clear_mind":
+			restored := p.maxMP / 4
+			if restored < 10 {
+				restored = 10
+			}
+			if p.mp+restored > p.maxMP {
+				restored = p.maxMP - p.mp
+			}
+			p.mp += restored
+			p.sendf("Clear Mind! +%d MP. (MP: %d/%d)", restored, p.mp, p.maxMP)
+		case "elemental_seal":
+			p.sendf("Elemental Seal! Your next spell is guaranteed to land.")
+		case "convert":
+			// Real FFXI RDM Lv1 ability: trade HP for MP. Up to 25% of max HP converts to MP,
+			// capped so a real player can never be dropped below 1 HP by their own ability.
+			hpCost := p.maxHP / 4
+			if hpCost >= p.hp {
+				hpCost = p.hp - 1
+			}
+			if hpCost < 0 {
+				hpCost = 0
+			}
+			mpGain := hpCost
+			if p.mp+mpGain > p.maxMP {
+				mpGain = p.maxMP - p.mp
+			}
+			p.hp -= hpCost
+			p.mp += mpGain
+			p.sendf("Convert! -%d HP, +%d MP. (HP: %d/%d  MP: %d/%d)", hpCost, mpGain, p.hp, p.maxHP, p.mp, p.maxMP)
+		case "chainspell":
+			p.sendf("Chainspell! Your spells cost no MP for a short time.")
+		case "sneak_attack":
+			p.sendf("Sneak Attack! Your next strike lands a critical blow from the shadows.")
+		case "trick_attack":
+			p.sendf("Trick Attack! Your next strike transfers enmity to a nearby ally.")
 		default:
 			p.sendf("You use %s.", abilityID)
 		}
@@ -5872,19 +5928,24 @@ func cmdCast(p *player, spell string, targetName string) {
 			return
 		}
 		p.mp -= diaCost
-		// Apply Dia as a mild DoT: 2 HP/tick for 1 minute on the mob.
-		m.HP -= 5 // immediate tick damage
-		if m.HP < 0 {
-			m.HP = 0
+		// Apply Dia as a mild DoT: 2 HP/tick for 1 minute on the mob. Real fix (2026-08-04,
+		// same class of bug as cmdCastBlackMagic's own doc comment): routed through reg.Hit
+		// instead of a direct m.HP mutation so this also properly aggros the mob.
+		mobID := p.combat.TargetMobID
+		res, _, err := reg.Hit(mobID, p.slot, 5) // immediate tick damage
+		if err != nil {
+			p.send("Your target is dead or gone.")
+			p.prompt()
+			return
 		}
-		p.sendf("Dia: -5 HP on %s. (mob HP: %d/%d  MP: %d)", m.Kind, m.HP, m.MaxHP, p.mp)
-		if m.HP <= 0 {
-			m.State = mob.StateDead
+		p.sendf("Dia: -%d HP on %s. (mob HP: %d/%d  MP: %d)", res.Dealt, m.Kind, m.HP, m.MaxHP, p.mp)
+		if res.Died {
 			p.send("  The creature falls!")
 			p.combat.TargetMobID = ""
 			resolveKill(p, m, reg, now)
 		}
-	case "fire", "fire2", "fire3",
+	case "poison",
+		"fire", "fire2", "fire3",
 		"blizzard", "blizzard2", "blizzard3",
 		"thunder", "thunder2", "thunder3",
 		"stone", "stone2", "stone3",
@@ -5904,7 +5965,7 @@ func cmdCast(p *player, spell string, targetName string) {
 	case "flash", "sentinel", "rampart", "holy", "banish", "banish2":
 		cmdCastPaladinMagic(p, spell)
 	default:
-		p.sendf("Unknown spell %q. Try: invisible, sneak, cure/cure2, protect, shell, haste, regen, refresh, dia, fire/blizzard/thunder/stone/water/aero [I-III], march/paeon/ballad/minne/carol/mambo, teleport-meadow/hills/caves/swamp, drain, aspir, absorb-str/dex/vit/int/mnd", spell)
+		p.sendf("Unknown spell %q. Try: invisible, sneak, cure/cure2, protect, shell, haste, regen, refresh, dia, poison, fire/blizzard/thunder/stone/water/aero [I-III], march/paeon/ballad/minne/carol/mambo, teleport-meadow/hills/caves/swamp, drain, aspir, absorb-str/dex/vit/int/mnd", spell)
 	}
 	p.prompt()
 }
@@ -6367,6 +6428,14 @@ type blmSpellDef struct {
 }
 
 var blmSpells = map[string]blmSpellDef{
+	// Poison (2026-08-04, founder, live: "implement blm with a starter fireball and poison
+	// spells") -- BLM's second starter nuke alongside fire, same tier-1 MP cost/damage band.
+	// Real FFXI has no player-castable "Poison" nuke for BLM (Bio is the closest DoT-nuke
+	// analog); this repo's own dia/mob-Poison precedent already treats Poison as this game's
+	// real elemental-DoT idiom (server/mob/worm.go carries it, WHM's dia is described as its own
+	// "Poison equivalent"), so this keeps that same real, already-established convention rather
+	// than inventing a new element from scratch.
+	"poison":    {MPCost: 30, BaseDmg: 50, Element: "Poison"},
 	"fire":      {MPCost: 30, BaseDmg: 50, Element: "Fire"},
 	"fire2":     {MPCost: 65, BaseDmg: 130, Element: "Fire"},
 	"fire3":     {MPCost: 120, BaseDmg: 260, Element: "Fire"},
@@ -6433,15 +6502,24 @@ func cmdCastBlackMagic(p *player, spell string) {
 		}
 	}
 	dmg := def.BaseDmg + intBonus
-	if dmg > m.HP {
-		dmg = m.HP
+	// Real fix (2026-08-04, founder, live: "ensure spell casting works on the worms and puts
+	// them into combat") -- this used to mutate m.HP directly and hand-roll its own death check,
+	// silently bypassing reg.Hit (server/mob/mob.go), the ONLY real path that sets AggroSlot/
+	// StatePursuing and fires EvtMobAggro. cmdWS (this file, weapon skills) already establishes
+	// the real precedent for going through reg.Hit instead. Every BLM nuke was silently exempt
+	// from mob aggro before this -- a worm being nuked from outside its own real AggroRange never
+	// noticed the caster at all, unlike melee (cmdAttack) or weapon skills, both real combat.
+	mobID := p.combat.TargetMobID
+	res, _, err := reg.Hit(mobID, p.slot, dmg)
+	if err != nil {
+		p.sendf("Your target is dead or gone.")
+		p.prompt()
+		return
 	}
-	m.HP -= dmg
 	now := time.Now()
 	p.sendf("%s: %d %s damage on %s. (mob HP: %d/%d  MP: %d)",
-		def.Element, dmg, def.Element, m.Kind, m.HP, m.MaxHP, p.mp)
-	if m.HP <= 0 {
-		m.State = mob.StateDead
+		def.Element, res.Dealt, def.Element, m.Kind, m.HP, m.MaxHP, p.mp)
+	if res.Died {
 		p.send("  The creature falls!")
 		p.combat.TargetMobID = ""
 		resolveKill(p, m, reg, now)
