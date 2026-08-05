@@ -49,6 +49,7 @@
 #include "../packages/common/protocol.h"
 #include "../packages/common/hmac_sha256.h"
 #include "../packages/common/http_client.h"
+#include "../packages/goldenband/gband_rig.h"
 #include "../packages/simulation/arena_game.h"
 #include "../packages/simulation/arena_ai_bridge.h"
 #include "../packages/simulation/arena_replay.h"
@@ -1340,6 +1341,19 @@ static void draw_mesh(const Mesh *m) {
     glDrawArrays(GL_TRIANGLES, 0, m->count);
     glBindVertexArray_(0);
 }
+
+/* gband_rig callback plumbing (S144-06, ported from REDGARDEN's apps/arena --
+ * same rig, same skeleton, same test clips): gband_rig.c never links against
+ * this file's dynamically-loaded GL function pointers or its Mesh struct
+ * directly (see gband_rig.h's own doc comment on why) -- these two thin
+ * wrappers are the bridge instead. g_gband_loc_mvp/g_gband_loc_model are set
+ * once per call at the hero-draw call site. */
+static GLint g_gband_loc_mvp, g_gband_loc_model;
+static void gband_cb_set_mvp_model(const Mat4 *mvp, const Mat4 *model) {
+    glUniformMatrix4fv_(g_gband_loc_mvp, 1, GL_FALSE, mvp->m);
+    glUniformMatrix4fv_(g_gband_loc_model, 1, GL_FALSE, model->m);
+}
+static void gband_cb_draw_mesh(const void *m) { draw_mesh((const Mesh *)m); }
 
 /* draw_mesh_lines: same VAO/VBO layout as draw_mesh, GL_LINE_LOOP instead of GL_TRIANGLES --
  * upload_mesh doesn't care about draw mode (just uploads a 6-floats/vertex buffer), so this is
@@ -5557,6 +5571,14 @@ int main(int argc, char *argv[]) {
     Mesh ring_mesh = upload_mesh(RING_VERTS, RING_VERT_COUNT);
     Mesh disc_mesh = upload_mesh(DISC_VERTS, DISC_VERT_COUNT); /* S170-200 */
 
+    /* S144-06: real .gband motion data driving Tyler's silhouette instead of
+     * a plain box, via GOLDENBAND's sampler (packages/goldenband) -- same rig
+     * and test clips as REDGARDEN's apps/arena (built there first). Path is
+     * relative to CWD, matching this app's own asset-path convention.
+     * Missing/corrupt assets fail soft: gband_rig_ready() gates the call
+     * site below back to the plain box, never a crash or a missing hero. */
+    gband_rig_init("assets/goldenband");
+
     glEnable(GL_DEPTH_TEST);
 
     arena_init();
@@ -7273,7 +7295,19 @@ int main(int argc, char *argv[]) {
             }
             /* S170-118: per-hero_id silhouette (multi-box), not one generic cube --
                relationship color above still wins for self/team/enemy legibility. */
-            draw_hero_model(h->hero_id, h->x, 0.0f, h->z, hero_facing_rad[i], compute_squish(i), &vp, loc_mvp, loc_model, &cube_mesh);
+            if (h->hero_id == ARENA_HERO_TYLER && gband_rig_ready()) {
+                /* S144-06: real GOLDENBAND-driven skeleton instead of Tyler's
+                   old single static box -- see gband_rig.h. Falls back to the
+                   plain box above (via gband_rig_ready()) if the test assets
+                   didn't load, so a missing/corrupt asset never means a
+                   missing hero. */
+                g_gband_loc_mvp = loc_mvp;
+                g_gband_loc_model = loc_model;
+                gband_rig_draw(i, h->x, h->z, hero_facing_rad[i], (float)dt, &vp,
+                                gband_cb_set_mvp_model, gband_cb_draw_mesh, &cube_mesh);
+            } else {
+                draw_hero_model(h->hero_id, h->x, 0.0f, h->z, hero_facing_rad[i], compute_squish(i), &vp, loc_mvp, loc_model, &cube_mesh);
+            }
             if (is_intangible) {
                 glDepthMask(GL_TRUE);
                 glDisable(GL_BLEND);
