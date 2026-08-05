@@ -1,4 +1,5 @@
 ## 2026-08-05
+- fix(battlegrounds_gui): perf (VBO orphaning) + real skeleton-matched animation, ported from REDGARDEN same session (sess-20260723-2347-df115bd5)
 - feat(battlegrounds_gui): real founder-modeled Tyler mesh, ported from REDGARDEN - real skinned character live in the actual DragonsNShit MOBA client, mud rebuilt (sess-20260723-2347-df115bd5)
 - fix(ci): bundle GOLDENBAND .gband assets into DragonsNShit_MUD_GUI_Client zip - the real bug behind 'no skeleton Tyler animation' reports on downloaded builds, no hotkey ever existed (sess-20260723-2347-df115bd5)
 - feat(battlegrounds_gui): S144-06 GOLDENBAND box-rig drives Tyler's animation - port of REDGARDEN's arena implementation into the real DragonsNShit MOBA client, same rig/clips, live-verified under Xvfb, mud rebuilt (sess-20260723-2347-df115bd5)
