@@ -50,6 +50,7 @@
 #include "../packages/common/hmac_sha256.h"
 #include "../packages/common/http_client.h"
 #include "../packages/goldenband/gband_rig.h"
+#include "../packages/goldenband/gband_mesh_rig.h"
 #include "../packages/simulation/arena_game.h"
 #include "../packages/simulation/arena_ai_bridge.h"
 #include "../packages/simulation/arena_replay.h"
@@ -68,6 +69,7 @@ static int my_owner = 0; /* which arena_state.heroes[] slot is "me" -- 0 in loca
  * running-average-since-launch. */
 #define APM_RING_CAP 512
 static int show_apm = 0;
+static int force_box_rig = 0; /* S144-07: F9 A/B-toggles Tyler's real skinned mesh vs. the box-rig */
 static int show_ability_help = 0; /* S170-151, founder: "H should show an overlay with character ability descriptions" */
 static int shop_open = 0; /* S170-175, founder: "do a first pass shop interface" -- B toggles, same "works in any mode" precedent as F11/H */
 static int shop_page = 0; /* S170-231, founder: "too many items per page more pages navigate pages with shift 1 2 3" -- 0-indexed, Shift+1/2/3 jump straight to page 1/2/3 */
@@ -1139,6 +1141,7 @@ static PFNGLBINDVERTEXARRAYPROC glBindVertexArray_;
 static PFNGLGENBUFFERSPROC glGenBuffers_;
 static PFNGLBINDBUFFERPROC glBindBuffer_;
 static PFNGLBUFFERDATAPROC glBufferData_;
+static PFNGLBUFFERSUBDATAPROC glBufferSubData_; /* S144-07: dynamic skinned-mesh vertex updates */
 static PFNGLVERTEXATTRIBPOINTERPROC glVertexAttribPointer_;
 static PFNGLENABLEVERTEXATTRIBARRAYPROC glEnableVertexAttribArray_;
 static PFNGLGETUNIFORMLOCATIONPROC glGetUniformLocation_;
@@ -1167,6 +1170,7 @@ static int load_gl_functions(void) {
     LOAD(glGenBuffers, PFNGLGENBUFFERSPROC);
     LOAD(glBindBuffer, PFNGLBINDBUFFERPROC);
     LOAD(glBufferData, PFNGLBUFFERDATAPROC);
+    LOAD(glBufferSubData, PFNGLBUFFERSUBDATAPROC); /* S144-07: dynamic skinned-mesh vertex updates */
     LOAD(glVertexAttribPointer, PFNGLVERTEXATTRIBPOINTERPROC);
     LOAD(glEnableVertexAttribArray, PFNGLENABLEVERTEXATTRIBARRAYPROC);
     LOAD(glGetUniformLocation, PFNGLGETUNIFORMLOCATIONPROC);
@@ -1354,6 +1358,42 @@ static void gband_cb_set_mvp_model(const Mat4 *mvp, const Mat4 *model) {
     glUniformMatrix4fv_(g_gband_loc_model, 1, GL_FALSE, model->m);
 }
 static void gband_cb_draw_mesh(const void *m) { draw_mesh((const Mesh *)m); }
+
+/* gband_mesh_rig callback plumbing (S144-07, ported from REDGARDEN's
+ * apps/arena): a persistent dynamic VAO/VBO, re-uploaded via
+ * glBufferSubData each call since skinned vertex data changes every frame.
+ * 8192-vert cap sized for the real founder-modeled Tyler (2922 flattened
+ * verts) with headroom -- REDGARDEN's own original 512 cap (sized for the
+ * synthetic proof mesh) silently dropped every draw call for the real
+ * model, found live; not repeating that mistake here. */
+static Mesh g_gband_mesh_dynamic;
+static int g_gband_mesh_dynamic_ready = 0;
+#define GBAND_MESH_DYNAMIC_MAX_VERTS 8192
+
+static void gband_mesh_dynamic_init(void) {
+    glGenVertexArrays_(1, &g_gband_mesh_dynamic.vao);
+    glBindVertexArray_(g_gband_mesh_dynamic.vao);
+    glGenBuffers_(1, &g_gband_mesh_dynamic.vbo);
+    glBindBuffer_(GL_ARRAY_BUFFER, g_gband_mesh_dynamic.vbo);
+    glBufferData_(GL_ARRAY_BUFFER, sizeof(float) * 6 * GBAND_MESH_DYNAMIC_MAX_VERTS, NULL, GL_DYNAMIC_DRAW);
+    glVertexAttribPointer_(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
+    glEnableVertexAttribArray_(0);
+    glVertexAttribPointer_(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)(3 * sizeof(float)));
+    glEnableVertexAttribArray_(1);
+    glBindVertexArray_(0);
+    g_gband_mesh_dynamic.count = 0;
+    g_gband_mesh_dynamic_ready = 1;
+}
+
+static void gband_mesh_cb_draw_skinned(const float *verts6, int vert_count, const Mat4 *mvp, const Mat4 *model) {
+    if (!g_gband_mesh_dynamic_ready || vert_count > GBAND_MESH_DYNAMIC_MAX_VERTS) return;
+    glBindBuffer_(GL_ARRAY_BUFFER, g_gband_mesh_dynamic.vbo);
+    glBufferSubData_(GL_ARRAY_BUFFER, 0, sizeof(float) * 6 * vert_count, verts6);
+    g_gband_mesh_dynamic.count = vert_count;
+    glUniformMatrix4fv_(g_gband_loc_mvp, 1, GL_FALSE, mvp->m);
+    glUniformMatrix4fv_(g_gband_loc_model, 1, GL_FALSE, model->m);
+    draw_mesh(&g_gband_mesh_dynamic);
+}
 
 /* draw_mesh_lines: same VAO/VBO layout as draw_mesh, GL_LINE_LOOP instead of GL_TRIANGLES --
  * upload_mesh doesn't care about draw mode (just uploads a 6-floats/vertex buffer), so this is
@@ -5579,6 +5619,14 @@ int main(int argc, char *argv[]) {
      * site below back to the plain box, never a crash or a missing hero. */
     gband_rig_init("assets/goldenband");
 
+    /* S144-07: real founder-modeled skinned Tyler (GOLDENBAND/incoming/
+     * TYLER-rigged3.blend -> tyler_body.gskel/.gmesh via
+     * export_gband_rig.py), ported from REDGARDEN's apps/arena (built
+     * there first). Falls back to the box-rig above (and that falls back
+     * to the plain box) if these assets are missing. */
+    gband_mesh_rig_init("assets/goldenband", "tyler_body");
+    gband_mesh_dynamic_init();
+
     glEnable(GL_DEPTH_TEST);
 
     arena_init();
@@ -6456,6 +6504,11 @@ int main(int argc, char *argv[]) {
             if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_F11) {
                 show_apm = !show_apm; /* S170-71: works in any mode, not gated on net_mode/observing */
             }
+            if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_F9) {
+                force_box_rig = !force_box_rig; /* S144-07: dev-only A/B toggle -- forces Tyler
+                    back to the box-rig even though the real skinned mesh is available, for
+                    comparing the two live. Same "works in any mode" precedent as F11/H above. */
+            }
             if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_h) {
                 show_ability_help = !show_ability_help; /* same "works in any mode" precedent as F11 above */
             }
@@ -7295,14 +7348,18 @@ int main(int argc, char *argv[]) {
             }
             /* S170-118: per-hero_id silhouette (multi-box), not one generic cube --
                relationship color above still wins for self/team/enemy legibility. */
-            if (h->hero_id == ARENA_HERO_TYLER && gband_rig_ready()) {
-                /* S144-06: real GOLDENBAND-driven skeleton instead of Tyler's
-                   old single static box -- see gband_rig.h. Falls back to the
-                   plain box above (via gband_rig_ready()) if the test assets
-                   didn't load, so a missing/corrupt asset never means a
-                   missing hero. */
-                g_gband_loc_mvp = loc_mvp;
-                g_gband_loc_model = loc_model;
+            g_gband_loc_mvp = loc_mvp;
+            g_gband_loc_model = loc_model;
+            if (h->hero_id == ARENA_HERO_TYLER && !force_box_rig && gband_mesh_rig_ready()) {
+                /* S144-07: real, founder-modeled skinned mesh -- see
+                   gband_mesh_rig.h. This is what actually renders for Tyler
+                   now; F9 force-falls-back to the box-rig for A/B comparison. */
+                gband_mesh_rig_draw(i, h->x, h->z, hero_facing_rad[i], (float)dt, &vp, gband_mesh_cb_draw_skinned);
+            } else if (h->hero_id == ARENA_HERO_TYLER && gband_rig_ready()) {
+                /* S144-06: real GOLDENBAND-driven skeleton box-rig -- see
+                   gband_rig.h. Falls back to the plain box below (via
+                   gband_rig_ready()) if even this is missing, so a missing/
+                   corrupt asset never means a missing hero. */
                 gband_rig_draw(i, h->x, h->z, hero_facing_rad[i], (float)dt, &vp,
                                 gband_cb_set_mvp_model, gband_cb_draw_mesh, &cube_mesh);
             } else {
