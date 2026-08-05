@@ -1388,6 +1388,15 @@ static void gband_mesh_dynamic_init(void) {
 static void gband_mesh_cb_draw_skinned(const float *verts6, int vert_count, const Mat4 *mvp, const Mat4 *model) {
     if (!g_gband_mesh_dynamic_ready || vert_count > GBAND_MESH_DYNAMIC_MAX_VERTS) return;
     glBindBuffer_(GL_ARRAY_BUFFER, g_gband_mesh_dynamic.vbo);
+    /* Founder-reported lag (2026-08-05, real skinned Tyler, same fix as
+       REDGARDEN's apps/arena): CPU skinning benchmarked at ~0.12ms/frame
+       against the real 2922-vert mesh, not the bottleneck. glBufferSubData
+       with no orphan hint is a well-known way to force a CPU/GPU sync
+       stall -- re-specifying via glBufferData(NULL) first lets the driver
+       hand back a fresh buffer instead of blocking on the in-flight draw
+       still reading the old one. Standard technique for per-frame dynamic
+       vertex data. */
+    glBufferData_(GL_ARRAY_BUFFER, sizeof(float) * 6 * GBAND_MESH_DYNAMIC_MAX_VERTS, NULL, GL_DYNAMIC_DRAW);
     glBufferSubData_(GL_ARRAY_BUFFER, 0, sizeof(float) * 6 * vert_count, verts6);
     g_gband_mesh_dynamic.count = vert_count;
     glUniformMatrix4fv_(g_gband_loc_mvp, 1, GL_FALSE, mvp->m);
