@@ -5215,6 +5215,19 @@ func cmdSetJob(p *player, jobID string) {
 	// Restore HP to full on job change (FFXI-style rest at moogle).
 	p.hp = p.maxHP
 	p.mp = p.maxMP
+	// Real gap found 2026-08-05 diagnosing "1/2/3 ability hotkeys don't match my real spells in
+	// Meadow": this used to only ever mutate the in-memory p.jobID above -- IDUNA's own job_main
+	// never changed, so battlegrounds_gui's town_fetch_character (called once per Town entry) kept
+	// reading whichever job the character was created with, on any relaunch or reconnect. Best-
+	// effort, same convention as UpdateHome's own sethome call site -- a failed persist doesn't
+	// block the in-session job change itself.
+	subJobID := ""
+	if p.charJob != nil {
+		subJobID = p.charJob.Sub
+	}
+	if charID := gw.charIDBySlot[p.slot]; charID != "" {
+		_ = gw.iduna.UpdateJob(charID, jobID, subJobID)
+	}
 	mpStr := fmt.Sprintf("MP: %d", p.maxMP)
 	if s.BaseMP == 0 {
 		mpStr = "MP: --  (melee job)"
@@ -5228,6 +5241,9 @@ func cmdSetSubJob(p *player, subJobID string) {
 		if p.charJob != nil {
 			p.charJob.Sub = ""
 			p.charJob.SubLvl = 0
+		}
+		if charID := gw.charIDBySlot[p.slot]; charID != "" {
+			_ = gw.iduna.UpdateJob(charID, p.jobID, "")
 		}
 		p.send("Sub-job cleared.")
 		p.prompt()
@@ -5251,6 +5267,9 @@ func cmdSetSubJob(p *player, subJobID string) {
 		return
 	}
 	p.charJob = cj
+	if charID := gw.charIDBySlot[p.slot]; charID != "" {
+		_ = gw.iduna.UpdateJob(charID, p.jobID, subJobID)
+	}
 	combined, _ := cj.CombinedStats()
 	p.sendf("Sub-job set to %s (effective level %d). STR: %d VIT: %d INT: %d",
 		subJobID, cj.EffectiveSubLevel(), combined.STR, combined.VIT, combined.INT)
@@ -7080,8 +7099,27 @@ func getOrCreateHeadlessPlayer(characterID string) (*player, error) {
 	if err != nil {
 		return nil, err
 	}
-	startHP, _ := job.HPAtLevel(job.WAR, 1)
-	startMP, _ := job.MPAtLevel(job.WAR, 1)
+	// Real job seeding (2026-08-05, diagnosing "1/2/3 ability hotkeys don't match my real spells
+	// in Meadow"): this used to hardcode job.WAR unconditionally -- IDUNA's own job_main (now
+	// actually persisted by cmdSetJob, see that function's own doc comment) was never read back
+	// here, so a genuinely fresh headless session (idle-evicted, service restart, or first
+	// connection after a job change) always started as a level-1 WAR no matter what job the
+	// character's real IDUNA record said, silently rejecting "cast fire"-class commands a real
+	// BLM/WHM/etc. character should have been able to run. Falls back to WAR on an empty/unknown
+	// job_main (fresh characters, or a bad row), same as before.
+	startJobID := ch.JobMain
+	if startJobID == "" {
+		startJobID = job.WAR
+	}
+	if _, err := job.StatsFor(startJobID); err != nil {
+		startJobID = job.WAR
+	}
+	startLevel := 1
+	if ch.Level > 1 {
+		startLevel = ch.Level
+	}
+	startHP, _ := job.HPAtLevel(startJobID, startLevel)
+	startMP, _ := job.MPAtLevel(startJobID, startLevel)
 	if startHP == 0 {
 		startHP = defaultHP
 	}
@@ -7103,10 +7141,17 @@ func getOrCreateHeadlessPlayer(characterID string) (*player, error) {
 		charXP:        xp.NewCharXP(),
 		homePoint:     homepoint.NewState(ch.SceneID),
 		wsSkill:       "Fast Blade",
-		jobID:         job.WAR,
-		charJob:       func() *job.CharJob { cj, _ := job.NewCharJob(job.WAR, "", 1, 0); return cj }(),
+		jobID:         startJobID,
+		charJob: func() *job.CharJob {
+			subLvl := 0
+			if ch.JobSub != "" {
+				subLvl = startLevel / 2
+			}
+			cj, _ := job.NewCharJob(startJobID, ch.JobSub, startLevel, subLvl)
+			return cj
+		}(),
 		meritBank:     merit.NewMeritBank(),
-		recastTracker: job.NewRecastTracker(job.WarriorAbilities()),
+		recastTracker: job.NewRecastTracker(abilitiesForJob(startJobID)),
 		petSlot:       pet.NewSlot(),
 		questJournal:  quest.NewJournal(),
 		atlas:         cartography.NewAtlas(),

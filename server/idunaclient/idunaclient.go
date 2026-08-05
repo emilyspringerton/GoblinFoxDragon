@@ -179,6 +179,32 @@ func (c *Client) UpdateHome(characterID string, sceneID int, x, y, z float64) er
 	return nil
 }
 
+// UpdateJob patches the character's real, persisted job_main/job_sub (2026-08-05, real gap found
+// diagnosing "1/2/3 ability hotkeys don't match my real spells in Meadow"): cmdSetJob only ever
+// mutated apps2/mud's own in-memory p.jobID, never IDUNA, so any fresh session (relaunch,
+// reconnect) silently reverted the ability bar to whatever job the character was created with.
+// Same shape as UpdateHome. jobSub may be empty to clear it, matching cmdSetSubJob's own "NONE".
+func (c *Client) UpdateJob(characterID, jobMain, jobSub string) error {
+	body, _ := json.Marshal(map[string]interface{}{
+		"job_main": jobMain, "job_sub": jobSub,
+	})
+	req, _ := http.NewRequest(http.MethodPatch,
+		c.baseURL+"/api/v1/characters/"+characterID+"/job",
+		bytes.NewReader(body))
+	resp, err := c.do(req)
+	if err != nil {
+		return fmt.Errorf("idunaclient: UpdateJob: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return ErrNotFound
+	}
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+	return nil
+}
+
 // UpdatePosition patches the character's scene_id and position.
 func (c *Client) UpdatePosition(characterID string, sceneID int, x, y, z float64) error {
 	body, _ := json.Marshal(map[string]interface{}{
