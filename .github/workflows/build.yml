@@ -116,6 +116,9 @@ jobs:
             apps2/battlegrounds_gui/packages/common/mlp_infer.c \
             apps2/battlegrounds_gui/packages/goldenband/gband.c \
             apps2/battlegrounds_gui/packages/goldenband/gband_rig.c \
+            apps2/battlegrounds_gui/packages/goldenband/gskel.c \
+            apps2/battlegrounds_gui/packages/goldenband/gmesh.c \
+            apps2/battlegrounds_gui/packages/goldenband/gband_mesh_rig.c \
             -I./sdl2_mingw/include \
             -Iapps2/battlegrounds_gui/packages \
             -L./sdl2_mingw/lib \
@@ -284,8 +287,10 @@ jobs:
           # silently) fell back to Tyler's old plain box -- no crash, no error, just no animation,
           # exactly the reported symptom. No hotkey exists or ever did; this was purely a missing
           # asset in the package.
+          # S144-07: same class of gap, same day -- .gskel/.gmesh (the real
+          # skinned Tyler mesh) need bundling too, not just .gband.
           mkdir -p DragonsNShit_MUD_GUI_Client/assets/goldenband
-          cp apps2/battlegrounds_gui/assets/goldenband/*.gband apps2/battlegrounds_gui/assets/goldenband/*.gband.json DragonsNShit_MUD_GUI_Client/assets/goldenband/
+          cp apps2/battlegrounds_gui/assets/goldenband/*.gband apps2/battlegrounds_gui/assets/goldenband/*.gband.json apps2/battlegrounds_gui/assets/goldenband/*.gskel apps2/battlegrounds_gui/assets/goldenband/*.gmesh DragonsNShit_MUD_GUI_Client/assets/goldenband/
           # IDUNA_BASE_URL (real bug found live, 2026-08-02, founder testing "test test" login):
           # the client's own default (127.0.0.1:8080) only works if the client runs on the same
           # box as IDUNA -- a real downloaded PLAY.bat run on the founder's own machine needs this
