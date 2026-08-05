@@ -1,4 +1,5 @@
 ## 2026-08-05
+- feat(battlegrounds_gui): S144-06 GOLDENBAND box-rig drives Tyler's animation - port of REDGARDEN's arena implementation into the real DragonsNShit MOBA client, same rig/clips, live-verified under Xvfb, mud rebuilt (sess-20260723-2347-df115bd5)
 - docs: GOLDENBAND animation integration northstar (docs2/GOLDENBAND_INTEGRATION_NORTHSTAR.md) - Phase 1 box-rig proof (buildable now) + Phase 2 real skinning (blocked on founder Blender asset), with a concrete Blender asset checklist (sess-20260723-2347-df115bd5)
 - battlegrounds_gui: real clipboard paste (Ctrl+V) on the login screen's email/password fields (sess-20260723-2347-df115bd5)
 
