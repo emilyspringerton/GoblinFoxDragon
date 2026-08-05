@@ -276,6 +276,16 @@ jobs:
           mkdir -p DragonsNShit_MUD_GUI_Client
           cp DragonsNShit_MUD_GUI.exe DragonsNShit_MUD_GUI_Client/
           cp sdl2_mingw/bin/SDL2.dll DragonsNShit_MUD_GUI_Client/
+          # S144-06 (real bug found live, 2026-08-05, founder: "i dont see the skeleton tyler
+          # animations ... do i have to do something?"): gband_rig_init("assets/goldenband") loads
+          # relative to CWD, which for a double-clicked PLAY.bat is this client folder itself --
+          # the packaged zip never included assets/goldenband at all, so the real .gband files
+          # were simply missing on every distributed build. gband_rig_ready() then correctly (and
+          # silently) fell back to Tyler's old plain box -- no crash, no error, just no animation,
+          # exactly the reported symptom. No hotkey exists or ever did; this was purely a missing
+          # asset in the package.
+          mkdir -p DragonsNShit_MUD_GUI_Client/assets/goldenband
+          cp apps2/battlegrounds_gui/assets/goldenband/*.gband apps2/battlegrounds_gui/assets/goldenband/*.gband.json DragonsNShit_MUD_GUI_Client/assets/goldenband/
           # IDUNA_BASE_URL (real bug found live, 2026-08-02, founder testing "test test" login):
           # the client's own default (127.0.0.1:8080) only works if the client runs on the same
           # box as IDUNA -- a real downloaded PLAY.bat run on the founder's own machine needs this
