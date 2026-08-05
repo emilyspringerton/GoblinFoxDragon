@@ -8,9 +8,16 @@ mesh/skin format yet and no Blender asset exists anywhere in the monorepo to des
 → "write the full implementation plan including what blender assets are needed from the founder
 full plan to md somewhere synced to git."*
 
-**Status:** Plan only. No code written yet. S144-06 (Phase 1 below) is immediately buildable by a
-future session with no founder dependency. S144-07 (Phase 2) is blocked on the founder producing a
-real Blender asset per §5.
+**Status (updated same day):** S144-06 (Phase 1, box-rig) shipped and live-verified in both
+REDGARDEN and GFD's `battlegrounds_gui` — real Tyler animation, in production. S144-07 (Phase 2)
+is now split further than originally planned, since it turned out to have its own buildable-now
+half: the `.gskel`/`.gmesh` binary formats, C loaders, real CPU vertex-weighted skinning, and a
+synthetic proof rig (F9 in REDGARDEN's `apps/arena`) are all built and live-verified — a real
+tapered, continuous, multi-bone-blended mesh, not boxes. The Blender-side scripts (armature
+template + exporter, `GOLDENBAND/tools/blender_export/`) are written against the same format, but
+**unrun** — no Blender in this environment, so they're unverified until the founder has one. §4's
+checklist and the axis-conversion caveat in `export_gband_rig.py`'s own header are the load-bearing
+parts once real Blender testing starts.
 
 ---
 
@@ -168,19 +175,28 @@ export tooling existing yet:
 
 1. **Model** any low-poly character — doesn't need to be final art, just needs to exist. A simple
    humanoid or creature is fine.
-2. **Rig it with a single Armature.** Name the bones simply and consistently. A suggested starter
-   list, matching Phase 1's test skeleton so an early animation is directly reusable across both
-   phases: `Hips`, `Spine`, `Head`, `L_Arm`, `R_Arm` (add legs/more joints freely — Phase 2's real
-   exporter isn't restricted to this list, it reads whatever bones the armature actually has).
-3. **Weight-paint vertex groups matching the bone names** — this is Blender's standard rigging
-   workflow (Weight Paint mode, one vertex group per bone), no special tooling or plugin needed.
+2. **Get the matching armature into your scene**: open Blender's Scripting tab, open
+   `GOLDENBAND/tools/blender_export/create_tyler_armature.py`, click Run Script. Creates
+   `TylerRig` with the exact 5 bones (`Hips`/`Spine`/`Head`/`L_Arm`/`R_Arm`) already driving Tyler
+   — you don't need to place bones by hand or worry about matching names. Position/scale your mesh
+   around it in Blender's normal (Z-up) view.
+3. **Skin it**: select your mesh, then shift-select the armature, `Ctrl+P` → **"With Automatic
+   Weights"**. Blender computes the vertex weights for you — no manual weight painting needed for
+   a first pass. (Manual touch-ups in Weight Paint mode are fine later if the auto-weights look
+   wrong at a joint, same standard Blender workflow either way.)
 4. **Author (or apply) an Idle action and a Walk action** on the armature — Blender's Action
    Editor/NLA, standard keyframe animation. A short, simple loop is enough for a first pass; it
    doesn't need to be polished.
-5. **Export each action via Blender's built-in exporter**: `File → Export → Motion Capture
-   (.bvh)`. No plugin required — this is a stock Blender feature, and it's exactly the file format
-   `gbtool import --bvh` already consumes today (S144-01, shipped). One `.bvh` file per action
-   (e.g. `idle.bvh`, `walk.bvh`).
+5. **Export the animations**: `File → Export → Motion Capture (.bvh)`, once per action (e.g.
+   `idle.bvh`, `walk.bvh`). No plugin needed — stock Blender feature, and it's exactly the file
+   format `gbtool import --bvh` already consumes today (S144-01, shipped).
+6. **Export the mesh + skeleton**: with your mesh selected (Armature modifier pointing at
+   `TylerRig`), run `GOLDENBAND/tools/blender_export/export_gband_rig.py` (Scripting tab, or
+   `blender --background yourfile.blend --python export_gband_rig.py -- <out_dir>`). Writes
+   `<meshname>.gskel` + `<meshname>.gmesh`. **This script is unrun/unverified** (see its own
+   header) — the first real check is whether the exported mesh looks upright and correctly
+   proportioned once loaded in-engine, not sideways or mirrored. If it's wrong, the fix is almost
+   certainly the axis-conversion matrix at the top of that file, not the mesh/rig itself.
 6. **Mesh/skin export (Phase 2 only)** needs the custom `export_gband_rig.py` script from §2,
    which doesn't exist yet — so for now, only the BVH action exports in step 5 are immediately
    usable by us. Steps 1-4 (model + rig + weight-paint) can happen anytime; the actual `.gskel`/
