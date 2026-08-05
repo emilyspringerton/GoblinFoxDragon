@@ -1,4 +1,5 @@
 ## 2026-08-05
+- battlegrounds_gui: real clipboard paste (Ctrl+V) on the login screen's email/password fields (sess-20260723-2347-df115bd5)
 
 - fix(mud): setjob/setsubjob now persist to IDUNA; fresh headless sessions seed job/HP/MP from the real persisted job, not a hardcoded WAR L1 default (sess-20260723-2347-df115bd5)
 
