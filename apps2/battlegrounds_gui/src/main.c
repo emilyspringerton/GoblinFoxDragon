@@ -2063,6 +2063,25 @@ static int run_login_screen(SDL_Window *win, int win_w, int win_h,
                     char *field = (st.focus == 0) ? st.email : st.password;
                     size_t len = strlen(field);
                     if (len > 0) field[len - 1] = '\0';
+                } else if (e.key.keysym.sym == SDLK_v && (SDL_GetModState() & KMOD_CTRL)) {
+                    /* Real clipboard paste (2026-08-05, founder: "ensure i am able to paste the
+                       email and password into" the login screen) -- this field never had any
+                       clipboard handling at all, only real SDL_TEXTINPUT keystrokes, which is a
+                       real problem for the exact accounts this session's own tooling generates:
+                       emily iduna create-account/the new admin dashboard both print a 20-64
+                       character random hex password, not something anyone should have to
+                       hand-type. SDL_GetClipboardText() always returns a real (if possibly empty)
+                       malloc'd string, never NULL, per SDL2's own documented contract -- still
+                       guarded here since "never NULL" is the platform's promise, not a guarantee
+                       this code should trust blindly. */
+                    char *field = (st.focus == 0) ? st.email : st.password;
+                    char *clip = SDL_GetClipboardText();
+                    if (clip) {
+                        size_t len = strlen(field), add = strlen(clip);
+                        if (len + add > LOGIN_FIELD_MAX) add = LOGIN_FIELD_MAX - len;
+                        if (add > 0 && len <= LOGIN_FIELD_MAX) strncat(field, clip, add);
+                        SDL_free(clip);
+                    }
                 } else if (e.key.keysym.sym == SDLK_RETURN || e.key.keysym.sym == SDLK_KP_ENTER) {
                     if (st.email[0] && st.password[0]) {
                         st.submitting = 1;
