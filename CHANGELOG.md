@@ -1,4 +1,5 @@
 ## 2026-08-05
+- docs: GOLDENBAND animation integration northstar (docs2/GOLDENBAND_INTEGRATION_NORTHSTAR.md) - Phase 1 box-rig proof (buildable now) + Phase 2 real skinning (blocked on founder Blender asset), with a concrete Blender asset checklist (sess-20260723-2347-df115bd5)
 - battlegrounds_gui: real clipboard paste (Ctrl+V) on the login screen's email/password fields (sess-20260723-2347-df115bd5)
 
 - fix(mud): setjob/setsubjob now persist to IDUNA; fresh headless sessions seed job/HP/MP from the real persisted job, not a hardcoded WAR L1 default (sess-20260723-2347-df115bd5)
