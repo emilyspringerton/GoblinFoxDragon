@@ -1,6 +1,8 @@
 # GFD ↔ EINHORN_SURVIVAL Cross-Server Chat Bridge — Spec
 
-**Status:** Scoping pass, no code yet — see `EMILY/BACKLOG.md` S171-04.
+**Status:** IDUNA side done (extended the existing `/api/v1/chat/messages` endpoint, not a new
+one — see the correction in "What exists today" below). EINHORN_SURVIVAL/GTA7 and GFD sides not
+yet built. See `EMILY/BACKLOG.md` S171-04.
 **Founder:** "can we dev cross server chat? GFD to paper?"
 
 ---
@@ -32,18 +34,36 @@ structured records. The chat bridge's EINHORN_SURVIVAL side is almost entirely "
 **IDUNA**: already the coordination hub for everything else in this monorepo (Apples, blog, the
 TYLER reading room, WOTAN player identity) — the founder's own original framing ("IDUNA is the
 natural shared coordination point... rather than inventing a new channel") holds up against what's
-actually there. No chat-relay endpoint exists yet.
+actually there. **Correction, found after the first draft of this doc:** a chat-relay endpoint
+already exists — `POST/GET /api/v1/chat/messages` (migration `202608020001_chat_messages.sql`,
+`internal/http/handlers/chat_messages.go`), built for a real, separate bridge (GoblinFoxDragon's
+own `apps2/mud` telnet chat <-> REDGARDEN's Battlegrounds GUI client). Same shape as what this doc
+originally proposed building from scratch: any authenticated caller (any valid IDUNA JWT, no
+extra permission gate) may `POST`/`GET`, `sender_source`/`channel` are plain validated strings, no
+identity linkage to players. **The original draft of this doc proposed a parallel
+`internal/chatbridge` package before this was found — don't build that; extend this one instead**,
+same "check for an existing system before building a parallel one" discipline already applied
+elsewhere in this session (shankpit-460's bot AI).
 
----
+### IDUNA: extend the existing endpoint, not a new package
 
-## Proposed design
+`internal/http/handlers/chat_messages.go`'s `validChatSources` map gets two new entries,
+`gfd_server` and `einhorn_survival`, alongside the existing `mud`/`battlegrounds`. A new
+`validChatChannels` entry, `gta7`, is added for EINHORN_SURVIVAL-origin messages (paralleling how
+`battlegrounds` is both a source and its own channel already). GFD-origin messages use the
+already-real `yell` channel value — GFD's own zone-wide broadcast, the one channel this bridge
+relays (see Design Decisions below for why not `say`/`tell`/`guild`).
 
-### IDUNA: new `internal/chatbridge` package
+**No new IDUNA endpoint, no new migration, no new permission, no new agent grant needed.**
+`GTA7-SERVER` (already exists, already has a real secret) can call `/api/v1/chat/messages` today
+with zero additional IDUNA-side provisioning — `RequireAuth` is the only gate on this route
+(confirmed in `main.go`), same as it already was for the mud/battlegrounds bridge. GFD's own
+future outgoing/incoming chat code will need its own real IDUNA agent (none of GFD's existing
+processes currently authenticate to IDUNA as a general-purpose agent the way GTA7 does) —
+provisioning that agent is real remaining work, just not an IDUNA schema/endpoint change.
 
-Same "own small SQLite file, thin HTTP handler" shape as `internal/blog` and `internal/tyler` —
-not a queue/pubsub system, a simple append-and-poll store, since message volume here is low
-(player chat, not a firehose) and both sides are already comfortable polling (GTA7's own Enforcement/
-Watcher/Rogue Swarm ticks are all poll-based, not event-push).
+The original message shape this doc first proposed (kept here for reference, but the real schema
+above supersedes it):
 
 ```go
 type Message struct {
@@ -56,15 +76,13 @@ type Message struct {
 }
 ```
 
-Endpoints (mirrors blog/tyler's own shape exactly):
-- `POST /api/v1/chat-bridge/messages` — publish. Requires a new `chatbridge.write` permission
-  (same migration-based grant pattern as `blog.write`/`tyler.write`/`apples.write`), granted to
-  two new real agents — `GFD-CHAT-BRIDGE` and `GTA7-SERVER` (GTA7 already exists and already has a
-  real agent; reuse it rather than minting a third).
-- `GET /api/v1/chat-bridge/messages?since_id=<id>&exclude_server=<server>` — poll for new
-  messages, excluding ones the caller itself just sent (so GFD doesn't echo its own message back
-  to itself, same idea EINHORN_SURVIVAL needs the mirror of). Auth-gated, not public — this is
-  live player chat, not something to expose unauthenticated the way blog/tyler reads are.
+**Real endpoints, already live** (superseding the `chat-bridge`-prefixed ones above):
+- `POST /api/v1/chat/messages` — `{"channel": "yell"|"gta7", "sender_name": "...",
+  "sender_source": "gfd_server"|"einhorn_survival", "body": "..."}` -> `{"id": N}`.
+- `GET /api/v1/chat/messages?since_id=<id>&limit=<n>` — no `exclude_server` filter exists on this
+  endpoint (unlike the original proposal) — callers filter client-side by checking
+  `sender_source` against their own, same amount of code either way, no IDUNA change needed for
+  it.
 
 ### GFD side
 
@@ -92,10 +110,12 @@ Endpoints (mirrors blog/tyler's own shape exactly):
 Not designed in detail here — this is the one piece of the original ask ("rate limiting/spam
 handling") this pass is deliberately leaving open rather than guessing at numbers. Real options,
 for whoever picks this up next:
-- Simplest: IDUNA's own `chatbridge.write` POST endpoint rate-limits per-agent (not per-player —
-  neither side authenticates individual players to IDUNA for chat, only the server-level agent),
-  which caps total bridge throughput but can't stop one loud player from consuming that whole
-  budget.
+- Simplest: rate-limit `/api/v1/chat/messages` POSTs per-agent (not per-player — neither side
+  authenticates individual players to IDUNA for chat, only the server-level agent), which caps
+  total bridge throughput but can't stop one loud player from consuming that whole budget. This
+  endpoint doesn't currently rate-limit at all (confirmed: no `middleware.AuthRateLimit` wrapping
+  it in `main.go`, unlike some other routes) — adding one would affect the existing mud/
+  battlegrounds bridge too, not just this one, so scope that change carefully if it's picked up.
 - More correct, more work: track per-`FromName` message counts server-side (in GFD's/GTA7's own
   chat-hook code, before it ever reaches IDUNA) and drop/throttle at the source. This needs a real
   per-player rate state on each side, which neither side currently has for chat.
@@ -106,15 +126,20 @@ for whoever picks this up next:
 
 ## Phased plan
 
-1. **IDUNA**: `internal/chatbridge` package + endpoints + migration (permission + two agent
-   grants). Verify end-to-end via `curl`, same discipline as every other IDUNA feature this
-   session (GTA7-SERVER, tyler.write) — before either game server touches it.
+1. ~~**IDUNA**: `internal/chatbridge` package + endpoints + migration~~ — **done differently than
+   planned**: `internal/http/handlers/chat_messages.go`'s `validChatSources`/`validChatChannels`
+   extended (`gfd_server`/`einhorn_survival` sources, `gta7` channel), reusing the existing
+   `/api/v1/chat/messages` endpoint instead of building a parallel one. No migration, no new
+   permission, no new agent grant — `GTA7-SERVER`'s existing credential already works against this
+   route today. IDUNA commit (see `CHANGELOG.md`).
 2. **EINHORN_SURVIVAL/GTA7**: `ChatBridgeListener` + poll task. Ship first, alone — it's the
-   smaller lift (no `clientAddrs` restructuring needed) and gives something real to test the IDUNA
-   side against before touching GFD's live server.
+   smaller lift (no `clientAddrs` restructuring needed) and gives something real to test against
+   before touching GFD's live server.
 3. **GFD**: `clientAddrs` lifted to package scope (or the poll folded into the existing loop),
    then the publish hook on `ChatYell` and the receive/broadcast poll. Higher-risk change (a live,
    already-running UDP server), do this last and test locally before touching the live process.
+   Also needs a real IDUNA agent minted for GFD (none of GFD's processes currently authenticate to
+   IDUNA as a general-purpose agent) — a real prerequisite this phase can't skip.
 4. **Rate limiting**, once real usage patterns exist to design against, not before.
 
 ## Open questions
