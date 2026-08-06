@@ -131,7 +131,7 @@ func TestGuildChatNoGuildReturnsNil(t *testing.T) {
 // --- packet encoding ---
 
 func TestEncodeChatStructure(t *testing.T) {
-	pkt := encodeChat(ChatSay, "Alice", "hello")
+	pkt := EncodeChat(ChatSay, "Alice", "hello")
 	if pkt[0] != 6 {
 		t.Errorf("packet type: got %d, want 6", pkt[0])
 	}
@@ -153,7 +153,7 @@ func TestEncodeChatStructure(t *testing.T) {
 
 func TestEncodeChatTruncatesLongName(t *testing.T) {
 	name := strings.Repeat("x", 50)
-	pkt := encodeChat(ChatSay, name, "hi")
+	pkt := EncodeChat(ChatSay, name, "hi")
 	if pkt[2] != 32 {
 		t.Errorf("long name should truncate to 32, got %d", pkt[2])
 	}
@@ -161,7 +161,7 @@ func TestEncodeChatTruncatesLongName(t *testing.T) {
 
 func TestEncodeChatTruncatesLongMsg(t *testing.T) {
 	msg := strings.Repeat("m", 250)
-	pkt := encodeChat(ChatSay, "A", msg)
+	pkt := EncodeChat(ChatSay, "A", msg)
 	nameLen := int(pkt[2])
 	msgLen := int(pkt[3+nameLen])
 	if msgLen != 200 {

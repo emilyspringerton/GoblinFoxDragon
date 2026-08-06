@@ -87,7 +87,7 @@ func (r *Router) Deliver(fromSlot string, channel int, target, msg string, sayRa
 	if len(recipients) == 0 {
 		return nil
 	}
-	pkt := encodeChat(channel, sender.Name, msg)
+	pkt := EncodeChat(channel, sender.Name, msg)
 	out := make([]Delivery, 0, len(recipients))
 	for _, slot := range recipients {
 		out = append(out, Delivery{To: slot, Packet: pkt})
@@ -100,7 +100,7 @@ func (r *Router) DeliverFromSlot(fromSlot string, channel int, target, msg strin
 	return r.Deliver(fromSlot, channel, target, msg, sayRadius)
 }
 
-// encodeChat builds the server→client PacketChat payload.
+// EncodeChat builds the server→client PacketChat payload.
 //
 //	[0]   = 6 (PacketChat)
 //	[1]   = channel
@@ -108,7 +108,7 @@ func (r *Router) DeliverFromSlot(fromSlot string, channel int, target, msg strin
 //	[3..] = sender name
 //	[3+n] = msg_len (uint8)
 //	[4+n..] = message
-func encodeChat(channel int, senderName, msg string) []byte {
+func EncodeChat(channel int, senderName, msg string) []byte {
 	if len(senderName) > 32 {
 		senderName = senderName[:32]
 	}

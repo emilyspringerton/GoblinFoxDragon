@@ -317,6 +317,52 @@ func main() {
 		}
 	}()
 
+	// S171-04 chat bridge, receive side: polls IDUNA for EINHORN_SURVIVAL-
+	// origin messages and broadcasts them to every connected client via the
+	// existing broadcastCh mechanism (same pattern as the World Crisis
+	// ticker above) -- doesn't need clientAddrs directly, so it doesn't
+	// need that map lifted to package scope after all, contrary to what
+	// CHAT_BRIDGE_TO_EINHORN_SURVIVAL_SPEC.md originally assumed before
+	// broadcastCh was found. Starts from the current high-water mark (first
+	// tick only records lastSeenID, doesn't broadcast) so a restart doesn't
+	// replay EINHORN_SURVIVAL's whole chat history into the game.
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		lastSeenID := int64(-1)
+		for range ticker.C {
+			msgs, err := idunaClient.GetChatMessages(max(lastSeenID, 0), 50)
+			if err != nil {
+				fmt.Printf("[chat-bridge] poll failed: %v\n", err)
+				continue
+			}
+			if lastSeenID < 0 {
+				for _, m := range msgs {
+					if m.ID > lastSeenID {
+						lastSeenID = m.ID
+					}
+				}
+				if lastSeenID < 0 {
+					lastSeenID = 0
+				}
+				continue
+			}
+			for _, m := range msgs {
+				if m.ID > lastSeenID {
+					lastSeenID = m.ID
+				}
+				if m.SenderSource != "einhorn_survival" {
+					continue
+				}
+				pkt := chat.EncodeChat(chat.ChatYell, "[Paper] "+m.SenderName, m.Body)
+				select {
+				case broadcastCh <- pkt:
+				default:
+				}
+			}
+		}
+	}()
+
 	lastSnapshotBroadcast := time.Now()
 	const snapshotInterval = 250 * time.Millisecond // matches the read-loop's own natural poll cadence below -- see its own doc comment for why this isn't the higher SHANKPIT-sibling rate (33ms/30Hz)
 
@@ -813,6 +859,21 @@ func main() {
 				}
 			}
 			fmt.Printf("[chat/%s] %s: %s\n", channelName(channel), slot, msg)
+
+			// S171-04 chat bridge: only ChatYell relays to EINHORN_SURVIVAL --
+			// GFD's own zone-wide broadcast is the one channel public enough
+			// to bridge (see GoblinFoxDragon/docs2/
+			// CHAT_BRIDGE_TO_EINHORN_SURVIVAL_SPEC.md's Design Decisions).
+			// Async: a slow/failed IDUNA call must never stall the packet loop.
+			if channel == chat.ChatYell {
+				if sess, ok := chatRouter.GetSession(slot); ok {
+					go func(name, body string) {
+						if err := idunaClient.PostChatMessageAs("yell", name, "gfd_server", body); err != nil {
+							fmt.Printf("[chat-bridge] post failed: %v\n", err)
+						}
+					}(sess.Name, msg)
+				}
+			}
 		}
 	}
 }

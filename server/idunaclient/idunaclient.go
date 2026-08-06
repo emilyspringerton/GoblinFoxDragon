@@ -519,15 +519,24 @@ type ChatMessage struct {
 // REDGARDEN_GUI_NORTHSTAR.md's in-match MUD chat) so REDGARDEN's Battlegrounds GUI client can
 // pick it up. channel is "say"|"yell"|"guild"|"battlegrounds"; senderSource here is always
 // "mud" -- the Battlegrounds client posts its own messages with senderSource "battlegrounds"
-// directly.
+// directly. Thin wrapper over PostChatMessageAs kept for apps2/mud's existing call site.
 func (c *Client) PostChatMessage(channel, senderName, body string) error {
+	return c.PostChatMessageAs(channel, senderName, "mud", body)
+}
+
+// PostChatMessageAs is PostChatMessage with an explicit senderSource -- added for S171-04
+// (apps2/server-go posting as "gfd_server" to the GFD<->EINHORN_SURVIVAL bridge, which reuses
+// this same real endpoint rather than a parallel one; see GoblinFoxDragon/docs2/
+// CHAT_BRIDGE_TO_EINHORN_SURVIVAL_SPEC.md). IDUNA's own validChatSources gates which values are
+// actually accepted -- passing an unregistered source fails server-side, not silently.
+func (c *Client) PostChatMessageAs(channel, senderName, senderSource, body string) error {
 	reqBody, _ := json.Marshal(map[string]string{
-		"channel": channel, "sender_name": senderName, "sender_source": "mud", "body": body,
+		"channel": channel, "sender_name": senderName, "sender_source": senderSource, "body": body,
 	})
 	req, _ := http.NewRequest(http.MethodPost, c.baseURL+"/api/v1/chat/messages", bytes.NewReader(reqBody))
 	resp, err := c.do(req)
 	if err != nil {
-		return fmt.Errorf("idunaclient: PostChatMessage: %w", err)
+		return fmt.Errorf("idunaclient: PostChatMessageAs: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusCreated {
