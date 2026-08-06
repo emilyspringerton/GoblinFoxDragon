@@ -1,9 +1,14 @@
 # GFD ↔ EINHORN_SURVIVAL Cross-Server Chat Bridge — Spec
 
-**Status:** IDUNA side done (extended the existing `/api/v1/chat/messages` endpoint, not a new
-one — see the correction in "What exists today" below). EINHORN_SURVIVAL/GTA7 and GFD sides not
-yet built. See `EMILY/BACKLOG.md` S171-04.
-**Founder:** "can we dev cross server chat? GFD to paper?"
+**Status:** DONE — all three sides live. IDUNA extended `/api/v1/chat/messages` (not a new
+endpoint). EINHORN_SURVIVAL/GTA7 posts real player chat and relays GFD-origin messages into
+Minecraft. GFD's `apps2/server-go` posts real `ChatYell` chat and relays EINHORN_SURVIVAL-origin
+messages via the existing `broadcastCh` mechanism (no `clientAddrs` restructuring needed after
+all — see the correction below). Real player-facing verification (does a message typed on one
+side actually show up on the other, seen by an actual person) still hasn't happened — both
+directions are verified only as far as "posts/polls succeed, no crashes, no errors logged."
+**Founder:** "can we dev cross server chat? GFD to paper?" → "continue" (×3, across separate
+turns, each time picking this up as the next scoped-but-unfinished item).
 
 ---
 
@@ -14,14 +19,30 @@ router (`server/chat/chat.go`) — four channels: `ChatSay` (radius-based, in-sc
 (1:1 by name), `ChatYell` (scene-wide broadcast), `ChatGuild`. Wired at `apps2/server-go/
 main.go:800` — `PacketChat` is parsed, routed via `chatRouter.Deliver(...)`, and the resulting
 per-recipient `Delivery` list is sent by looking up each recipient's live UDP address in
-`clientAddrs`, **a function-local `map[string]*net.UDPAddr` declared at `main.go:274`** — not a
-package-level variable, not accessible from outside `main()`'s own scope. This matters: a bridge
-that needs to inject an unprompted message to "everyone currently connected" from a separate
-poller can't just call into the existing send path as-is. It needs either (a) `clientAddrs` lifted
-to a package-level, mutex-guarded map, or (b) the bridge poll folded into the same goroutine that
-already owns `clientAddrs`, checked on a timer inside the existing packet-read loop rather than as
-a truly separate goroutine. No broadcast-to-all helper exists yet either way — flagged here so a
-future build doesn't assume one.
+`clientAddrs`, a function-local `map[string]*net.UDPAddr` declared at `main.go:274` — not a
+package-level variable. **Correction, found during implementation:** this doesn't actually block a
+bridge poller, because a second mechanism already exists and was missed on the first read —
+`broadcastCh`, a `chan []byte` (declared right next to `clientAddrs`) already feeding a dedicated
+broadcast goroutine that iterates `clientAddrs` and sends to every connected client. The World
+Crisis ticker already uses exactly this pattern (a `time.Ticker` goroutine started inside `main()`
+that periodically sends a packet into `broadcastCh`). The chat bridge's own receive-side poller
+just does the same thing — no `clientAddrs` restructuring needed after all. **Real, pre-existing
+issue found and left unfixed, flagged rather than silently touched:** the broadcast goroutine
+iterates `clientAddrs` (a plain Go map) with no lock, while the main loop writes to that same map
+elsewhere — a genuine data race (Go maps aren't safe for concurrent read/write), pre-existing and
+unrelated to this feature. Out of scope to fix here; noted so it isn't mistaken for something this
+change introduced.
+
+Also found live during implementation, not part of the original scoping: `server/idunaclient`
+(the package `apps2/server-go` already imports and instantiates as `idunaClient := idunaclient.New()`
+at `main.go:268`) already has real, working `PostChatMessage`/`GetChatMessages` methods — built for
+`apps2/mud`'s side of the *other* real bridge this endpoint already serves (mud↔Battlegrounds).
+And the live `gfd-server-go.service` systemd unit already runs with real `IDUNA_AGENT_NAME`/
+`IDUNA_AGENT_SECRET` (`DRAGONSNSHIT-MUD`, confirmed via the deployed env file) — meaning **GFD
+already had everything needed to talk to IDUNA's chat relay before this feature started**, no new
+agent, no new credential. The original spec below (written before either of these two discoveries)
+proposed more new infrastructure than turned out to be necessary — kept for the record, not
+because it's still accurate.
 
 **EINHORN_SURVIVAL/GTA7 side**: real Paper server, real chat via Bukkit's async chat event
 (`io.papermc.paper.event.player.AsyncChatEvent` on this Paper version — confirmed via the same
@@ -84,24 +105,36 @@ type Message struct {
   `sender_source` against their own, same amount of code either way, no IDUNA change needed for
   it.
 
-### GFD side
+### GFD side — DONE (`apps2/server-go`)
 
-- On `ChatYell` specifically (scene-wide is the closest existing channel to "public enough to
-  bridge," `ChatSay`'s radius-gating and `ChatTell`'s 1:1 nature don't fit a cross-server relay)
-  at `main.go:800`'s existing handler: after `chatRouter.Deliver(...)`, also POST to IDUNA
-  (async — a goroutine with its own short-timeout HTTP client, not blocking the packet loop).
-- A polling goroutine (needs `clientAddrs` addressed per the "What exists today" note above)
-  that GETs new EINHORN_SURVIVAL-origin messages every few seconds and sends a synthesized chat
-  packet to every connected client, prefixed to make the cross-server origin obvious (e.g.
-  `[Paper] <FounderName>: message text`) — never presented as if it came from a GFD player.
+- `server/chat/chat.go`'s `encodeChat` exported to `EncodeChat` (trivial, pure function, no
+  behavior change) so the bridge poller can build outbound chat packets outside the `chat`
+  package.
+- `server/idunaclient/idunaclient.go`: new `PostChatMessageAs(channel, senderName, senderSource,
+  body)`, with the existing `PostChatMessage` (used by `apps2/mud`) becoming a thin wrapper that
+  calls it with `"mud"` — the existing call site is untouched.
+- `main.go`'s existing `PacketChat` handler: on `ChatYell` specifically, after
+  `chatRouter.Deliver(...)`, also fires `go idunaClient.PostChatMessageAs("yell", name,
+  "gfd_server", body)` — a bare goroutine, not blocking the packet-read loop, logs on failure
+  only.
+- A new `time.Ticker`-driven goroutine started inside `main()` (same shape as the existing World
+  Crisis ticker): polls `idunaClient.GetChatMessages` every 5s, filters for
+  `sender_source == "einhorn_survival"` client-side (no `exclude_server` param on the real
+  endpoint), encodes via `chat.EncodeChat(chat.ChatYell, "[Paper] "+name, body)`, sends into the
+  existing `broadcastCh`. First tick only records the current high-water mark, doesn't broadcast
+  — a restart doesn't replay EINHORN_SURVIVAL's chat history into the game.
 
-### EINHORN_SURVIVAL/GTA7 side
+### EINHORN_SURVIVAL/GTA7 side — DONE
 
-- New `ChatBridgeListener` (mirrors `PlayerIdentityListener`'s existing shape): on
-  `AsyncChatEvent`, POST to IDUNA async via a small wrapper around the existing `IdunaClient`.
-- A repeating `Bukkit.getScheduler().runTaskTimer` poll (same pattern as `EnforcementManager`/
-  `RogueSwarmManager`'s own ticks) that GETs new GFD-origin messages and calls
-  `Bukkit.broadcastMessage`, prefixed `[DragonsNShit] <Name>: message text`.
+- `ChatBridgeListener` (mirrors `PlayerIdentityListener`'s existing shape): on the real
+  `AsyncChatEvent`, converts the message `Component` to plain text via
+  `PlainTextComponentSerializer` and POSTs to IDUNA via `IdunaClient.postChat` — safe to call the
+  blocking HTTP client directly here since `AsyncChatEvent` already fires off the main thread.
+- `ChatBridgePoller`: an async-scheduled repeating task (same pattern as `EnforcementManager`/
+  `RogueSwarmManager`'s own ticks) that polls every 5s, hops back to the main thread via
+  `Bukkit.getScheduler().runTask(...)` to call `Bukkit.broadcastMessage`, prefixed
+  `[DragonsNShit] <Name>: message text`. Same high-water-mark-on-first-tick behavior as the GFD
+  side, for the same reason.
 
 ---
 
@@ -132,15 +165,24 @@ for whoever picks this up next:
    `/api/v1/chat/messages` endpoint instead of building a parallel one. No migration, no new
    permission, no new agent grant — `GTA7-SERVER`'s existing credential already works against this
    route today. IDUNA commit (see `CHANGELOG.md`).
-2. **EINHORN_SURVIVAL/GTA7**: `ChatBridgeListener` + poll task. Ship first, alone — it's the
-   smaller lift (no `clientAddrs` restructuring needed) and gives something real to test against
-   before touching GFD's live server.
-3. **GFD**: `clientAddrs` lifted to package scope (or the poll folded into the existing loop),
-   then the publish hook on `ChatYell` and the receive/broadcast poll. Higher-risk change (a live,
-   already-running UDP server), do this last and test locally before touching the live process.
-   Also needs a real IDUNA agent minted for GFD (none of GFD's processes currently authenticate to
-   IDUNA as a general-purpose agent) — a real prerequisite this phase can't skip.
-4. **Rate limiting**, once real usage patterns exist to design against, not before.
+2. ~~**EINHORN_SURVIVAL/GTA7**: `ChatBridgeListener` + poll task~~ — **done.** Built, deployed,
+   confirmed enabling cleanly with zero exceptions.
+3. ~~**GFD**: `clientAddrs` lifted to package scope~~ — **done differently than planned**: turned
+   out unnecessary once `broadcastCh` was found (see the correction in "What exists today").
+   `EncodeChat` export, `PostChatMessageAs`, the `ChatYell` publish hook, and the receive/broadcast
+   poller are all built and deployed. **No new IDUNA agent was needed either** — `apps2/server-go`
+   was already running with a real, live `DRAGONSNSHIT-MUD` credential. **Real deploy incident,
+   found and fixed, not GFD-code-related**: the live `server-go` process turned out to be an
+   orphan (`PPID=1`, started manually at some point in the past, never actually supervised by the
+   `gfd-server-go.service` systemd unit) — holding the UDP port and causing the real systemd unit
+   to crash-loop on restart. Confirmed it was fatbaby's own process (not root's, despite a
+   misleading cgroup path) before stopping it with `SIGTERM` and starting the systemd-managed
+   instance for what's apparently the first time it's actually been under supervision.
+4. **Rate limiting**, once real usage patterns exist to design against, not before. Still open.
+
+**Overall status: all three build phases done.** What's *not* yet done: real player-facing
+verification — nobody has typed a message on one server and watched it appear on the other. Both
+directions are verified only as far as "the code runs, posts/polls succeed, nothing crashes."
 
 ## Open questions
 
