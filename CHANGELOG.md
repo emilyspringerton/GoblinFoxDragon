@@ -1,3 +1,7 @@
+## 2026-08-06
+
+- New docs2/CHAT_BRIDGE_TO_EINHORN_SURVIVAL_SPEC.md -- real scoping pass for the S171-04 chat bridge. Found a real structural blocker (clientAddrs is function-local in main.go, not package-level) before proposing anything. No code yet. (sess-20260723-2347-df115bd5)
+
 ## 2026-08-05
 - fix(battlegrounds_gui): perf (VBO orphaning) + real skeleton-matched animation, ported from REDGARDEN same session (sess-20260723-2347-df115bd5)
 - feat(battlegrounds_gui): real founder-modeled Tyler mesh, ported from REDGARDEN - real skinned character live in the actual DragonsNShit MOBA client, mud rebuilt (sess-20260723-2347-df115bd5)
