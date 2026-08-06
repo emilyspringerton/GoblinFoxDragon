@@ -1,4 +1,5 @@
 ## 2026-08-06
+- S171-04 chat bridge, GFD side complete: EncodeChat exported, PostChatMessageAs added, ChatYell publish hook + broadcast poller (reused existing broadcastCh, no clientAddrs restructuring needed). Found and fixed a real deploy incident: the live server-go was an unsupervised orphan process blocking the systemd unit. All 3 sides of S171-04 now built; real player-facing verification still pending. (sess-20260723-2347-df115bd5)
 
 - New docs2/CHAT_BRIDGE_TO_EINHORN_SURVIVAL_SPEC.md -- real scoping pass for the S171-04 chat bridge. Found a real structural blocker (clientAddrs is function-local in main.go, not package-level) before proposing anything. No code yet. (sess-20260723-2347-df115bd5)
 
