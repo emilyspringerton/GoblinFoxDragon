@@ -1,3 +1,7 @@
+## 2026-08-10
+
+- Jungle Camps Milestone 5：Four Kings 從 REDGARDEN 移植進 battlegrounds_gui fork，3-way merge + gcc 編譯驗證 (sess-20260810-0505-a53abca2)
+
 ## 2026-08-06
 - S171-04 chat bridge, GFD side complete: EncodeChat exported, PostChatMessageAs added, ChatYell publish hook + broadcast poller (reused existing broadcastCh, no clientAddrs restructuring needed). Found and fixed a real deploy incident: the live server-go was an unsupervised orphan process blocking the systemd unit. All 3 sides of S171-04 now built; real player-facing verification still pending. (sess-20260723-2347-df115bd5)
 
