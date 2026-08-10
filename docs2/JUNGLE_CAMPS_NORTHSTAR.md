@@ -15,6 +15,23 @@ budhism and update the designs accordingly" -- corrected the initial draft's dir
 against the real Shitennō (the Musician King is East, not North as first guessed); §3.3 now
 checked against source, not invented.*
 
+*Update 2026-08-10, sequencing reversed by founder real-time direction: this doc's own §4/§6
+originally scoped GFD's `apps2/battlegrounds_gui` fork FIRST, REDGARDEN backport as a deliberate,
+separate LATER pass (Milestone 5). Founder redirected mid-session: "but you need to implement it
+in REDGARDEN first" -- explicit reversal, not a misreading of the original plan. Framed as real
+infrastructure, not a standalone feature request: "for now it is table stakes for our auto
+curriculum before we go full UED" -- ties this doc directly to REDGARDEN's own NORTHSTAR.md
+§25/§26 multi-agent RL research thread (role discovery, noisy-gestalt diversity training, synergy
+decay, autocurriculum engine, UED) as a real dependency (bots need real jungle-camp objectives to
+learn to contest before curriculum-generation research over them is meaningful), not arbitrary
+priority-shuffling. Also: "we will port the four gods to GFD after validation" -- confirms the
+new order explicitly (REDGARDEN build → validate → port to GFD), not "build in both
+simultaneously." Milestone 1 (camp placement + minion waves) ported into REDGARDEN's own
+`apps/arena_server`/`packages/simulation/arena_game.c` the same session, verified via 4 new
+smoke tests (positions, wave timing, damage, kill reward) plus the existing `test_10_bots.sh`
+live matchmaker/server suite, both green. REDGARDEN commit `1402702`. Milestone 2 (the Four
+Heavenly Kings themselves) not yet built in either codebase -- next up, in REDGARDEN.*
+
 ---
 
 ## 1. What exists today (found while scoping this)
@@ -190,12 +207,12 @@ objective system -- real open question, not guessed at (§5).
 | # | Milestone | Acceptance | Status |
 |---|---|---|---|
 | 0 | This northstar | Written, registered in golden-docs-index | DONE |
-| 1 | Camp placement + minion waves | 4 camps at real N/S/E/W positions spawn neutral-hostile minions on a wave timer from the opening bell, reusing the lane-creep wave/march primitives | **DONE (2026-08-10)** — `ArenaCampMinion` pool (`arena_game.h`/`.c`), `arena_camp_position()` (4 fixed N/S/E/W points, same margin convention as fountains/graveyards), `arena_tick_camp_minions()`/`arena_hero_attack_camp_minions()` wired into `arena_update_teams()`. Neutral aggro (either team), stationary (no waypoint march — that's §3.4, still open). Verified with a real standalone smoke test: 8 minions spawn immediately at the correct 4 positions, a hero standing in a camp takes real damage over time. Server-side only — not yet exposed over the wire protocol for a real client/bot to see (separate, smaller follow-up) |
-| 2 | Four Heavenly Kings | One real boss per camp, silent until 1:00, each granting its own distinct buff mechanic on death (§3.3: East/Music, South/Growth, West/All-Seeing, North/Wealth) | NOT STARTED — genuinely the larger half of this doc; Music's team-viral buff-carrier mechanic in particular needs a new primitive with no existing system to extend (§2.5) |
+| 1 | Camp placement + minion waves | 4 camps at real N/S/E/W positions spawn neutral-hostile minions on a wave timer from the opening bell, reusing the lane-creep wave/march primitives | **DONE (2026-08-10)** — `ArenaCampMinion` pool (`arena_game.h`/`.c`), `arena_camp_position()` (4 fixed N/S/E/W points, same margin convention as fountains/graveyards), `arena_tick_camp_minions()`/`arena_hero_attack_camp_minions()` wired into `arena_update_teams()`. Neutral aggro (either team), stationary (no waypoint march — that's §3.4, still open). Verified with a real standalone smoke test: 8 minions spawn immediately at the correct 4 positions, a hero standing in a camp takes real damage over time. Server-side only — not yet exposed over the wire protocol for a real client/bot to see (separate, smaller follow-up). **Also ported into REDGARDEN's own `apps/arena_server`/`packages/simulation/arena_game.c` the same day** (founder sequencing reversal, see header note above) — REDGARDEN commit `1402702`, 4 new smoke tests + `test_10_bots.sh` live-server suite both green there too |
+| 2 | Four Heavenly Kings | One real boss per camp, silent until 1:00, each granting its own distinct buff mechanic on death (§3.3: East/Music, South/Growth, West/All-Seeing, North/Wealth) | NOT STARTED in either codebase — genuinely the larger half of this doc; Music's team-viral buff-carrier mechanic in particular needs a new primitive with no existing system to extend (§2.5). Building in REDGARDEN first per the sequencing reversal |
 | 2.5 | Team-viral buff carrier system | New mechanic Music's own design needs: a team-level buff-carrier set that persists across deaths and auto-grants on respawn -- the one King mechanic with no existing primitive to extend | NOT STARTED |
 | 3 | Anti-stall escalation | An uncleared camp's minions begin marching toward the nearest objective past a real time threshold | NOT STARTED |
 | 4 | King respawn | Resolves §5's open question -- does a defeated King return on a timer, or once per match | NOT STARTED |
-| 5 | Backport to REDGARDEN | Deliberate, separate later pass -- port the proven GFD-fork implementation into REDGARDEN's own `apps/arena_server`, per founder direction ("we will back port to the other one") | NOT STARTED |
+| 5 | Validate in REDGARDEN, then port to GFD | **Reversed 2026-08-10** (see header note) — was "backport to REDGARDEN," now "REDGARDEN is the primary build target; port proven REDGARDEN implementation back to GFD's `apps2/battlegrounds_gui` fork once validated here." Milestone 1 half of this is already done (REDGARDEN has its own working copy now, not yet re-synced back to GFD); the rest waits on Milestone 2 landing in REDGARDEN first | IN PROGRESS |
 
 ## 7. Related docs
 
