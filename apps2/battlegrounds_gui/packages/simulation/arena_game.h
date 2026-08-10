@@ -1190,6 +1190,33 @@ typedef struct {
     ArenaLaneCreepRole role; /* S170-218: melee (0, default) or caster -- see the enum's own doc comment above */
 } ArenaLaneCreep;
 
+/* Jungle camps -- the Four Heavenly Kings, Milestone 1 (docs2/JUNGLE_CAMPS_NORTHSTAR.md §3.1/
+ * §3.2). 4 fixed camps at the map's cardinal edge midpoints (N/S/E/W -- the 2 corners NOT
+ * occupied by fountains, per that doc's own §1 finding that only 2 of 4 corners are real team
+ * bases). Each camp waves neutral-hostile minions from the opening bell (no owning team, aggros
+ * either side -- same "neutral" framing ArenaCreep's ARENA_CREEP_NEUTRAL flavor already uses for
+ * node guardians, not a new concept). Stationary (guard the camp, don't march) in this first
+ * pass -- §3.4's anti-stall escalation (uncleared camps eventually march toward an objective) is
+ * real, separate, NOT-STARTED follow-up work per that doc's own milestone table, not built here.
+ * The Kings themselves (§3.3 -- one boss per camp, silent until 1:00, each granting a distinct
+ * buff mechanic) are Milestone 2, also NOT built in this pass -- this is minion waves only. */
+#define ARENA_CAMP_COUNT               4
+#define ARENA_CAMP_MINIONS_PER_WAVE    2
+#define ARENA_MAX_CAMP_MINIONS         (ARENA_CAMP_MINIONS_PER_WAVE * ARENA_CAMP_COUNT * 2) /* 2x headroom, same reasoning ARENA_MAX_LANE_CREEPS already uses for its own multiplier */
+#define ARENA_CAMP_WAVE_INTERVAL_MS    25000 /* slightly slower than lane creeps' 20s -- a camp is a detour, not the main lane, real MOBA jungle camps respawn slower than lane waves too */
+#define ARENA_CAMP_MINION_HP           45    /* between lane creep melee (60) and caster (36) -- a real but not dominant jungle fight */
+#define ARENA_CAMP_MINION_DAMAGE       6     /* matches ARENA_CREEP_NEUTRAL_DAMAGE -- same "neutral creep" damage tier as node guardians */
+#define ARENA_CAMP_MINION_AGGRO_RADIUS 4.0f  /* matches ARENA_CREEP_AGGRO_RADIUS -- same "passive until approached" neutral-camp convention */
+#define ARENA_CAMP_MINION_ATTACK_COOLDOWN_MS 1500 /* matches ARENA_CREEP_ATTACK_COOLDOWN_MS */
+
+typedef struct {
+    int active;
+    int alive;
+    float x, z;
+    int hp, max_hp;
+    int attack_cooldown_ms;
+} ArenaCampMinion;
+
 /* ARENA_HERO_RESPAWN_MS (S170-121, "controlling a node enables its spawn
  * for your team"): team-mode-only hero respawn timer. Before this, death
  * was permanent within a match (arena_update_teams only checked team-wipe
@@ -1469,6 +1496,13 @@ extern const ArenaItemDef ARENA_ITEMS[];
  * file's typical combat-ability radii (3.5-6.0) on purpose -- XP-share is meant to reward
  * "present for the wave," not "landed inside a tight hitbox." */
 #define ARENA_LANE_CREEP_XP_SHARE_RADIUS 8.0f
+/* Camp minion kill reward (Jungle Camps Milestone 1) -- between node-guardian and lane-creep
+ * tier, real MOBA jungle-minion parity (a small but real reward for clearing camp trash, not the
+ * main event -- the King itself, Milestone 2, is where the real payoff lives). No XP-share radius
+ * of its own -- camps are off the beaten path, "present for the wave" doesn't apply the same way
+ * lane pushing does. */
+#define ARENA_CAMP_MINION_KILL_FLOW     60
+#define ARENA_CAMP_MINION_KILL_XP        5
 #define ARENA_HERO_KILL_FLOW         1000
 #define ARENA_HERO_KILL_XP             60
 /* Assists (S170-187, founder: "assists should gen flow"). Real MOBA convention: anyone else
@@ -2053,6 +2087,8 @@ typedef struct {
     ArenaPowerup powerups[ARENA_POWERUP_COUNT]; /* S170-190 */
     ArenaLaneCreep lane_creeps[ARENA_MAX_LANE_CREEPS]; /* S170-139 */
     int lane_wave_timer_ms[2]; /* S170-139: per-team countdown to next wave; starts at 0 (memset), so both teams' first wave spawns on the first tick, matching a real MOBA's 0:00 wave */
+    ArenaCampMinion camp_minions[ARENA_MAX_CAMP_MINIONS]; /* Jungle camps Milestone 1 */
+    int camp_wave_timer_ms[ARENA_CAMP_COUNT]; /* per-camp countdown to next wave; starts at 0 (memset) -- camps wave from the opening bell, docs2/JUNGLE_CAMPS_NORTHSTAR.md §3.2 */
     int fountain_tick_ms; /* S170-147: fixed-interval (1000ms) accumulator for the fountain heal tick, same idiom as every other DPS/heal zone's own r_zone_tick_ms -- global, not per-hero, since a fountain heals whoever's nearby, not a single caster's target */
     /* resources[2]/resource_tick_ms (S170-153, "true arathi basin node
      * control resource management as a win con instead of team wipe"):
@@ -2467,6 +2503,27 @@ void arena_tick_lane_creeps(unsigned int dt_ms);
  * tuning here, matching this file's "spec the model, not the numbers"
  * discipline elsewhere). */
 void arena_hero_attack_lane_creeps(unsigned int dt_ms);
+
+/* arena_camp_position: the 4 fixed jungle-camp positions (docs2/JUNGLE_CAMPS_NORTHSTAR.md §3.1),
+ * index 0=N, 1=S, 2=E, 3=W -- (0, +-(ARENA_HALF_EXTENT-margin)) and (+-(ARENA_HALF_EXTENT-margin), 0),
+ * same "-margin so it's never buried in terrain" convention arena_fountain_position/
+ * arena_graveyard_position already use for every other fixed map landmark. */
+void arena_camp_position(int index, float *x, float *z);
+
+/* arena_tick_camp_minions (Jungle Camps Milestone 1): advances each camp's own wave timer
+ * (spawning a fresh ARENA_CAMP_MINIONS_PER_WAVE-strong wave at that camp's position when it
+ * elapses), then advances every active camp minion -- neutral-hostile (attacks whichever team's
+ * hero gets closest, no owning side, same ARENA_CREEP_NEUTRAL framing node-guardian creeps
+ * already use), stationary (no waypoint march in this first pass -- §3.4's anti-stall escalation
+ * is separate, not-yet-built follow-up work). */
+void arena_tick_camp_minions(unsigned int dt_ms);
+
+/* arena_hero_attack_camp_minions: the hero-initiates-the-attack half, same split
+ * arena_tick_lane_creeps/arena_hero_attack_lane_creeps already uses -- a hero within
+ * ARENA_ATTACK_RANGE of a live camp minion and off cooldown deals ARENA_ATTACK_DAMAGE (+ bonus
+ * AD) to it, same flat-damage-no-armor-stat convention arena_hero_attack_creeps already applies
+ * to node guardians. */
+void arena_hero_attack_camp_minions(unsigned int dt_ms);
 
 /* Kit casts dispatch on the hero's hero_id, not a hardcoded owner check
  * (S170-31 generalized this from S170-18's Unicorn-only version). No-ops
