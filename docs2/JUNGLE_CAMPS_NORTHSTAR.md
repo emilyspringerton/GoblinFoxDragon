@@ -29,8 +29,32 @@ new order explicitly (REDGARDEN build → validate → port to GFD), not "build 
 simultaneously." Milestone 1 (camp placement + minion waves) ported into REDGARDEN's own
 `apps/arena_server`/`packages/simulation/arena_game.c` the same session, verified via 4 new
 smoke tests (positions, wave timing, damage, kill reward) plus the existing `test_10_bots.sh`
-live matchmaker/server suite, both green. REDGARDEN commit `1402702`. Milestone 2 (the Four
-Heavenly Kings themselves) not yet built in either codebase -- next up, in REDGARDEN.*
+live matchmaker/server suite, both green. REDGARDEN commit `1402702`.*
+
+*Update 2026-08-10, later same day: Milestones 2-4 (the Four Heavenly Kings, §3.4 anti-stall
+escalation, King respawn) plus §25.3 synergy decay all built and fully validated in REDGARDEN
+(see §6's own milestone table for each one's own Apple/commit). Milestone 5 -- port the validated
+REDGARDEN implementation back to this fork -- done the same day: `packages/simulation/
+arena_game.h`/`.c` merged via a real 3-way merge (base = this fork's own Milestone-1 commit
+`bff785f`, "mine" = this fork's current file, "theirs" = REDGARDEN's current file) rather than a
+blind overwrite, since this fork had its own independent Milestone-1-era comment wording worth
+preserving and a blind copy would have silently discarded it. The merge produced one real
+conflict (trivial, an empty "mine" side vs. a pure addition from "theirs" -- resolved by taking
+"theirs" whole) and one non-conflicting duplication `git merge-file` couldn't detect on its own
+(the pre-Milestone-2 `ArenaCampMinion` struct definition surviving alongside its Milestone-2+
+`camp_index`-extended replacement, because the base's own definition moved rather than simply
+being edited in place -- a diff3 blind spot, not a merge-tool bug) -- caught by a real compile,
+not just eyeballing the diff, and fixed by deleting the stale duplicate. `arena_game.c` merged
+byte-identical to REDGARDEN's own current file (zero conflicts, zero manual fixes needed).
+Verified via `gcc -fsyntax-only` against this fork's own `src/main.c` (the SDL2 GUI client compiles
+clean against the merged headers, confirming no client-side breakage) plus a standalone smoke
+test mirroring this fork's own established "no build script exists, verify via direct gcc +
+compile + smoke test" precedent from the Milestone-1 pass: synergy-tier default-safe-at-init,
+all 4 Kings silent before 1:00, all 4 spawn at 1:00, a real King kill-to-death loop (North/Wealth,
+`ARENA_HERO_DUCK`), the killer picking up the Wealth buff, and the King respawning on its own
+2:30 timer -- all pass. **All 6 milestones now done in both REDGARDEN and this fork.** Not yet
+exercised by a real running client/session in this fork specifically (this fork has no automated
+test harness the way REDGARDEN's own `test_arena.sh`/`test_10_bots.sh` do) -- flagged, not faked.*
 
 ---
 
@@ -212,7 +236,7 @@ objective system -- real open question, not guessed at (§5).
 | 2.5 | Team-viral buff carrier system | New mechanic Music's own design needs: a team-level buff-carrier set that persists across deaths and auto-grants on respawn -- the one King mechanic with no existing primitive to extend | **DONE (2026-08-10)** — `ArenaHero.king_music_carrier` + a relay check in `arena_respawn_hero` (grants on respawn iff another living teammate still carries it; the permanent-lapse case falls out of the same check with no extra flag needed). Built as part of Milestone 2, REDGARDEN commit `3943f94` |
 | 3 | Anti-stall escalation | An uncleared camp's minions begin marching toward the nearest objective past a real time threshold | **DONE in REDGARDEN (2026-08-10)** — a camp with a continuously-living minion for `ARENA_CAMP_ESCALATION_THRESHOLD_MS` (1:30) escalates, minions march toward the nearest `ArenaNode` (§1's "assault the towers" question resolved by deliberately NOT building new tower-attack code — lane creeps themselves don't attack towers either, matching that existing limitation). Re-arms on full clear. 3 new smoke tests, REDGARDEN commit `d539588`, Apple #12831 |
 | 4 | King respawn | Resolves §5's open question -- does a defeated King return on a timer, or once per match | **DONE in REDGARDEN (2026-08-10)** — resolved as yes, on a 2:30 timer (`ARENA_KING_RESPAWN_MS`), never founder-confirmed so documented as a real judgment call rather than left open indefinitely -- follows this game's own established faster-than-real-MOBA timer-scaling convention. Reuses the existing spawn-timer field for both first-spawn and respawn (mutually exclusive states). 1 new smoke test, full suite green. Apple #12839, REDGARDEN commit `fc745ac` |
-| 5 | Validate in REDGARDEN, then port to GFD | **Reversed 2026-08-10** (see header note) — was "backport to REDGARDEN," now "REDGARDEN is the primary build target; port proven REDGARDEN implementation back to GFD's `apps2/battlegrounds_gui` fork once validated here." **All 4 real milestones (1, 2, 3, 4) are now done in REDGARDEN** — only §3.4's own porting-back to GFD remains, GFD still only has Milestone 1 | Milestones 1-4 fully validated in REDGARDEN; port to GFD not yet started |
+| 5 | Validate in REDGARDEN, then port to GFD | **Reversed 2026-08-10** (see header note) — was "backport to REDGARDEN," now "REDGARDEN is the primary build target; port proven REDGARDEN implementation back to GFD's `apps2/battlegrounds_gui` fork once validated here." | **DONE (2026-08-10)** — 3-way merge (base: this fork's own Milestone-1 commit `bff785f`; theirs: REDGARDEN's current `packages/simulation/arena_game.h`/`.c`) rather than a blind overwrite, preserving this fork's own Milestone-1 comment wording. One duplicate struct definition (a diff3 blind spot from the base's own definition having moved, not just been edited, going from base→REDGARDEN) caught by a real compile and fixed by hand. Verified: `gcc -fsyntax-only` on this fork's own `src/main.c` against the merged headers (GUI client unaffected), plus a standalone smoke test (this fork's own established no-build-script precedent) covering synergy-tier init safety, King silence-then-spawn-at-1:00, a real kill-to-death loop with buff pickup, and King respawn on timer -- all pass. See header note for the full merge writeup |
 
 ## 7. Related docs
 

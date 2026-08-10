@@ -1209,13 +1209,9 @@ typedef struct {
 #define ARENA_CAMP_MINION_AGGRO_RADIUS 4.0f  /* matches ARENA_CREEP_AGGRO_RADIUS -- same "passive until approached" neutral-camp convention */
 #define ARENA_CAMP_MINION_ATTACK_COOLDOWN_MS 1500 /* matches ARENA_CREEP_ATTACK_COOLDOWN_MS */
 
-typedef struct {
-    int active;
-    int alive;
-    float x, z;
-    int hp, max_hp;
-    int attack_cooldown_ms;
-} ArenaCampMinion;
+/* ArenaCampMinion itself is defined below, alongside Milestone 2-4's §3.4 escalation fields
+   (camp_index) -- kept as one definition, not duplicated here, so the struct never drifts out of
+   sync between its Milestone-1 and later-milestone halves. */
 
 /* ARENA_HERO_RESPAWN_MS (S170-121, "controlling a node enables its spawn
  * for your team"): team-mode-only hero respawn timer. Before this, death
@@ -1503,6 +1499,139 @@ extern const ArenaItemDef ARENA_ITEMS[];
  * lane pushing does. */
 #define ARENA_CAMP_MINION_KILL_FLOW     60
 #define ARENA_CAMP_MINION_KILL_XP        5
+
+/* §3.4 Anti-stall escalation (2026-08-10): "so it becomes difficult to stale out the game by
+ * never attacking towers." A camp that's had at least one active minion continuously for
+ * ARENA_CAMP_ESCALATION_THRESHOLD_MS stops being purely passive -- its minions march toward the
+ * nearest ArenaNode instead of standing still, reusing the same step-toward-target idiom lane
+ * creeps already use for their own waypoint march. Deliberately targets nodes, not a new
+ * base-siege/tower-attack system: §1's own open question ("does 'assault the towers' mean the
+ * existing node-guard towers, or motivate a new objective-tower system") is resolved here by
+ * NOT building new tower-attack code -- lane creeps themselves don't attack towers either (they
+ * despawn at the enemy spawn line with "no structure to hit," see arena_tick_lane_creeps' own
+ * comment), so escalated camp minions matching that same limitation is consistency, not a cut
+ * corner. An escalated camp's pressure is real board presence at a contested node (forces a
+ * response), not simulated siege damage that doesn't exist anywhere else in this file yet.
+ * Re-arms (camp_uncleared_ms resets to 0, camp_escalated clears) the instant a camp has zero
+ * active minions -- "uncleared" specifically means "never fully cleared," not "reached some
+ * total elapsed time since the match started." */
+#define ARENA_CAMP_ESCALATION_THRESHOLD_MS 90000 /* 1:30 -- longer than a King's own 1:00 spawn gate (early jungle contests shouldn't already be under pressure), real MOBA precedent for "camps left rotting create real map pressure inside ~2 minutes" */
+#define ARENA_CAMP_MINION_MARCH_SPEED 2.0f /* slower than a lane creep's own 2.5 -- a camp minion escalating is a secondary, slower threat, not a second full wave */
+#define ARENA_CAMP_MINION_WAYPOINT_EPSILON 0.15f /* matches ARENA_LANE_CREEP_WAYPOINT_EPSILON's own arrival tolerance */
+
+typedef struct {
+    int active;
+    int alive;
+    float x, z;
+    int hp, max_hp;
+    int attack_cooldown_ms;
+    int camp_index; /* which of the ARENA_CAMP_COUNT camps spawned this minion -- needed for §3.4's per-camp escalation state and to pick a stable march target */
+} ArenaCampMinion;
+
+/* Jungle Camps Milestone 2 -- The Four Heavenly Kings (2026-08-10). docs2/
+ * JUNGLE_CAMPS_NORTHSTAR.md §3.3. One boss per camp, silent until ARENA_KING_SPAWN_DELAY_MS,
+ * killable by either team. camp_index doubles as King identity -- arena_camp_position's own
+ * N/S/E/W convention (0/1/2/3) maps to North/Vaisravana-Wealth, South/Virudhaka-Growth,
+ * East/Dhrtarastra-Music, West/Virupaksha-All-Seeing, checked against the real Shitennō
+ * (Buddhism's Four Heavenly Kings), not an arbitrary assignment -- see the northstar's own §3.3
+ * for the full mythology grounding. */
+#define ARENA_KING_SPAWN_DELAY_MS      60000 /* 1:00 into the match, real MOBA jungle-boss precedent -- longer than lane creeps' own initial delay, boss-scale gate */
+/* Milestone 4, King respawn (2026-08-10): §5's own open question -- "does a defeated King
+ * respawn later, or is each King a one-time kill per match? Not specified yet -- real MOBA
+ * precedent (jungle bosses respawning) suggests yes, but the founder hasn't confirmed a timer."
+ * Not founder-confirmed; resolved here as a real, documented judgment call rather than left
+ * open indefinitely, same "spec the model, not the numbers, but still commit to real numbers"
+ * discipline every other timer in this file already uses. Chose: yes, respawns, on a timer
+ * shorter than real MOBA jungle-boss respawns (Baron ~6-7 min, Roshan ~8-11 min) -- this game's
+ * own match pace is already deliberately faster than real-MOBA precedent throughout (lane waves
+ * 20s not League's ~30s, camp waves 25s, King's own FIRST spawn at 1:00 not 5+ minutes), same
+ * "scaled down for this game's faster match pace" reasoning ARENA_POWERUP_RESPAWN_MS's own doc
+ * comment already gives for an analogous real-WSG-precedent timer. */
+#define ARENA_KING_RESPAWN_MS         150000 /* 2:30 -- long enough that farming one King twice is a real commitment, short enough to matter again within a single fast match */
+#define ARENA_KING_HP                    500 /* boss-scale, comparable to a tower (420) -- a real fight, not a lane-creep reskin */
+#define ARENA_KING_DAMAGE                 14 /* roughly 2x a neutral camp minion's 6 -- a real threat, not instant-kill */
+#define ARENA_KING_AGGRO_RADIUS          5.0f /* slightly wider than a camp minion's 4.0 -- boss-scale presence */
+#define ARENA_KING_ATTACK_COOLDOWN_MS   1200 /* faster swings than a camp minion's 1500 -- boss-scale threat */
+#define ARENA_KING_KILL_FLOW             300 /* real objective-tier reward, between a lane creep (80) and a hero kill (1000) */
+#define ARENA_KING_KILL_XP                25
+
+typedef struct {
+    int active;
+    int alive;
+    float x, z;
+    int hp, max_hp;
+    int attack_cooldown_ms;
+} ArenaKing;
+
+/* East/Dhrtarastra, God of Music -- Catchy Song: attack speed + move speed. The one King
+ * mechanic with no existing primitive to extend -- team-viral, spreads on respawn, survives
+ * individual deaths (§3.3: "the buff persists on the TEAM as long as at least one living member
+ * currently carries it... the moment ANY teammate respawns, they pick it up too"). Implemented
+ * as ArenaHero.king_music_carrier (see that field's own doc comment) plus a relay check in
+ * arena_respawn_hero -- deliberately NOT a per-hero timer like every other buff in this file,
+ * because the whole point is that it outlives any single hero's death. */
+#define ARENA_KING_MUSIC_ATTACK_SPEED_PCT 20 /* additional CDR pct on top of items, same apply_cdr path Haste Trinket already uses */
+#define ARENA_KING_MUSIC_MOVE_SPEED_PCT   20 /* multiplicative move-speed bonus, same speed_mult path slows already use */
+
+/* South/Virudhaka, God of Growth -- Bloodroar: individual, stacking, fragile. Each takedown
+ * while holding it adds a stack (more damage) and refreshes the duration; the instant the
+ * holder dies, the buff and every stack are gone -- no drop, no relay, the deliberate opposite
+ * of Music. Both fields are wiped by the ordinary memset in arena_respawn_hero with no special
+ * handling needed (unlike king_music_carrier). */
+#define ARENA_KING_GROWTH_AD_PER_STACK      6 /* flat bonus AD per stack, same "flat, not multiplier" shape as ARENA_BERSERKER_BONUS_AD */
+#define ARENA_KING_GROWTH_DURATION_MS   15000 /* refreshed on every takedown while held */
+
+/* West/Virupaksha, The All-Seeing -- Farsight: team-wide, flat timer, utility not combat --
+ * "deliberately the simplest of the four." Genuinely team-wide (everyone gets it the instant
+ * it's claimed), so this is ArenaState.king_allseeing_team_ms[2], not a per-hero field.
+ * Implemented: bonus Flow from camp-minion/King kills while active (an econ reward, matching
+ * the real domain). NOT implemented: the vision-reveal half of the original design -- no
+ * fog-of-war system exists anywhere in this simulation yet (NORTHSTAR §15 is spec-only, no
+ * code), so there is nothing to reveal against. Flagged honestly rather than silently dropped;
+ * revisit once §15 lands. */
+#define ARENA_KING_ALLSEEING_DURATION_MS 45000 /* longer than Growth -- explicitly the low-stakes, simplest King */
+#define ARENA_KING_ALLSEEING_BONUS_FLOW_PCT 50 /* +50% Flow from jungle-monster kills while active */
+
+/* North/Vaisravana, God of Wealth (chief of the Four Kings) -- Bulwark: proximity aura, not a
+ * carried buff -- "an umbrella large enough to shelter a group, not one person." Held by
+ * whoever claimed it (ArenaHero.king_wealth_ms), but the flat armor bonus + gold trickle apply
+ * to any teammate within ARENA_KING_WEALTH_AURA_RADIUS of a current holder, computed live in
+ * arena_hero_armor()/arena_tick_kings() -- not copied onto nearby allies' own fields. */
+#define ARENA_KING_WEALTH_DURATION_MS   30000
+#define ARENA_KING_WEALTH_ARMOR_BONUS     12 /* flat armor, this engine's damage model is flat-subtraction (apply_armor), not percentage -- comparable in scale to real armor items (e.g. Iron Ram Trousers' 18) */
+#define ARENA_KING_WEALTH_AURA_RADIUS    6.0f /* wider than a normal ability radius on purpose -- "shelter a group" */
+#define ARENA_KING_WEALTH_GOLD_PER_SEC      4 /* small trickle to nearby allies -- deliberately smaller than All-Seeing's own bonus, "a smaller bonus-gold trickle" per the holder's real domain */
+
+/* §25.3 Synergy decay -- a REAL LIVE-MATCH COMEBACK MECHANIC, not a training technique
+ * (NORTHSTAR §25.3 explicitly separates this from §25.2's diversity-preserving TRAINING
+ * schedule -- distinct concept, same "synergy" word, don't conflate with noisy-gestalt or with
+ * this doc's OWN unrelated §3.4 anti-stall camp-minion escalation, another same-word naming
+ * collision). A team's cohesion "tier" (0 = full cohesion .. ARENA_SYNERGY_TIER_COUNT-1 = fully
+ * decayed) re-rolls every ARENA_SYNERGY_ROLL_INTERVAL_MS, stochastically -- founder, explicit:
+ * "there needs to be a random chance of synergy decay at different levels... not always
+ * happen." Higher tiers get more likely the further AHEAD (in the real resource race, S170-153)
+ * that team is -- the team pulling ahead risks losing a small team-wide "playing well together"
+ * bonus, giving the losing side real openings, same rubber-band spirit as Mario Kart items or
+ * League's own catch-up gold (NORTHSTAR §25.3's own framing). Source design: the CarePyre
+ * transcript's own StochasticSynergyController (docs2/MULTI_AGENT_RD_RESEARCH_NOTES.md),
+ * base_probs [0.60, 0.25, 0.10, 0.05] for tiers 0-3 -- ported faithfully EXCEPT one real bug
+ * found while porting: the source's own score-lead shift (`logits = log(base_probs) +
+ * score_diff * 0.15`) adds the SAME constant to every tier's logit, which softmax normalization
+ * makes a mathematical no-op (adding a constant to every logit before softmax never changes the
+ * resulting probabilities) -- not silently reproduced. This implementation instead scales the
+ * shift BY tier index (higher tiers pushed up more as the lead grows), which actually does what
+ * the source design describes. Numbers TBD per NORTHSTAR §25.3's own framing -- a real,
+ * documented first pass, not tuned against actual match data. */
+#define ARENA_SYNERGY_TIER_COUNT            4
+#define ARENA_SYNERGY_ROLL_INTERVAL_MS    8000 /* "shouldn't flicker frame-by-frame" per the source design's own "realistic temporal boundaries" note -- real MOBA-scale cadence, not a per-tick coin flip */
+#define ARENA_SYNERGY_LEAD_SHIFT_SCALE  0.003f /* per resource-race point (cap 2000, ARENA_RESOURCE_CAP) of lead, per tier index -- tuned so a real, not-noise-level lead (ARENA_COMMANDER_RESOURCE_LEAD_THRESHOLD-equivalent, ~300 points, see apps/arena_bot's own analogous constant) meaningfully shifts probability mass toward tier 3 without making it a certainty */
+/* Cohesion bonus per tier -- deliberately reuses the exact same attack-speed/move-speed SHAPE
+ * East/Music's Catchy Song already established (apply_cdr/update_hero_motion), not a new bonus
+ * category. Tier 0 = full cohesion gets the full bonus; each tier down linearly scales it
+ * toward 0 at the fully-decayed tier. */
+#define ARENA_SYNERGY_TIER0_CDR_PCT           8 /* smaller than Music's own 20% -- an ambient team-cohesion bonus, not a dedicated jungle-objective reward */
+#define ARENA_SYNERGY_TIER0_MOVE_SPEED_PCT    8
+
 #define ARENA_HERO_KILL_FLOW         1000
 #define ARENA_HERO_KILL_XP             60
 /* Assists (S170-187, founder: "assists should gen flow"). Real MOBA convention: anyone else
@@ -1773,6 +1902,25 @@ typedef struct {
     int berserker_ms;
     int regen_ms;
     float regen_accum;
+    /* King buffs (Jungle Camps Milestone 2, 2026-08-10) -- docs2/JUNGLE_CAMPS_NORTHSTAR.md §3.3.
+     * king_music_carrier: East/Music's Catchy Song -- unlike every other buff field in this
+     * struct, this is NOT a countdown timer. It's a persistent flag that survives this hero's
+     * OWN death (the memset-on-respawn in arena_respawn_hero clears it like everything else,
+     * but arena_respawn_hero then explicitly re-grants it if any OTHER living teammate still
+     * carries it -- "the song reaches them"). The buff effect itself (apply_cdr, update_hero_
+     * motion) only ever reads this while alive, so a stale value on a dead hero is harmless.
+     * king_growth_stacks/king_growth_ms: South/Growth's Bloodroar -- ordinary timer + counter,
+     * both correctly wiped by the plain memset on death/respawn, no special handling (the
+     * deliberate opposite of Music).
+     * king_wealth_ms: North/Wealth's Bulwark -- held by whoever claimed it; the proximity aura
+     * itself is computed live off whichever hero(es) currently have this > 0 (see arena_hero_
+     * armor()), never copied onto nearby allies' own fields.
+     * West/All-Seeing's Farsight is genuinely team-wide, not per-hero -- see ArenaState's own
+     * king_allseeing_team_ms[2] instead. */
+    int king_music_carrier;
+    int king_growth_stacks;
+    int king_growth_ms;
+    int king_wealth_ms;
     /* w_drain_accum (S170-181, founder: "instead of initial mana cost toggle spells should
      * drain mana over time"): same fractional-accumulator idiom as mp_regen_accum right above,
      * for the same reason -- ARENA_MP_DRAIN_W_PER_SEC * dt_ms/1000 truncates to 0 almost every
@@ -2089,6 +2237,14 @@ typedef struct {
     int lane_wave_timer_ms[2]; /* S170-139: per-team countdown to next wave; starts at 0 (memset), so both teams' first wave spawns on the first tick, matching a real MOBA's 0:00 wave */
     ArenaCampMinion camp_minions[ARENA_MAX_CAMP_MINIONS]; /* Jungle camps Milestone 1 */
     int camp_wave_timer_ms[ARENA_CAMP_COUNT]; /* per-camp countdown to next wave; starts at 0 (memset) -- camps wave from the opening bell, docs2/JUNGLE_CAMPS_NORTHSTAR.md §3.2 */
+    int camp_uncleared_ms[ARENA_CAMP_COUNT]; /* §3.4 anti-stall escalation -- ticks up while a camp has any active minion, resets to 0 the instant it's fully cleared */
+    int camp_escalated[ARENA_CAMP_COUNT]; /* 1 once camp_uncleared_ms crosses ARENA_CAMP_ESCALATION_THRESHOLD_MS -- that camp's minions march instead of standing still */
+    ArenaKing kings[ARENA_CAMP_COUNT]; /* Jungle camps Milestone 2 -- index-matched to camps (0=N/Wealth, 1=S/Growth, 2=E/Music, 3=W/All-Seeing) */
+    int king_spawn_timer_ms[ARENA_CAMP_COUNT]; /* per-camp countdown, dual-purpose (Milestone 4): counts toward ARENA_KING_SPAWN_DELAY_MS before a King's first-ever spawn (gated on max_hp == 0, see arena_tick_kings), or toward ARENA_KING_RESPAWN_MS after a kill (reset to 0 the instant a King dies, gated on !active with max_hp > 0) -- one field serves both, since a King is never simultaneously "never spawned" and "dead," so which threshold applies is never ambiguous. Lives in arena_state (not a function-static) same as every other per-match timer in this file, so arena_init_teams()'s memset correctly resets it between matches */
+    int king_allseeing_team_ms[2]; /* West/All-Seeing's Farsight -- genuinely team-wide (see ArenaHero's own king_wealth_ms doc comment for why this one's different from the other three) */
+    int wealth_gold_tick_ms; /* North/Wealth's gold-trickle accumulator -- see arena_tick_kings' own doc comment; arena_state, not a function-static, same reasoning as king_spawn_timer_ms above */
+    int synergy_tier[2]; /* §25.3 -- current cohesion tier per team, 0 (memset default) = full cohesion */
+    int synergy_roll_timer_ms; /* single shared timer -- both teams re-roll on the same cadence, see arena_tick_synergy's own doc comment */
     int fountain_tick_ms; /* S170-147: fixed-interval (1000ms) accumulator for the fountain heal tick, same idiom as every other DPS/heal zone's own r_zone_tick_ms -- global, not per-hero, since a fountain heals whoever's nearby, not a single caster's target */
     /* resources[2]/resource_tick_ms (S170-153, "true arathi basin node
      * control resource management as a win con instead of team wipe"):
@@ -2524,6 +2680,38 @@ void arena_tick_camp_minions(unsigned int dt_ms);
  * AD) to it, same flat-damage-no-armor-stat convention arena_hero_attack_creeps already applies
  * to node guardians. */
 void arena_hero_attack_camp_minions(unsigned int dt_ms);
+
+/* arena_tick_kings (Jungle Camps Milestones 2+4): arms each camp's King spawn timer at
+ * ARENA_KING_SPAWN_DELAY_MS (1:00, unlike camp minions' opening-bell start), spawns it silently
+ * once the delay elapses, then advances every active King: same neutral-aggro/stationary-attack
+ * shape as arena_tick_camp_minions, boss-scale numbers. Milestone 4 (King respawn, §5): a King
+ * killed by heroes respawns on ARENA_KING_RESPAWN_MS, resetting the same king_spawn_timer_ms
+ * countdown this function already uses for the first spawn (see king_spawn_timer_ms's own doc
+ * comment for how one field serves both without ambiguity). Also decrements every hero's
+ * king_growth_ms/king_wealth_ms and the team-wide king_allseeing_team_ms[2] -- the timer side of
+ * the 3 timer-based King buffs (Music's king_music_carrier is not a timer, see its own field doc
+ * comment). Called from arena_update_teams() only. */
+void arena_tick_kings(unsigned int dt_ms);
+
+/* arena_hero_attack_kings: mirrors arena_hero_attack_camp_minions -- each active, alive hero
+ * without a closer enemy hero or camp minion already occupying its attack this tick instead
+ * auto-attacks the nearest King within ARENA_ATTACK_RANGE if one's there. On a kill, grants
+ * ARENA_KING_KILL_FLOW/XP plus that King's own distinct buff (§3.3, keyed off which camp_index
+ * this King belongs to) to the killing team. Called from arena_update_teams() only, after
+ * arena_hero_attack_camp_minions so a hero already mid-swing this tick doesn't also get a free
+ * King hit. */
+void arena_hero_attack_kings(unsigned int dt_ms);
+
+/* arena_tick_synergy (§25.3, live-match comeback mechanic, not a training technique -- see
+ * ARENA_SYNERGY_TIER_COUNT's own doc comment for the full design): every ARENA_SYNERGY_ROLL_
+ * INTERVAL_MS, re-rolls each team's synergy_tier stochastically, weighted toward higher (more
+ * decayed) tiers the further that team is currently ahead in the real resource race. The
+ * resulting tier scales a small team-wide attack-speed/move-speed bonus (ARENA_SYNERGY_TIER0_
+ * CDR_PCT/MOVE_SPEED_PCT at tier 0, linearly toward 0 at the fully-decayed tier), read by
+ * apply_cdr/update_hero_motion exactly like East/Music's own Catchy Song buff. Called from
+ * arena_update_teams() only, team-mode-only scope (the resource race itself is team-mode-only,
+ * S170-153). */
+void arena_tick_synergy(unsigned int dt_ms);
 
 /* Kit casts dispatch on the hero's hero_id, not a hardcoded owner check
  * (S170-31 generalized this from S170-18's Unicorn-only version). No-ops
