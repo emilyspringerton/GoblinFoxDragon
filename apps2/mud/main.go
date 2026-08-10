@@ -3055,11 +3055,21 @@ func cmdGo(p *player, dir string) {
 	cmdLook(p)
 }
 
-// redgardenMatchmakerHost/Port are where cmdBattlegrounds sends a player -- REDGARDEN's own
-// apps/matchmaker default (docs/NORTHSTAR.md's own "--matchmaker-port default 7778"). Overridable
-// via REDGARDEN_MATCHMAKER_HOST for a non-same-box deployment; the port isn't currently
-// configurable here since apps/matchmaker's own default hasn't needed overriding in this repo yet.
-const redgardenMatchmakerPort = 7778
+// redgardenMatchmakerHost/Port are where cmdBattlegrounds sends a player.
+//
+// 2026-08-10, founder: "REDGARDEN is now dedicated to R and D" / "i want HFD [GFD] battlegrounds
+// stable" / "we need full duplicate backend surfaces including matchmaking and bot pools" --
+// REDGARDEN's own :7778 bot-pool matchmaker is now the fast-iterating R&D deployment (frequent
+// commits, auto-deploy churn from MARL/autocurriculum experiments -- see REDGARDEN/NORTHSTAR.md
+// §25-28), no longer safe for a live product to depend on directly. Battlegrounds now points at
+// a genuinely separate, stable REDGARDEN deployment instead: its own checkout
+// (/home/fatbaby/redgarden-stable), own matchmaker + bot-pool systemd units
+// (redgarden-stable-matchmaker-bots.service / redgarden-stable-bot-pool.service), own port
+// (8778, was 7778), manually promoted (not wired into REDGARDEN's own auto-deploy timer) --
+// REDGARDEN's own R&D churn can no longer touch this at all. Overridable via
+// REDGARDEN_MATCHMAKER_HOST for a non-same-box deployment; the port isn't currently configurable
+// here since it hasn't needed overriding beyond this one change yet.
+const redgardenMatchmakerPort = 8778
 
 // cmdBattlegrounds (REDGARDEN_GUI_NORTHSTAR.md Milestone 3, 2026-07-31): the persistent world's
 // Battlegrounds entry point -- "portal, NPC, queue command, or something else" per §4.3's own
