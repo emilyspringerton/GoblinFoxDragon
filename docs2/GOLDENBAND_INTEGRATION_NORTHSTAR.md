@@ -204,6 +204,37 @@ export tooling existing yet:
 
 ---
 
+## 4a. Queued rig targets (2026-08-19)
+
+Founder, real-time: "i need a crab rig for mnm" / "i need a rig for medusa" / "use the ffxi medusa
+render as an example." Two concrete first candidates for §4's checklist, named here so a future
+Blender session has a real visual brief instead of starting from nothing — the checklist itself
+(model → armature → skin → animate → export) is already generic to any character, not written
+against these two specifically, so nothing in §1–§4 changes; this is just target selection.
+
+- **MnM, the Shapeshifting Crab** (`TYLER/multiverse_heroes.md` #114) — already founder-picked as
+  the Tank archetype for RED GARDEN (`REDGARDEN/NORTHSTAR.md` §7, `EMILY/BACKLOG.md` S170-134), so
+  a real rig for him is directly useful past this doc's own scope, not a one-off. Lore brief: a
+  crab the size of a doorway, shapeshifting mid-sentence — no single fixed shell to model against,
+  which is itself real creative direction (a Blender pass could reasonably pick ONE mid-shift
+  silhouette as the base mesh rather than trying to model "shapeshifting" directly, then treat
+  future alternate shells as separate mesh swaps on the same armature later, not a Phase-2
+  blocker).
+- **Medusa** (Prompt-o-verse's most-generated subject — 26 gens, `TYLER/multiverse_heroes.md` #120,
+  BRAWLPIT `CHARACTER_MEDUSA`) — founder specified the real `medusa-ffxi` Prompt-o-verse generation
+  (`okemily.com/prompt-o-verse/medusa-ffxi/`) as the visual reference for the model itself: full
+  gorgon armor, snake hair, teal/gold color scheme. Same reference image family as this session's
+  cel-shading pass (`RENDERING_QUALITY_NORTHSTAR.md`), so a Medusa model built to match it would
+  also be the first real test of whether a modeled/rigged character reads consistently with that
+  shader pass, not just the existing box-primitive heroes.
+
+Both are genuinely blocked the same way every other Phase 2 asset already is: real Blender
+modeling time from the founder (§4 steps 1-4), not a missing tool or a missing spec on our side.
+Not started this pass — named and grounded so the next session that has Blender time available
+doesn't have to re-derive which two characters to start with or why.
+
+---
+
 ## 5. Backlog
 
 Tracked as `S144-06` (Phase 1) and `S144-07` (Phase 2) under `EMILY/BACKLOG.md` SECTION 144.
