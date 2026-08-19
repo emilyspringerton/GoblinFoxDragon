@@ -1,4 +1,5 @@
 ## 2026-08-19
+- Queued MnM and Medusa as concrete next GOLDENBAND rig targets in RENDERING_QUALITY/GOLDENBAND_INTEGRATION_NORTHSTAR, with real visual briefs (sess-20260813-2154-dda37e8b)
 
 - Added RENDERING_QUALITY_NORTHSTAR.md scoping the cel-shading -> Source-engine -> Unreal-engine tier roadmap (sess-20260813-2154-dda37e8b)
 
