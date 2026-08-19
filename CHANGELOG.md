@@ -1,3 +1,7 @@
+## 2026-08-19
+
+- Added RENDERING_QUALITY_NORTHSTAR.md scoping the cel-shading -> Source-engine -> Unreal-engine tier roadmap (sess-20260813-2154-dda37e8b)
+
 ## 2026-08-10
 
 - Jungle Camps Milestone 5：Four Kings 從 REDGARDEN 移植進 battlegrounds_gui fork，3-way merge + gcc 編譯驗證 (sess-20260810-0505-a53abca2)
