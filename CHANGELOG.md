@@ -1,4 +1,5 @@
 ## 2026-08-20
+- Real WebSocket<->UDP relay (apps2/wsudprelay) makes the GFD Battlegrounds WASM web client actually playable -- fronts redgarden-stable, verified live via a real WebSocket handshake against the running matchmaker. websocket_proxy_pre.js routes through nginx's new wss:// proxy for HTTPS mixed-content compliance. (sess-20260820-0649-a3f19d93)
 - Ported REDGARDEN's Four Kings/jungle-camp wire-protocol fix into apps2/battlegrounds_gui (commit 81d8076) -- same root cause (fully simulated server-side, never serialized/rendered), same fix, matching Milestone 5's porting precedent. (sess-20260820-0649-a3f19d93)
 - docs2/MOD_SURFACE_NORTHSTAR.md §4a: scoped a METALVERSE terminal mode for spawning ticker
   charts + news feeds (founder: "similar to how /gta7tv spawns screens in gta7"). Real data source
