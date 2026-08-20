@@ -47,6 +47,7 @@ emcc -std=c99 -D_DEFAULT_SOURCE -O2 \
     -s USE_SDL=2 \
     -s LEGACY_GL_EMULATION=1 \
     -s ALLOW_MEMORY_GROWTH=1 \
+    --pre-js websocket_proxy_pre.js \
     -o battlegrounds.html \
     "$GUI_ROOT/src/main.c" \
     "$GUI_ROOT/packages/simulation/arena_game.c" \

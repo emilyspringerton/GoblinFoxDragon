@@ -1,0 +1,38 @@
+# WebSocket<->UDP relay for the GFD Battlegrounds WASM web client — user-level
+# systemd unit (no sudo required).
+#
+# Deploy:
+#   mkdir -p ~/.config/systemd/user
+#   cp ops/systemd/gfd-wsudprelay.service ~/.config/systemd/user/
+#   GOWORK=off go build -o ~/.local/bin/wsudprelay ./apps2/wsudprelay
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now gfd-wsudprelay.service
+#
+# Added 2026-08-20 — founder: "ensure GFD web is live on okemily - link it
+# from WOTAN" / "live demos that are more than just demos." Fronts
+# redgarden-stable (see REDGARDEN/CLAUDE.md's Deployments table) — the
+# actual live backend GFD Battlegrounds connects to — not REDGARDEN's own
+# R&D pool, so the public web demo shares state with the real live game
+# rather than a separate throwaway deployment.
+#
+# apps2/battlegrounds_gui/wasm's own README.md names the exact gap this
+# closes: Emscripten's socket emulation links the client successfully but
+# provides no real transport, and expects a WebSocket-to-UDP proxy in front
+# of whatever host:port the C code's connect()/sendto() calls target.
+
+[Unit]
+Description=GFD Battlegrounds WebSocket<->UDP relay (WASM web client)
+After=network-online.target redgarden-stable-matchmaker-bots.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/fatbaby/GoblinFoxDragon
+ExecStart=/home/fatbaby/.local/bin/wsudprelay --udp-host 127.0.0.1 --matchmaker-port 8778 --game-port-start 8300 --game-port-count 100
+Restart=on-failure
+RestartSec=10s
+StandardOutput=append:/home/fatbaby/GoblinFoxDragon/var/logs/wsudprelay.log
+StandardError=append:/home/fatbaby/GoblinFoxDragon/var/logs/wsudprelay.log
+MemoryMax=256M
+
+[Install]
+WantedBy=default.target
