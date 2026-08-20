@@ -1190,29 +1190,6 @@ typedef struct {
     ArenaLaneCreepRole role; /* S170-218: melee (0, default) or caster -- see the enum's own doc comment above */
 } ArenaLaneCreep;
 
-/* Jungle camps -- the Four Heavenly Kings, Milestone 1 (docs2/JUNGLE_CAMPS_NORTHSTAR.md §3.1/
- * §3.2). 4 fixed camps at the map's cardinal edge midpoints (N/S/E/W -- the 2 corners NOT
- * occupied by fountains, per that doc's own §1 finding that only 2 of 4 corners are real team
- * bases). Each camp waves neutral-hostile minions from the opening bell (no owning team, aggros
- * either side -- same "neutral" framing ArenaCreep's ARENA_CREEP_NEUTRAL flavor already uses for
- * node guardians, not a new concept). Stationary (guard the camp, don't march) in this first
- * pass -- §3.4's anti-stall escalation (uncleared camps eventually march toward an objective) is
- * real, separate, NOT-STARTED follow-up work per that doc's own milestone table, not built here.
- * The Kings themselves (§3.3 -- one boss per camp, silent until 1:00, each granting a distinct
- * buff mechanic) are Milestone 2, also NOT built in this pass -- this is minion waves only. */
-#define ARENA_CAMP_COUNT               4
-#define ARENA_CAMP_MINIONS_PER_WAVE    2
-#define ARENA_MAX_CAMP_MINIONS         (ARENA_CAMP_MINIONS_PER_WAVE * ARENA_CAMP_COUNT * 2) /* 2x headroom, same reasoning ARENA_MAX_LANE_CREEPS already uses for its own multiplier */
-#define ARENA_CAMP_WAVE_INTERVAL_MS    25000 /* slightly slower than lane creeps' 20s -- a camp is a detour, not the main lane, real MOBA jungle camps respawn slower than lane waves too */
-#define ARENA_CAMP_MINION_HP           45    /* between lane creep melee (60) and caster (36) -- a real but not dominant jungle fight */
-#define ARENA_CAMP_MINION_DAMAGE       6     /* matches ARENA_CREEP_NEUTRAL_DAMAGE -- same "neutral creep" damage tier as node guardians */
-#define ARENA_CAMP_MINION_AGGRO_RADIUS 4.0f  /* matches ARENA_CREEP_AGGRO_RADIUS -- same "passive until approached" neutral-camp convention */
-#define ARENA_CAMP_MINION_ATTACK_COOLDOWN_MS 1500 /* matches ARENA_CREEP_ATTACK_COOLDOWN_MS */
-
-/* ArenaCampMinion itself is defined below, alongside Milestone 2-4's §3.4 escalation fields
-   (camp_index) -- kept as one definition, not duplicated here, so the struct never drifts out of
-   sync between its Milestone-1 and later-milestone halves. */
-
 /* ARENA_HERO_RESPAWN_MS (S170-121, "controlling a node enables its spawn
  * for your team"): team-mode-only hero respawn timer. Before this, death
  * was permanent within a match (arena_update_teams only checked team-wipe
@@ -1359,10 +1336,34 @@ typedef struct {
      * so none of the existing 26 items' own initializer rows needed touching -- only Haste
      * Trinket's own entry sets it. */
     int bonus_cdr_pct;
+    /* bonus_true_dmg / bonus_lifesteal_pct (2026-08-11, founder real-time: "do a first pass
+     * generating weird items that expand the play space" / "using ffxi items and your own best
+     * judgement on how the new items with unique qualities... push the meta forward" -- an
+     * expansion-of-the-shop-catalog first pass, page 4, see arena_game.c's own ARENA_ITEMS doc
+     * comment for the full item-by-item design). Two genuinely NEW mechanic categories, not more
+     * of the same flat-stat blends every existing item already has: bonus_true_dmg (Gae Bolg) is
+     * flat damage applied AFTER apply_armor, not before -- the first armor-piercing stat this
+     * catalog has ever had, opening a real counter-build against armor-stacking. bonus_
+     * lifesteal_pct (Masamune) heals the attacker for that percent of the FINAL (post-armor)
+     * damage dealt on a landed auto-attack -- the first sustain/lifesteal mechanic in this
+     * engine at all. Both zero-fill for every existing item via the same "positional
+     * initializers with fewer values than members zero-fill the rest" convention bonus_cdr_pct's
+     * own doc comment already established -- no existing item's initializer row needs touching. */
+    int bonus_true_dmg;
+    int bonus_lifesteal_pct;
 } ArenaItemDef;
 
 extern const ArenaItemDef ARENA_ITEMS[];
-#define ARENA_ITEM_COUNT 27 /* S170-207: was 26 -- +1 for Haste Trinket (no named ID constant needed, unlike Blink Dagger/Donkey -- it's pure passive stats, no per-item equipped-item index check anywhere) */
+#define ARENA_ITEM_COUNT 33 /* 2026-08-11: was 27 -- +6 for the "expand the play space" first pass (Gae Bolg, Masamune, Muramasa, Balance Ring, Empress Hairpin, Ninja Tekko), pushing the shop UI's own SHOP_PAGE_COUNT (apps/arena/src/main.c, ceil(ARENA_ITEM_COUNT/SHOP_ITEMS_PER_PAGE)) from 3 to a real 4th page -- founder: "add page 4 to the shop." No client-side paging code needed for this: SHOP_PAGE_COUNT is entirely derived from this one constant already. */
+/* ARENA_BALANCE_RING_ITEM_ID (2026-08-11, "expand the play space" pass): a named index, same
+ * reasoning ARENA_BLINK_DAGGER_ITEM_ID's own doc comment gives -- Balance Ring's comeback armor
+ * bonus scales LIVE with the wearer's own missing-HP fraction (computed inside
+ * arena_hero_armor() itself, same "computed live, not copied" idiom the King Wealth aura bonus
+ * already uses in that same function), which can't be pre-summed once at purchase time the way
+ * every flat-stat item's own bonus can -- code needs to check "is THIS SPECIFIC item equipped"
+ * by index, not just read a cached aggregate field. */
+#define ARENA_BALANCE_RING_ITEM_ID 30
+#define ARENA_BALANCE_RING_MAX_ARMOR_BONUS 40 /* the bonus at 0 HP (approached, never quite reached while alive) -- roughly double Iron Ram Trousers' own flat 18, since this only reaches near its max value while critically low, not all the time like a flat item */
 /* ARENA_BLINK_DAGGER_ITEM_ID (S170-205, founder: "add blink dagger 1400 flow it gives a new
  * keybind on screen for tilda"): a named index into ARENA_ITEMS, not just a stat entry -- the
  * only item in the catalog whose value comes from an ACTIVE ability (arena_use_blink) rather
@@ -1492,11 +1493,36 @@ extern const ArenaItemDef ARENA_ITEMS[];
  * file's typical combat-ability radii (3.5-6.0) on purpose -- XP-share is meant to reward
  * "present for the wave," not "landed inside a tight hitbox." */
 #define ARENA_LANE_CREEP_XP_SHARE_RADIUS 8.0f
-/* Camp minion kill reward (Jungle Camps Milestone 1) -- between node-guardian and lane-creep
- * tier, real MOBA jungle-minion parity (a small but real reward for clearing camp trash, not the
- * main event -- the King itself, Milestone 2, is where the real payoff lives). No XP-share radius
- * of its own -- camps are off the beaten path, "present for the wave" doesn't apply the same way
- * lane pushing does. */
+
+/* Jungle Camps -- The Four Heavenly Kings, Milestone 1 (2026-08-10). Founder real-time
+ * direction: "ok for arena in the north south east and west (the bases are at the corners
+ * between the corners if you fold it you get 4 spots we can spawn minions from and spawn boss
+ * monsters that give buffs)" -> "this way those camps will spawn mobs that will eventually
+ * assault the towers so it becomes difficult to stale out the game by never attacking towers"
+ * -> "the four heavenly kings" (boss naming). Full design: GoblinFoxDragon/docs2/
+ * JUNGLE_CAMPS_NORTHSTAR.md. Originally scoped to build in GoblinFoxDragon's own fork
+ * (`apps2/battlegrounds_gui`) first and backport later -- founder redirected real-time to build
+ * in REDGARDEN's own apps/arena_server FIRST instead (table stakes for the NORTHSTAR §25/§26
+ * autocurriculum/UED work: bots need real jungle-camp objectives to learn to contest before
+ * curriculum-generation research is meaningful), validate here, THEN port to GFD.
+ *
+ * 4 camps at the edge midpoints (N/S/E/W), between the 2 fountain corners and the 2 shop
+ * corners -- same "-margin so it's never buried in terrain" idiom arena_fountain_position
+ * already uses. Each camp waves neutral-hostile minions from the opening bell (no owning team,
+ * aggros either side -- same ARENA_CREEP_NEUTRAL flavor node guardians already use). Stationary
+ * (guard the camp, don't march) in this first pass -- §3.4's anti-stall escalation (uncleared
+ * camps eventually march toward an objective) is real, separate, NOT-STARTED follow-up work per
+ * that doc's own milestone table, not built here. The Kings themselves (§3.3 -- one boss per
+ * camp, silent until 1:00, each granting a distinct buff mechanic) are Milestone 2, also NOT
+ * built in this pass -- this is minion waves only. */
+#define ARENA_CAMP_COUNT               4
+#define ARENA_CAMP_MINIONS_PER_WAVE    2
+#define ARENA_MAX_CAMP_MINIONS         (ARENA_CAMP_MINIONS_PER_WAVE * ARENA_CAMP_COUNT * 2) /* 2x headroom, same reasoning ARENA_MAX_LANE_CREEPS already uses for its own multiplier */
+#define ARENA_CAMP_WAVE_INTERVAL_MS    25000 /* slightly slower than lane creeps' 20s -- a camp is a detour, not the main lane, real MOBA jungle camps respawn slower than lane waves too */
+#define ARENA_CAMP_MINION_HP           45    /* between lane creep melee (60) and caster (36) -- a real but not dominant jungle fight */
+#define ARENA_CAMP_MINION_DAMAGE       6     /* matches ARENA_CREEP_NEUTRAL_DAMAGE -- same "neutral creep" damage tier as node guardians */
+#define ARENA_CAMP_MINION_AGGRO_RADIUS 4.0f  /* matches ARENA_CREEP_AGGRO_RADIUS -- same "passive until approached" neutral-camp convention */
+#define ARENA_CAMP_MINION_ATTACK_COOLDOWN_MS 1500 /* matches ARENA_CREEP_ATTACK_COOLDOWN_MS */
 #define ARENA_CAMP_MINION_KILL_FLOW     60
 #define ARENA_CAMP_MINION_KILL_XP        5
 
@@ -1921,6 +1947,14 @@ typedef struct {
     int king_growth_stacks;
     int king_growth_ms;
     int king_wealth_ms;
+    /* king_allseeing_display, 2026-08-20: client-network-parse-only mirror of ArenaState's
+     * team-wide king_allseeing_team_ms[2] (see that field's own doc comment for why All-Seeing
+     * is team-wide, not per-hero, unlike everything else in this struct) -- ArenaHeroSnapshot's
+     * king_buff_flags bit 3 packs the killer's own team's value onto every hero snapshot so the
+     * client's buff HUD can read one consistent per-hero field like the other three buffs,
+     * without needing a separate team-wide network message. Never read or written by the
+     * server-side simulation itself -- purely a display mirror. */
+    int king_allseeing_display;
     /* w_drain_accum (S170-181, founder: "instead of initial mana cost toggle spells should
      * drain mana over time"): same fractional-accumulator idiom as mp_regen_accum right above,
      * for the same reason -- ARENA_MP_DRAIN_W_PER_SEC * dt_ms/1000 truncates to 0 almost every
@@ -2119,6 +2153,11 @@ typedef struct {
     int item_bonus_ad;
     float item_bonus_move_speed;
     int item_bonus_cdr_pct;
+    /* item_bonus_true_dmg / item_bonus_lifesteal_pct (2026-08-11 "expand the play space" pass):
+     * same recomputed-cache shape as the fields above, see ArenaItemDef's own doc comment on
+     * bonus_true_dmg/bonus_lifesteal_pct for the full design. */
+    int item_bonus_true_dmg;
+    int item_bonus_lifesteal_pct;
 } ArenaHero;
 
 typedef struct {
@@ -2660,25 +2699,30 @@ void arena_tick_lane_creeps(unsigned int dt_ms);
  * discipline elsewhere). */
 void arena_hero_attack_lane_creeps(unsigned int dt_ms);
 
-/* arena_camp_position: the 4 fixed jungle-camp positions (docs2/JUNGLE_CAMPS_NORTHSTAR.md §3.1),
- * index 0=N, 1=S, 2=E, 3=W -- (0, +-(ARENA_HALF_EXTENT-margin)) and (+-(ARENA_HALF_EXTENT-margin), 0),
- * same "-margin so it's never buried in terrain" convention arena_fountain_position/
- * arena_graveyard_position already use for every other fixed map landmark. */
+/* arena_camp_position (Jungle Camps Milestone 1): fills (x,z) with the deterministic position of
+ * jungle camp `index` (0=N, 1=S, 2=E, 3=W by convention, GoblinFoxDragon/docs2/
+ * JUNGLE_CAMPS_NORTHSTAR.md §3.1) -- the 4 edge midpoints between the 2 fountain corners and the
+ * 2 shop corners, same "-margin so it's never buried in terrain" idiom as arena_fountain_position.
+ * `index` is clamped into [0, ARENA_CAMP_COUNT) same as arena_fountain_position's own convention. */
 void arena_camp_position(int index, float *x, float *z);
 
 /* arena_tick_camp_minions (Jungle Camps Milestone 1): advances each camp's own wave timer
  * (spawning a fresh ARENA_CAMP_MINIONS_PER_WAVE-strong wave at that camp's position when it
- * elapses), then advances every active camp minion -- neutral-hostile (attacks whichever team's
- * hero gets closest, no owning side, same ARENA_CREEP_NEUTRAL framing node-guardian creeps
- * already use), stationary (no waypoint march in this first pass -- §3.4's anti-stall escalation
- * is separate, not-yet-built follow-up work). */
+ * elapses, from the opening bell -- no initial delay unlike lane creeps, see
+ * ARENA_CAMP_WAVE_INTERVAL_MS's own doc comment), then advances every active camp minion:
+ * neutral-hostile (aggros either team, same ARENA_CREEP_NEUTRAL flavor as node guardians),
+ * stationary -- attacks the nearest hittable hero within ARENA_CAMP_MINION_AGGRO_RADIUS if one's
+ * there, otherwise idle (no waypoint march -- that's §3.4's anti-stall escalation, real, separate,
+ * NOT built here). Called from arena_update_teams() only, same team-mode-only scope as
+ * arena_tick_lane_creeps. */
 void arena_tick_camp_minions(unsigned int dt_ms);
 
-/* arena_hero_attack_camp_minions: the hero-initiates-the-attack half, same split
- * arena_tick_lane_creeps/arena_hero_attack_lane_creeps already uses -- a hero within
- * ARENA_ATTACK_RANGE of a live camp minion and off cooldown deals ARENA_ATTACK_DAMAGE (+ bonus
- * AD) to it, same flat-damage-no-armor-stat convention arena_hero_attack_creeps already applies
- * to node guardians. */
+/* arena_hero_attack_camp_minions: mirrors arena_hero_attack_lane_creeps -- each active, alive
+ * hero without a closer enemy hero already occupying its attack this tick instead auto-attacks
+ * the nearest camp minion within ARENA_ATTACK_RANGE if one's there. Grants
+ * ARENA_CAMP_MINION_KILL_FLOW/XP to whoever lands the kill. Called from arena_update_teams()
+ * only, after arena_hero_attack_lane_creeps so a hero already mid-swing this tick doesn't also
+ * get a free camp-minion hit. */
 void arena_hero_attack_camp_minions(unsigned int dt_ms);
 
 /* arena_tick_kings (Jungle Camps Milestones 2+4): arms each camp's King spawn timer at
