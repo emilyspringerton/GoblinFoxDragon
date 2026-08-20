@@ -1,3 +1,13 @@
+## 2026-08-20
+- Added docs2/MOD_SURFACE_NORTHSTAR.md — scoping-only pass on GFD's new "mod API first, then the
+  feature" standing MO. Real prior art found: the EduScript VM (packages/education/) already
+  exists and is live in apps/lobby but has zero reach into apps2/battlegrounds_gui (the FPS "edu
+  edition" client, specifically prioritized). Scopes solid buildings, a destructible-environments
+  engine (recommended to share one system with /home/fatbaby/skateboard's own real R6-Siege-style
+  destructibility spec), skate-culture tech, and faction hooks as mod-surface consumers. Scripting
+  language left explicitly open (EduScript-extended vs. Lua vs. a founder-invented language not
+  yet located). (sess-20260813-2154-dda37e8b)
+
 ## 2026-08-19
 - Queued MnM and Medusa as concrete next GOLDENBAND rig targets in RENDERING_QUALITY/GOLDENBAND_INTEGRATION_NORTHSTAR, with real visual briefs (sess-20260813-2154-dda37e8b)
 
