@@ -1,4 +1,18 @@
 ## 2026-08-20
+- Real, working WASM build of apps2/battlegrounds_gui (the real IDUNA login GUI client). Founder,
+  urgent real-time: "we need a web client for that product yesterday." Installed Emscripten
+  (emsdk, no sudo needed) and got a clean compile+link with ZERO changes to any real game source
+  -- the 3D world rendering (already modern GL) ports as-is; the legacy-immediate-mode 2D HUD
+  pass (~400 glVertex2f call sites) is covered by Emscripten's own `-s LEGACY_GL_EMULATION=1`
+  except `glRectf`, patched via an 8-line WASM-build-only shim (`apps2/battlegrounds_gui/wasm/
+  glrectf_shim.c`). Real build script (`apps2/battlegrounds_gui/wasm/build_wasm.sh`) + doc
+  (`wasm/README.md`) added. Verified: clean compile, all 3 output artifacts (html/js/wasm) serve
+  correctly over HTTP. NOT verified: actual browser rendering/interaction (no headless browser in
+  this environment) and, more importantly, real networking -- confirmed via direct grep that
+  `main.c` uses raw UDP sockets, which don't exist in a browser at all; Emscripten's socket
+  emulation let this link but a real WebSocket-to-UDP relay (or a native WebSocket listener on
+  apps2/server-go) is real, unstarted, unsolved work, flagged honestly as the actual hard part of
+  a playable web client. (sess-20260813-2154-dda37e8b)
 - Added docs2/MOD_SURFACE_NORTHSTAR.md — scoping-only pass on GFD's new "mod API first, then the
   feature" standing MO. Real prior art found: the EduScript VM (packages/education/) already
   exists and is live in apps/lobby but has zero reach into apps2/battlegrounds_gui (the FPS "edu
