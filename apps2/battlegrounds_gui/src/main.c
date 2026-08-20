@@ -8033,6 +8033,39 @@ int main(int argc, char *argv[]) {
         }
         g_hover_target = hovered_i; /* S170-143: publish this frame's hover result for the QWE keybind handler to read next frame */
         if (hovered_i < 0) SDL_SetCursor(cursor_default); /* S170-69: hovering empty ground/terrain -- no lingering crosshair from a previous hover */
+
+        /* King health bars + name tags, 2026-08-20 -- ported from REDGARDEN commit 546a4ca.
+           See that commit's own message (founder: "the 4 kings need health bars and name
+           tags"). */
+        {
+            static const char *king_names[ARENA_CAMP_COUNT] = {
+                "WEALTH KING", "GROWTH KING", "MUSIC KING", "ALL-SEEING KING"
+            };
+            static const float king_hud_color[ARENA_CAMP_COUNT][3] = {
+                {0.85f, 0.7f, 0.15f}, {0.25f, 0.75f, 0.2f}, {0.75f, 0.2f, 0.75f}, {0.2f, 0.6f, 0.85f}
+            };
+            for (int ki = 0; ki < ARENA_CAMP_COUNT; ki++) {
+                ArenaKing *k = &arena_state.kings[ki];
+                if (!k->active || !k->alive) continue;
+                float ksx, ksy;
+                if (!world_to_screen(&vp, k->x, 2.4f, k->z, win_w, win_h, &ksx, &ksy)) continue;
+                if (ksx < -60 || ksx > win_w + 60 || ksy < -20 || ksy > win_h + 20) continue;
+                float kfrac = k->max_hp > 0 ? (float)k->hp / k->max_hp : 0.0f;
+                float kbw = 80.0f, kbh = 8.0f;
+                glColor3f(0.1f, 0.1f, 0.1f);
+                glBegin(GL_QUADS);
+                glVertex2f(ksx - kbw / 2, ksy); glVertex2f(ksx + kbw / 2, ksy);
+                glVertex2f(ksx + kbw / 2, ksy + kbh); glVertex2f(ksx - kbw / 2, ksy + kbh);
+                glEnd();
+                glColor3f(king_hud_color[ki][0], king_hud_color[ki][1], king_hud_color[ki][2]);
+                glBegin(GL_QUADS);
+                glVertex2f(ksx - kbw / 2, ksy); glVertex2f(ksx - kbw / 2 + kbw * kfrac, ksy);
+                glVertex2f(ksx - kbw / 2 + kbw * kfrac, ksy + kbh); glVertex2f(ksx - kbw / 2, ksy + kbh);
+                glEnd();
+                draw_string(king_names[ki], ksx - kbw / 2, ksy + kbh + 3.0f, 12);
+            }
+        }
+
         if (hovered_i >= 0) {
             ArenaHero *hh = &arena_state.heroes[hovered_i];
             float bw = 40.0f, bh = 5.0f;
