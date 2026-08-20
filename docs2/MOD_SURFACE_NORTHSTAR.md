@@ -116,6 +116,41 @@ here.
   completeness since the founder raised it in the same breath as the graphics work, but it's a
   client-settings concern, not a modding concern.
 
+## 4a. METALVERSE terminal mode — ticker charts + news feeds (2026-08-20 addendum)
+
+Founder, real-time, after settling on **METALVERSE** as the name for `apps2/battlegrounds_gui`
+specifically (not an abstract repo concept — see §5's own note on that naming thread): "can we
+build a mode into metalverse with heavy terminal integration that lets you spawn ticker stock
+charts and news feeds in a similar way to /gta7tv spawns screens in gta7."
+
+**Real, already-built data source to back this — checked directly, not assumed:** FatBaby's
+`signalapi` (`PRRJECT_FATBABY/internal/apiserver/server.go`, real HTTP endpoints, already live on
+`:9091`) already exposes exactly the data this feature needs: `/v1/movers-history/{ticker}` (real
+historical price data — the actual backing for a "ticker stock chart"), `/v1/entities/{ticker}`
+and `/v1/press-releases/` (real company/news data — the backing for a "news feed"),
+`/v1/signals` and `/v1/governance-signals`. Nothing needs inventing on the data side; this is a
+real client integration against a real existing API, not new data infrastructure.
+
+**Real, already-built rendering precedent to build from:** GTA7's `/gta7tv` (a real Minecraft
+`TextDisplay` entity, Paper-plugin-specific) doesn't port directly — `apps2/battlegrounds_gui` is
+a custom SDL2/OpenGL engine, not Minecraft. The two closer precedents actually inside this engine
+family: (1) the EduScript VM's "Architect's Orb" terminal in `apps/lobby` (F6 toggle / F7 compile
+/ F8 run / F9 reset — real, working, in-world terminal UI, the closest existing analog to "heavy
+terminal integration"), and (2) `apps2/battlegrounds_gui`'s own existing 2D HUD pass (the same
+immediate-mode GL layer this doc's WASM work already characterized in
+`apps2/battlegrounds_gui/wasm/README.md`). A "spawn a screen" mode most naturally means a
+world-anchored renderable panel (a textured quad in 3D space, not just a 2D HUD overlay) that can
+be populated with either live chart data (rendered client-side from `movers-history` JSON) or news
+text (from `press-releases`) — a real, new rendering primitive this engine doesn't have yet, not
+a reskin of something that exists.
+
+**Scope call, consistent with the rest of this doc:** per the founder's own new standing MO ("game
+expansions need to be mod api first then add the feature"), this should be a mod-surface-defined
+panel type (spawn-a-typed-panel, panel type + data source as script/config-driven properties) once
+the mod surface itself exists — not a hardcoded feature bolted directly onto `main.c`. Blocked on
+the same open question as everything else in §4: the scripting-language decision (§3). Not started
+here — data source and rendering precedent identified and grounded, implementation not begun.
+
 ## 5. A separate, bigger open question — flagged, not decided here
 
 The founder also floated, in the same real-time stretch, unifying both GFD clients (`apps/lobby`

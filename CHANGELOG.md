@@ -1,4 +1,11 @@
 ## 2026-08-20
+- docs2/MOD_SURFACE_NORTHSTAR.md §4a: scoped a METALVERSE terminal mode for spawning ticker
+  charts + news feeds (founder: "similar to how /gta7tv spawns screens in gta7"). Real data source
+  identified (FatBaby signalapi's already-live /v1/movers-history/{ticker}, /v1/press-releases/,
+  /v1/entities/{ticker} -- nothing to invent on the data side), real rendering precedent grounded
+  (EduScript's Architect's Orb terminal + the engine's existing 2D HUD pass; GTA7's /gta7tv itself
+  doesn't port, it's Minecraft-specific). Scoping only, blocked on the same mod-surface scripting
+  decision as the rest of the doc. (sess-20260813-2154-dda37e8b)
 - Real, working WASM build of apps2/battlegrounds_gui (the real IDUNA login GUI client). Founder,
   urgent real-time: "we need a web client for that product yesterday." Installed Emscripten
   (emsdk, no sudo needed) and got a clean compile+link with ZERO changes to any real game source
