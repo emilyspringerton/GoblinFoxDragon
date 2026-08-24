@@ -70,18 +70,90 @@ missing is the authoring layer WC3 shipped alongside its actual game (the World 
 not a different game engine. EduScript, ported and deepened, is that authoring layer's real
 starting point — it's a scripting console without a world-editing UI around it yet.
 
-## 3. Scripting language — genuinely open, not decided here
+## 3. Scripting language — RESOLVED 2026-08-24, two-VM model
 
-The founder floated "lua or whatever the heck" and separately mentioned having invented a custom
-language and needing to locate it. **Not resolved in this doc.** EduScript itself is a real
-incumbent worth weighing against both: it's already integrated, already bound to world objects,
-and already running in production in `apps/lobby` — the cost of extending it (arrays, functions)
-is likely much lower than integrating Lua fresh or standing up a from-scratch custom language,
-but "lower cost" isn't the same as "founder's actual intent," especially if the invented language
-is meant to be a real product feature (a differentiator), not just an implementation detail. Real
-next step: the founder locates the invented-language reference, then a real three-way comparison
-(EduScript-extended vs. Lua vs. the invented language) happens before committing — not guessed at
-here.
+Originally left open (see history below, kept for the real reasoning trail): the founder floated
+"lua or whatever the heck" and separately mentioned having invented a custom language (PARENA,
+since located — see `PARENA/NORTHSTAR.md`) and needing to locate it. **Resolved, founder
+real-time, 2026-08-24**, after a deferred discussion earlier the same session on how PARENA could
+"turbocharge" EduScript: **don't extend EduScript's own opcode table.** EduScript stays exactly
+the small, easy-to-learn, no-arrays/no-functions/no-recursion 17-op VM it already is — that
+minimalism is the actual feature, not a gap to close. A **second VM** — PARENA, which compiles
+ahead-of-time to real C rather than interpreting toy bytecode — handles anything needing real
+data structures, recursion, or genuine instruction-level hacking (the founder's own stated
+end-goal: mod-surface "instruction hacks" that transfer to real ARM/x86 architectures, which a
+17-op puzzle VM can never resemble but PARENA's real C/assembly output can). The two VMs connect
+via **federated process operation**, not in-process embedding/linking — see §3a below for the
+concrete shape.
+
+**Real, checkable consequence of this decision**: the "extend EduScript's arrays/functions gap"
+next-step named in the original version of this section (and echoed in
+`EDUCATION_CURRICULUM_NORTHSTAR.md`) is **superseded** — EduScript's own opcode set is not the
+thing that grows. Advanced mod-surface capability grows on the PARENA side, reached from EduScript
+scripts via the federated-process interop once that layer exists. `EDUCATION_CURRICULUM_NORTHSTAR
+.md`'s own "Phase 0: array opcode + user-defined functions" plan should be re-read against this
+resolution before anyone picks it up — it may no longer be the right next increment for EduScript
+itself; flagged here, not edited there, since that doc's own phase plan wasn't re-scoped in this
+same pass.
+
+**Old, superseded framing kept for history**: "EduScript itself is a real incumbent worth weighing
+against both [Lua and PARENA]: the cost of extending it (arrays, functions) is likely much lower
+than integrating Lua fresh or standing up a from-scratch custom language... a real three-way
+comparison (EduScript-extended vs. Lua vs. the invented language) happens before committing." That
+three-way comparison didn't end up being how the decision actually got made — the founder decided
+directly, real-time, once PARENA's own real existence and status were established this session,
+rather than running the formal comparison this section originally proposed. Recorded so a future
+reader doesn't wonder why the planned comparison never appears elsewhere.
+
+## 3a. Federated process operation — the EduScript↔PARENA interop shape (2026-08-24)
+
+**North star, founder real-time, verbatim: "north star is full erlang scheduler system."** The
+concrete model for how EduScript (small, sandboxed, in-process puzzle VM) and PARENA (native-
+compiled, real-instruction-hacking VM) talk to each other is **not** a function-call-style
+embedding (PARENA linked into the game process, called like a library) — it's **federated
+processes**, styled on Erlang/BEAM: independent, isolated processes/schedulable-units that
+communicate by message-passing, with the supervision/fault-isolation properties BEAM is actually
+known for (a crashing PARENA-side process doesn't take the game process down with it — "let it
+crash," contained, restarted, not a shared-fault-domain embed).
+
+**Why this shape, not embedding, reasoned from the founder's own stated goals:**
+- EduScript's whole value is being small, safe, and puzzle-scoped — sandboxing that by running it
+  in-process next to arbitrary PARENA-compiled native code (which is explicitly NOT sandboxed —
+  the entire point is instruction-level ARM/x86-transferable hacking) would undermine exactly the
+  property EduScript is being kept around for.
+- "Federated" + Erlang-scheduler framing implies each VM instance is its own schedulable unit,
+  not a shared address space — matches BEAM's actual process model (green threads, no shared
+  memory, mailbox message-passing) more than a traditional OS-process IPC pipe, though the two
+  aren't mutually exclusive (BEAM's own distribution protocol runs process-to-process messaging
+  over real OS sockets between real OS processes/nodes too).
+
+**Real, honest status: north star only, nothing scoped or built.** Real open questions a future
+scoping pass needs to answer, not guessed at here:
+1. Does "federated process operation" mean literally reimplementing a BEAM-style preemptive
+   green-thread scheduler (a substantial VM-runtime project on its own, independent of both
+   EduScript and PARENA), or does it mean real OS processes + a message-passing IPC protocol
+   between them (lighter-weight, faster to reach, less ambitious than "full Erlang scheduler")?
+   The founder's own "north star is full erlang" phrasing suggests the former is the eventual
+   target even if the latter is the real near-term stepping stone — not resolved here which one
+   is the actual next build increment.
+2. What's the message/mailbox contract between an EduScript script and a federated PARENA
+   process — what triggers a PARENA process to spawn, what data crosses the boundary, what a
+   crash/timeout/restart looks like from the EduScript script's own point of view?
+3. Where does this scheduler layer actually live — a new package in this repo, in PARENA itself
+   (a real runtime component, not just a compiler), or a separate new repo? Not decided.
+4. Relationship to PARENA's own already-stated multi-target ambition (C/JVM/TS/Wasm, per
+   `PARENA/NORTHSTAR.md`) — a federated PARENA process is presumably always the C target
+   (native, ARM/x86-adjacent, matching the instruction-hacking goal), not the others; not
+   confirmed with the founder.
+
+**Connected idea, same real-time stretch, not yet scoped to a specific game/repo:** founder —
+"our game will have a phone system built on the same resiliency patterns as the real world." This
+lines up directly with Erlang/OTP's own real origin (Ericsson telecom switching — supervision
+trees, let-it-crash, hot code reload were built FOR phone-system reliability specifically, not a
+metaphor borrowed after the fact), so an in-game phone/comms mechanic riding on this same
+federated-process scheduler would be using the pattern for exactly what it was invented for, not
+just borrowing its name. Which game/repo this belongs to (GFD? SHANKPIT? REDGARDEN? a new one?)
+wasn't specified — logged here as a connected open question, not scoped further.
 
 ## 4. Concrete next features, all mod-API-first per the new GFD MO
 
