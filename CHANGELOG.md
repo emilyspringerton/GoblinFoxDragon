@@ -1,3 +1,7 @@
+## 2026-08-24
+
+- MOD_SURFACE_NORTHSTAR: resolved the EduScript/PARENA scripting-language question (§3) -- two-VM model, federated process operation styled on Erlang/BEAM (§3a), founder's own phone-system-resiliency idea connected as the same real pattern (sess-20260824-2252-ce890e4f)
+
 ## 2026-08-20
 - Ported REDGARDEN's King buff-HUD and King health-bar/name-tag fixes into battlegrounds_gui. WASM rebuilt and redeployed. (sess-20260820-0649-a3f19d93)
 - Real WebSocket<->UDP relay (apps2/wsudprelay) makes the GFD Battlegrounds WASM web client actually playable -- fronts redgarden-stable, verified live via a real WebSocket handshake against the running matchmaker. websocket_proxy_pre.js routes through nginx's new wss:// proxy for HTTPS mixed-content compliance. (sess-20260820-0649-a3f19d93)
