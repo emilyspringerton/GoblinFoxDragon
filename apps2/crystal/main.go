@@ -1,9 +1,12 @@
 package main
 
 import (
+	"encoding/json"
+	"flag"
 	"fmt"
 	"math"
 	"math/rand"
+	"os"
 	"time"
 )
 
@@ -585,7 +588,125 @@ func render() {
 	}
 }
 
+// CrystalNPC is one goblin or fox's exported position+kind, the unit BACKLOG.md
+// S189-07 asks for MUD-side entity/system support -- not a raw dump of every
+// internal simulation field (Aggro/Greed/Energy stay internal to crystal; the
+// MUD gets what it needs to place a real NPC: where, and what kind).
+type CrystalNPC struct {
+	X, Y int
+	Kind string
+}
+
+// CrystalSeed is the real crystal->MUD data format (S189-07's own open question
+// 1, resolved here): a snapshot of the world at the tick the seed was captured.
+// Terrain layers ride along as the same H x W float grids crystal already
+// maintains -- the MUD doesn't need a new terrain representation invented, just
+// crystal's own city/entropy/rubble grids handed over as data. Boids and dragon
+// events are deliberately left out (S189-07's own open question 2, resolved):
+// boids are ambient flavor with no discrete identity worth a MUD entity, and
+// dragon events are transient, not a steady-state seed feature -- goblins and
+// foxes are the only entity types with real per-individual state (Kind, a
+// stable position) worth carrying over as actual MUD NPCs.
+type CrystalSeed struct {
+	Tick    int           `json:"tick"`
+	Width   int           `json:"width"`
+	Height  int           `json:"height"`
+	Goblins []CrystalNPC  `json:"goblins"`
+	Foxes   []CrystalNPC  `json:"foxes"`
+	City    [H][W]float64 `json:"city"`
+	Entropy [H][W]float64 `json:"entropy"`
+	Rubble  [H][W]float64 `json:"rubble"`
+}
+
+func goblinKindName(k GoblinType) string {
+	switch k {
+	case GoblinScavenger:
+		return "scavenger"
+	case GoblinTinkerer:
+		return "tinkerer"
+	case GoblinRaider:
+		return "raider"
+	case GoblinMerchant:
+		return "merchant"
+	default:
+		return "scavenger"
+	}
+}
+
+func foxKindName(k FoxType) string {
+	switch k {
+	case FoxCourier:
+		return "courier"
+	case FoxPitFix:
+		return "pitfix"
+	case FoxApex:
+		return "apex"
+	case FoxShow:
+		return "show"
+	default:
+		return "courier"
+	}
+}
+
+// runHeadlessSeed runs initWorld() then the real simulation tick functions
+// (no render, no sleep) for the requested number of ticks and returns the
+// resulting world snapshot. S189-07's own open question 3, resolved: "100
+// generations" reads as ~100 real simulation ticks (crystal has no
+// evolutionary-generations concept, confirmed by reading its actual update
+// loop -- it's a continuously-ticking boids/ecosystem sim, not a GA), not a
+// literal reimplementation of a generational algorithm.
+func runHeadlessSeed(ticks int) CrystalSeed {
+	rand.Seed(time.Now().UnixNano())
+	initWorld()
+
+	for i := 0; i < ticks; i++ {
+		updateBoids()
+		updateGoblins()
+		updateFoxes()
+		updateDragon()
+		updateFields()
+	}
+
+	seed := CrystalSeed{Tick: ticks, Width: W, Height: H}
+	for _, g := range goblins {
+		seed.Goblins = append(seed.Goblins, CrystalNPC{X: g.X, Y: g.Y, Kind: goblinKindName(g.Kind)})
+	}
+	for _, fx := range foxes {
+		seed.Foxes = append(seed.Foxes, CrystalNPC{X: fx.X, Y: fx.Y, Kind: foxKindName(fx.Kind)})
+	}
+	seed.City = city
+	seed.Entropy = entropy
+	seed.Rubble = rubble
+	return seed
+}
+
 func main() {
+	seedTicks := flag.Int("seed", 0, "run headless for N ticks and dump a JSON world seed instead of the live terminal render (0 = live render, the original default behavior)")
+	seedOut := flag.String("seed-out", "", "output path for the JSON seed (required with -seed)")
+	flag.Parse()
+
+	if *seedTicks > 0 {
+		if *seedOut == "" {
+			fmt.Fprintln(os.Stderr, "crystal: -seed-out is required when -seed is set")
+			os.Exit(1)
+		}
+		seed := runHeadlessSeed(*seedTicks)
+		f, err := os.Create(*seedOut)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "crystal: %v\n", err)
+			os.Exit(1)
+		}
+		defer f.Close()
+		enc := json.NewEncoder(f)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(seed); err != nil {
+			fmt.Fprintf(os.Stderr, "crystal: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("crystal: seeded %d goblins, %d foxes after %d ticks -> %s\n", len(seed.Goblins), len(seed.Foxes), *seedTicks, *seedOut)
+		return
+	}
+
 	rand.Seed(time.Now().UnixNano())
 	initWorld()
 
