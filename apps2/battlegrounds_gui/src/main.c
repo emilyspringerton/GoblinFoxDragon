@@ -2286,6 +2286,43 @@ static void chat_push_line(const char *channel, const char *sender, const char *
     chat_line_count++;
 }
 
+/* Copy/paste for chat (2026-08-25, founder real-time: "we need copy and paste to work for GFD
+ * same bindings as the other repos we put copy paste into pitviper"). chat_input_buf had zero
+ * clipboard support -- same original gap the 2026-08-05 login screen fix (see run_login_screen's
+ * own SDLK_v handler above) already closed for email/password; this applies that exact pattern
+ * (SDL_GetClipboardText, bounds-checked strncat, SDL_free) to chat instead of inventing a new one.
+ * Bound to plain Ctrl+V here, not PITVIPER's Ctrl+Shift+V -- PITVIPER reserves plain Ctrl+C/V
+ * because it's a terminal emulator that must keep Ctrl+C free for SIGINT; that reason doesn't
+ * apply to a game chat box, so this follows this file's own already-established plain-Ctrl+V
+ * precedent (the login screen) instead, for consistency within this client.
+ *
+ * No PITVIPER-style mouse-drag text selection is attempted for "copy" -- PITVIPER can do that
+ * cheaply because it renders a fixed character grid with trivial pixel->cell hit-testing; this is
+ * an immediate-mode-GL 3D game client with no per-glyph position tracking anywhere in it, so
+ * building an equivalent selection subsystem is real, separate, much larger scope. Instead, Ctrl+C
+ * (while chat is NOT being typed into, so it can't collide with an in-progress message) copies the
+ * whole visible chat scrollback to the OS clipboard -- covers the real use case (grabbing an item
+ * name/error/coordinates someone just said) without a new subsystem. */
+static void chat_paste_into_input(void) {
+    char *clip = SDL_GetClipboardText();
+    if (clip) {
+        size_t len = strlen(chat_input_buf), add = strlen(clip);
+        if (len + add >= CHAT_INPUT_MAX) add = CHAT_INPUT_MAX - 1 - len;
+        if (add > 0 && len < CHAT_INPUT_MAX) strncat(chat_input_buf, clip, add);
+        SDL_free(clip);
+    }
+}
+
+static void chat_copy_scrollback(void) {
+    char buf[CHAT_LINES * CHAT_LINE_MAX + CHAT_LINES];
+    buf[0] = '\0';
+    for (int i = 0; i < chat_line_count; i++) {
+        strcat(buf, chat_lines[i]);
+        strcat(buf, "\n");
+    }
+    if (buf[0]) SDL_SetClipboardText(buf);
+}
+
 /* chat_poll: parses a controlled, known, flat-object JSON array (no nesting) with a simple
  * brace-matching scan -- same "not a real parser, IDUNA's response is trusted, not adversarial"
  * scope as http_client.h's own field extractors, just applied once per array element here since
@@ -5800,8 +5837,21 @@ int main(int argc, char *argv[]) {
                         } else if (te.key.keysym.sym == SDLK_BACKSPACE) {
                             size_t len = strlen(chat_input_buf);
                             if (len > 0) chat_input_buf[len - 1] = '\0';
+                        } else if (te.key.keysym.sym == SDLK_v && (SDL_GetModState() & KMOD_CTRL)) {
+                            chat_paste_into_input();
                         }
                     }
+                    continue;
+                }
+                /* Ctrl+C copies the chat scrollback -- only reachable when chat isn't focused
+                   (the block above already consumed the event and continued otherwise), so this
+                   can't collide with typing. See chat_copy_scrollback's own doc comment. Checked
+                   -- and `continue`s -- before the plain-C-opens-chat block further down, which
+                   has no modifier guard of its own and would otherwise also fire on this same
+                   keydown and immediately reopen chat right after the copy. */
+                if (te.type == SDL_KEYDOWN && te.key.keysym.sym == SDLK_c &&
+                    (SDL_GetModState() & KMOD_CTRL)) {
+                    chat_copy_scrollback();
                     continue;
                 }
                 /* Auction House menu, checked next -- same "consume every event while focused"
@@ -6471,8 +6521,21 @@ int main(int argc, char *argv[]) {
                     } else if (e.key.keysym.sym == SDLK_BACKSPACE) {
                         size_t len = strlen(chat_input_buf);
                         if (len > 0) chat_input_buf[len - 1] = '\0';
+                    } else if (e.key.keysym.sym == SDLK_v && (SDL_GetModState() & KMOD_CTRL)) {
+                        chat_paste_into_input();
                     }
                 }
+                continue;
+            }
+            /* Ctrl+C copies the chat scrollback -- only reachable when chat isn't focused (the
+               block above already consumed the event and continued otherwise), so this can't
+               collide with typing. See chat_copy_scrollback's own doc comment. Checked -- and
+               `continue`s -- before the plain SDLK_c cam_locked toggle further down, which has no
+               modifier guard of its own and would otherwise also fire on this same keydown and
+               immediately flip the camera lock right after the copy. */
+            if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_c &&
+                (SDL_GetModState() & KMOD_CTRL)) {
+                chat_copy_scrollback();
                 continue;
             }
             /* Y/T also open chat here, alongside Enter -- same "for now" list Town's own chat-open
