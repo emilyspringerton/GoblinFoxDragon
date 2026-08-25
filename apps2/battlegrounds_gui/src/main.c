@@ -1228,6 +1228,37 @@ static int load_gl_functions(void) {
 }
 
 /* ---------------- shader source ---------------- */
+#ifdef __EMSCRIPTEN__
+/* WebGL1/GLES2 equivalents of the desktop GLSL 150 shaders below --
+   Emscripten's LEGACY_GL_EMULATION targets a WebGL1 context, whose GLSL ES
+   1.00 compiler rejects `#version 150` and the `in`/`out` storage
+   qualifiers outright ("client/version number not supported" / "storage
+   qualifier supported in GLSL ES 3.00 and above only"), which failed the
+   vertex shader compile and, transitively, every draw call -- the actual
+   cause of the WASM build's black screen (SDL_GL_CreateContext itself was
+   a separate, now-fixed issue). Same semantics, ES 1.00 syntax:
+   in->attribute, out->varying, user `out` fragColor -> gl_FragColor. */
+static const char *VS_SRC =
+    "attribute vec3 aPos;\n"
+    "attribute vec3 aNormal;\n"
+    "uniform mat4 uMVP;\n"
+    "uniform mat4 uModel;\n"
+    "varying vec3 vNormal;\n"
+    "void main() {\n"
+    "    vNormal = mat3(uModel) * aNormal;\n"
+    "    gl_Position = uMVP * vec4(aPos, 1.0);\n"
+    "}\n";
+
+static const char *FS_SRC =
+    "precision mediump float;\n"
+    "varying vec3 vNormal;\n"
+    "uniform vec4 uColor;\n"
+    "uniform vec3 uLightDir;\n"
+    "void main() {\n"
+    "    float diff = max(dot(normalize(vNormal), normalize(uLightDir)), 0.2);\n"
+    "    gl_FragColor = vec4(uColor.rgb * diff, uColor.a);\n"
+    "}\n";
+#else
 static const char *VS_SRC =
     "#version 150\n"
     "in vec3 aPos;\n"
@@ -1250,6 +1281,7 @@ static const char *FS_SRC =
     "    float diff = max(dot(normalize(vNormal), normalize(uLightDir)), 0.2);\n"
     "    fragColor = vec4(uColor.rgb * diff, uColor.a);\n"
     "}\n";
+#endif
 
 static GLuint compile_shader(GLenum type, const char *src) {
     GLuint s = glCreateShader_(type);
@@ -5593,10 +5625,20 @@ int main(int argc, char *argv[]) {
     for (int gi = 0; gi < SDL_NumJoysticks(); gi++) {
         if (SDL_IsGameController(gi)) { g_gfd_pad = SDL_GameControllerOpen(gi); if (g_gfd_pad) break; }
     }
+#ifndef __EMSCRIPTEN__
+    /* Desktop-only: requests a real OpenGL 3.2 Compatibility context (needed
+       for the legacy glBegin/glEnd HUD pass on native builds). Emscripten's
+       WebGL/EGL emulation has no such concept -- requesting it there fails
+       SDL_GL_CreateContext outright ("Could not create EGL context (context
+       attributes are not supported)"), which is fatal before the first frame
+       ever draws, i.e. an all-black canvas. The WASM build's LEGACY_GL_EMULATION=1
+       build flag (build_wasm.sh) already provides the equivalent legacy-GL
+       shim on top of WebGL1/GLES2 without any SDL attribute request. */
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+#endif
 
     int win_w = 1280, win_h = 720;
     SDL_Window *win = SDL_CreateWindow(
