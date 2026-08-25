@@ -1,4 +1,5 @@
 ## 2026-08-25
+- added auto-release CI job (PITVIPER pattern): real, non-prerelease GitHub release on every push to master (sess-20260825-1938-f6bd411e)
 - battlegrounds_gui: chat copy/paste bindings (Ctrl+V paste, Ctrl+C copy-scrollback), same PITVIPER-inspired pattern (sess-20260825-1938-f6bd411e)
 - fixed WASM battlegrounds black screen: guarded desktop-only SDL_GL_SetAttribute(3.2 Compat) calls and swapped VS_SRC/FS_SRC to GLSL ES 1.00 for __EMSCRIPTEN__ builds; verified via headless Chromium (zero WebGL/shader errors post-fix vs fatal errors before), deployed to /var/www/okemily/battlegrounds/ (sess-20260825-1938-f6bd411e)
 
