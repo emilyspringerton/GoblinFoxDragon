@@ -1,6 +1,6 @@
 # GoblinFoxDragon
 
-## Current Status (2026-08-04)
+## Current Status (2026-08-26)
 
 Real, playable: `apps2/mud` (server-authoritative MUD combat backend, real jobs/spells/aggro) +
 `apps2/battlegrounds_gui` (bespoke SDL2/GL client, not the real Bedrock client) rendering Town,
@@ -10,6 +10,14 @@ by `WEAKNIGHT_BEDROCK_RACERS`). Recent real fixes: dead-worm visibility, KO auto
 Home Point Crystal, and auto-recovery of a KO'd character on the next command (not just typing
 `home`) — see `CHANGELOG.md` for the full trail. See `docs/NORTHSTAR.md` for the fuller
 architecture picture (dated 2026-06-14, now stale in places relative to the above).
+
+**New since**: a real combat damage log in `battlegrounds_gui` (S189-01); the King's buff status
+now syncs to the client with a bottom-right buff HUD, plus real King health bars + name tags;
+Meadow (zone 0) seeded with goblin/fox NPCs generated via a real crystal-simulation pass
+(S189-07); chat copy/paste bindings in `battlegrounds_gui` (`Ctrl+V` paste, same pattern as
+PITVIPER); the WASM build's black-screen bug fixed (SDL GL context attributes weren't compatible
+with the browser's GLSL version). The mod-surface scripting-language question (EduScript vs.
+PARENA) was resolved — see `docs/MOD_SURFACE_NORTHSTAR.md`.
 
 ---
 
