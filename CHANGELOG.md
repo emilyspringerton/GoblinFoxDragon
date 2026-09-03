@@ -1,4 +1,17 @@
 ## 2026-09-03
+- feat(mob): real Milestone 3 seeded dungeon spawn table (kanban `534432532` "GFD dungeons",
+  `docs2/DUNGEON_NORTHSTAR.md` Milestone 3). New `server/mob/dungeon.go`: `DungeonRoster` carries
+  §7's real 8-named-dungeon boss/elite content pass as real Go data (not re-derived); consumes a
+  Milestone-2 `worldapi.DungeonLayout` and `GenerateDungeonSpawns(layout, dungeonIndex, sceneID,
+  seed)` places the real named boss in the boss room, an optional elite hero in interior rooms,
+  generic `dungeon-minion` fillers elsewhere, and keeps the entrance room clear (matching every
+  existing zone's own safe-landing convention). 6 new tests (boss presence + correct SceneID,
+  entrance stays clear, same-seed determinism, out-of-range `dungeonIndex` wraps safely,
+  empty-layout safety, every spawn actually accepted by the real `Registry.Spawn`), all green.
+  `GOWORK=off go build/test/vet ./...` all clean. Real, honest, deliberately NOT done: every
+  spawn's `Kind` carries the real hero identifier as an honest placeholder -- actually driving
+  REDGARDEN's `apps/arena_bot` AI as that hero, the harder cross-repo work §3.3 itself names, is
+  still ahead.
 - feat(worldapi): real Milestone 2 dungeon generator (kanban `534432532` "GFD dungeons",
   `docs2/DUNGEON_NORTHSTAR.md` Milestone 2). New `server/worldapi/dungeon.go`:
   `GenerateDungeonLayout(seed)` seeds 5-8 rooms in an alternating-axis snake placement, linked in
