@@ -1,4 +1,16 @@
 ## 2026-09-03
+- feat(worldapi): real Milestone 2 dungeon generator (kanban `534432532` "GFD dungeons",
+  `docs2/DUNGEON_NORTHSTAR.md` Milestone 2). New `server/worldapi/dungeon.go`:
+  `GenerateDungeonLayout(seed)` seeds 5-8 rooms in an alternating-axis snake placement, linked in
+  a linear chain (real reachability from entrance to boss room, verified via an actual BFS in
+  `IsReachable()`, not just assumed by construction); `DungeonLayoutToBlocks` carves the layout
+  into real `WorldBlock`s reusing `cavesChunk`'s own solid-grid-then-carve representation
+  (scenes.go). 7 new tests: same-seed determinism, different-seed variety, room-count bounds,
+  reachability, real floor/wall block output, and a defensive empty-layout case. `GOWORK=off go
+  test ./...` and `go vet ./server/worldapi/...` both clean. Real, honest, deliberately not
+  built: Diablo 2's own branching/preset-room-pool connectivity (still future work per §3.2) --
+  this is a straight room chain, not a graph; also not wired into the real chunk-streaming HTTP
+  path yet (needs Milestone 1's own still-missing dungeon server binary to actually serve it).
 - docs2/DUNGEON_NORTHSTAR.md: Milestone 1 updated to IN PROGRESS -- real seed/mode transport
   shipped in REDGARDEN (commit `4bb46b9`): `MatchFoundMsg` carries a real per-match seed+mode,
   the matchmaker generates and passes it to the spawned server, `arena_server` seeds its own RNG
