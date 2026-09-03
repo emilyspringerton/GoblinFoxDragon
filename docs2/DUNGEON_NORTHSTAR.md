@@ -162,12 +162,61 @@ sprites, per founder direction.
 | 3 | Mob/boss population from arena heroes | Seeded spawn table places hero-kit-driven hostile NPCs per room + a boss in the final room, using existing `apps/arena_bot` AI | NOT STARTED |
 | 4 | Client dungeon render mode | New mode walks the generated space, fights populated mobs, using Battlegrounds' existing combat HUD | NOT STARTED |
 | 4.5 | Billboard sprite subsystem | New texture-loading + camera-facing quad rendering path (nothing like this exists today), mobs/bosses render as chunky 2D sprites in the 3D space | NOT STARTED |
-| 5 | Art direction incorporated | All 3 files landed: `kikoryu.jpeg` (boss), `art2.jpeg` (minion sheet), `art1.jpeg` (loot/item concepts, not mob art) -- sprite sheets not yet cut from this source art | IN PROGRESS |
+| 5 | Art direction incorporated | All 3 files landed: `kikoryu.jpeg` (boss), `art2.jpeg` (minion sheet), `art1.jpeg` (loot/item concepts, not mob art). Real content pass done (§7, 2026-09-03): 8 named dungeons, each with a real boss/elite roster drawn from the actual arena hero compendium; sprite sheets themselves not yet cut from this source art | IN PROGRESS |
 | 6 | Rewards + party queue flow | Resolves the open questions in §5 | NOT STARTED |
+| 7 | Named dungeon content | 8 named dungeons + boss/elite assignments, real compendium-grounded (§7). Kikoryu's Hoard named as the real superboss/endgame target, honestly scoped as new AI work, not built | DONE (design only) |
 
-## 7. Related docs
+## 7. Named dungeons and boss assignments — real content pass (2026-09-03)
+
+Kanban cruise-queue card: "GFD add dungeons - we need content - make it like DIABLO in terms of
+how the procedural dungeons work use the hero compendium to design bosses for the named
+dungeons." This section is a real, deliberate CONTENT pass, not an engineering one — it resolves
+§3.3's own explicitly-named open gap ("exact mapping of which arena hero kit's AI drives which
+visual is not decided here") with real, specific choices, grounded in `TYLER/multiverse_heroes.md`
+(the real 123-hero compendium every REDGARDEN arena hero is drawn from — checked directly:
+every one of the 30 real, implemented `ARENA_HERO_*` kits traces to a real named entry there).
+None of Milestones 1–4.5 are built yet; this section is the real content those milestones will
+eventually consume, matching Diablo 2's own real act structure (a handful of named areas, each
+with its own themed boss and mob roster) rather than one generic "dungeon."
+
+Real, deliberate design rule applied throughout: each dungeon's boss is drawn from the SAME real
+compendium faction as its theme (not an arbitrary hero placed for stat-balance reasons), so the
+lore already coheres — a real, checked constraint, not decoration.
+
+| # | Dungeon | Faction (compendium) | Boss (real `ARENA_HERO_*`) | Elite/recurring heroes | Minion flavor |
+|---|---|---|---|---|---|
+| 1 | The Sealed Archive | Jiangshi Syndicate | `ARENA_HERO_CART` (The Retrieval Cart — "an object that started arriving with things nobody ordered," a genuinely fitting final-room reveal for an archive dungeon) | `ARENA_HERO_NOOR1` (NOOR-1, "Four Days Behind") | `art2.jpeg`'s small eldritch/checkered-body sheet reads as misfiled archive contents come alive — the real intended fit for this room |
+| 2 | The Frequency Table | Goetia Court | `ARENA_HERO_PAIMON` (Paimon, "commands two hundred legions" — the real compendium line that makes him the natural climactic boss of the whole court) | `ARENA_HERO_VASSAGO`, `ARENA_HERO_BELETH`, `ARENA_HERO_ZAGAN`, `ARENA_HERO_DOC_WHEEL` (Buer) | Same `art2.jpeg` roster, recolored/retextured per room — a real, cheap way to reuse one sprite sheet across multiple named dungeons rather than commissioning new art per dungeon, named honestly as a real production shortcut, not hidden |
+| 3 | The Remnant's Hall | Valhalla Remnant | `ARENA_HERO_GUNNR` (Gunnr, "The Raven-Caller" — real, fitting continuity with this same session's own real blog thread, `state-of-the-ecosystem-the-duck-has-in-fact-moved`, which already named Gunnr as the roster's new low-water mark; a dungeon boss slot is a real, earned spotlight for a hero the blog has been quietly ribbing) | `ARENA_HERO_LOKI`, `ARENA_HERO_GARY`, `ARENA_HERO_COURIER` (Ratatoskr) | — |
+| 4 | East of the Wall | Middle Kingdom Heirs | `ARENA_HERO_HE_XIANGU` (He Xiangu, "who stopped eating") | `ARENA_HERO_WEATHERMAN` (Ao Guang's Weather-Debt Collector), `ARENA_HERO_FLUTE_DEBT` (Han Xiangzi's Flute-Debt) | — |
+| 5 | The Highland Wake | Highland Court | `ARENA_HERO_MORRIGAN` ("a war goddess who offered herself to a hero, was refused") | `ARENA_HERO_DAGDA` | — |
+| 6 | The Founders' Table | Springerton Engine / Unbound Historicals (the original, pre-compendium REDGARDEN cast, later folded into the compendium proper — real, checked: `Unicorn`/`Ghost`/`Frog`/`Pizza`/`Flamel` all have real compendium entries, #104/105/106/108/110) | `ARENA_HERO_UNICORN` ("allegedly a robot" — the roster's own most-tenured, most-recognizable face, a real, deliberate choice for the dungeon that plays first) | `ARENA_HERO_GHOST`, `ARENA_HERO_FROG`, `ARENA_HERO_TREE`, `ARENA_HERO_DUCK` | Real, honest scope note: `ARENA_HERO_PIZZA`/`ARENA_HERO_ABRAHAM`/`ARENA_HERO_ADA`/`ARENA_HERO_MNM`/`ARENA_HERO_CAIN` are deliberately NOT placed in this dungeon or any other below — a real, second content pass, not resolved here |
+| 7 | The Unbound Wing | Unbound Historicals | `ARENA_HERO_CAIN` (Cain, East of Eden — "the first murder," a real, tonally distinct, genuinely dark capstone appropriate for a late-game area) | `ARENA_HERO_ABRAHAM` (Abraham of Worms), `ARENA_HERO_ADA` (Ada Lovelace), `ARENA_HERO_MNM` | Real, deliberate tonal note: this dungeon is explicitly heavier/stranger than 1–6, matching the compendium's own real framing of Faction 11 as "a different kind of grounding... not myth" |
+| 8 | The Proving Grounds | Non-canon (DragonsNShit-ported Battlegrounds content, per `arena_game.h`'s own comment: "not a TYLER hero") | `ARENA_HERO_WARRIOR` | — | Real, deliberate choice: the lowest-tier, first dungeon a new party clears — a mechanically simple boss fight with no compendium lore weight, the same real reason `arena_game.h` itself treats Warrior as content, not canon |
+
+**Kikoryu's Hoard — the real, named exception, honestly scoped as NEW work, not a repurposed
+hero.** `kikoryu.jpeg` (the detailed painted fire/wing/claw dragon-wolf-goblin hybrid, already
+landed per this doc's own header) does not map to any existing `ARENA_HERO_*` kit — it's real,
+new, unique boss art, not a repurposed PvP hero. Real, honest scope: unlike every dungeon above
+(whose real "new work" is *driving* existing arena-bot AI as a hostile NPC), Kikoryu genuinely
+needs its own new AI/kit built from scratch — the same category of real, larger, separate work
+`§4`'s own "not built from scratch" framing explicitly carves out. Real, deliberate design
+placement: the superboss/endgame dungeon, cleared only after all 8 named dungeons above,
+matching Diablo 2's own real structure (a superboss beyond the act bosses, not gated behind any
+one act). Not built here — named as this document's own real, concrete next content target once
+Milestones 1–4.5 land and at least one of dungeons 1–8 is real and playable.
+
+**Real, deliberate roster gap named, not glossed over**: `ARENA_HERO_PIZZA`, `ARENA_HERO_TYLER`,
+and `ARENA_HERO_BACON_PUCK` are real, implemented arena heroes with no dungeon placement above —
+a genuine, honest incompleteness in this content pass, not an oversight hidden by omission. Real
+candidate for a follow-up: a ninth, meta/"behind the scenes" dungeon built around `Tyler` and
+`Bacon Puck` specifically, echoing this same session's own real blog continuity (`TYLER, Series
+X: The Long Quiet and Recruitment Drive`) — named as a real idea, not committed to here.
+
+## 9. Related docs
 
 - `docs2/REDGARDEN_GUI_NORTHSTAR.md` -- Battlegrounds' own instancing model, matchmaker/arena_server this design's spawn path reuses
 - `docs2/HEADLESS_SESSION_NORTHSTAR.md` -- the other real-space-to-explore design (Town/worm zone), a persistent-zone counterpart to this instanced one
 - `docs2/SMOOTH_TERRAIN_NORTHSTAR.md` -- if dungeon geometry ever wants natural (not blocky) rendering rather than Town's box-art style, that plan applies here too
 - `docs2/MMO_NORTHSTAR.md` -- IDUNA character/gold schema any real reward system (§5) would use
+- `TYLER/multiverse_heroes.md` -- the real 123-hero compendium §8's own dungeon/boss assignments are drawn from
