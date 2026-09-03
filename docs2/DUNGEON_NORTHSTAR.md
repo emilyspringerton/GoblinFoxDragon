@@ -157,7 +157,7 @@ sprites, per founder direction.
 | # | Milestone | Acceptance | Status |
 |---|---|---|---|
 | 0 | This northstar | Written, registered in golden-docs-index | DONE |
-| 1 | Dungeon server binary + instancing | New `--server-bin` spawns via the matchmaker's existing fork/exec path, client receives a real "you're in a dungeon, here's the port" message | NOT STARTED |
+| 1 | Dungeon server binary + instancing | New `--server-bin` spawns via the matchmaker's existing fork/exec path, client receives a real "you're in a dungeon, here's the port" message | IN PROGRESS -- real seed/mode transport shipped 2026-09-03 (REDGARDEN commit `4bb46b9`): `MatchFoundMsg` carries a real per-match `seed`+`mode`, matchmaker generates+passes the seed to the spawned server, `arena_server` seeds its own RNG from it when present. `--mode dungeon` CLI flag exists on the matchmaker but no dungeon server binary consumes `mode=1` yet -- that binary itself, and party-roster passthrough, are the real remaining work in this milestone. |
 | 2 | Seeded room/corridor generator | Multi-room layout, connected, reachable entrance-to-boss-room, regenerates differently per instance | NOT STARTED |
 | 3 | Mob/boss population from arena heroes | Seeded spawn table places hero-kit-driven hostile NPCs per room + a boss in the final room, using existing `apps/arena_bot` AI | NOT STARTED |
 | 4 | Client dungeon render mode | New mode walks the generated space, fights populated mobs, using Battlegrounds' existing combat HUD | NOT STARTED |
