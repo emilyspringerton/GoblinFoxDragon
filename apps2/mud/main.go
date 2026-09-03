@@ -5107,7 +5107,13 @@ func cmdInventory(p *player) {
 	}
 	sort.Strings(ids)
 	for _, id := range ids {
-		p.sendf("  %-30s  x%d", itemName(id), p.inventory[id])
+		// Trailing [id] (3455435, "listing items on the GFD auction house should work"): the
+		// battlegrounds_gui client's Sell screen needs the real item ID to build "ah sell
+		// <item-id> <price>" -- itemName(id) is a display string, not the ID, and this was the
+		// one real place that ID never reached the client at all (ahBrowse/ahSell already print
+		// it fine, cmdInventory just never did). Same bracket-id convention ah_parse_rows
+		// already extracts from every other AH screen (categories, my listings).
+		p.sendf("  %-30s  x%d  [%s]", itemName(id), p.inventory[id], id)
 	}
 	p.prompt()
 }

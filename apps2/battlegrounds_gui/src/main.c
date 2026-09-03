@@ -5030,13 +5030,26 @@ static void chat_send_or_command(const char *text) {
 #define AH_MAX_ROWS 20
 #define AH_ROW_MAX 96
 #define AH_ID_MAX 40
-typedef enum { AH_CLOSED = 0, AH_MAIN, AH_CATEGORIES, AH_CATEGORY_ITEMS, AH_MY_LISTINGS } AHScreen;
+/* AH_SELL_ITEMS/AH_SELL_PRICE (3455435, "listing items on the GFD auction house should work"):
+ * real gap found live reading this file's own doc comments -- the menu could browse, view your
+ * own listings, and cancel one, but had NO way to actually create a new listing at all; the only
+ * real path was typing a raw "/ah sell <item-id> <price>" slash command, defeating the entire
+ * point of an "arrow keys and enter just like ffxi" menu. AH_SELL_ITEMS lists the player's own
+ * inventory (real item IDs now included, see cmdInventory's own doc comment in apps2/mud);
+ * AH_SELL_PRICE is a small numeric text-entry step, same real SDL_TEXTINPUT mechanism chat_input
+ * already uses, scoped to digits only. */
+typedef enum { AH_CLOSED = 0, AH_MAIN, AH_CATEGORIES, AH_CATEGORY_ITEMS, AH_MY_LISTINGS, AH_SELL_ITEMS, AH_SELL_PRICE } AHScreen;
 static AHScreen g_ah_screen = AH_CLOSED;
 static int g_ah_selected = 0;
 static char g_ah_rows[AH_MAX_ROWS][AH_ROW_MAX];
 static char g_ah_row_ids[AH_MAX_ROWS][AH_ID_MAX]; /* "" for a row with no real bracketed [id] -- header/instructional lines */
 static int g_ah_row_count = 0;
 static char g_ah_title[64] = "";
+#define AH_PRICE_INPUT_MAX 12
+static int g_ah_price_input_active = 0;
+static char g_ah_price_buf[AH_PRICE_INPUT_MAX] = "";
+static char g_ah_pending_item[AH_ID_MAX] = ""; /* the real item ID chosen on AH_SELL_ITEMS, carried into the price step */
+static char g_ah_pending_item_label[AH_ROW_MAX] = ""; /* that row's own display text, shown again during price entry so the player can confirm what they're selling */
 
 /* ah_parse_rows: same line-splitting/noise-filtering shape town_send_command's own combat-log
  * parser already uses, generalized to ALSO capture whatever's inside a line's first "[...]" as
@@ -5078,14 +5091,26 @@ static void ah_open(void) {
     g_ah_screen = AH_MAIN;
     g_ah_selected = 0;
     snprintf(g_ah_title, sizeof(g_ah_title), "AUCTION HOUSE");
-    g_ah_row_count = 3;
+    g_ah_row_count = 4;
     snprintf(g_ah_rows[0], AH_ROW_MAX, "Browse Categories");
     snprintf(g_ah_rows[1], AH_ROW_MAX, "My Listings");
-    snprintf(g_ah_rows[2], AH_ROW_MAX, "Close");
-    g_ah_row_ids[0][0] = g_ah_row_ids[1][0] = g_ah_row_ids[2][0] = '\0';
+    snprintf(g_ah_rows[2], AH_ROW_MAX, "Sell an Item"); /* 3455435 */
+    snprintf(g_ah_rows[3], AH_ROW_MAX, "Close");
+    g_ah_row_ids[0][0] = g_ah_row_ids[1][0] = g_ah_row_ids[2][0] = g_ah_row_ids[3][0] = '\0';
 }
 
-static void ah_close(void) { g_ah_screen = AH_CLOSED; }
+static void ah_close(void) {
+    g_ah_screen = AH_CLOSED;
+    /* Defensive (3455435): every real path into AH_SELL_PRICE also gets its own real exit
+       (submit or ah_cancel_price_input), but this stops text input unconditionally too in case
+       any future screen transition reaches ah_close() directly while price entry was somehow
+       still active, rather than leaving SDL's text-input mode stuck on. */
+    if (g_ah_price_input_active) {
+        g_ah_price_input_active = 0;
+        g_ah_price_buf[0] = '\0';
+        SDL_StopTextInput();
+    }
+}
 
 /* ah_fetch: the same real HTTP round-trip town_send_command uses (/api/town/command against
  * apps2/mud's own headless-session dispatch), but returns the raw output text directly instead
@@ -5165,6 +5190,59 @@ static void ah_enter_my_listings(SDL_Window *win, int win_w, int win_h) {
     snprintf(g_ah_title, sizeof(g_ah_title), "AUCTION HOUSE - MY LISTINGS (enter to cancel)");
 }
 
+/* ah_enter_sell_items (3455435): the real Sell flow's first step -- fetches the player's own
+ * inventory (real "inventory" mud command, its own [item-id] bracket now included specifically
+ * for this, see cmdInventory's own doc comment) and lists it exactly like every other AH row
+ * list, reusing ah_parse_rows unchanged. Enter on a row moves to AH_SELL_PRICE (see
+ * ah_handle_enter's own AH_SELL_ITEMS case) rather than doing anything here directly. */
+static void ah_enter_sell_items(SDL_Window *win, int win_w, int win_h) {
+    ah_draw_loading(win, win_w, win_h);
+    char text[4096];
+    if (ah_fetch("inventory", text, sizeof(text))) {
+        ah_parse_rows(text);
+    } else {
+        g_ah_row_count = 0;
+    }
+    g_ah_screen = AH_SELL_ITEMS;
+    g_ah_selected = 0;
+    snprintf(g_ah_title, sizeof(g_ah_title), "AUCTION HOUSE - SELL (choose an item)");
+}
+
+/* ah_cancel_price_input (3455435): Escape during price entry -- returns to the item picker
+ * (re-fetches inventory since the player might come back and pick something else; cheap, and
+ * keeps this consistent with every other screen transition in this menu always fetching fresh
+ * state rather than caching). Does NOT list anything -- a cancelled price entry is a real no-op,
+ * same "no commitment on a cancel" convention g_ground_target_pending_slot's own doc comment
+ * elsewhere in this file already establishes for targeted actions. */
+static void ah_cancel_price_input(SDL_Window *win, int win_w, int win_h) {
+    g_ah_price_input_active = 0;
+    g_ah_price_buf[0] = '\0';
+    SDL_StopTextInput();
+    ah_enter_sell_items(win, win_w, win_h);
+}
+
+/* ah_handle_price_submit (3455435): Enter during price entry -- the one real action this whole
+ * Sell flow builds up to. price <= 0 (empty buffer, or somehow all-zero) is a silent no-op, same
+ * convention as every other real-commitment action in this file (nothing sent, nothing spent) --
+ * matches market.List's own real ErrInvalidPrice boundary, checked here too so a malformed
+ * request is never even sent rather than relying on the server to reject it. On success, routes
+ * through town_send_command exactly like every other real AH action in this menu (cancel,
+ * browse) -- no second, client-only economy -- then jumps to My Listings so the player sees the
+ * real new listing immediately, the same "confirm by showing the result" precedent
+ * ah_handle_enter's own AH_MY_LISTINGS cancel case already uses. */
+static void ah_handle_price_submit(SDL_Window *win, int win_w, int win_h) {
+    int price = atoi(g_ah_price_buf);
+    if (price <= 0) return;
+    char cmd[80];
+    snprintf(cmd, sizeof(cmd), "ah sell %s %d", g_ah_pending_item, price);
+    g_ah_price_input_active = 0;
+    g_ah_price_buf[0] = '\0';
+    SDL_StopTextInput();
+    ah_draw_loading(win, win_w, win_h);
+    town_send_command(cmd);
+    ah_enter_my_listings(win, win_w, win_h);
+}
+
 /* ah_handle_enter: the one real action this menu takes beyond navigation -- cancelling your own
  * listing (ah cancel <id>, a real cmdAH subcommand). Everything else Enter does is pure
  * navigation between screens; see this file's own AUCTION HOUSE doc comment for why buying a
@@ -5176,6 +5254,7 @@ static void ah_handle_enter(SDL_Window *win, int win_w, int win_h) {
         case AH_MAIN:
             if (g_ah_selected == 0) ah_enter_categories(win, win_w, win_h);
             else if (g_ah_selected == 1) ah_enter_my_listings(win, win_w, win_h);
+            else if (g_ah_selected == 2) ah_enter_sell_items(win, win_w, win_h); /* 3455435 */
             else ah_close();
             break;
         case AH_CATEGORIES:
@@ -5192,6 +5271,22 @@ static void ah_handle_enter(SDL_Window *win, int win_w, int win_h) {
                 ah_enter_my_listings(win, win_w, win_h); /* refresh -- the cancelled listing should be gone now */
             }
             break;
+        case AH_SELL_ITEMS:
+            /* 3455435: picking an item doesn't list it yet -- it moves to the price step, same
+               "confirm the price before anything real happens" flow the FFXI Sell screen this
+               whole menu is modeled on uses. */
+            if (g_ah_row_ids[g_ah_selected][0]) {
+                snprintf(g_ah_pending_item, sizeof(g_ah_pending_item), "%s", g_ah_row_ids[g_ah_selected]);
+                snprintf(g_ah_pending_item_label, sizeof(g_ah_pending_item_label), "%s", g_ah_rows[g_ah_selected]);
+                g_ah_price_buf[0] = '\0';
+                g_ah_price_input_active = 1;
+                g_ah_screen = AH_SELL_PRICE;
+                snprintf(g_ah_title, sizeof(g_ah_title), "AUCTION HOUSE - SELL (enter price)");
+                SDL_StartTextInput();
+            }
+            break;
+        case AH_SELL_PRICE:
+            break; /* handled by g_ah_price_input_active's own text/key capture below, not row-based Enter */
         default:
             break;
     }
@@ -5207,7 +5302,15 @@ static void ah_handle_back(SDL_Window *win, int win_w, int win_h) {
             break;
         case AH_CATEGORIES:
         case AH_MY_LISTINGS:
+        case AH_SELL_ITEMS: /* 3455435 */
             ah_open();
+            break;
+        case AH_SELL_PRICE:
+            /* Not normally reached this way -- Backspace during price entry edits the price
+               buffer instead (see g_ah_price_input_active's own dispatch in the event loop),
+               same "text-entry Backspace means erase a character" precedence chat_input_active
+               already establishes. Kept as a defensive fallback, not dead code by design. */
+            ah_cancel_price_input(win, win_w, win_h);
             break;
         default:
             ah_close();
@@ -5224,7 +5327,11 @@ static void ah_handle_back(SDL_Window *win, int win_w, int win_h) {
 static void ah_draw(int win_w, int win_h) {
     if (g_ah_screen == AH_CLOSED) return;
     float panel_w = 520.0f, row_h = 22.0f;
-    float panel_h = 60.0f + row_h * (float)(g_ah_row_count > 0 ? g_ah_row_count : 1);
+    /* AH_SELL_PRICE (3455435) shows 2 fixed lines (the chosen item + the price prompt), not the
+       row list -- sized on its own rather than g_ah_row_count, which still holds AH_SELL_ITEMS'
+       own stale inventory row count at this point. */
+    int display_rows = (g_ah_screen == AH_SELL_PRICE) ? 2 : (g_ah_row_count > 0 ? g_ah_row_count : 1);
+    float panel_h = 60.0f + row_h * (float)display_rows;
     float x0 = (float)win_w / 2.0f - panel_w / 2.0f;
     float y0 = (float)win_h / 2.0f - panel_h / 2.0f;
     glEnable(GL_BLEND);
@@ -5243,10 +5350,27 @@ static void ah_draw(int win_w, int win_h) {
     glColor3f(0.85f, 0.7f, 0.3f);
     draw_string(g_ah_title, x0 + 16.0f, y0 + panel_h - 28.0f, 12);
     glColor3f(0.5f, 0.55f, 0.55f);
-    draw_string("UP/DOWN - select   ENTER - confirm   BACKSPACE - back   ESC - close",
-                x0 + 16.0f, y0 + panel_h - 46.0f, 7);
+    if (g_ah_screen == AH_SELL_PRICE) {
+        draw_string("TYPE A NUMBER   ENTER - list it   BACKSPACE - erase   ESC - cancel",
+                    x0 + 16.0f, y0 + panel_h - 46.0f, 7);
+    } else {
+        draw_string("UP/DOWN - select   ENTER - confirm   BACKSPACE - back   ESC - close",
+                    x0 + 16.0f, y0 + panel_h - 46.0f, 7);
+    }
 
     float row_y = y0 + panel_h - 70.0f;
+
+    if (g_ah_screen == AH_SELL_PRICE) {
+        glColor3f(0.85f, 0.9f, 0.7f);
+        draw_string(g_ah_pending_item_label, x0 + 16.0f, row_y, 9);
+        row_y -= row_h;
+        char prompt[AH_ROW_MAX];
+        snprintf(prompt, sizeof(prompt), "Price (flow): %s_", g_ah_price_buf);
+        glColor3f(1.0f, 0.9f, 0.6f);
+        draw_string(prompt, x0 + 16.0f, row_y, 10);
+        return;
+    }
+
     for (int i = 0; i < g_ah_row_count; i++) {
         if (i == g_ah_selected) {
             glEnable(GL_BLEND);
@@ -5870,6 +5994,30 @@ int main(int argc, char *argv[]) {
                    as chat_input_active's own precedence. */
                 if (g_ah_screen != AH_CLOSED) {
                     if (te.type == SDL_QUIT) { running = 0; }
+                    /* Price entry (3455435): checked first within this block, same
+                       "text-input mode consumes its own keys/text before ordinary
+                       navigation" precedence chat_input_active establishes above --
+                       otherwise a digit typed here would also try to move the row
+                       selection or whatever else a stray key might do. Digits only,
+                       filtered here rather than trusting SDL_TEXTINPUT to only ever
+                       send them (a real player could paste/IME garbage in). */
+                    else if (g_ah_price_input_active && te.type == SDL_TEXTINPUT) {
+                        size_t len = strlen(g_ah_price_buf);
+                        for (const char *c = te.text.text; *c && len < AH_PRICE_INPUT_MAX - 1; c++) {
+                            if (*c >= '0' && *c <= '9') g_ah_price_buf[len++] = *c;
+                        }
+                        g_ah_price_buf[len] = '\0';
+                    }
+                    else if (g_ah_price_input_active && te.type == SDL_KEYDOWN) {
+                        if (te.key.keysym.sym == SDLK_RETURN || te.key.keysym.sym == SDLK_KP_ENTER) {
+                            ah_handle_price_submit(win, win_w, win_h);
+                        } else if (te.key.keysym.sym == SDLK_BACKSPACE) {
+                            size_t len = strlen(g_ah_price_buf);
+                            if (len > 0) g_ah_price_buf[len - 1] = '\0';
+                        } else if (te.key.keysym.sym == SDLK_ESCAPE) {
+                            ah_cancel_price_input(win, win_w, win_h);
+                        }
+                    }
                     else if (te.type == SDL_KEYDOWN) {
                         if (te.key.keysym.sym == SDLK_UP) {
                             g_ah_selected = (g_ah_row_count > 0) ? (g_ah_selected - 1 + g_ah_row_count) % g_ah_row_count : 0;
