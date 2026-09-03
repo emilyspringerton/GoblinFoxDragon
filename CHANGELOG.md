@@ -1,4 +1,25 @@
 ## 2026-09-03
+- feat(mud): real `hatshop` command -- Town proxy to the real BRAWLPIT hat store (kanban
+  `WTHS-012010`: "there is already a hat shop in town that could be a proxy to the BrawlPit hat
+  shop allowing you to purchase brawlpit hats with GFD flow"). Real, checked-live finding: no
+  literal hat-selling NPC exists in `npcVendorCatalog` today -- the founder's own framing reads
+  as "there's already a shop mechanism in Town, reuse it as a proxy," not a pre-existing hat
+  catalog. New `server/idunaclient` methods (`ListHats`/`BuyHat`/`ListCharacterHats`) call
+  IDUNA's own real hat-store API (`WOTAN_HAT_STORE_NORTHSTAR.md` Phase 1, IDUNA commit
+  `5bf170c`) directly, 5 new tests against a real `httptest.Server`. New MUD commands `hatshop`
+  (catalog), `hatshop buy <hat-id>`, `hatshop mine` (owned hats) -- a real, deliberate
+  architectural difference from the existing `shop`/`cmdShopBuy` (which deducts `p.flow`
+  LOCALLY and relies on periodic sync to reconcile with IDUNA): a hat purchase spends Flow via a
+  real, atomic transaction on IDUNA's own side first, so `cmdHatShopBuy` re-fetches the real,
+  authoritative balance afterward via `GetCharacter` rather than guessing the new local value,
+  and updates `headlessSyncedFlow` so the periodic delta-sync doesn't later see a stale
+  mismatch. `go build/vet/test ./...` all clean (the one pre-existing `go vet` warning in
+  `apps2/server-go` is unrelated, confirmed via `git stash`). **Real, live, end-to-end proof**:
+  redeployed the live IDUNA instance with the new hat-store routes (real backup taken of
+  `var/iduna.db` first, careful manual restart after the earlier session's own matchmaker
+  incident), then ran a full probe as the real `DRAGONSNSHIT-MUD` agent -- created a real test
+  character, credited Flow, bought a real hat (150 Flow deducted correctly), confirmed
+  ownership via `ListCharacterHats`, and confirmed a duplicate purchase correctly fails.
 - feat(mob): real Milestone 3 seeded dungeon spawn table (kanban `534432532` "GFD dungeons",
   `docs2/DUNGEON_NORTHSTAR.md` Milestone 3). New `server/mob/dungeon.go`: `DungeonRoster` carries
   §7's real 8-named-dungeon boss/elite content pass as real Go data (not re-derived); consumes a

@@ -563,3 +563,98 @@ func (c *Client) GetChatMessages(sinceID int64, limit int) ([]ChatMessage, error
 	}
 	return msgs, nil
 }
+
+// Hat is one catalog entry from GET /api/v1/hats (WOTAN_HAT_STORE_NORTHSTAR.md Phase 1, IDUNA
+// commit 5bf170c). image_asset is a plain placeholder string today (an emoji codepoint, see
+// that migration's own seed data) -- no real image asset pipeline exists yet.
+type Hat struct {
+	HatID       string `json:"hat_id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	FlowCost    int    `json:"flow_cost"`
+	ImageAsset  string `json:"image_asset"`
+}
+
+// ListHats fetches the real BRAWLPIT hat catalog (kanban WTHS-012010: "there is already a hat
+// shop in town that could be a proxy to the BrawlPit hat shop allowing you to purchase brawlpit
+// hats with GFD flow"). Ordered by flow_cost ascending, matching IDUNA's own handler.
+func (c *Client) ListHats() ([]Hat, error) {
+	req, _ := http.NewRequest(http.MethodGet, c.baseURL+"/api/v1/hats", nil)
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, fmt.Errorf("idunaclient: ListHats: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+	var hats []Hat
+	if err := json.NewDecoder(resp.Body).Decode(&hats); err != nil {
+		return nil, fmt.Errorf("idunaclient: ListHats decode: %w", err)
+	}
+	return hats, nil
+}
+
+// BuyHat purchases a real BRAWLPIT hat for a real DragonsNShit character, spending Flow
+// atomically on IDUNA's own side (POST /api/v1/characters/:id/hats/buy -- one real DB
+// transaction: deduct + grant ownership together, IDUNA commit 5bf170c). ErrInsufficientGold is
+// the same real sentinel DeductGold already uses -- hats spend the SAME real Flow balance
+// (IDUNA's characters.gold_balance column), not a separate currency. ErrConflict means the
+// character already owns this hat.
+func (c *Client) BuyHat(characterID, hatID string) error {
+	body, _ := json.Marshal(map[string]string{"hat_id": hatID})
+	req, _ := http.NewRequest(http.MethodPost,
+		c.baseURL+"/api/v1/characters/"+characterID+"/hats/buy",
+		bytes.NewReader(body))
+	resp, err := c.do(req)
+	if err != nil {
+		return fmt.Errorf("idunaclient: BuyHat: %w", err)
+	}
+	defer resp.Body.Close()
+	switch resp.StatusCode {
+	case http.StatusNoContent, http.StatusOK:
+		return nil
+	case http.StatusConflict:
+		// IDUNA's own handler returns 409 for BOTH "insufficient Flow" and "hat already owned"
+		// -- real, honest ambiguity this client can't resolve without re-reading the response
+		// body, which every other sentinel-error method in this file already declines to do
+		// (see DeductGold's own identical 409 handling). ErrInsufficientGold is the more common
+		// real case (a shop flow always checks the catalog price against the player's own real
+		// balance before offering to buy), callers needing to distinguish the rarer
+		// already-owned case should check ListCharacterHats first.
+		return ErrInsufficientGold
+	case http.StatusNotFound:
+		return ErrNotFound
+	default:
+		return fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+}
+
+// OwnedHat is one entry from GET /api/v1/characters/:id/hats.
+type OwnedHat struct {
+	HatID       string `json:"hat_id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	ImageAsset  string `json:"image_asset"`
+	AcquiredAt  string `json:"acquired_at"`
+	Equipped    bool   `json:"equipped"`
+}
+
+// ListCharacterHats fetches a real character's own owned hats.
+func (c *Client) ListCharacterHats(characterID string) ([]OwnedHat, error) {
+	req, _ := http.NewRequest(http.MethodGet,
+		c.baseURL+"/api/v1/characters/"+characterID+"/hats", nil)
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, fmt.Errorf("idunaclient: ListCharacterHats: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+	var hats []OwnedHat
+	if err := json.NewDecoder(resp.Body).Decode(&hats); err != nil {
+		return nil, fmt.Errorf("idunaclient: ListCharacterHats decode: %w", err)
+	}
+	return hats, nil
+}

@@ -210,3 +210,109 @@ func TestMintBattlegroundsTicketNotFound(t *testing.T) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
 }
+
+// Hats -- kanban WTHS-012010 ("there is already a hat shop in town that could be a proxy to the
+// BrawlPit hat shop allowing you to purchase brawlpit hats with GFD flow from the GFD town").
+
+func TestListHatsSuccess(t *testing.T) {
+	var gotPath, gotMethod string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotMethod = r.Method
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode([]Hat{
+			{HatID: "hat-1", Name: "Joystick Cap", Description: "test", FlowCost: 150, ImageAsset: "🎮"},
+			{HatID: "hat-2", Name: "Top Hat", Description: "test", FlowCost: 250, ImageAsset: "🎩"},
+		})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	hats, err := c.ListHats()
+	if err != nil {
+		t.Fatalf("ListHats: unexpected error: %v", err)
+	}
+	if gotMethod != http.MethodGet {
+		t.Errorf("expected GET, got %s", gotMethod)
+	}
+	if gotPath != "/api/v1/hats" {
+		t.Errorf("expected /api/v1/hats, got %s", gotPath)
+	}
+	if len(hats) != 2 || hats[0].HatID != "hat-1" || hats[1].FlowCost != 250 {
+		t.Errorf("unexpected hats: %+v", hats)
+	}
+}
+
+func TestBuyHatSuccess(t *testing.T) {
+	var gotPath, gotMethod, gotBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotMethod = r.Method
+		b, _ := io.ReadAll(r.Body)
+		gotBody = string(b)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	if err := c.BuyHat("char-1", "hat-1"); err != nil {
+		t.Fatalf("BuyHat: unexpected error: %v", err)
+	}
+	if gotMethod != http.MethodPost {
+		t.Errorf("expected POST, got %s", gotMethod)
+	}
+	if gotPath != "/api/v1/characters/char-1/hats/buy" {
+		t.Errorf("expected /api/v1/characters/char-1/hats/buy, got %s", gotPath)
+	}
+	if gotBody != `{"hat_id":"hat-1"}` {
+		t.Errorf(`expected body {"hat_id":"hat-1"}, got %s`, gotBody)
+	}
+}
+
+func TestBuyHatInsufficientFlow(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusConflict)
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	if err := c.BuyHat("char-1", "hat-1"); err != ErrInsufficientGold {
+		t.Fatalf("expected ErrInsufficientGold, got %v", err)
+	}
+}
+
+func TestBuyHatNotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	if err := c.BuyHat("char-1", "no-such-hat"); err != ErrNotFound {
+		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestListCharacterHatsSuccess(t *testing.T) {
+	var gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode([]OwnedHat{
+			{HatID: "hat-1", Name: "Joystick Cap", Equipped: true, AcquiredAt: "2026-09-03T00:00:00Z"},
+		})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	hats, err := c.ListCharacterHats("char-1")
+	if err != nil {
+		t.Fatalf("ListCharacterHats: unexpected error: %v", err)
+	}
+	if gotPath != "/api/v1/characters/char-1/hats" {
+		t.Errorf("expected /api/v1/characters/char-1/hats, got %s", gotPath)
+	}
+	if len(hats) != 1 || !hats[0].Equipped {
+		t.Errorf("unexpected hats: %+v", hats)
+	}
+}

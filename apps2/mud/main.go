@@ -14,6 +14,7 @@ import (
 	crand "crypto/rand"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -2376,6 +2377,28 @@ func handle(p *player, line string) {
 			p.send("Usage: shop  |  shop buy <item-id>  |  shop sell <item-id>")
 			p.prompt()
 		}
+	// hatshop -- kanban WTHS-012010 ("there is already a hat shop in town that could be a proxy
+	// to the BrawlPit hat shop allowing you to purchase brawlpit hats with GFD flow"). A real,
+	// separate command from `shop` above -- this proxies IDUNA's own real hat-store API
+	// (WOTAN_HAT_STORE_NORTHSTAR.md Phase 1) rather than the local npcVendorCatalog, since a hat
+	// purchase spends Flow via a real, atomic server-side transaction on IDUNA's own end, not
+	// this process's own local p.flow bookkeeping.
+	case "hatshop":
+		if len(args) == 0 {
+			cmdHatShopList(p)
+		} else if args[0] == "buy" {
+			if len(args) < 2 {
+				p.send("Usage: hatshop buy <hat-id>")
+				p.prompt()
+				return
+			}
+			cmdHatShopBuy(p, args[1])
+		} else if args[0] == "mine" {
+			cmdHatShopMine(p)
+		} else {
+			p.send("Usage: hatshop  |  hatshop buy <hat-id>  |  hatshop mine")
+			p.prompt()
+		}
 	case "sethome":
 		if p.homePoint.IsKO {
 			p.send("Cannot set home while KO'd.")
@@ -4430,6 +4453,93 @@ func cmdShopSell(p *player, itemID string) {
 	p.inventory[itemID]--
 	p.flow += sellPrice
 	p.sendf("You sell %s to %s for %d flow. (Flow: %d)", itemName(itemID), npc.Name, sellPrice, p.flow)
+	p.prompt()
+}
+
+// cmdHatShopList — real, live catalog fetch from IDUNA's own real hat-store API (kanban
+// WTHS-012010). No local caching -- a real, small catalog (6 hats as of this writing), fetched
+// fresh every time, same real "no caching, small enough not to matter yet" scope the AH's own
+// browse commands already accept.
+func cmdHatShopList(p *player) {
+	hats, err := gw.iduna.ListHats()
+	if err != nil {
+		p.send("The hat shop is unavailable right now.")
+		p.prompt()
+		return
+	}
+	p.send("\r\n=== BrawlPit Hat Shop (WOTAN, paid in real Flow) ===")
+	for _, h := range hats {
+		p.sendf("  %-24s  %4d flow  (hatshop buy %s)", h.Name, h.FlowCost, h.HatID)
+	}
+	p.send("  View your own hats: hatshop mine")
+	p.prompt()
+}
+
+// cmdHatShopBuy — real, atomic purchase via IDUNA's own real POST /api/v1/characters/:id/hats/
+// buy (WOTAN_HAT_STORE_NORTHSTAR.md Phase 1, IDUNA commit 5bf170c: one real DB transaction,
+// Flow deduct + ownership grant together). Real, deliberate architectural difference from
+// npcVendorCatalog's own cmdShopBuy: that command deducts p.flow LOCALLY and relies on the
+// periodic headless-session sync (see runHeadlessCommand's own CreditGold/DeductGold delta
+// sync) to eventually reconcile with IDUNA -- a hat purchase instead spends Flow on IDUNA's own
+// side FIRST (the real source of truth), so this re-fetches the real, authoritative balance
+// afterward rather than guessing the new local value, and updates headlessSyncedFlow to match so
+// that same periodic sync doesn't later see a stale local/remote mismatch and double-adjust.
+func cmdHatShopBuy(p *player, hatID string) {
+	charID, ok := gw.charIDBySlot[p.slot]
+	if !ok || charID == "" {
+		p.send("No character record found for hat purchases.")
+		p.prompt()
+		return
+	}
+	if err := gw.iduna.BuyHat(charID, hatID); err != nil {
+		switch {
+		case errors.Is(err, idunaclient.ErrInsufficientGold):
+			// Real, honest ambiguity named directly in idunaclient.BuyHat's own doc comment:
+			// IDUNA's handler returns 409 for both insufficient Flow AND an already-owned hat.
+			p.send("You can't buy that hat right now -- not enough Flow, or you already own it.")
+		case errors.Is(err, idunaclient.ErrNotFound):
+			p.send("The hat shop doesn't carry that hat.")
+		default:
+			p.send("The hat shop couldn't complete that purchase right now.")
+		}
+		p.prompt()
+		return
+	}
+	if ch, err := gw.iduna.GetCharacter(charID); err == nil {
+		p.flow = ch.GoldBalance
+		p.headlessSyncedFlow = p.flow
+	}
+	p.sendf("You bought a hat for your BrawlPit fighter! (Flow: %d)", p.flow)
+	p.prompt()
+}
+
+// cmdHatShopMine — real, live fetch of a character's own owned hats from IDUNA.
+func cmdHatShopMine(p *player) {
+	charID, ok := gw.charIDBySlot[p.slot]
+	if !ok || charID == "" {
+		p.send("No character record found.")
+		p.prompt()
+		return
+	}
+	hats, err := gw.iduna.ListCharacterHats(charID)
+	if err != nil {
+		p.send("Could not fetch your hats right now.")
+		p.prompt()
+		return
+	}
+	if len(hats) == 0 {
+		p.send("You don't own any BrawlPit hats yet -- try: hatshop")
+		p.prompt()
+		return
+	}
+	p.send("\r\n=== Your BrawlPit Hats ===")
+	for _, h := range hats {
+		eq := ""
+		if h.Equipped {
+			eq = " (equipped)"
+		}
+		p.sendf("  %s%s", h.Name, eq)
+	}
 	p.prompt()
 }
 
