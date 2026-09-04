@@ -1,0 +1,10 @@
+[
+  {"name": "The Sealed Archive", "boss": "ARENA_HERO_CART", "elite": ["ARENA_HERO_NOOR1"]},
+  {"name": "The Frequency Table", "boss": "ARENA_HERO_PAIMON", "elite": ["ARENA_HERO_VASSAGO", "ARENA_HERO_BELETH", "ARENA_HERO_ZAGAN", "ARENA_HERO_DOC_WHEEL"]},
+  {"name": "The Remnant's Hall", "boss": "ARENA_HERO_GUNNR", "elite": ["ARENA_HERO_LOKI", "ARENA_HERO_GARY", "ARENA_HERO_COURIER"]},
+  {"name": "East of the Wall", "boss": "ARENA_HERO_HE_XIANGU", "elite": ["ARENA_HERO_WEATHERMAN", "ARENA_HERO_FLUTE_DEBT"]},
+  {"name": "The Highland Wake", "boss": "ARENA_HERO_MORRIGAN", "elite": ["ARENA_HERO_DAGDA"]},
+  {"name": "The Founders' Table", "boss": "ARENA_HERO_UNICORN", "elite": ["ARENA_HERO_GHOST", "ARENA_HERO_FROG", "ARENA_HERO_TREE", "ARENA_HERO_DUCK"]},
+  {"name": "The Unbound Wing", "boss": "ARENA_HERO_CAIN", "elite": ["ARENA_HERO_ABRAHAM", "ARENA_HERO_ADA", "ARENA_HERO_MNM"]},
+  {"name": "The Proving Grounds", "boss": "ARENA_HERO_WARRIOR", "elite": []}
+]

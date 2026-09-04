@@ -1,3 +1,18 @@
+## 2026-09-04 (12)
+- feat(mob): dungeon roster override, GFD-MOBSPAWN-001 Phase 5 (final phase). New
+  `mob.LoadDungeonRosterOverride(path)`: replaces the package-level `DungeonRoster` from
+  `data/dungeon_roster.json` if present and valid, otherwise keeps the real, compiled-in default
+  (same real compendium-grounded content DUNGEON_NORTHSTAR.md's §7 already established) --
+  unlike `server/mobdrop`/`server/spawn`, this data has a working fallback, so a missing/
+  malformed file degrades gracefully rather than starting empty. Seeded
+  `data/dungeon_roster.json` with the exact same 8 real dungeons. Wired into `apps2/mud`'s own
+  world init, non-fatal on failure. 3 new tests (override replaces the roster, missing file
+  keeps the compiled default, empty array keeps the compiled default -- each restoring
+  `DungeonRoster` afterward so other tests in the package never see a polluted global). `go test
+  ./...` clean. This closes all 5 phases of `GFD-MOBSPAWN-001` -- see
+  `docs2/MOB_SPAWN_NORTHSTAR.md` for the full plan. Live-verified: restarted the real production
+  `apps2/mud`, confirmed the override loads with no warning.
+
 ## 2026-09-04 (11)
 - feat(mob): difficulty-tier variants -- "same model, harder name" (GFD-MOBSPAWN-001 Phase 4).
   New `Mob.DisplayName` field + `Mob.Label()` (falls back to `Kind`), `mob.ApplyVariant` (scales

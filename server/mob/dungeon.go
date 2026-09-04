@@ -1,7 +1,10 @@
 package mob
 
 import (
+	"encoding/json"
+	"fmt"
 	"math/rand"
+	"os"
 
 	"dragonsnshit/server/worldapi"
 )
@@ -23,9 +26,9 @@ import (
 // content pass -- kept here as real Go data (not re-derived) so a seeded spawn table can place
 // the actual named roster, not a placeholder. Order matches the northstar's own table exactly.
 type DungeonBossAssignment struct {
-	Name  string   // dungeon name, e.g. "The Sealed Archive"
-	Boss  string   // real ARENA_HERO_* identifier
-	Elite []string // real ARENA_HERO_* identifiers, may be empty
+	Name  string   `json:"name"`  // dungeon name, e.g. "The Sealed Archive"
+	Boss  string   `json:"boss"`  // real ARENA_HERO_* identifier
+	Elite []string `json:"elite"` // real ARENA_HERO_* identifiers, may be empty
 }
 
 // DungeonRoster is DUNGEON_NORTHSTAR.md §7's 8 named dungeons, real and in-order. Kikoryu's
@@ -41,6 +44,30 @@ var DungeonRoster = []DungeonBossAssignment{
 	{Name: "The Founders' Table", Boss: "ARENA_HERO_UNICORN", Elite: []string{"ARENA_HERO_GHOST", "ARENA_HERO_FROG", "ARENA_HERO_TREE", "ARENA_HERO_DUCK"}},
 	{Name: "The Unbound Wing", Boss: "ARENA_HERO_CAIN", Elite: []string{"ARENA_HERO_ABRAHAM", "ARENA_HERO_ADA", "ARENA_HERO_MNM"}},
 	{Name: "The Proving Grounds", Boss: "ARENA_HERO_WARRIOR", Elite: nil},
+}
+
+// LoadDungeonRosterOverride replaces the package-level DungeonRoster from a JSON file
+// (GFD-MOBSPAWN-001 Phase 5, same real "hardcoded Go table -> JSON + registry -> GUI" pattern
+// already applied to mob drops (server/mobdrop) and spawn toggles (server/spawn) earlier in
+// this same effort). Unlike those two, DungeonRoster stays a real, honest compiled-in default
+// above -- this is real, compendium-grounded content that must keep working even if
+// data/dungeon_roster.json is ever missing or malformed, not a feature that starts out empty.
+// The dungeon-order dependency (dungeonIndex selects DungeonRoster[i % len]) is preserved
+// automatically since this replaces the whole ordered slice, never merges into it.
+func LoadDungeonRosterOverride(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("mob: load dungeon roster override %s: %w", path, err)
+	}
+	var roster []DungeonBossAssignment
+	if err := json.Unmarshal(data, &roster); err != nil {
+		return fmt.Errorf("mob: parse dungeon roster override: %w", err)
+	}
+	if len(roster) == 0 {
+		return fmt.Errorf("mob: dungeon roster override %s is empty, keeping the compiled-in default", path)
+	}
+	DungeonRoster = roster
+	return nil
 }
 
 const (

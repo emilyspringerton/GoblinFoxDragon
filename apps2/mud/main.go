@@ -962,6 +962,11 @@ func initWorld() *world {
 	if err := mobVariantReg.LoadFile("data/mob_variants.json"); err != nil {
 		fmt.Printf("warn: mob variant load: %v (no difficulty-tier variants this run)\n", err)
 	}
+	// Load the dungeon boss/elite roster override (Phase 5). Non-fatal: falls back to the real,
+	// compiled-in mob.DungeonRoster default if the file is missing or malformed.
+	if err := mob.LoadDungeonRosterOverride("data/dungeon_roster.json"); err != nil {
+		fmt.Printf("warn: dungeon roster override: %v (using the compiled-in default roster)\n", err)
+	}
 	variantSpawnedInZone := make(map[string]bool) // "zoneID:displayName" -> already placed one
 	spawnInto := func(zoneID int, mobs []mob.Mob) {
 		for _, m := range mobs {

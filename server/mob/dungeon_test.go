@@ -1,6 +1,7 @@
 package mob
 
 import (
+	"os"
 	"testing"
 
 	"dragonsnshit/server/worldapi"
@@ -89,4 +90,59 @@ func TestGenerateDungeonSpawns_SpawnsRegisterCleanly(t *testing.T) {
 			t.Fatalf("Spawn(%+v) failed: %v", m, err)
 		}
 	}
+}
+
+// withRestoredDungeonRoster saves and restores the real package-level DungeonRoster around a
+// test that mutates it via LoadDungeonRosterOverride, so other tests in this file (which read
+// DungeonRoster directly, e.g. DungeonRoster[0].Boss above) never see a polluted value.
+func withRestoredDungeonRoster(t *testing.T) {
+	t.Helper()
+	original := DungeonRoster
+	t.Cleanup(func() { DungeonRoster = original })
+}
+
+func TestLoadDungeonRosterOverride_ReplacesRoster(t *testing.T) {
+	withRestoredDungeonRoster(t)
+	dir := t.TempDir()
+	path := dir + "/roster.json"
+	if err := writeFile(path, `[{"name":"Test Dungeon","boss":"ARENA_HERO_TEST","elite":["ARENA_HERO_TEST2"]}]`); err != nil {
+		t.Fatalf("writeFile: %v", err)
+	}
+	if err := LoadDungeonRosterOverride(path); err != nil {
+		t.Fatalf("LoadDungeonRosterOverride: %v", err)
+	}
+	if len(DungeonRoster) != 1 || DungeonRoster[0].Name != "Test Dungeon" {
+		t.Fatalf("expected the override to replace DungeonRoster, got %+v", DungeonRoster)
+	}
+}
+
+func TestLoadDungeonRosterOverride_MissingFile_KeepsCompiledDefault(t *testing.T) {
+	withRestoredDungeonRoster(t)
+	original := DungeonRoster
+	if err := LoadDungeonRosterOverride("/nonexistent/path/roster.json"); err == nil {
+		t.Fatal("expected an error for a missing override file")
+	}
+	if len(DungeonRoster) != len(original) {
+		t.Fatal("expected DungeonRoster to stay unchanged after a failed load")
+	}
+}
+
+func TestLoadDungeonRosterOverride_EmptyArray_KeepsCompiledDefault(t *testing.T) {
+	withRestoredDungeonRoster(t)
+	dir := t.TempDir()
+	path := dir + "/empty.json"
+	if err := writeFile(path, `[]`); err != nil {
+		t.Fatalf("writeFile: %v", err)
+	}
+	original := DungeonRoster
+	if err := LoadDungeonRosterOverride(path); err == nil {
+		t.Fatal("expected an error for an empty override array")
+	}
+	if len(DungeonRoster) != len(original) {
+		t.Fatal("expected DungeonRoster to stay unchanged after an empty override")
+	}
+}
+
+func writeFile(path, content string) error {
+	return os.WriteFile(path, []byte(content), 0644)
 }
