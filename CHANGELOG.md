@@ -1,3 +1,13 @@
+## 2026-09-04 (3)
+- feat(login): `GFD-UA-001` ("GFD needs a sign up button that shells out to IDUNA GFD signup
+  form"). Login screen had no sign-up path at all. New `Ctrl+Alt+S` handler (same
+  can't-collide-with-typing special-combo pattern as PITVIPER's own `Ctrl+Alt+I`) calls
+  `SDL_OpenURL` to open `wotan.okemily.com/store.html?signup=1` in the system browser -- that
+  page's real register form (`WOTAN-997`, shipped this session) creates an account through the
+  exact same `/api/v1/auth/email/login` this login screen itself calls, so a freshly-registered
+  account works here immediately. On-screen hint added ("NO ACCOUNT? CTRL+ALT+S TO SIGN UP").
+  WASM rebuilt, redeployed, live-verified. GFD commit `706ca52`.
+
 ## 2026-09-04 (2)
 - feat(town-avatar): GFD-ENRICHMENT-0013 ("port some of the skins from SHANKPIT to GFD as NPCs
   Mobs, even the yellow ronin shell can stand in for our player character for now"). Real,
