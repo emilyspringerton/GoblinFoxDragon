@@ -97,9 +97,13 @@ publishing for it.
   has real PvE content" and "a player can actually see and click on it," and is a real
   prerequisite for `DUNGEON_NORTHSTAR.md`'s own Milestone 4 (client dungeon render mode).
 - **Inventory has no durability** (§5) — a real, live, reported bug, root-caused and scoped, not fixed.
-- **Battlegrounds (the PvP arena mode) is currently reported broken** (`GFD-BG-12444`, open in
-  the priority queue as of this report) — matchmaking, bot pools, or fallout from ongoing
-  REDGARDEN→GFD Battlegrounds migration work; not yet investigated.
+- **Battlegrounds (the PvP arena mode) is currently reported broken, and now root-caused**
+  (`GFD-BG-12444`, `docs2/BATTLEGROUNDS_MIGRATION_NORTHSTAR.md`): GFD has no native
+  matchmaker/arena-server at all — every real match is served by REDGARDEN's own live
+  processes, and GFD's own forked client simulation code (`protocol.h`, `arena_game.c`) has
+  drifted 78/1161 real lines behind REDGARDEN's current, still-evolving copy. A real,
+  founder-level decision among 3 named options (full sync, pin to the fork commit's binaries, or
+  give GFD its own native server) is needed before a fix — not resolved here.
 - **Every job shares one level** (`GFD-XX-1249`, open) — switching job does not reset level to 1
   per-job the way real FFXI does; a real, reported, unfixed bug.
 - **`docs/NORTHSTAR.md`** (note: `docs/`, not `docs2/`) is the repo's oldest architecture doc,

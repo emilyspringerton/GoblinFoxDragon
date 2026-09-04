@@ -1,3 +1,22 @@
+## 2026-09-04 (24)
+- docs: GFD-BG-12444 -- "GFD battlegrounds is down never works... migrating redgarden changes to
+  gfd battlegrounds maybe something broke." Real root-cause investigation, new
+  `docs2/BATTLEGROUNDS_MIGRATION_NORTHSTAR.md`: decisive, checked-live finding -- GFD has no
+  native matchmaker/arena-server of its own at all; every real Battlegrounds match is served by
+  REDGARDEN's own live `red_garden_matchmaker`/`red_garden_arena_server` processes. GFD's own
+  forked client simulation code has drifted from REDGARDEN's current, still-evolving copy:
+  `protocol.h` 78-line diff (new `MatchFoundMsg` seed/mode fields, ground-target cast fields, a
+  new packet type, an `obstacle_hp` snapshot array), `arena_game.c` 1161-line diff (REDGARDEN is
+  900+ lines ahead: build templates, tree-passive HP, Duck's Smoke Bomb, per-hero zone radius).
+  A struct-layout mismatch this size silently corrupts every wire field past the divergence
+  point -- matches the report exactly (connects, but real gameplay breaks). 3 real options
+  named, not resolved: full sync (real, substantial, ongoing recurring cost), pin the client's
+  queue target to a frozen REDGARDEN build at the fork commit (fast, low-risk, freezes
+  features), or give GFD a genuinely native arena server (biggest lift, only real fix to the
+  recurring-drift problem itself). No code changed -- diagnosed and scoped only, same "scope it,
+  don't build now" precedent as `INVENTORY_PERSISTENCE_NORTHSTAR.md`. Registered as golden doc
+  `BG-MIGRATION-NORTH`; `docs2/STACK_CONTINUITY_REPORT.md` §6 updated to point at it.
+
 ## 2026-09-04 (23)
 - fix(battlegrounds_gui): GFD-XX-12441 -- "teleport to town should teleport to home point
   crystal not the dragon gate." `town_telecrystal_return` (the real "return to town" scene
