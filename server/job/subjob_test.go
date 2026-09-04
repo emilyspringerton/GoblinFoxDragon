@@ -216,3 +216,48 @@ func TestSummonerAbilities_UsableThroughRecastTracker(t *testing.T) {
 		t.Error("summon_zagan should still be on its own 3-minute recast immediately after use")
 	}
 }
+
+// GFD-JOB-244122: real ASN ability tests, same shape as SummonerAbilities' own two tests above.
+
+func TestAssassinAbilities_HasVenomAndSiphon(t *testing.T) {
+	want := map[string]bool{"venom": false, "siphon": false}
+	for _, a := range AssassinAbilities() {
+		if a.Job != ASN {
+			t.Errorf("ability %s has Job=%s, want ASN", a.ID, a.Job)
+		}
+		if _, ok := want[a.ID]; !ok {
+			t.Errorf("unexpected ability ID %q in AssassinAbilities", a.ID)
+			continue
+		}
+		want[a.ID] = true
+	}
+	for id, found := range want {
+		if !found {
+			t.Errorf("AssassinAbilities is missing %q", id)
+		}
+	}
+}
+
+func TestAssassinAbilities_SiphonLevelGated(t *testing.T) {
+	rt := NewRecastTracker(AssassinAbilities())
+	if err := rt.Use("siphon", baseTime, 1); err != ErrAbilityLevelGated {
+		t.Fatalf("Use(siphon) at level 1: got %v, want ErrAbilityLevelGated", err)
+	}
+	if err := rt.Use("siphon", baseTime, 5); err != nil {
+		t.Fatalf("Use(siphon) at level 5: unexpected error %v", err)
+	}
+}
+
+func TestAssassinAbilities_VenomUsableThroughRecastTracker(t *testing.T) {
+	rt := NewRecastTracker(AssassinAbilities())
+	if err := rt.Use("venom", baseTime, 1); err != nil {
+		t.Fatalf("Use(venom): unexpected error %v", err)
+	}
+	ready, err := rt.Ready("venom", baseTime)
+	if err != nil {
+		t.Fatalf("Ready: unexpected error %v", err)
+	}
+	if ready {
+		t.Error("venom should still be on its own 3-minute recast immediately after use")
+	}
+}

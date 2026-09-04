@@ -40,10 +40,20 @@ const (
 	SCH = "SCH" // Scholar
 	GEO = "GEO" // Geomancer
 	RUN = "RUN" // Rune Fencer
+
+	// ASN (Assassin) is a real, new, non-FFXI-canonical 23rd job (GFD-JOB-244122, founder:
+	// "NEW CLASS ENFEEBLE DD SUPPORT SUSTAIN (sorta like DNC)... can cast aoe buffs like a
+	// bard for different poisons that have different impacts on the different mob types...
+	// mp regen affordances"). A real, deliberate hybrid: DEX/AGI-focused damage dealer (the
+	// "DD" half) with two support/utility abilities (see subjob.go's AssassinAbilities) --
+	// an AoE poison JA scaled per real mob-Kind resistance (undead-tagged kinds resist it,
+	// matching real FFXI's own undead-resist-poison convention) and an MP-regen support JA
+	// (the "sustain" half, same real mechanism Bard's own Ballad song already uses).
+	ASN = "ASN" // Assassin
 )
 
-// AllJobs lists all 22 base jobs in FFXI definition order.
-var AllJobs = []JobID{WAR, MNK, WHM, BLM, RDM, THF, PLD, DRK, BST, BRD, RNG, SAM, NIN, DRG, SMN, BLU, COR, PUP, DNC, SCH, GEO, RUN}
+// AllJobs lists all 23 jobs in FFXI definition order, plus this repo's own real ASN addition.
+var AllJobs = []JobID{WAR, MNK, WHM, BLM, RDM, THF, PLD, DRK, BST, BRD, RNG, SAM, NIN, DRG, SMN, BLU, COR, PUP, DNC, SCH, GEO, RUN, ASN}
 
 var ErrUnknownJob = errors.New("unknown job ID")
 
@@ -88,6 +98,10 @@ var jobStats = map[JobID]Stats{
 	SCH: {BaseHP: 55,  HPPerLevel: 8,  BaseMP: 95,  MPPerLevel: 15, STR: 4, DEX: 5, VIT: 4, AGI: 5, INT: 8, MND: 8, CHR: 6},
 	GEO: {BaseHP: 60,  HPPerLevel: 9,  BaseMP: 85,  MPPerLevel: 14, STR: 5, DEX: 5, VIT: 5, AGI: 5, INT: 8, MND: 8, CHR: 7},
 	RUN: {BaseHP: 80,  HPPerLevel: 13, BaseMP: 40,  MPPerLevel: 7,  STR: 7, DEX: 7, VIT: 7, AGI: 7, INT: 6, MND: 6, CHR: 6},
+	// ASN: DEX/AGI-focused DD (real STR/DEX/AGI band close to THF/DNC), with enough MP for its
+	// own two real support JAs (venom/siphon, subjob.go) -- not a caster, so BaseMP sits well
+	// below any real magic-user job, closer to PLD/DRK's "some MP for a few real abilities."
+	ASN: {BaseHP: 78,  HPPerLevel: 12, BaseMP: 45,  MPPerLevel: 8,  STR: 7, DEX: 9, VIT: 6, AGI: 8, INT: 5, MND: 6, CHR: 6},
 }
 
 // StatsFor returns the base stats for the given job.

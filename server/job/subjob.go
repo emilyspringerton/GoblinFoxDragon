@@ -245,6 +245,16 @@ func RedMageAbilities() []Ability {
 	}
 }
 
+// AssassinAbilities returns the starter ability set for ASN (GFD-JOB-244122) -- venom (the real
+// AoE poison JA, per-mob-Kind resistance) and siphon (the real MP-regen "sustain" JA, matching
+// the founder's own "sorta like DNC" framing).
+func AssassinAbilities() []Ability {
+	return []Ability{
+		{ID: "venom", Job: ASN, Recast: 3 * time.Minute, MinLevel: 1},
+		{ID: "siphon", Job: ASN, Recast: 5 * time.Minute, MinLevel: 5},
+	}
+}
+
 // ThiefAbilities returns the starter ability set for THF.
 func ThiefAbilities() []Ability {
 	return []Ability{

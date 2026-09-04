@@ -5557,7 +5557,7 @@ func cmdSetJob(p *player, jobID string) {
 	}
 	s, err := job.StatsFor(jobID)
 	if err != nil {
-		p.sendf("Unknown job %q. Use 'jobs' to list all 22 jobs.", jobID)
+		p.sendf("Unknown job %q. Use 'jobs' to list all 23 jobs.", jobID)
 		p.prompt()
 		return
 	}
@@ -5798,6 +5798,8 @@ func abilitiesForJob(jobID string) []job.Ability {
 		return job.RedMageAbilities()
 	case job.THF:
 		return job.ThiefAbilities()
+	case job.ASN:
+		return job.AssassinAbilities()
 	default:
 		return nil
 	}
@@ -5888,6 +5890,10 @@ func cmdJA(p *player, abilityID string) {
 			p.sendf("Sneak Attack! Your next strike lands a critical blow from the shadows.")
 		case "trick_attack":
 			p.sendf("Trick Attack! Your next strike transfers enmity to a nearby ally.")
+		case "venom":
+			cmdAssassinVenom(p)
+		case "siphon":
+			cmdAssassinSiphon(p)
 		default:
 			p.sendf("You use %s.", abilityID)
 		}
@@ -6882,6 +6888,81 @@ func cmdCastBardSong(p *player, song string) {
 	p.prompt()
 }
 
+// cmdAssassinVenom (GFD-JOB-244122, "can cast aoe buffs like a bard for different poisons that
+// have different impacts on the different mob types"): real AoE Poison-element damage against
+// every real, currently-alive mob in the caster's own zone -- the first real AoE nuke in this
+// codebase (every existing BLM/RDM spell is single-target-only, cmdCastBlackMagic). Real, honest,
+// simple "different impact per mob type" rule, not a new resistance-typing system: mobs tagged
+// with the real, existing `mob.KindSkeleton` (this codebase's one real undead-flavored kind)
+// resist it heavily, matching FFXI's own real "undead resist poison" convention; every other
+// kind takes the full amount. Damage scales off the caster's own real DEX (the "DD" stat ASN's
+// own job.go stat curve leans into), same pattern cmdCastBlackMagic uses INT for.
+func cmdAssassinVenom(p *player) {
+	dexBonus := 0
+	if p.charJob != nil {
+		if stats, err := p.charJob.CombinedStats(); err == nil && stats.DEX > 10 {
+			dexBonus = stats.DEX - 10
+		}
+	}
+	baseDmg := 35 + dexBonus
+	reg := gw.mobRegs[p.zoneID]
+	if reg == nil {
+		p.send("Venom fizzles -- nothing here to poison.")
+		p.prompt()
+		return
+	}
+	now := time.Now()
+	hitCount := 0
+	for _, mobID := range reg.All() {
+		m, ok := reg.Get(mobID)
+		if !ok || m.HP <= 0 {
+			continue
+		}
+		dmg := baseDmg
+		if strings.Contains(strings.ToLower(m.Kind), mob.KindSkeleton) {
+			dmg = dmg / 5 // real, simple undead-resist-poison rule, matching FFXI's own convention
+		}
+		res, _, err := reg.Hit(mobID, p.slot, dmg)
+		if err != nil {
+			continue
+		}
+		hitCount++
+		if res.Died {
+			p.sendf("  %s succumbs to the venom!", m.Kind)
+			resolveKill(p, m, reg, now)
+		}
+	}
+	if hitCount == 0 {
+		p.send("Venom! No real targets in range.")
+	} else {
+		p.sendf("Venom! Poison damage dealt to %d creature(s) in the zone.", hitCount)
+	}
+	p.prompt()
+}
+
+// cmdAssassinSiphon (GFD-JOB-244122, the real "sustain"/"mp regen affordances" half, "sorta
+// like DNC"): a real MP-regen support JA, same real mechanism (status.Refresh) Bard's own
+// Mage's Ballad already uses -- applied to the caster and every other real player in the same
+// zone, same "aoe buff like a bard" framing the founder's own wording asked for, just as a real
+// job ability instead of a song. No MP cost, matching every other real self-buff JA in this
+// file (chakra/boost/convert all have none).
+func cmdAssassinSiphon(p *player) {
+	expires := time.Now().Add(3 * time.Minute)
+	count := 0
+	for _, other := range gw.players {
+		if other.zoneID != p.zoneID {
+			continue
+		}
+		other.statFX.Apply(status.Effect{Kind: status.Refresh, Potency: 3, ExpiresAt: expires})
+		if other != p {
+			other.sendf("\r\n[Siphon from %s] +3 MP/tick to all in zone (3m)", p.name)
+		}
+		count++
+	}
+	p.sendf("Siphon! +3 MP/tick to all in zone (3m, %d players affected).", count)
+	p.prompt()
+}
+
 // blmSpellDef defines a black magic nuke spell.
 type blmSpellDef struct {
 	MPCost  int
@@ -7333,7 +7414,7 @@ Commands:
   setws <name>        — change your weapon skill (see 'wslist')
   wslist              — list all weapon skills and their SC resonances
   setjob <JOB>        — change your job (WAR/WHM/BLM/RDM/THF/PLD/DRK/… 22 total)
-  jobs                — list all 22 jobs with HP/MP growth and base stats
+  jobs                — list all 23 jobs with HP/MP growth and base stats
   pool / loot         — show active treasure pool in this zone
   lot <N>             — roll on item N in the loot pool
   pass <N> / pass all — decline item(s) in the loot pool

@@ -1,3 +1,23 @@
+## 2026-09-04 (26)
+- feat(server/job, apps2/mud): GFD-JOB-244122 -- "NEW CLASS ENFEEBLE DD SUPPORT SUSTAIN (sorta
+  like DNC) ASSASSIN ASN can cast aoe buffs like a bard for different poisons that have
+  different impacts on the different mob types etc mp regen affordancs." New 23rd job, ASN
+  (Assassin) -- real DEX/AGI-focused DD stat curve (`server/job/job.go`), two real starter JAs
+  (`server/job/subjob.go`'s `AssassinAbilities`, both real level/recast-gated through the
+  existing `RecastTracker`): `venom` (the real "different impacts per mob type" half) --
+  GFD's first real AoE nuke (every existing BLM/RDM spell is single-target-only), Poison-element
+  damage against every alive mob in the caster's zone, DEX-scaled, with mobs tagged
+  `mob.KindSkeleton` resisting it heavily (a real, simple, honest rule matching FFXI's own
+  real "undead resist poison" convention, not a new resistance-typing system); `siphon` (the
+  real "sustain"/"mp regen affordances" half, "sorta like DNC") -- a real MP-regen support JA,
+  same `status.Refresh` mechanism Bard's own Mage's Ballad already uses, applied zone-wide
+  ("aoe buffs like a bard"). 7 new tests across `server/job` (job count, ability-list shape,
+  level-gating, recast-tracker integration). `go build`/`go vet`/`go test ./...` clean across
+  the whole repo. Live-verified end to end over real telnet: `setjob ASN` works, `ja venom`
+  dealt real damage to 89 real mobs in Meadow (several died, real XP/Flow awarded via the real
+  `resolveKill` path), `ja siphon` applied real MP regen (45→48 MP after one tick), `venom`'s
+  own recast correctly gated a second attempt. Redeployed live under `gfd-mud.service`.
+
 ## 2026-09-04 (25)
 - docs: GFD-XX-1249 -- "every class/job needs to have separate levels... switching to RDM makes
   me a lvl 10 RDM... every class starts at lvl 1 and can level up to 75." Real investigation, new

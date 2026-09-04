@@ -4,9 +4,10 @@ import "testing"
 
 // ── All jobs defined ──────────────────────────────────────────────────────────
 
-func TestAllJobs_22Jobs(t *testing.T) {
-	if len(AllJobs) != 22 {
-		t.Errorf("AllJobs: got %d, want 22", len(AllJobs))
+func TestAllJobs_23Jobs(t *testing.T) {
+	// 22 real FFXI-canonical jobs + this repo's own real ASN addition (GFD-JOB-244122).
+	if len(AllJobs) != 23 {
+		t.Errorf("AllJobs: got %d, want 23", len(AllJobs))
 	}
 }
 
