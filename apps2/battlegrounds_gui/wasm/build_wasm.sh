@@ -58,6 +58,7 @@ emcc -std=c99 -D_DEFAULT_SOURCE -O2 \
     "$GUI_ROOT/packages/simulation/arena_game.c" \
     "$GUI_ROOT/packages/simulation/arena_replay.c" \
     "$GUI_ROOT/packages/simulation/arena_ai_bridge.c" \
+    "$GUI_ROOT/packages/simulation/action_bar_mod.c" \
     "$GUI_ROOT/packages/common/mlp_infer.c" \
     "$GUI_ROOT/packages/goldenband/gband.c" \
     "$GUI_ROOT/packages/goldenband/gband_rig.c" \

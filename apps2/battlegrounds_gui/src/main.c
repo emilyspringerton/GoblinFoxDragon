@@ -54,6 +54,7 @@
 #include "../packages/simulation/arena_game.h"
 #include "../packages/simulation/arena_ai_bridge.h"
 #include "../packages/simulation/arena_replay.h"
+#include "../packages/simulation/action_bar_mod_host.h"
 
 /* ---------------- networked PvP (2026-07-24 pivot, NORTHSTAR §13) ----------------
  * Local-only mode (no --connect flag) is unchanged: my_owner stays 0,
@@ -5156,46 +5157,70 @@ static void town_draw_cast_bar(float center_x, float bar_y) {
  * FFXI instant actions. Job coverage matches this session's own earlier starter-kit work
  * (WAR/WHM/SMN/MNK/BLM/RDM/THF) -- any other job still falls through to "Attack only," same as
  * before, since they have no real starter kit yet either. */
+/* town_job_id: host-side job-string -> job-id encoding, matching action_bar_mod.prn's own
+ * header comment exactly (0=WAR 1=MNK 2=WHM 3=BLM 4=RDM 5=THF 6=SMN, -1 for anything else). The
+ * mod's own on-gfd-ability-for-slot treats every unrecognized job id the same as -1 would here
+ * (falls through every branch to the universal slot-0 Attack rule), so returning -1 for an
+ * unknown job string is safe -- it just never matches (job == 0..6) inside the generated C. */
+static int town_job_id(const char *job) {
+    if (strcmp(job, "WAR") == 0) return 0;
+    if (strcmp(job, "MNK") == 0) return 1;
+    if (strcmp(job, "WHM") == 0) return 2;
+    if (strcmp(job, "BLM") == 0) return 3;
+    if (strcmp(job, "RDM") == 0) return 4;
+    if (strcmp(job, "THF") == 0) return 5;
+    if (strcmp(job, "SMN") == 0) return 6;
+    return -1;
+}
+
+/* town_ability_for_slot (GFD-MACRO-0012, founder: "GFD macro system make sure we tie the action
+ * frame stuff into a parena mod based shape so we can easily allow for extension at the action
+ * bar affordance"): the real WHICH-ability-goes-in-WHICH-slot decision now lives in a real PARENA
+ * mod (PARENA/stdlib/gfd/action_bar_mod.prn -> on_gfd_ability_for_slot, generated C committed at
+ * packages/simulation/action_bar_mod.c), not this C switch -- reassigning slots or adding a new
+ * ability to an existing job is now a .prn edit + `parena build` + recompile, not a hunt through
+ * this function's body. See that mod's own header comment for the full real ABI/scope reasoning
+ * (why the ECOWAR-proven static-link pattern was chosen over PAPERCRAFT's heavier dlopen mod
+ * registry or the still-unscoped federated EduScript<->PARENA process model in this repo's own
+ * docs2/MOD_SURFACE_NORTHSTAR.md).
+ *
+ * VS0 is I32-only across the mod boundary (same real ceiling every ECOWAR/PAPERCRAFT mod hits),
+ * so the mod hands back a plain ability id, not a command string -- this table is the one real
+ * piece still owned by host C: what each ability id actually SENDS to the server and how the
+ * ability bar/cast-timer UI should render it. Adding a wholly new ability (not just reassigning
+ * an existing one to a different slot) still needs one new row here, an honest, named limit. */
 static int town_ability_for_slot(const char *job, int slot, char *out_cmd, size_t out_cmd_len,
                                   char *out_label, size_t out_label_len,
                                   int *out_is_cast, uint32_t *out_cast_ms) {
     *out_is_cast = 0;
     *out_cast_ms = 0;
-    if (strcmp(job, "BLM") == 0) {
-        if (slot == 0) { snprintf(out_cmd, out_cmd_len, "cast fire"); snprintf(out_label, out_label_len, "Fire"); *out_is_cast = 1; *out_cast_ms = 2000; return 1; }
-        if (slot == 1) { snprintf(out_cmd, out_cmd_len, "cast poison"); snprintf(out_label, out_label_len, "Poison"); *out_is_cast = 1; *out_cast_ms = 2000; return 1; }
-        if (slot == 2) { snprintf(out_cmd, out_cmd_len, "ja clear_mind"); snprintf(out_label, out_label_len, "Clear Mind"); return 1; }
-        return 0;
-    }
-    if (slot == 0) { snprintf(out_cmd, out_cmd_len, "attack"); snprintf(out_label, out_label_len, "Attack"); return 1; }
-    if (strcmp(job, "WAR") == 0) {
-        if (slot == 1) { snprintf(out_cmd, out_cmd_len, "ja provoke"); snprintf(out_label, out_label_len, "Provoke"); return 1; }
-        if (slot == 2) { snprintf(out_cmd, out_cmd_len, "ja berserk"); snprintf(out_label, out_label_len, "Berserk"); return 1; }
-    } else if (strcmp(job, "MNK") == 0) {
-        if (slot == 1) { snprintf(out_cmd, out_cmd_len, "ja chakra"); snprintf(out_label, out_label_len, "Chakra"); return 1; }
-        if (slot == 2) { snprintf(out_cmd, out_cmd_len, "ja boost"); snprintf(out_label, out_label_len, "Boost"); return 1; }
-    } else if (strcmp(job, "WHM") == 0) {
-        if (slot == 1) { snprintf(out_cmd, out_cmd_len, "cast cure"); snprintf(out_label, out_label_len, "Cure"); *out_is_cast = 1; *out_cast_ms = 2000; return 1; }
-        if (slot == 2) { snprintf(out_cmd, out_cmd_len, "ja benediction"); snprintf(out_label, out_label_len, "Benediction"); return 1; }
-    } else if (strcmp(job, "RDM") == 0) {
-        if (slot == 1) { snprintf(out_cmd, out_cmd_len, "ja convert"); snprintf(out_label, out_label_len, "Convert"); return 1; }
-        if (slot == 2) { snprintf(out_cmd, out_cmd_len, "ja chainspell"); snprintf(out_label, out_label_len, "Chainspell"); return 1; }
-        /* GFD-AF-01939: real, hallucinated content for the new slots 4-6 (founder, live: "gimme
+    int ability_id = on_gfd_ability_for_slot(town_job_id(job), slot);
+    switch (ability_id) {
+        case 1: snprintf(out_cmd, out_cmd_len, "attack"); snprintf(out_label, out_label_len, "Attack"); return 1;
+        case 2: snprintf(out_cmd, out_cmd_len, "cast fire"); snprintf(out_label, out_label_len, "Fire"); *out_is_cast = 1; *out_cast_ms = 2000; return 1;
+        case 3: snprintf(out_cmd, out_cmd_len, "cast poison"); snprintf(out_label, out_label_len, "Poison"); *out_is_cast = 1; *out_cast_ms = 2000; return 1;
+        case 4: snprintf(out_cmd, out_cmd_len, "ja clear_mind"); snprintf(out_label, out_label_len, "Clear Mind"); return 1;
+        case 5: snprintf(out_cmd, out_cmd_len, "ja provoke"); snprintf(out_label, out_label_len, "Provoke"); return 1;
+        case 6: snprintf(out_cmd, out_cmd_len, "ja berserk"); snprintf(out_label, out_label_len, "Berserk"); return 1;
+        case 7: snprintf(out_cmd, out_cmd_len, "ja chakra"); snprintf(out_label, out_label_len, "Chakra"); return 1;
+        case 8: snprintf(out_cmd, out_cmd_len, "ja boost"); snprintf(out_label, out_label_len, "Boost"); return 1;
+        case 9: snprintf(out_cmd, out_cmd_len, "cast cure"); snprintf(out_label, out_label_len, "Cure"); *out_is_cast = 1; *out_cast_ms = 2000; return 1;
+        case 10: snprintf(out_cmd, out_cmd_len, "ja benediction"); snprintf(out_label, out_label_len, "Benediction"); return 1;
+        case 11: snprintf(out_cmd, out_cmd_len, "ja convert"); snprintf(out_label, out_label_len, "Convert"); return 1;
+        case 12: snprintf(out_cmd, out_cmd_len, "ja chainspell"); snprintf(out_label, out_label_len, "Chainspell"); return 1;
+        /* GFD-AF-01939: real, hallucinated content for RDM's slots 4-6 (founder, live: "gimme
            some random ones... copy paste of poison as long as they call their own functions") --
-           first real content proving slots 3-5 actually work end to end, not just structurally
-           present. Bio/Distract/Frazzle are real FFXI RDM enfeeble/DoT spell names, mechanically
-           identical to Poison server-side on purpose (apps2/mud's own blmSpells map). */
-        if (slot == 3) { snprintf(out_cmd, out_cmd_len, "cast bio"); snprintf(out_label, out_label_len, "Bio"); *out_is_cast = 1; *out_cast_ms = 2000; return 1; }
-        if (slot == 4) { snprintf(out_cmd, out_cmd_len, "cast distract"); snprintf(out_label, out_label_len, "Distract"); *out_is_cast = 1; *out_cast_ms = 2000; return 1; }
-        if (slot == 5) { snprintf(out_cmd, out_cmd_len, "cast frazzle"); snprintf(out_label, out_label_len, "Frazzle"); *out_is_cast = 1; *out_cast_ms = 2000; return 1; }
-    } else if (strcmp(job, "THF") == 0) {
-        if (slot == 1) { snprintf(out_cmd, out_cmd_len, "ja sneak_attack"); snprintf(out_label, out_label_len, "Sneak Attack"); return 1; }
-        if (slot == 2) { snprintf(out_cmd, out_cmd_len, "ja trick_attack"); snprintf(out_label, out_label_len, "Trick Attack"); return 1; }
-    } else if (strcmp(job, "SMN") == 0) {
-        if (slot == 1) { snprintf(out_cmd, out_cmd_len, "ja summon_zagan"); snprintf(out_label, out_label_len, "Summon Zagan"); return 1; }
-        if (slot == 2) { snprintf(out_cmd, out_cmd_len, "ja summon_beleth"); snprintf(out_label, out_label_len, "Summon Beleth"); return 1; }
+           Bio/Distract/Frazzle are real FFXI RDM enfeeble/DoT spell names, mechanically identical
+           to Poison server-side on purpose (apps2/mud's own blmSpells map). */
+        case 13: snprintf(out_cmd, out_cmd_len, "cast bio"); snprintf(out_label, out_label_len, "Bio"); *out_is_cast = 1; *out_cast_ms = 2000; return 1;
+        case 14: snprintf(out_cmd, out_cmd_len, "cast distract"); snprintf(out_label, out_label_len, "Distract"); *out_is_cast = 1; *out_cast_ms = 2000; return 1;
+        case 15: snprintf(out_cmd, out_cmd_len, "cast frazzle"); snprintf(out_label, out_label_len, "Frazzle"); *out_is_cast = 1; *out_cast_ms = 2000; return 1;
+        case 16: snprintf(out_cmd, out_cmd_len, "ja sneak_attack"); snprintf(out_label, out_label_len, "Sneak Attack"); return 1;
+        case 17: snprintf(out_cmd, out_cmd_len, "ja trick_attack"); snprintf(out_label, out_label_len, "Trick Attack"); return 1;
+        case 18: snprintf(out_cmd, out_cmd_len, "ja summon_zagan"); snprintf(out_label, out_label_len, "Summon Zagan"); return 1;
+        case 19: snprintf(out_cmd, out_cmd_len, "ja summon_beleth"); snprintf(out_label, out_label_len, "Summon Beleth"); return 1;
+        default: return 0;
     }
-    return 0;
 }
 
 /* town_poll_combat: throttled drain (empty command) so background auto-attack ticks -- "You hit

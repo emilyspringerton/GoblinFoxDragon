@@ -1,3 +1,23 @@
+## 2026-09-04 (18)
+- feat(battlegrounds_gui): GFD-MACRO-0012 — "GFD macro system make sure we tie the action frame
+  stuff into a parena mod based shape so we can easily allow for extension at the action bar
+  affordance." `town_ability_for_slot`'s old hardcoded job/slot `if`-chain now calls a real
+  PARENA mod (`PARENA/stdlib/gfd/action_bar_mod.prn` → `on_gfd_ability_for_slot`, generated C
+  committed at `packages/simulation/action_bar_mod.c`) for the WHICH-ability-per-slot decision;
+  host C keeps a small ability-id → (cmd, label, is_cast, cast_ms) table for the actual
+  consequence, same "mod decides, host does" split every real ECOWAR/PAPERCRAFT mod uses. Chosen
+  over `docs2/MOD_SURFACE_NORTHSTAR.md`'s own still-unscoped federated EduScript↔PARENA process
+  model (§3a) — reuses the already-live, proven ECOWAR static-link mod pattern instead (see
+  that doc's new §7 for the full reasoning). Real, found-live gap fixed along the way: PARENA's
+  current `runtime/parena_runtime.h` doesn't compile under Emscripten (`forkpty`, no WASM
+  equivalent) — GFD's own copy pinned to the original, minimal 41-line runtime (`git rev
+  9bdf91e`), same per-repo-pinned-copy precedent `ECOWAR/packages/simulation/parena_runtime.h`
+  already set. Verified: a standalone C probe against the generated function (20 real
+  assertions, every job × every real slot), a full real native link (`gcc`, clean), and a full
+  real WASM build (`build_wasm.sh`, clean) redeployed live to `okemily.com/battlegrounds/` (all
+  4 artifacts curl-200-verified). `.github/workflows/build.yml` and `build_wasm.sh` both updated
+  to compile the new generated file.
+
 ## 2026-09-04 (17)
 - feat(battlegrounds_gui): real LOG IN / SIGN UP buttons on the login screen, closing both
   `GFD-FIX` ("ctrl alt s to sign up does not actually work") and `GFD-UX-8325432` ("we need an

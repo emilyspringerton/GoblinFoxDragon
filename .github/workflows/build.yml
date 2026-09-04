@@ -113,6 +113,7 @@ jobs:
             apps2/battlegrounds_gui/packages/simulation/arena_game.c \
             apps2/battlegrounds_gui/packages/simulation/arena_replay.c \
             apps2/battlegrounds_gui/packages/simulation/arena_ai_bridge.c \
+            apps2/battlegrounds_gui/packages/simulation/action_bar_mod.c \
             apps2/battlegrounds_gui/packages/common/mlp_infer.c \
             apps2/battlegrounds_gui/packages/goldenband/gband.c \
             apps2/battlegrounds_gui/packages/goldenband/gband_rig.c \

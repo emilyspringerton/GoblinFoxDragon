@@ -243,3 +243,51 @@ the chosen path; (3) EduScript's binding layer gets ported to `apps2/battlegroun
 zero mod surface there); (4) the shared destructible-geometry system between GFD and
 `/home/fatbaby/skateboard` gets confirmed with the founder before either side starts building its
 own.
+
+## 7. GFD-MACRO-0012 — real, first PARENA mod slice shipped (2026-09-04)
+
+**This section supersedes §6's "currently zero mod surface" claim for one narrow, real slice.**
+Founder, kanban: "GFD macro system make sure we tie the action frame stuff into a parena mod
+based shape so we can easily allow for extension at the action bar affordance" — a direct
+continuation of GFD-AF-01939's just-shipped 6-slot ability bar.
+
+**Real, deliberate choice: NOT §3a's federated EduScript↔PARENA process model.** That model is
+still "north star only, nothing scoped or built" (4 real open questions, no message contract, no
+host location decided) — standing it up just to give the action bar a mod hook would have been a
+substantial, unscoped detour from a much smaller real ask. Instead, this reuses the ALREADY LIVE,
+proven-in-production pattern `ECOWAR/docs/ARENA_API.md` documents for 8 real mods: a PARENA module
+compiled once via the real `parena build` CLI, its generated `.c` committed, called by its emitted
+C name directly from host code — no dlopen/dlsym runtime loading (PAPERCRAFT's heavier
+`--mods-manifest` pattern), since GFD's release model (native + WASM, both statically linked at
+build time) doesn't need live-reload.
+
+**Shipped**: `PARENA/stdlib/gfd/action_bar_mod.prn` → `on-gfd-ability-for-slot`, real decision
+logic (a job×slot branch, not a bare trigger — matching `card_effect_mod.prn`'s own "real decision
+logic" tier, not the earlier "mod is the trigger" tier) — generated C committed at
+`apps2/battlegrounds_gui/packages/simulation/action_bar_mod.c`, wired into `town_ability_for_slot`
+(`src/main.c`) in place of its old hardcoded job/slot `if`-chain. I32-only ABI (job id, slot id in;
+ability id out) — same VS0 ceiling every ECOWAR/PAPERCRAFT mod hits; host C still owns the actual
+per-ability-id command string/label/cast-timing table (mod decides WHICH ability, host owns what
+it DOES, same split every real mod in this monorepo uses). Verified: a standalone C probe against
+the generated function (20 real assertions, all 7 jobs × every real slot) plus full real builds —
+native (`gcc`, links clean) and WASM (`build_wasm.sh`, redeployed to
+`https://okemily.com/battlegrounds/`, all 4 artifacts curl-200-verified).
+
+**Real, found-live build gap, fixed**: PARENA's own current `runtime/parena_runtime.h` pulls in
+SDL2/SDL_ttf and POSIX pty/socket/process helpers (added since this repo's own copy would have
+been pinned) that this I32-only mod never calls but Emscripten's libc can't even compile
+(`forkpty` has no WASM equivalent). Fixed by pinning GFD's own `packages/simulation/
+parena_runtime.h` to PARENA's original, minimal 41-line version (`git rev 9bdf91e`) — same
+"repo pins its own compatible copy" precedent `ECOWAR/packages/simulation/parena_runtime.h`
+already set (confirmed by diff, not assumed). Documented on `action_bar_mod_host.h`'s own header.
+
+**Real, honest scope of "extension" this buys, stated plainly (not oversold)**: reassigning which
+ability lives in which slot, or extending an EXISTING job into a still-unassigned slot, is now a
+`.prn` edit + `parena build` + a normal recompile — no more hunting through `town_ability_for_slot`
+'s C body for the job/slot DECISION. This is NOT hot-reload and NOT third-party/runtime modding —
+no dlopen surface exists here, and adding a wholly NEW ability (not just moving an existing one)
+still needs one new row in host C's own ability-id table. Real, unstarted next increment if this
+direction continues: the same pattern applied to other GFD-side per-job/per-slot decisions (e.g.
+`apps2/mud`'s own `blmSpells` map), and, if the founder wants closer-to-runtime extensibility
+later, revisiting PAPERCRAFT's dlopen `--mods-manifest` pattern for this client specifically —
+neither started, both real, separate future decisions, not resolved here.
