@@ -1,3 +1,18 @@
+## 2026-09-04 (10)
+- feat(spawn): data-driven spawn toggles + fixed a real, live "Hills and Caves have been empty
+  since S189" bug (GFD-MOBSPAWN-001 Phase 2). New `server/spawn.Registry` (`data/mob_spawns.json`,
+  `(zone_id, kind) -> enabled`, fail-open default matching pre-existing behavior) answers the
+  founder's own real ask ("turn bunnies on or off in the meadow") without rewriting
+  `server/mob`'s own real per-Kind stat-block constructors into generic data. Wiring this in
+  surfaced a real, found-live bug: `HillsSpawns()` and `CavesSpawns()` have existed since S189's
+  hero-lineup work but were never actually called from world init -- `apps2/mud/main.go` created
+  empty `mob.Registry`s for zones 1 and 2 and never populated them. Fixed in the same pass: both
+  zones now spawn their real mob rosters (rabbits/beetles/hills-wolves; cave-bats/cave-spiders/
+  skeletons) at startup, filtered through the new registry. 5 new `server/spawn` tests, `go test
+  ./...` clean. Live-verified: restarted the real production `apps2/mud` (zero active
+  connections first), teleported a real WHM test character to both zones via `cast tele-hills`/
+  `cast tele-caves` -- both now show real, populated mob lists for the first time ever.
+
 ## 2026-09-04 (9)
 - feat(zone): real FFXI-style grid coordinate system, Phase 1 of `docs2/MOB_SPAWN_NORTHSTAR.md`
   (kanban GFD-MOBSPAWN-001). New `server/zone/grid.go`: `ZoneBounds` (real per-zone X/Z extents,

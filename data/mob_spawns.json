@@ -1,0 +1,13 @@
+[
+  {"zone_id": 0, "kind": "worm", "enabled": true},
+  {"zone_id": 1, "kind": "rabbit", "enabled": true},
+  {"zone_id": 1, "kind": "beetle", "enabled": true},
+  {"zone_id": 1, "kind": "hills-wolf", "enabled": true},
+  {"zone_id": 2, "kind": "cave-bat", "enabled": true},
+  {"zone_id": 2, "kind": "cave-spider", "enabled": true},
+  {"zone_id": 2, "kind": "skeleton", "enabled": true},
+  {"zone_id": 3, "kind": "leech", "enabled": true},
+  {"zone_id": 3, "kind": "slime", "enabled": true},
+  {"zone_id": 3, "kind": "lizard", "enabled": true},
+  {"zone_id": 4, "kind": "worm", "enabled": true}
+]
