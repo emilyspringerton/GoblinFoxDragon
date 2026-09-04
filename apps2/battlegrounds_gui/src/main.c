@@ -3329,6 +3329,11 @@ static const TownBuilding TOWN_BUILDINGS[TOWN_BUILDING_COUNT] = {
  * g_town_char_loaded's fuller doc comment further down, next to where it's actually set. */
 static int g_town_char_loaded = 0;
 static float town_q_peak_ms = 0.0f, town_w_peak_ms = 0.0f, town_r_peak_ms = 0.0f;
+/* GFD-AF-01939: slots 4/5/6's own peak-cooldown trackers, same real per-slot self-correcting
+ * shape as town_q_peak_ms/etc above -- unused until town_ability_for_slot actually assigns some
+ * job a real ability there (see that function's own doc comment), but real and wired now so a
+ * future content pass doesn't also need to touch the draw loop. */
+static float town_slot4_peak_ms = 0.0f, town_slot5_peak_ms = 0.0f, town_slot6_peak_ms = 0.0f;
 /* g_town_job moved up here too (2026-08-04) -- town_draw_hud's own ability tiles now read it
    directly for their real per-job labels, same "needed before town_draw_hud exists" reason
    g_town_char_loaded is already up here. Real doc comment (the by-player fetch, setjob's own
@@ -4316,16 +4321,22 @@ static void town_draw_hud(int win_w, int win_h, int queue_available, int player_
     if (g_town_char_loaded) {
         float tile_size = 56.0f;
         float tile_pitch = 66.0f;
-        float tiles_total_w = tile_pitch * 2.0f + tile_size;
+        /* GFD-AF-01939 ("lets start with 1-6 as action abilities"): real expansion from the old
+           3-slot cap to 6 -- see town_ability_for_slot's own doc comment for the real, honest
+           content boundary (only RDM has real abilities past slot 3 so far). */
+        float tiles_total_w = tile_pitch * 5.0f + tile_size;
         float tiles_x0 = (float)win_w / 2.0f - tiles_total_w / 2.0f;
         float tiles_y = 90.0f;
         /* Real per-job labels (2026-08-04, founder: "now that im blm im expecting 1 2 3 to be
            differebnt spells") -- town_ability_for_slot's own doc comment has the real mapping;
            an unassigned slot keeps the same "(unassigned)" label every job used to show here. */
-        const char *slot_keys[3] = {"1", "2", "3"};
-        const float slot_r[3] = {0.3f, 0.7f, 1.0f}, slot_g[3] = {0.7f, 0.3f, 0.85f}, slot_b[3] = {1.0f, 1.0f, 0.2f};
-        float *slot_peak[3] = {&town_q_peak_ms, &town_w_peak_ms, &town_r_peak_ms};
-        for (int slot_i = 0; slot_i < 3; slot_i++) {
+        const char *slot_keys[6] = {"1", "2", "3", "4", "5", "6"};
+        const float slot_r[6] = {0.3f, 0.7f, 1.0f, 0.9f, 0.5f, 0.2f};
+        const float slot_g[6] = {0.7f, 0.3f, 0.85f, 0.4f, 0.8f, 0.9f};
+        const float slot_b[6] = {1.0f, 1.0f, 0.2f, 0.6f, 0.3f, 0.7f};
+        float *slot_peak[6] = {&town_q_peak_ms, &town_w_peak_ms, &town_r_peak_ms,
+                                &town_slot4_peak_ms, &town_slot5_peak_ms, &town_slot6_peak_ms};
+        for (int slot_i = 0; slot_i < 6; slot_i++) {
             char slot_cmd[80], slot_label[32];
             int slot_is_cast; uint32_t slot_cast_ms;
             const char *label = "(unassigned)";
@@ -5105,6 +5116,14 @@ static int town_ability_for_slot(const char *job, int slot, char *out_cmd, size_
     } else if (strcmp(job, "RDM") == 0) {
         if (slot == 1) { snprintf(out_cmd, out_cmd_len, "ja convert"); snprintf(out_label, out_label_len, "Convert"); return 1; }
         if (slot == 2) { snprintf(out_cmd, out_cmd_len, "ja chainspell"); snprintf(out_label, out_label_len, "Chainspell"); return 1; }
+        /* GFD-AF-01939: real, hallucinated content for the new slots 4-6 (founder, live: "gimme
+           some random ones... copy paste of poison as long as they call their own functions") --
+           first real content proving slots 3-5 actually work end to end, not just structurally
+           present. Bio/Distract/Frazzle are real FFXI RDM enfeeble/DoT spell names, mechanically
+           identical to Poison server-side on purpose (apps2/mud's own blmSpells map). */
+        if (slot == 3) { snprintf(out_cmd, out_cmd_len, "cast bio"); snprintf(out_label, out_label_len, "Bio"); *out_is_cast = 1; *out_cast_ms = 2000; return 1; }
+        if (slot == 4) { snprintf(out_cmd, out_cmd_len, "cast distract"); snprintf(out_label, out_label_len, "Distract"); *out_is_cast = 1; *out_cast_ms = 2000; return 1; }
+        if (slot == 5) { snprintf(out_cmd, out_cmd_len, "cast frazzle"); snprintf(out_label, out_label_len, "Frazzle"); *out_is_cast = 1; *out_cast_ms = 2000; return 1; }
     } else if (strcmp(job, "THF") == 0) {
         if (slot == 1) { snprintf(out_cmd, out_cmd_len, "ja sneak_attack"); snprintf(out_label, out_label_len, "Sneak Attack"); return 1; }
         if (slot == 2) { snprintf(out_cmd, out_cmd_len, "ja trick_attack"); snprintf(out_label, out_label_len, "Trick Attack"); return 1; }
@@ -6467,14 +6486,22 @@ int main(int argc, char *argv[]) {
                     }
                 }
                 else if (te.type == SDL_KEYDOWN &&
-                         (te.key.keysym.sym == SDLK_1 || te.key.keysym.sym == SDLK_2 || te.key.keysym.sym == SDLK_3)) {
-                    /* "1"/"2"/"3" -- same ability-slot keybind Battlegrounds already uses (Q/W/E
-                       rebound to 1/2/3 this same fork), now job-aware (2026-08-04, founder, live:
-                       "now that im blm im expecting 1 2 3 to be differebnt spells") --
-                       town_ability_for_slot's own doc comment has the real per-job mapping. Melee
-                       attack and job abilities dispatch instantly, same real town_send_command
-                       path this key always used; real MP spells go through town_start_cast's own
-                       cast-timer instead of firing immediately. */
+                         (te.key.keysym.sym == SDLK_1 || te.key.keysym.sym == SDLK_2 || te.key.keysym.sym == SDLK_3 ||
+                          te.key.keysym.sym == SDLK_4 || te.key.keysym.sym == SDLK_5 || te.key.keysym.sym == SDLK_6)) {
+                    /* "1".."6" -- GFD-AF-01939 ("lets start with 1-6 as action abilities"), a
+                       real expansion from the old 3-slot cap: same ability-slot keybind
+                       Battlegrounds already uses (Q/W/E rebound to 1/2/3 this same fork), now
+                       job-aware (2026-08-04, founder, live: "now that im blm im expecting 1 2 3
+                       to be differebnt spells") -- town_ability_for_slot's own doc comment has
+                       the real per-job mapping. Melee attack and job abilities dispatch
+                       instantly, same real town_send_command path this key always used; real MP
+                       spells go through town_start_cast's own cast-timer instead of firing
+                       immediately. Real, honest v0 boundary: slots 3-5 (keys 4-6) are real and
+                       wired end to end the same as 0-2, but town_ability_for_slot doesn't assign
+                       any job a real command there yet -- every job shows "(unassigned)" on
+                       those three tiles until real content is authored, a separate, later,
+                       per-job content pass (this card's own literal ask was the UI capacity,
+                       not the full 22-job skill list). */
                     int slot = (int)(te.key.keysym.sym - SDLK_1);
                     char base_cmd[80], label[32];
                     int is_cast; uint32_t cast_ms;

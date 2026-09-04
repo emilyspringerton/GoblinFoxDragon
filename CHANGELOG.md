@@ -1,3 +1,30 @@
+## 2026-09-04 (16)
+- feat(battlegrounds_gui): Town's own ability bar expands from 3 to 6 real slots
+  (`GFD-AF-01939`, founder: "UX UI needs a big overhaul we need to bring the ability frames down
+  to the bottom of the screen lets start with 1-6 as action abilities"). Real, checked-live
+  finding: both Town and the Battlegrounds arena mode already had their ability tiles
+  bottom-center-anchored (an earlier real card, S170-151, already did that repositioning) --
+  the real, actionable gap was slot COUNT, capped at 3 (`town_ability_for_slot`'s own real
+  per-job mapping only ever assigned slots 0-2; most of the 22 real jobs got nothing past slot 0
+  at all). Keys `4`/`5`/`6` now wired through the exact same real dispatch path `1`-`3` already
+  use (melee/JA/cast, `town_start_cast`'s own cast-timer for real MP spells); the draw loop, tile
+  layout math, and per-slot cooldown-peak trackers all scale to 6. Real, honest v0 boundary
+  named directly: slots 3-5 are structurally real and wired end to end, but `town_ability_for_
+  slot` doesn't assign most jobs anything there yet -- "(unassigned)" shows until a real,
+  separate per-job content pass (this card's own literal ask was UI capacity, not a full 22-job
+  skill-list rewrite).
+  Founder real-time follow-up, live, same session: "do RDM" -> "hallucinaate the RDM skills
+  gimme some random ones it doesnt have to toally work they can all be copy paste of poison as
+  long as they call their own fucnctions" -> "the ux is the priority but we need something to
+  call to judge if its working". Gave RDM real content for the new slots -- `bio`/`distract`/
+  `frazzle` (real FFXI Red Mage enfeeble/DoT spell names), each a real, independently castable
+  `apps2/mud` spell entry, mechanically identical to the existing `poison` spell on purpose (same
+  `blmSpells` map stats), proving the new slot plumbing actually dispatches real server commands,
+  not just placeholder UI. Live-verified: a real RDM test character's `cast bio` landed a real
+  hit on a real worm through the exact same path the new slot-4 key would trigger. Full real WASM
+  build clean (2 pre-existing, unrelated warnings only), redeployed all 4 real artifacts,
+  live-verified real 200s.
+
 ## 2026-09-04 (15)
 - feat(battlegrounds_gui): real, standalone, FFXI-style Inventory screen (`GFD-INV-93911`,
   founder: "list based inventory system like FFXI list based navigation so keyboard and

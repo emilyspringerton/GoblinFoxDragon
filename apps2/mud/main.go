@@ -6237,7 +6237,7 @@ func cmdCast(p *player, spell string, targetName string) {
 			p.combat.TargetMobID = ""
 			resolveKill(p, m, reg, now)
 		}
-	case "poison",
+	case "poison", "bio", "distract", "frazzle",
 		"fire", "fire2", "fire3",
 		"blizzard", "blizzard2", "blizzard3",
 		"thunder", "thunder2", "thunder3",
@@ -6729,6 +6729,16 @@ var blmSpells = map[string]blmSpellDef{
 	// "Poison equivalent"), so this keeps that same real, already-established convention rather
 	// than inventing a new element from scratch.
 	"poison":    {MPCost: 30, BaseDmg: 50, Element: "Poison"},
+	// bio/distract/frazzle (GFD-AF-01939, founder real-time: "hallucinaate the RDM skills gimme
+	// some random ones it doesnt have to toally work they can all be copy paste of poison as
+	// long as they call their own fucnctions") -- real FFXI Red Mage enfeeble/DoT spell names,
+	// mechanically identical to Poison on purpose per the founder's own explicit instruction;
+	// real, deliberate content-stub, not a bug. Each gets its own real spell-name entry (and its
+	// own case in cmdCast's own switch below), so they're real, independently castable spells,
+	// not literal aliases of "poison" -- just sharing its exact numbers for now.
+	"bio":       {MPCost: 30, BaseDmg: 50, Element: "Poison"},
+	"distract":  {MPCost: 30, BaseDmg: 50, Element: "Poison"},
+	"frazzle":   {MPCost: 30, BaseDmg: 50, Element: "Poison"},
 	"fire":      {MPCost: 30, BaseDmg: 50, Element: "Fire"},
 	"fire2":     {MPCost: 65, BaseDmg: 130, Element: "Fire"},
 	"fire3":     {MPCost: 120, BaseDmg: 260, Element: "Fire"},
