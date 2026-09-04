@@ -1,3 +1,28 @@
+## 2026-09-04 (28)
+- perf(apps2/server-go): GFD-994001 -- "GFD core game loop performance tuning." Real, decisive
+  root cause found by direct investigation (not guessed), after checking every real hot-path
+  candidate: `scanChunkForVoxelBlocks` (16x16x16=4096-cell scan, negligible), `gameWorld.RayTrace`
+  (O(n) over connected clients per shot, negligible at this game's real player counts), and the
+  synchronous IDUNA HTTP calls on connect/telecrystal/dungeon-enter (real, but bounded by
+  `idunaclient`'s own 5s timeout and gated behind rare, deliberate player actions, not the
+  steady-state tick path). The one real, steady-state, every-tick number this loop was self-
+  imposing well below what the hardware or wire format need: the world PacketSnapshot broadcast
+  was capped at ~4Hz (250ms) purely because it shared its cadence with the main loop's blocking
+  UDP read-timeout -- already self-documented in the code's own prior comment as "a named,
+  follow-on-able limitation, not silently accepted as good enough forever," never actually
+  followed up on until now. Raised both the read-timeout and `snapshotInterval` to 33ms, a real
+  30Hz, matching SHANKPIT sibling's own established rate -- zero concurrency changes needed
+  (`clients`/`clientAddrs` stay owned by the single main-loop thread exactly as before; this only
+  changes how often the loop wakes to check the elapsed-time gate and re-arm the deadline).
+  Drive-by: removed a dead, never-wired `var addrsMu sync.RWMutex; _ = addrsMu` placeholder in the
+  broadcast goroutine that `go vet` was flagging ("assignment copies lock value to _") -- inert
+  leftover, not a real lock, zero behavior change. `GOWORK=off go build ./...` clean across the
+  whole repo, `go vet ./apps2/server-go/...` clean, `go test ./apps2/server-go/...` all pass
+  (23 tests, unchanged pass count). Real, honest, not investigated this pass: `apps2/mud`'s own
+  separate game loop runs a deliberate 1Hz (`time.Second`) tick -- appropriate for a text MUD, not
+  a real-time sync path like server-go's, so left untouched rather than "tuned" without a real
+  finding there.
+
 ## 2026-09-04 (27)
 - fix(apps2/mud): GFD-RDM-12422 -- "program the real RDM abilities: POISON, FIRE, WATER, STONE,
   CURE, BIO, DIA." Real, checked-first finding: 5 of the 7 named spells already worked for RDM

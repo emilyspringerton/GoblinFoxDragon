@@ -291,9 +291,11 @@ func main() {
 	broadcastCh := make(chan []byte, 64) // server goroutine → broadcast goroutine
 
 	// Broadcast goroutine: sends packets from broadcastCh to all connected clients.
+	// GFD-994001 drive-by: removed a dead `var addrsMu sync.RWMutex; _ = addrsMu` placeholder
+	// that was never wired to anything (go vet flagged it: "assignment copies lock value to _").
+	// clients/clientAddrs are still accessed from the main loop; broadcast reaches this goroutine
+	// via the channel, unchanged -- this only removes an inert leftover, not a real lock.
 	go func() {
-		var addrsMu sync.RWMutex
-		_ = addrsMu // clients/clientAddrs are accessed from main loop; broadcast via channel
 		for pkt := range broadcastCh {
 			for slot, addr := range clientAddrs {
 				if _, ok := clients[slot]; ok {
@@ -376,7 +378,22 @@ func main() {
 	}()
 
 	lastSnapshotBroadcast := time.Now()
-	const snapshotInterval = 250 * time.Millisecond // matches the read-loop's own natural poll cadence below -- see its own doc comment for why this isn't the higher SHANKPIT-sibling rate (33ms/30Hz)
+	// GFD-994001 (2026-09-04, "GFD core game loop performance tuning"): raised from 250ms/4Hz to
+	// 33ms/30Hz, matching SHANKPIT sibling's own real rate -- exactly the follow-up this constant's
+	// own prior comment already named as owed ("a named, follow-on-able limitation, not silently
+	// accepted as good enough forever"). Real, decisive root cause investigation before this
+	// change (not guessed): read the full main loop plus every hot-path candidate
+	// (scanChunkForVoxelBlocks -- 16x16x16=4096-cell chunk scan, negligible; gameWorld.RayTrace --
+	// O(n) over connected clients per shot, negligible at this game's real player counts; the
+	// synchronous IDUNA HTTP calls on connect/telecrystal/dungeon-enter -- real, but bounded by
+	// idunaclient's own 5s http.Client timeout and gated behind rare, deliberate player actions,
+	// not the steady-state tick path). This snapshot-broadcast cadence is the one real, steady-
+	// state, every-tick throughput number this loop was self-imposing well below what the
+	// hardware or the wire format need, purely because the blocking-read timeout used to double
+	// as its clock. No concurrency change needed to fix it -- `clients`/`clientAddrs` stay owned
+	// by this single thread exactly as before, this only changes how often it wakes up to check
+	// the elapsed-time gate below and re-arm the read deadline.
+	const snapshotInterval = 33 * time.Millisecond
 
 	for {
 		// Backend-unification, 2026-08-03: real player-position broadcast (PacketSnapshot,
@@ -388,9 +405,7 @@ func main() {
 		// via channel" -- an intent that was only half-wired). Adding a THIRD unsynchronized
 		// accessor would be a real, new Go crash risk (concurrent map read/write panics), not
 		// just a style nit. Doing it here instead means it only ever runs where `clients` is
-		// already safely, singly owned. Real, honest tradeoff: ~4Hz (driven by this loop's own
-        // 250ms read-timeout cadence) instead of SHANKPIT sibling's own 30Hz -- a named,
-		// follow-on-able limitation, not silently accepted as good enough forever.
+		// already safely, singly owned. GFD-994001: now a real 30Hz, matching SHANKPIT sibling.
 		if time.Since(lastSnapshotBroadcast) >= snapshotInterval {
 			lastSnapshotBroadcast = time.Now()
 			all := make([]snapshotPeer, 0, len(clients))
@@ -422,7 +437,11 @@ func main() {
 			}
 		}
 
-		conn.SetReadDeadline(time.Now().Add(250 * time.Millisecond))
+		// GFD-994001: matches snapshotInterval above -- this is what actually keeps the loop
+		// waking up often enough to hit the new 30Hz cadence during low-traffic stretches (when
+		// packets are arriving continuously, ReadFromUDP already returns immediately regardless
+		// of this deadline; it only governs the idle case).
+		conn.SetReadDeadline(time.Now().Add(snapshotInterval))
 		n, remote, err := conn.ReadFromUDP(buf)
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
