@@ -1,3 +1,17 @@
+## 2026-09-04 (8)
+- fix(combat): real TP-per-hit bug found and fixed -- `apps2/mud/main.go`'s own melee-hit
+  handler always called `combatTp.AddTP` with the hardcoded `combatTp.Delay1HSword` constant,
+  regardless of what weapon (or nothing) a player had equipped. New `ItemDef.Delay` field
+  (`server/itemdef.go`) + new `weaponDelayFor` (real lookup of the equipped main-hand weapon's
+  own delay, falling back to `DelayHtH` bare-handed or `Delay1HSword` for a not-yet-backfilled
+  weapon). Founder real-time: "before we go too far i think we need to add attack speed to the
+  items... every weapon... not a standard delay per item type." All 18 real weapons in
+  `data/items.json` backfilled with individually-chosen delay values (168-372 du), not a shared
+  per-weapon-type constant, via the new IDUNA GUI (dogfooding again). 4 new tests (first real
+  unit tests for `apps2/mud`), `go build/vet/test ./...` clean. Live-verified against a real
+  throwaway instance: a bare-handed hit now grants 13 TP (matching `floor(80/6)` for real
+  hand-to-hand delay) instead of the old, universally-wrong 40 TP (1H-sword rate).
+
 ## 2026-09-04 (7)
 - docs: `docs2/ITEM_BUILDER_NORTHSTAR.md` -- Phase 2d shipped (see `IDUNA/CHANGELOG.md`'s own
   entry for the implementation): a real Vertex-powered batch item-propose assistant. Reuses the

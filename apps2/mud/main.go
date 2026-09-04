@@ -1533,7 +1533,7 @@ func tickAll() {
 			continue
 		}
 		if res.Dealt > 0 {
-			gained := p.tp.AddTP(combatTp.Delay1HSword, float64(p.statFX.NetHastePct()))
+			gained := p.tp.AddTP(weaponDelayFor(p), float64(p.statFX.NetHastePct()))
 			p.sendf("\r\nYou hit for %d damage. (TP: %d [+%d])", res.Dealt, p.tp.Current, gained)
 			// Enmity: damage generates CE.
 			mobID := p.combat.TargetMobID
@@ -4315,6 +4315,28 @@ func itemDisplayNameOr(itemID string) string {
 		return dn
 	}
 	return itemID
+}
+
+// weaponDelayFor is the real fix for a found-live bug: TP gain used to always call
+// combatTp.AddTP with the hardcoded combatTp.Delay1HSword constant, regardless of what weapon
+// (or nothing at all) a player actually had equipped -- every real weapon type gave 1H-sword TP
+// gain. Now reads the player's own real equipped main-hand weapon's ItemDef.Delay (the new
+// field this exact bug motivated adding). Real, honest fallbacks, in order: bare hands (nothing
+// in the main slot) -> combatTp.DelayHtH; a weapon equipped but its own ItemDef.Delay is still
+// the real, honest "not backfilled yet" zero value, or the weapon has no itemdef entry at all
+// (a real, pre-existing legacy-item gap) -> combatTp.Delay1HSword, the same value every player
+// got before this fix, so nothing gets SLOWER for gear that hasn't been backfilled with a real
+// delay yet.
+func weaponDelayFor(p *player) int {
+	entry, err := p.equip.ItemAt(gear.SlotMainHand)
+	if err != nil || entry == nil {
+		return combatTp.DelayHtH
+	}
+	def, ok := itemdefReg.ByID(entry.DefID)
+	if !ok || def.Delay == 0 {
+		return combatTp.Delay1HSword
+	}
+	return def.Delay
 }
 
 func cmdEat(p *player, itemID string) {

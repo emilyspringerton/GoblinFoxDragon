@@ -133,6 +133,13 @@ type ItemDef struct {
 	ModelID         string         `json:"model_id,omitempty"`
 	IconID          int            `json:"icon_id,omitempty"`
 	DisguiseFaction string         `json:"disguise_faction,omitempty"` // non-empty = disguise item
+	// Delay is the weapon's own attack speed, in server/combat's own real delay-units (60 du ≈
+	// 1 second; see that package's own doc comment for the full formula and its real
+	// representative values per weapon type: 80=hand-to-hand, 240=1H sword, 288=1H axe,
+	// 480=great sword, 366=staff, 402=polearm). 0 (the zero value) means "not a weapon, or a
+	// weapon whose real delay hasn't been set yet" -- real, honest, callers must not treat 0 as
+	// "instant." Only meaningful for `Category == CatWeapon`.
+	Delay int `json:"delay,omitempty"`
 
 	// Computed at load time — not in JSON.
 	jobMask  JobMask

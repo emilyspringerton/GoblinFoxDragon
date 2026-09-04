@@ -19,7 +19,8 @@
       "mnd": 1
     },
     "stack_size": 1,
-    "model_id": "wand_willow"
+    "model_id": "wand_willow",
+    "delay": 198
   },
   {
     "id": 2,
@@ -44,7 +45,8 @@
       "dex": 1
     },
     "stack_size": 1,
-    "model_id": "dagger_basic"
+    "model_id": "dagger_basic",
+    "delay": 168
   },
   {
     "id": 3,
@@ -67,7 +69,8 @@
       "str": 1
     },
     "stack_size": 1,
-    "model_id": "sword_basic"
+    "model_id": "sword_basic",
+    "delay": 228
   },
   {
     "id": 4,
@@ -88,7 +91,8 @@
       "str": 3
     },
     "stack_size": 1,
-    "model_id": "axe_hand"
+    "model_id": "axe_hand",
+    "delay": 264
   },
   {
     "id": 5,
@@ -111,7 +115,8 @@
       "mnd": 3
     },
     "stack_size": 1,
-    "model_id": "staff_brass"
+    "model_id": "staff_brass",
+    "delay": 348
   },
   {
     "id": 6,
@@ -134,7 +139,8 @@
       "str": 5
     },
     "stack_size": 1,
-    "model_id": "sword_steel"
+    "model_id": "sword_steel",
+    "delay": 246
   },
   {
     "id": 7,
@@ -154,7 +160,8 @@
       "ranged_attack": 28
     },
     "stack_size": 1,
-    "model_id": "bow_composite"
+    "model_id": "bow_composite",
+    "delay": 288
   },
   {
     "id": 8,
@@ -181,7 +188,8 @@
     "flags": [
       "rare"
     ],
-    "model_id": "sword_mythril"
+    "model_id": "sword_mythril",
+    "delay": 252
   },
   {
     "id": 9,
@@ -202,7 +210,8 @@
       "mnd": 8
     },
     "stack_size": 1,
-    "model_id": "staff_healing"
+    "model_id": "staff_healing",
+    "delay": 372
   },
   {
     "id": 10,
@@ -226,7 +235,8 @@
       "rare",
       "ex"
     ],
-    "model_id": "sword_excalibur"
+    "model_id": "sword_excalibur",
+    "delay": 216
   },
   {
     "id": 11,
@@ -248,7 +258,8 @@
       "attack": 8
     },
     "stack_size": 1,
-    "model_id": "sword_training"
+    "model_id": "sword_training",
+    "delay": 234
   },
   {
     "id": 12,
@@ -271,7 +282,8 @@
       "str": 1
     },
     "stack_size": 1,
-    "model_id": "sword_iron_short"
+    "model_id": "sword_iron_short",
+    "delay": 222
   },
   {
     "id": 13,
@@ -294,7 +306,8 @@
       "str": 2
     },
     "stack_size": 1,
-    "model_id": "sword_broadsword"
+    "model_id": "sword_broadsword",
+    "delay": 258
   },
   {
     "id": 101,
@@ -1328,5 +1341,122 @@
     "level": 1,
     "stack_size": 1,
     "disguise_faction": "merchant"
+  },
+  {
+    "id": 1004,
+    "name": "Mikazuki",
+    "description": "A legendary katana named for its crescent moon blade, said to grant its wielder swiftness in combat.",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "NIN"
+    ],
+    "level": 74,
+    "stats": {
+      "accuracy": 20,
+      "attack": 55,
+      "dex": 6,
+      "haste": 20,
+      "str": 6
+    },
+    "stack_size": 1,
+    "model_id": "katana_mikazuki",
+    "delay": 204
+  },
+  {
+    "id": 1005,
+    "name": "Juzumaru",
+    "description": "A legendary katana whispered to possess a profound, ancient spirit, said to empower its wielder with unparalleled precision.",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "SAM",
+      "NIN"
+    ],
+    "level": 75,
+    "stats": {
+      "accuracy": 18,
+      "attack": 55,
+      "dex": 5,
+      "haste": 3,
+      "str": 5
+    },
+    "stack_size": 1,
+    "model_id": "katana_juzumaru",
+    "delay": 210
+  },
+  {
+    "id": 1006,
+    "name": "Onimaru",
+    "description": "A legendary katana, said to be imbued with the essence of a vengeful spirit, granting its wielder supernatural speed and precision.",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "SAM",
+      "NIN"
+    ],
+    "level": 75,
+    "stats": {
+      "accuracy": 10,
+      "attack": 68,
+      "dex": 5,
+      "haste": 3,
+      "str": 5
+    },
+    "stack_size": 1,
+    "model_id": "weapon_katana_onimaru",
+    "delay": 216
+  },
+  {
+    "id": 1007,
+    "name": "Ōdenta",
+    "description": "A legendary katana, one of the Five Great Swords of Japan, imbued with the spirit of a fierce guardian.",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "SAM"
+    ],
+    "level": 75,
+    "stats": {
+      "accuracy": 12,
+      "attack": 78,
+      "haste": 7,
+      "str": 10
+    },
+    "stack_size": 1,
+    "model_id": "katana_great_001",
+    "delay": 228
+  },
+  {
+    "id": 1008,
+    "name": "Dōjigiri",
+    "description": "One of the Five Great Swords of legend, said to have slain the oni Shuten Dōji. Its edge hums with an ancient, formidable power.",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "SAM",
+      "NIN"
+    ],
+    "level": 75,
+    "stats": {
+      "accuracy": 5,
+      "attack": 88,
+      "dex": 10,
+      "haste": 3,
+      "str": 15
+    },
+    "stack_size": 1,
+    "model_id": "weapon_katana_dojigiri",
+    "delay": 240
   }
 ]

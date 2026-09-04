@@ -96,6 +96,21 @@ from the builder tool's own engineering scope above:
   endgame) will eventually need real `ex` flags applied deliberately, item by item, as that
   content gets built — a real, ongoing curation task for whoever builds each piece, not a
   system change.
+- **Every weapon carries its own real, individually-set attack speed.** Founder real-time:
+  "before we go too far i think we need to add attack speed to the items... no every item has a
+  delay specified on that item i mean all the weapons do... not a standard delay per item type."
+  Real, decisive finding that motivated this: `server/combat/tp.go`'s own real TP-per-hit
+  formula already existed and was already live, but `apps2/mud/main.go`'s own real call site
+  hardcoded `combatTp.Delay1HSword` for every single attack regardless of what weapon (or
+  nothing) a player had equipped — a real, found-live bug, not a hypothetical one. New
+  `ItemDef.Delay` field (delay-units, matching `server/combat`'s own real unit convention) closes
+  it: `weaponDelayFor` now reads the equipped main-hand weapon's own real `Delay`, falling back
+  to `DelayHtH` for bare hands and `Delay1HSword` for a weapon that hasn't been backfilled yet
+  (never silently "instant"). Real, deliberate design: NOT a fixed value per weapon category —
+  two swords can and should carry different delays from each other, the same way real FFXI
+  weapons of the same type vary in actual speed. All 18 real weapons in `data/items.json` were
+  backfilled with individually-chosen values (168-372 du) as this pass's own real first draft,
+  not a shared per-type constant.
 
 ## Real, phased plan
 
