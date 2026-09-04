@@ -1,65 +1,1332 @@
 [
-  {"id":1,"name":"Willow Wand","category":"weapon","equip_slots":["main"],"jobs":["WHM","BLM","RDM","SMN","SCH"],"level":1,"stats":{"magic_attack_bonus":3,"mnd":1},"stack_size":1,"model_id":"wand_willow"},
-  {"id":2,"name":"Dagger","category":"weapon","equip_slots":["main","off"],"jobs":["WAR","MNK","RDM","THF","BST","NIN","DNC"],"level":1,"stats":{"attack":6,"dex":1},"stack_size":1,"model_id":"dagger_basic"},
-  {"id":3,"name":"Sword","category":"weapon","equip_slots":["main","off"],"jobs":["WAR","PLD","DRK","RDM","NIN"],"level":1,"stats":{"attack":10,"str":1},"stack_size":1,"model_id":"sword_basic"},
-  {"id":4,"name":"Hand Axe","category":"weapon","equip_slots":["main","off"],"jobs":["WAR","DRK","BST"],"level":7,"stats":{"attack":18,"str":3},"stack_size":1,"model_id":"axe_hand"},
-  {"id":5,"name":"Brass Staff","category":"weapon","equip_slots":["main"],"jobs":["WHM","BLM","RDM","SMN","SCH"],"level":10,"stats":{"magic_attack_bonus":12,"mnd":3,"int":3},"stack_size":1,"model_id":"staff_brass"},
-  {"id":6,"name":"Steel Sword","category":"weapon","equip_slots":["main","off"],"jobs":["WAR","PLD","DRK","RDM","NIN"],"level":25,"stats":{"attack":34,"str":5},"stack_size":1,"model_id":"sword_steel"},
-  {"id":7,"name":"Composite Bow","category":"weapon","equip_slots":["main"],"jobs":["WAR","RNG","NIN"],"level":15,"stats":{"ranged_attack":28,"dex":3},"stack_size":1,"model_id":"bow_composite"},
-  {"id":8,"name":"Mythril Sword","category":"weapon","equip_slots":["main","off"],"jobs":["WAR","PLD","DRK","RDM","NIN"],"level":50,"stats":{"attack":89,"str":10,"accuracy":8},"stack_size":1,"flags":["rare"],"model_id":"sword_mythril"},
-  {"id":9,"name":"Healing Staff","category":"weapon","equip_slots":["main"],"jobs":["WHM","BRD","SCH"],"level":40,"stats":{"magic_attack_bonus":35,"mnd":8,"magic_defense_bonus":6},"stack_size":1,"model_id":"staff_healing"},
-  {"id":10,"name":"Excalibur","category":"weapon","equip_slots":["main"],"jobs":["PLD"],"level":73,"stats":{"attack":249,"str":25,"accuracy":20,"defense":25},"stack_size":1,"flags":["rare","ex"],"model_id":"sword_excalibur"},
-
-  {"id":101,"name":"Leather Vest","category":"armor","equip_slots":["body"],"jobs":["WAR","MNK","THF","BST","NIN","DNC","RNG"],"level":4,"stats":{"defense":8,"vit":1},"stack_size":1,"model_id":"body_leather"},
-  {"id":102,"name":"Leather Trousers","category":"armor","equip_slots":["legs"],"jobs":["WAR","MNK","THF","BST","NIN","DNC","RNG"],"level":4,"stats":{"defense":6,"agi":1},"stack_size":1,"model_id":"legs_leather"},
-  {"id":103,"name":"Leather Gloves","category":"armor","equip_slots":["handl","handr"],"jobs":["WAR","MNK","THF","BST","NIN","DNC","RNG"],"level":4,"stats":{"defense":4,"dex":1},"stack_size":1,"model_id":"hands_leather"},
-  {"id":104,"name":"Leather Sandals","category":"armor","equip_slots":["feet"],"jobs":["WAR","MNK","THF","BST","NIN","DNC","RNG"],"level":4,"stats":{"defense":4,"agi":1},"stack_size":1,"model_id":"feet_leather"},
-  {"id":105,"name":"Leather Cap","category":"armor","equip_slots":["head"],"jobs":["WAR","MNK","THF","BST","NIN","DNC","RNG"],"level":4,"stats":{"defense":5,"evasion":3},"stack_size":1,"model_id":"head_leather"},
-  {"id":106,"name":"Chainmail","category":"armor","equip_slots":["body"],"jobs":["WAR","PLD","DRK","SAM"],"level":20,"stats":{"defense":28,"str":3,"vit":2},"stack_size":1,"model_id":"body_chain"},
-  {"id":107,"name":"Chain Leggings","category":"armor","equip_slots":["legs"],"jobs":["WAR","PLD","DRK","SAM"],"level":20,"stats":{"defense":22,"vit":2},"stack_size":1,"model_id":"legs_chain"},
-  {"id":108,"name":"Iron Helm","category":"armor","equip_slots":["head"],"jobs":["WAR","PLD","DRK","SAM"],"level":18,"stats":{"defense":20,"str":2},"stack_size":1,"model_id":"head_iron"},
-  {"id":109,"name":"Mage's Robe","category":"armor","equip_slots":["body"],"jobs":["WHM","BLM","RDM","SMN","SCH","BRD"],"level":10,"stats":{"defense":10,"int":5,"mnd":5,"magic_defense_bonus":8},"stack_size":1,"model_id":"body_robe"},
-  {"id":110,"name":"Knight's Plate","category":"armor","equip_slots":["body"],"jobs":["PLD"],"level":55,"stats":{"defense":78,"vit":12,"str":8,"enmity":10},"stack_size":1,"flags":["rare"],"model_id":"body_plate_knight"},
-  {"id":111,"name":"Ninja Gi","category":"armor","equip_slots":["body"],"jobs":["NIN","THF","DNC"],"level":45,"stats":{"defense":40,"agi":10,"evasion":15,"haste":3},"stack_size":1,"model_id":"body_gi"},
-  {"id":112,"name":"Wizard's Coat","category":"armor","equip_slots":["body"],"jobs":["BLM","SMN","SCH"],"level":48,"stats":{"defense":35,"int":12,"magic_attack_bonus":18,"fast_cast":5},"stack_size":1,"model_id":"body_wizcoat"},
-  {"id":113,"name":"Sabatons","category":"armor","equip_slots":["feet"],"jobs":["PLD","DRK","WAR"],"level":30,"stats":{"defense":22,"str":4},"stack_size":1,"model_id":"feet_sabatons"},
-  {"id":114,"name":"Silk Slippers","category":"armor","equip_slots":["feet"],"jobs":["WHM","BLM","RDM","SMN","SCH","BRD"],"level":28,"stats":{"defense":14,"mnd":4,"fast_cast":2},"stack_size":1,"model_id":"feet_silk"},
-  {"id":115,"name":"Spiked Knuckles","category":"armor","equip_slots":["handl","handr"],"jobs":["MNK","BST"],"level":22,"stats":{"attack":15,"str":4},"stack_size":1,"model_id":"hands_knuckles"},
-
-  {"id":201,"name":"Copper Ring","category":"accessory","equip_slots":["ringl","ringr"],"level":1,"stats":{"str":1},"stack_size":1,"model_id":"ring_copper"},
-  {"id":202,"name":"Silver Ring","category":"accessory","equip_slots":["ringl","ringr"],"level":20,"stats":{"str":2,"dex":2},"stack_size":1,"model_id":"ring_silver"},
-  {"id":203,"name":"Spike Earring","category":"accessory","equip_slots":["earl","earr"],"level":1,"stats":{"str":2},"stack_size":1,"model_id":"ear_spike"},
-  {"id":204,"name":"Mage's Earring","category":"accessory","equip_slots":["earl","earr"],"level":15,"stats":{"int":3,"mnd":3},"stack_size":1,"model_id":"ear_mage"},
-  {"id":205,"name":"Traveler's Cloak","category":"accessory","equip_slots":["back"],"level":5,"stats":{"defense":4,"agi":2},"stack_size":1,"model_id":"back_cloak"},
-  {"id":206,"name":"Shinobi Sash","category":"accessory","equip_slots":["waist"],"jobs":["NIN","THF","DNC"],"level":35,"stats":{"evasion":10,"agi":6,"haste":2},"stack_size":1,"model_id":"waist_sash"},
-  {"id":207,"name":"Life Belt","category":"accessory","equip_slots":["waist"],"level":15,"stats":{"accuracy":5,"attack":5},"stack_size":1,"model_id":"waist_belt_life"},
-  {"id":208,"name":"Wisdom Ring","category":"accessory","equip_slots":["ringl","ringr"],"level":30,"stats":{"int":5,"mnd":5,"magic_attack_bonus":3},"stack_size":1,"model_id":"ring_wisdom"},
-  {"id":209,"name":"Venerer's Belt","category":"accessory","equip_slots":["waist"],"jobs":["RNG","COR"],"level":42,"stats":{"ranged_accuracy":10,"dex":5,"store_tp":3},"stack_size":1,"model_id":"waist_venerer"},
-  {"id":210,"name":"Choker of Dawn","category":"accessory","equip_slots":["neck"],"level":60,"stats":{"mnd":10,"magic_defense_bonus":12,"light":8},"stack_size":1,"flags":["rare","ex"],"model_id":"neck_choker_dawn"},
-
-  {"id":301,"name":"Potion","category":"consumable","level":0,"stats":{},"stack_size":12,"model_id":"item_potion"},
-  {"id":302,"name":"Hi-Potion","category":"consumable","level":20,"stats":{},"stack_size":12,"model_id":"item_hipotion"},
-  {"id":303,"name":"Ether","category":"consumable","level":0,"stats":{},"stack_size":12,"model_id":"item_ether"},
-  {"id":304,"name":"Rolanberry","category":"consumable","level":0,"stats":{"mnd":1},"stack_size":12,"model_id":"item_rolanberry"},
-  {"id":305,"name":"Selbina Milk","category":"consumable","level":0,"stats":{"vit":2,"str":1},"stack_size":12,"model_id":"item_milk"},
-
-  {"id":401,"name":"Fire Crystal","category":"crystal","level":0,"stats":{},"stack_size":12,"model_id":"crystal_fire"},
-  {"id":402,"name":"Ice Crystal","category":"crystal","level":0,"stats":{},"stack_size":12,"model_id":"crystal_ice"},
-  {"id":403,"name":"Wind Crystal","category":"crystal","level":0,"stats":{},"stack_size":12,"model_id":"crystal_wind"},
-  {"id":404,"name":"Earth Crystal","category":"crystal","level":0,"stats":{},"stack_size":12,"model_id":"crystal_earth"},
-  {"id":405,"name":"Thunder Crystal","category":"crystal","level":0,"stats":{},"stack_size":12,"model_id":"crystal_thunder"},
-  {"id":406,"name":"Water Crystal","category":"crystal","level":0,"stats":{},"stack_size":12,"model_id":"crystal_water"},
-
-  {"id":501,"name":"Iron Ore","category":"material","level":0,"stats":{},"stack_size":12,"model_id":"material_iron_ore"},
-  {"id":502,"name":"Worm Silk","category":"material","level":0,"stats":{},"stack_size":12,"model_id":"material_worm_silk"},
-  {"id":503,"name":"Bat Wing","category":"material","level":0,"stats":{},"stack_size":12,"model_id":"material_bat_wing"},
-  {"id":504,"name":"Spider Web","category":"material","level":0,"stats":{},"stack_size":12,"model_id":"material_spider_web"},
-  {"id":505,"name":"Bone Chip","category":"material","level":0,"stats":{},"stack_size":12,"model_id":"material_bone_chip"},
-
-  {"id":901,"name":"Key to the Old Fort","category":"key_item","level":0,"stats":{},"stack_size":1,"flags":["rare","ex"]},
-  {"id":902,"name":"Gobbiebag Voucher I","category":"key_item","level":0,"stats":{},"stack_size":1,"flags":["rare","ex"],"description":"Presented to the Goblin Emporium to expand inventory capacity by 10 slots."},
-
-  {"id":1001,"name":"Guard Uniform","category":"accessory","level":1,"stats":{},"stack_size":1,"flags":["ex"],"disguise_faction":"guard","description":"Authentic patrol uniform. Guards see through it faster than civilians do."},
-  {"id":1002,"name":"Civilian Clothes","category":"accessory","level":1,"stats":{},"stack_size":1,"disguise_faction":"civilian","description":"Unremarkable street clothes. Passes inspection from most NPCs except civilians who know the area."},
-  {"id":1003,"name":"Merchant Coat","category":"accessory","level":1,"stats":{},"stack_size":1,"disguise_faction":"merchant","description":"A merchant's long coat with hidden pockets. Accepted by market NPCs; arouses suspicion from guards."}
+  {
+    "id": 1,
+    "name": "Willow Wand",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH"
+    ],
+    "level": 1,
+    "stats": {
+      "magic_attack_bonus": 3,
+      "mnd": 1
+    },
+    "stack_size": 1,
+    "model_id": "wand_willow"
+  },
+  {
+    "id": 2,
+    "name": "Dagger",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC"
+    ],
+    "level": 1,
+    "stats": {
+      "attack": 6,
+      "dex": 1
+    },
+    "stack_size": 1,
+    "model_id": "dagger_basic"
+  },
+  {
+    "id": 3,
+    "name": "Sword",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN"
+    ],
+    "level": 1,
+    "stats": {
+      "attack": 10,
+      "str": 1
+    },
+    "stack_size": 1,
+    "model_id": "sword_basic"
+  },
+  {
+    "id": 4,
+    "name": "Hand Axe",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "DRK",
+      "BST"
+    ],
+    "level": 7,
+    "stats": {
+      "attack": 18,
+      "str": 3
+    },
+    "stack_size": 1,
+    "model_id": "axe_hand"
+  },
+  {
+    "id": 5,
+    "name": "Brass Staff",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH"
+    ],
+    "level": 10,
+    "stats": {
+      "int": 3,
+      "magic_attack_bonus": 12,
+      "mnd": 3
+    },
+    "stack_size": 1,
+    "model_id": "staff_brass"
+  },
+  {
+    "id": 6,
+    "name": "Steel Sword",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN"
+    ],
+    "level": 25,
+    "stats": {
+      "attack": 34,
+      "str": 5
+    },
+    "stack_size": 1,
+    "model_id": "sword_steel"
+  },
+  {
+    "id": 7,
+    "name": "Composite Bow",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WAR",
+      "RNG",
+      "NIN"
+    ],
+    "level": 15,
+    "stats": {
+      "dex": 3,
+      "ranged_attack": 28
+    },
+    "stack_size": 1,
+    "model_id": "bow_composite"
+  },
+  {
+    "id": 8,
+    "name": "Mythril Sword",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN"
+    ],
+    "level": 50,
+    "stats": {
+      "accuracy": 8,
+      "attack": 89,
+      "str": 10
+    },
+    "stack_size": 1,
+    "flags": [
+      "rare"
+    ],
+    "model_id": "sword_mythril"
+  },
+  {
+    "id": 9,
+    "name": "Healing Staff",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WHM",
+      "BRD",
+      "SCH"
+    ],
+    "level": 40,
+    "stats": {
+      "magic_attack_bonus": 35,
+      "magic_defense_bonus": 6,
+      "mnd": 8
+    },
+    "stack_size": 1,
+    "model_id": "staff_healing"
+  },
+  {
+    "id": 10,
+    "name": "Excalibur",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "PLD"
+    ],
+    "level": 73,
+    "stats": {
+      "accuracy": 20,
+      "attack": 249,
+      "defense": 25,
+      "str": 25
+    },
+    "stack_size": 1,
+    "flags": [
+      "rare",
+      "ex"
+    ],
+    "model_id": "sword_excalibur"
+  },
+  {
+    "id": 11,
+    "name": "Training Sword",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN"
+    ],
+    "level": 1,
+    "stats": {
+      "attack": 8
+    },
+    "stack_size": 1,
+    "model_id": "sword_training"
+  },
+  {
+    "id": 12,
+    "name": "Iron Shortsword",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN"
+    ],
+    "level": 5,
+    "stats": {
+      "attack": 14,
+      "str": 1
+    },
+    "stack_size": 1,
+    "model_id": "sword_iron_short"
+  },
+  {
+    "id": 13,
+    "name": "Broadsword",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN"
+    ],
+    "level": 10,
+    "stats": {
+      "attack": 22,
+      "str": 2
+    },
+    "stack_size": 1,
+    "model_id": "sword_broadsword"
+  },
+  {
+    "id": 101,
+    "name": "Leather Vest",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ],
+    "level": 4,
+    "stats": {
+      "defense": 8,
+      "vit": 1
+    },
+    "stack_size": 1,
+    "model_id": "body_leather"
+  },
+  {
+    "id": 102,
+    "name": "Leather Trousers",
+    "category": "armor",
+    "equip_slots": [
+      "legs"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ],
+    "level": 4,
+    "stats": {
+      "agi": 1,
+      "defense": 6
+    },
+    "stack_size": 1,
+    "model_id": "legs_leather"
+  },
+  {
+    "id": 103,
+    "name": "Leather Gloves",
+    "category": "armor",
+    "equip_slots": [
+      "handl",
+      "handr"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ],
+    "level": 4,
+    "stats": {
+      "defense": 4,
+      "dex": 1
+    },
+    "stack_size": 1,
+    "model_id": "hands_leather"
+  },
+  {
+    "id": 104,
+    "name": "Leather Sandals",
+    "category": "armor",
+    "equip_slots": [
+      "feet"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ],
+    "level": 4,
+    "stats": {
+      "agi": 1,
+      "defense": 4
+    },
+    "stack_size": 1,
+    "model_id": "feet_leather"
+  },
+  {
+    "id": 105,
+    "name": "Leather Cap",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ],
+    "level": 4,
+    "stats": {
+      "defense": 5,
+      "evasion": 3
+    },
+    "stack_size": 1,
+    "model_id": "head_leather"
+  },
+  {
+    "id": 106,
+    "name": "Chainmail",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM"
+    ],
+    "level": 20,
+    "stats": {
+      "defense": 28,
+      "str": 3,
+      "vit": 2
+    },
+    "stack_size": 1,
+    "model_id": "body_chain"
+  },
+  {
+    "id": 107,
+    "name": "Chain Leggings",
+    "category": "armor",
+    "equip_slots": [
+      "legs"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM"
+    ],
+    "level": 20,
+    "stats": {
+      "defense": 22,
+      "vit": 2
+    },
+    "stack_size": 1,
+    "model_id": "legs_chain"
+  },
+  {
+    "id": 108,
+    "name": "Iron Helm",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM"
+    ],
+    "level": 18,
+    "stats": {
+      "defense": 20,
+      "str": 2
+    },
+    "stack_size": 1,
+    "model_id": "head_iron"
+  },
+  {
+    "id": 109,
+    "name": "Mage's Robe",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "BRD"
+    ],
+    "level": 10,
+    "stats": {
+      "defense": 10,
+      "int": 5,
+      "magic_defense_bonus": 8,
+      "mnd": 5
+    },
+    "stack_size": 1,
+    "model_id": "body_robe"
+  },
+  {
+    "id": 110,
+    "name": "Knight's Plate",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "PLD"
+    ],
+    "level": 55,
+    "stats": {
+      "defense": 78,
+      "enmity": 10,
+      "str": 8,
+      "vit": 12
+    },
+    "stack_size": 1,
+    "flags": [
+      "rare"
+    ],
+    "model_id": "body_plate_knight"
+  },
+  {
+    "id": 111,
+    "name": "Ninja Gi",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "NIN",
+      "THF",
+      "DNC"
+    ],
+    "level": 45,
+    "stats": {
+      "agi": 10,
+      "defense": 40,
+      "evasion": 15,
+      "haste": 3
+    },
+    "stack_size": 1,
+    "model_id": "body_gi"
+  },
+  {
+    "id": 112,
+    "name": "Wizard's Coat",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "BLM",
+      "SMN",
+      "SCH"
+    ],
+    "level": 48,
+    "stats": {
+      "defense": 35,
+      "fast_cast": 5,
+      "int": 12,
+      "magic_attack_bonus": 18
+    },
+    "stack_size": 1,
+    "model_id": "body_wizcoat"
+  },
+  {
+    "id": 113,
+    "name": "Sabatons",
+    "category": "armor",
+    "equip_slots": [
+      "feet"
+    ],
+    "jobs": [
+      "PLD",
+      "DRK",
+      "WAR"
+    ],
+    "level": 30,
+    "stats": {
+      "defense": 22,
+      "str": 4
+    },
+    "stack_size": 1,
+    "model_id": "feet_sabatons"
+  },
+  {
+    "id": 114,
+    "name": "Silk Slippers",
+    "category": "armor",
+    "equip_slots": [
+      "feet"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "BRD"
+    ],
+    "level": 28,
+    "stats": {
+      "defense": 14,
+      "fast_cast": 2,
+      "mnd": 4
+    },
+    "stack_size": 1,
+    "model_id": "feet_silk"
+  },
+  {
+    "id": 115,
+    "name": "Spiked Knuckles",
+    "category": "armor",
+    "equip_slots": [
+      "handl",
+      "handr"
+    ],
+    "jobs": [
+      "MNK",
+      "BST"
+    ],
+    "level": 22,
+    "stats": {
+      "attack": 15,
+      "str": 4
+    },
+    "stack_size": 1,
+    "model_id": "hands_knuckles"
+  },
+  {
+    "id": 116,
+    "name": "Novice Tunic",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ],
+    "level": 1,
+    "stats": {
+      "defense": 3
+    },
+    "stack_size": 1,
+    "model_id": "body_novice"
+  },
+  {
+    "id": 117,
+    "name": "Novice Leggings",
+    "category": "armor",
+    "equip_slots": [
+      "legs"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ],
+    "level": 1,
+    "stats": {
+      "defense": 2
+    },
+    "stack_size": 1,
+    "model_id": "legs_novice"
+  },
+  {
+    "id": 118,
+    "name": "Novice Gloves",
+    "category": "armor",
+    "equip_slots": [
+      "hand-l",
+      "hand-r"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ],
+    "level": 1,
+    "stats": {
+      "defense": 1
+    },
+    "stack_size": 1,
+    "model_id": "hands_novice"
+  },
+  {
+    "id": 119,
+    "name": "Novice Cap",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ],
+    "level": 1,
+    "stats": {
+      "defense": 2
+    },
+    "stack_size": 1,
+    "model_id": "head_novice"
+  },
+  {
+    "id": 120,
+    "name": "Novice Boots",
+    "category": "armor",
+    "equip_slots": [
+      "feet"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ],
+    "level": 1,
+    "stats": {
+      "defense": 1
+    },
+    "stack_size": 1,
+    "model_id": "feet_novice"
+  },
+  {
+    "id": 121,
+    "name": "Rugged Vest",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ],
+    "level": 7,
+    "stats": {
+      "defense": 12,
+      "vit": 1
+    },
+    "stack_size": 1,
+    "model_id": "body_rugged"
+  },
+  {
+    "id": 122,
+    "name": "Rugged Leggings",
+    "category": "armor",
+    "equip_slots": [
+      "legs"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ],
+    "level": 7,
+    "stats": {
+      "defense": 9
+    },
+    "stack_size": 1,
+    "model_id": "legs_rugged"
+  },
+  {
+    "id": 123,
+    "name": "Rugged Gloves",
+    "category": "armor",
+    "equip_slots": [
+      "hand-l",
+      "hand-r"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ],
+    "level": 7,
+    "stats": {
+      "defense": 6
+    },
+    "stack_size": 1,
+    "model_id": "hands_rugged"
+  },
+  {
+    "id": 124,
+    "name": "Rugged Cap",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ],
+    "level": 7,
+    "stats": {
+      "defense": 8
+    },
+    "stack_size": 1,
+    "model_id": "head_rugged"
+  },
+  {
+    "id": 125,
+    "name": "Rugged Boots",
+    "category": "armor",
+    "equip_slots": [
+      "feet"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ],
+    "level": 7,
+    "stats": {
+      "defense": 6
+    },
+    "stack_size": 1,
+    "model_id": "feet_rugged"
+  },
+  {
+    "id": 126,
+    "name": "Warden's Cuirass",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ],
+    "level": 10,
+    "stats": {
+      "defense": 16,
+      "str": 1,
+      "vit": 2
+    },
+    "stack_size": 1,
+    "model_id": "body_warden"
+  },
+  {
+    "id": 127,
+    "name": "Warden's Greaves",
+    "category": "armor",
+    "equip_slots": [
+      "legs"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ],
+    "level": 10,
+    "stats": {
+      "defense": 13
+    },
+    "stack_size": 1,
+    "model_id": "legs_warden"
+  },
+  {
+    "id": 128,
+    "name": "Warden's Gauntlets",
+    "category": "armor",
+    "equip_slots": [
+      "hand-l",
+      "hand-r"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ],
+    "level": 10,
+    "stats": {
+      "defense": 9
+    },
+    "stack_size": 1,
+    "model_id": "hands_warden"
+  },
+  {
+    "id": 129,
+    "name": "Warden's Helm",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ],
+    "level": 10,
+    "stats": {
+      "defense": 11
+    },
+    "stack_size": 1,
+    "model_id": "head_warden"
+  },
+  {
+    "id": 130,
+    "name": "Warden's Sabatons",
+    "category": "armor",
+    "equip_slots": [
+      "feet"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ],
+    "level": 10,
+    "stats": {
+      "defense": 9
+    },
+    "stack_size": 1,
+    "model_id": "feet_warden"
+  },
+  {
+    "id": 201,
+    "name": "Copper Ring",
+    "category": "accessory",
+    "equip_slots": [
+      "ringl",
+      "ringr"
+    ],
+    "level": 1,
+    "stats": {
+      "str": 1
+    },
+    "stack_size": 1,
+    "model_id": "ring_copper"
+  },
+  {
+    "id": 202,
+    "name": "Silver Ring",
+    "category": "accessory",
+    "equip_slots": [
+      "ringl",
+      "ringr"
+    ],
+    "level": 20,
+    "stats": {
+      "dex": 2,
+      "str": 2
+    },
+    "stack_size": 1,
+    "model_id": "ring_silver"
+  },
+  {
+    "id": 203,
+    "name": "Spike Earring",
+    "category": "accessory",
+    "equip_slots": [
+      "earl",
+      "earr"
+    ],
+    "level": 1,
+    "stats": {
+      "str": 2
+    },
+    "stack_size": 1,
+    "model_id": "ear_spike"
+  },
+  {
+    "id": 204,
+    "name": "Mage's Earring",
+    "category": "accessory",
+    "equip_slots": [
+      "earl",
+      "earr"
+    ],
+    "level": 15,
+    "stats": {
+      "int": 3,
+      "mnd": 3
+    },
+    "stack_size": 1,
+    "model_id": "ear_mage"
+  },
+  {
+    "id": 205,
+    "name": "Traveler's Cloak",
+    "category": "accessory",
+    "equip_slots": [
+      "back"
+    ],
+    "level": 5,
+    "stats": {
+      "agi": 2,
+      "defense": 4
+    },
+    "stack_size": 1,
+    "model_id": "back_cloak"
+  },
+  {
+    "id": 206,
+    "name": "Shinobi Sash",
+    "category": "accessory",
+    "equip_slots": [
+      "waist"
+    ],
+    "jobs": [
+      "NIN",
+      "THF",
+      "DNC"
+    ],
+    "level": 35,
+    "stats": {
+      "agi": 6,
+      "evasion": 10,
+      "haste": 2
+    },
+    "stack_size": 1,
+    "model_id": "waist_sash"
+  },
+  {
+    "id": 207,
+    "name": "Life Belt",
+    "category": "accessory",
+    "equip_slots": [
+      "waist"
+    ],
+    "level": 15,
+    "stats": {
+      "accuracy": 5,
+      "attack": 5
+    },
+    "stack_size": 1,
+    "model_id": "waist_belt_life"
+  },
+  {
+    "id": 208,
+    "name": "Wisdom Ring",
+    "category": "accessory",
+    "equip_slots": [
+      "ringl",
+      "ringr"
+    ],
+    "level": 30,
+    "stats": {
+      "int": 5,
+      "magic_attack_bonus": 3,
+      "mnd": 5
+    },
+    "stack_size": 1,
+    "model_id": "ring_wisdom"
+  },
+  {
+    "id": 209,
+    "name": "Venerer's Belt",
+    "category": "accessory",
+    "equip_slots": [
+      "waist"
+    ],
+    "jobs": [
+      "RNG",
+      "COR"
+    ],
+    "level": 42,
+    "stats": {
+      "dex": 5,
+      "ranged_accuracy": 10,
+      "store_tp": 3
+    },
+    "stack_size": 1,
+    "model_id": "waist_venerer"
+  },
+  {
+    "id": 210,
+    "name": "Choker of Dawn",
+    "category": "accessory",
+    "equip_slots": [
+      "neck"
+    ],
+    "level": 60,
+    "stats": {
+      "light": 8,
+      "magic_defense_bonus": 12,
+      "mnd": 10
+    },
+    "stack_size": 1,
+    "flags": [
+      "rare",
+      "ex"
+    ],
+    "model_id": "neck_choker_dawn"
+  },
+  {
+    "id": 301,
+    "name": "Potion",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_potion"
+  },
+  {
+    "id": 302,
+    "name": "Hi-Potion",
+    "category": "consumable",
+    "level": 20,
+    "stack_size": 12,
+    "model_id": "item_hipotion"
+  },
+  {
+    "id": 303,
+    "name": "Ether",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_ether"
+  },
+  {
+    "id": 304,
+    "name": "Rolanberry",
+    "category": "consumable",
+    "stats": {
+      "mnd": 1
+    },
+    "stack_size": 12,
+    "model_id": "item_rolanberry"
+  },
+  {
+    "id": 305,
+    "name": "Selbina Milk",
+    "category": "consumable",
+    "stats": {
+      "str": 1,
+      "vit": 2
+    },
+    "stack_size": 12,
+    "model_id": "item_milk"
+  },
+  {
+    "id": 401,
+    "name": "Fire Crystal",
+    "category": "crystal",
+    "stack_size": 12,
+    "model_id": "crystal_fire"
+  },
+  {
+    "id": 402,
+    "name": "Ice Crystal",
+    "category": "crystal",
+    "stack_size": 12,
+    "model_id": "crystal_ice"
+  },
+  {
+    "id": 403,
+    "name": "Wind Crystal",
+    "category": "crystal",
+    "stack_size": 12,
+    "model_id": "crystal_wind"
+  },
+  {
+    "id": 404,
+    "name": "Earth Crystal",
+    "category": "crystal",
+    "stack_size": 12,
+    "model_id": "crystal_earth"
+  },
+  {
+    "id": 405,
+    "name": "Thunder Crystal",
+    "category": "crystal",
+    "stack_size": 12,
+    "model_id": "crystal_thunder"
+  },
+  {
+    "id": 406,
+    "name": "Water Crystal",
+    "category": "crystal",
+    "stack_size": 12,
+    "model_id": "crystal_water"
+  },
+  {
+    "id": 501,
+    "name": "Iron Ore",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "material_iron_ore"
+  },
+  {
+    "id": 502,
+    "name": "Worm Silk",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "material_worm_silk"
+  },
+  {
+    "id": 503,
+    "name": "Bat Wing",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "material_bat_wing"
+  },
+  {
+    "id": 504,
+    "name": "Spider Web",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "material_spider_web"
+  },
+  {
+    "id": 505,
+    "name": "Bone Chip",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "material_bone_chip"
+  },
+  {
+    "id": 901,
+    "name": "Key to the Old Fort",
+    "category": "key_item",
+    "stack_size": 1,
+    "flags": [
+      "rare",
+      "ex"
+    ]
+  },
+  {
+    "id": 902,
+    "name": "Gobbiebag Voucher I",
+    "description": "Presented to the Goblin Emporium to expand inventory capacity by 10 slots.",
+    "category": "key_item",
+    "stack_size": 1,
+    "flags": [
+      "rare",
+      "ex"
+    ]
+  },
+  {
+    "id": 1001,
+    "name": "Guard Uniform",
+    "description": "Authentic patrol uniform. Guards see through it faster than civilians do.",
+    "category": "accessory",
+    "level": 1,
+    "stack_size": 1,
+    "flags": [
+      "ex"
+    ],
+    "disguise_faction": "guard"
+  },
+  {
+    "id": 1002,
+    "name": "Civilian Clothes",
+    "description": "Unremarkable street clothes. Passes inspection from most NPCs except civilians who know the area.",
+    "category": "accessory",
+    "level": 1,
+    "stack_size": 1,
+    "disguise_faction": "civilian"
+  },
+  {
+    "id": 1003,
+    "name": "Merchant Coat",
+    "description": "A merchant's long coat with hidden pockets. Accepted by market NPCs; arouses suspicion from guards.",
+    "category": "accessory",
+    "level": 1,
+    "stack_size": 1,
+    "disguise_faction": "merchant"
+  }
 ]

@@ -1,3 +1,20 @@
+## 2026-09-04 (6)
+- content: 18 new items via `data/items.json` -- 3 swords (Training Sword/Iron Shortsword/
+  Broadsword, levels 1/5/10) and 3 full 5-piece armor sets at levels 1/7/10 (Novice/Rugged/
+  Warden), ids 11-13 and 116-130. Founder real-time: "we need like 3 different swords etc we
+  need a beginner armor set a lvl 7 armor set and a lvl 10 armor." Seeded through IDUNA's new
+  `/admin/gfd-items` tool itself (dogfooding, not hand-edited), live-verified loading correctly
+  via the real `itemdefReg.LoadFile`. Real, found-live, pre-existing bug flagged, not fixed:
+  two existing items (Leather Gloves id 103, Spiked Knuckles id 115) use un-hyphenated
+  `equip_slots` (`"handl"`/`"handr"`) that don't match `server/gear.AllSlots`'s own real
+  `"hand-l"`/`"hand-r"` values -- neither has ever been equippable as authored. New content uses
+  the correct hyphenated names throughout.
+- docs: `docs2/ITEM_BUILDER_NORTHSTAR.md` updated -- Phase 2a (real IDUNA item GUI) shipped, see
+  IDUNA's own changelog; new "Item design principles" section records real founder direction
+  (FFXI-style per-item job lists not WoW armor-class tiers; most gear is stats+model, mod hooks
+  are the minority case; `FlagRare`/`FlagEx` are already a real, correctly-separated tradability
+  axis, not something needing a system change).
+
 ## 2026-09-04 (5)
 - feat(mud): `use <item-id>` command -- `ITEM_BUILDER_NORTHSTAR.md` Phase 0, the blocking
   prerequisite for real item special-effects. `cmdUseItem` checks ownership, looks the item up

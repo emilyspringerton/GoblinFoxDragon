@@ -65,6 +65,38 @@ Two real, separable pieces, matching the card's own two-clause structure:
    wired as a real player-facing command at all, a real, separate, even more basic gap than the
    mod-hook mechanism itself).
 
+## Item design principles (founder real-time, 2026-09-04)
+
+Real, concrete direction for what the item roster itself should actually look like, distinct
+from the builder tool's own engineering scope above:
+
+- **FFXI-style job lists, not WoW-style armor-class tiers.** No "cloth/leather/mail/plate"
+  armor-class system — every piece of gear names its own real `Jobs` list directly (already
+  `ItemDef`'s real, existing field, checked against `data/items.json`'s own already-live
+  entries), the same way FFXI's own gear works. A WAR-only plate piece and a WHM-only robe are
+  both just items with a different `Jobs` list, not two different mechanical systems.
+- **Most gear is "just stats and a model," not custom-programmed.** "wow has the shitty grey and
+  white gear too... the more advanced gear will have stats and stuff... but to start we need
+  like 3 different swords... a beginner armor set a lvl 7 armor set and a lvl 10 armor" — the
+  large majority of the roster is real archetype content (a name, a `Category`, a `Stats` block,
+  a `ModelID`) built directly with the Phase 2 GUI, no mod hook attached. Phase 1's real mod-hook
+  mechanism is for the genuine minority — items whose behavior can't be expressed as a flat stat
+  block (a real, honest example: a consumable with a scripted multi-stage effect, not just "+N
+  to a stat while worn").
+- **Tradability is a real, separate axis from rarity, not the same thing.** `ItemDef.FlagsRaw`
+  already carries this distinction correctly (checked directly, not designed fresh here):
+  `FlagRare` ("only one per character across all bags") and `FlagEx` ("cannot be traded,
+  dropped, or bazaared") are two independent bits — an item can be rare without being exclusive.
+  Founder's own real reference point: "kirin osode was rare but not exclusive meaning you could
+  sell it technically but you never would, it was so valuable and rare and hard to get." Real,
+  existing proof this already works as designed: `data/items.json`'s own Mythril Sword (id 8)
+  carries `flags:["rare"]` alone (rare, still tradable) while Excalibur (id 10) carries
+  `flags:["rare","ex"]` (rare AND untradable) — two real, already-differentiated cases, not a
+  gap this doc needs to close. The one real, honest gap: most gear (quest rewards, deep
+  endgame) will eventually need real `ex` flags applied deliberately, item by item, as that
+  content gets built — a real, ongoing curation task for whoever builds each piece, not a
+  system change.
+
 ## Real, phased plan
 
 **Phase 0 — DONE, real "use item" command shipped (2026-09-04).** New `use <item-id>` MUD
@@ -94,13 +126,37 @@ PARENA-authored `heal_mod.prn` — a scalar decision function (heal amount from 
 current HP) matching `stdlib/k8s/scaling.prn`'s own I32-only shape, the smallest real proof
 point.
 
-**Phase 2 — the authoring tool itself.** Resolves the open question named above (CLI vs. web
-page) — real, founder-level decision, not guessed here. Whichever is chosen, real minimum
-feature set: list/search existing items, create a new item (all `ItemDef` fields), edit an
-existing item's stats, and — the real, literal "expose affordances to the item builder" ask —
-a dropdown/picker of already-compiled mod names to attach as `on_use_mod`/`on_equip_mod`,
-sourced from whatever the Phase 1 manifest already tracks, not a free-text field a typo could
-silently break.
+**Phase 2a — DONE, real IDUNA-hosted item GUI shipped (2026-09-04).** Founder resolved the
+hosting question real-time: "we need some kind of big gui to help us manage our items... via GFD
+world building tools either in iduna or whatever." New `/admin/gfd-items` page in IDUNA
+(`GfdItemsPageHandler` + `GfdItemsHandler`), same direct-file-access precedent the kanban/
+BACKLOG.md bridge already established (`GFD_ITEMS_JSON_PATH` env var, defaults to
+`GoblinFoxDragon/data/items.json`) — real list/create/edit/delete against the actual live file,
+gated behind the same `iduna.admin` permission every other admin page uses. Real, honest
+limitation named on the page itself: `apps2/mud` only loads `items.json` once at startup, so a
+GUI edit takes effect on next restart, not live. Real content seeded through the tool itself
+(dogfooding, not hand-edited JSON) matching the founder's own literal ask: 3 swords (Training
+Sword/Iron Shortsword/Broadsword, levels 1/5/10) and 3 full 5-piece armor sets at levels 1/7/10
+(Novice/Rugged/Warden) — 18 new items total, ids 11-13 and 116-130, live-verified loading
+correctly through the real `itemdefReg.LoadFile`. 10 new IDUNA-side tests (list/create/duplicate-
+id-rejection/invalid-category-rejection/update/URL-id-wins-over-body/not-found/delete/field-name
+round-trip), `go build/vet/test ./...` clean. Real, found-live, pre-existing bug flagged, not
+fixed: two existing items (Leather Gloves id 103, Spiked Knuckles id 115) use `equip_slots:
+["handl","handr"]` (no hyphen), but `server/gear.AllSlots`'s own real canonical values are
+`"hand-l"`/`"hand-r"` (hyphenated) — neither the `equip` command's own slot-name validation nor
+`ItemDef.CanEquip`'s string match would ever accept those two items into a hand slot, making
+them permanently unequippable as authored. New content in this pass uses the correct hyphenated
+slot names throughout.
+
+**Phase 2b — NPC vendor catalog editing.** Not built. Real, separate prerequisite named above:
+`npcVendorCatalog` in `apps2/mud/main.go` is a hardcoded Go map today, not data-driven at all —
+needs to move to its own editable file (the same real shape `items.json` already has) before any
+GUI can manage which items an NPC actually sells, at what price.
+
+**Phase 2c — mod-name picker.** Once Phase 1's mod-hook mechanism exists, extend the Phase 2a
+GUI with a dropdown/picker of already-compiled mod names to attach as `on_use_mod`/`on_equip_mod`
+— the real, literal "expose affordances to the item builder" ask — sourced from whatever the
+Phase 1 manifest already tracks, not a free-text field a typo could silently break.
 
 **Phase 3 — broader special-programming coverage.** Once Phase 1's mechanism is proven on one
 real item, port more of the currently-inert consumable roster (Hi-Potion, Ether, etc.) and any
@@ -109,8 +165,8 @@ rather than ever hardcoding a second one-off branch in `apps2/mud/main.go` direc
 
 ## Real, honest, explicitly out of scope for this pass
 
-Phase 0 shipped (see above) — Phase 1's mod-loading mechanism, any `ItemDef` schema change, and
-the Phase 2 authoring tool itself are not built by this doc. **Update 2026-09-04**: the founder
-resolved Phase 2's own open hosting question directly, real-time — "we need some kind of big gui
-to help us manage our items" — a real web page, not a CLI. Exactly which existing consumables
-get real effects first in Phase 3 stays a real, open follow-up-session decision.
+Phases 0 and 2a shipped (see above). Not built: Phase 1's mod-loading mechanism, any `ItemDef`
+schema change (`on_use_mod`/`on_equip_mod` fields don't exist yet), Phase 2b (vendor catalog
+editing — blocked on `npcVendorCatalog` becoming data-driven first), and Phase 2c (the mod-name
+picker, blocked on Phase 1). Exactly which existing consumables get real effects first in Phase
+3 stays a real, open follow-up-session decision.
