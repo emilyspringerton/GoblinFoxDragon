@@ -1,3 +1,22 @@
+## 2026-09-04
+- feat(dungeons): DUNGEON_NORTHSTAR.md Milestone 1 ("instancing"), real correction + real v0
+  shipped. Decisive correction: Milestone 1's own acceptance text assumed REDGARDEN's per-match
+  matchmaker-fork/exec architecture, but Milestone 4's own text names Battlegrounds (this repo's
+  `apps2/server-go`, a single persistent UDP process, not a per-match spawned server) as the
+  real dungeon-render client -- entry needs to happen through the process the client actually
+  talks to. New `server/worldapi/dungeon_instance.go`: `DungeonInstanceRegistry.Allocate`
+  generates a fresh instance from Milestone 2/3's own real generators and reserves a scene ID in
+  a real, wire-format-bounded `208-255` range (`PacketTelecrystalAck`/`PacketSceneChange` encode
+  scene ID as a single `uint8` -- checked directly before picking a range), refusing once its
+  48-instance capacity is exhausted rather than wrapping onto a still-live instance. New
+  `apps2/server-go` UDP handler `PacketDungeonEnter` reuses `server/telecrystal`'s own real
+  travel mechanism (`TravelTelecrystal` at 0 cost) instead of a new travel path. `worldapi`'s
+  `/chunks` HTTP handler checks the registry before falling back to `ProceduralWorldStore`. 9
+  new tests, `go build/vet/test ./...` clean across the whole repo. Real, honest, NOT done:
+  party-roster passthrough (every instance is solo), mob spawns not wired into a live instance
+  yet, no live multiplayer end-to-end verification this pass (unit/integration-tested against
+  the real registry/generator code directly).
+
 ## 2026-09-03
 - feat(mud): real `hatshop` command -- Town proxy to the real BRAWLPIT hat store (kanban
   `WTHS-012010`: "there is already a hat shop in town that could be a proxy to the BrawlPit hat

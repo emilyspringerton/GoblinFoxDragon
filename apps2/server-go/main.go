@@ -228,9 +228,21 @@ func main() {
 
 	initCityState()
 
+	// Dungeon instancing (DUNGEON_NORTHSTAR.md Milestone 1, real v0, 2026-09-04): shared between
+	// the worldapi chunk-generator closure below and the UDP PacketDungeonEnter handler further
+	// down -- see server/worldapi/dungeon_instance.go's own doc comment for why this lives here
+	// (this persistent process, not a REDGARDEN-style per-match spawned server) rather than
+	// wiring through REDGARDEN's matchmaker.
+	dungeonRegistry := worldapi.NewDungeonInstanceRegistry(208)
+
 	// Start the worldapi HTTP server — SHANKPIT connects here with --dragonfly-url http://localhost:7070
 	if *worldapiPort > 0 {
-		gen := worldapi.NewDragonflyChunkGenerator(worldapi.ProceduralWorldStore)
+		gen := worldapi.NewDragonflyChunkGenerator(func(sceneID, chunkX, chunkZ int) []worldapi.WorldBlock {
+			if blocks, ok := dungeonRegistry.BlocksForChunk(sceneID, chunkX, chunkZ); ok {
+				return blocks
+			}
+			return worldapi.ProceduralWorldStore(sceneID, chunkX, chunkZ)
+		})
 		srv := worldapi.New(gen)
 		go func() {
 			addr := fmt.Sprintf(":%d", *worldapiPort)
@@ -557,6 +569,50 @@ func main() {
 			fmt.Printf("[telecrystal] %s → scene=%d spawn=(%.1f,%.1f,%.1f)\n",
 				info.playerID, crystal.TargetScene,
 				crystal.SpawnPos.X, crystal.SpawnPos.Y, crystal.SpawnPos.Z)
+
+		case common.PacketDungeonEnter:
+			// DUNGEON_NORTHSTAR.md Milestone 1, real v0 (2026-09-04): payload = dungeon_index
+			// uint8 (not yet used to pick a per-dungeon boss/elite roster -- see
+			// GenerateDungeonSpawns' own real signature for that follow-up wiring). Reuses the
+			// exact same travel mechanism as PacketTelecrystalUse just above (allocate a
+			// destination, update scene/pos via IDUNA, ack with a PacketSceneChange-shaped
+			// body) at zero Flow/gold cost -- a dungeon entrance isn't a paid telecrystal.
+			if n < 2 {
+				continue
+			}
+			slot := remote.String()
+			info, ok := clients[slot]
+			if !ok || info.playerID == "" {
+				conn.WriteToUDP([]byte{common.PacketDungeonEnterErr, 1}, remote)
+				continue
+			}
+			dungeonIndex := int(buf[1])
+			seed := time.Now().UnixNano() // real, fresh per-request seed -- this v0 always
+			// allocates a brand-new solo instance per request (no party-roster passthrough or
+			// instance-sharing yet, see dungeon_instance.go's own doc comment).
+			sceneID, allocated := dungeonRegistry.Allocate(dungeonIndex, seed)
+			if !allocated {
+				fmt.Printf("[dungeon] enter %s: no free instance slots\n", info.playerID)
+				conn.WriteToUDP([]byte{common.PacketDungeonEnterErr, 2}, remote)
+				continue
+			}
+			spawnX, spawnY, spawnZ, _ := dungeonRegistry.EntrySpawn(sceneID) // always ok right
+			// after a successful Allocate for this same sceneID -- no separate error path needed.
+			if err := idunaClient.TravelTelecrystal(info.playerID, 0, sceneID, spawnX, spawnY, spawnZ); err != nil {
+				fmt.Printf("[dungeon] enter %s: %v\n", info.playerID, err)
+				conn.WriteToUDP([]byte{common.PacketDungeonEnterErr, 3}, remote)
+				continue
+			}
+			// Send PacketDungeonEnterAck = same wire layout as PacketSceneChange/PacketTelecrystalAck.
+			ack := make([]byte, 14)
+			ack[0] = common.PacketDungeonEnterAck
+			ack[1] = uint8(sceneID)
+			binary.LittleEndian.PutUint32(ack[2:], math.Float32bits(float32(spawnX)))
+			binary.LittleEndian.PutUint32(ack[6:], math.Float32bits(float32(spawnY)))
+			binary.LittleEndian.PutUint32(ack[10:], math.Float32bits(float32(spawnZ)))
+			conn.WriteToUDP(ack, remote)
+			fmt.Printf("[dungeon] %s → scene=%d (dungeon_index=%d, seed=%d) spawn=(%.1f,%.1f,%.1f)\n",
+				info.playerID, sceneID, dungeonIndex, seed, spawnX, spawnY, spawnZ)
 
 		case common.PacketCraftRequest:
 			// Payload: JSON {"recipe_id":"...","character_id":"...","reagent_ids":["...","..."]}

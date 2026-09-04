@@ -41,6 +41,15 @@ const (
 	// the handler's own comment).
 	PacketRespawn       = 19 // client→server: no payload
 	PacketRespawnResult = 20 // server→client: JSON {hp,max_hp,xp_penalty,error}
+	// Dungeon entry (DUNGEON_NORTHSTAR.md Milestone 1, real v0, 2026-09-04): reuses the exact
+	// same travel mechanism telecrystal already established (allocate a destination, update
+	// scene/pos via IDUNA, ack with a PacketSceneChange-shaped body) rather than a REDGARDEN-
+	// style spawned server process -- see server/worldapi/dungeon_instance.go's own doc comment
+	// for the real reasoning (Battlegrounds, the actual dungeon-render client per Milestone 4,
+	// talks to this persistent apps2/server-go process, not a per-match spawned one).
+	PacketDungeonEnter    = 21 // client→server: payload: dungeon_index uint8
+	PacketDungeonEnterAck = 22 // server→client: payload = PacketSceneChange body (sceneID + spawnXYZ)
+	PacketDungeonEnterErr = 23 // server→client: payload: uint8 error code
 )
 
 // Chat channel IDs (byte 1 of PacketChat).
