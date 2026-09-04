@@ -1,3 +1,27 @@
+## 2026-09-04 (21)
+- feat(server/modevent, apps2/mud): GFD-x-123/GFD-x-124 -- "mod interface for event broker in
+  server mods should be able to register and or subscribe to specific named events in the
+  system (USE PARENA TYPES) mods should fire off signals for their callbacks" + "mods can
+  subscribe to certain events... fire off callbacks on specific event types events can have
+  generic payload must be typed." New `server/modevent.Broker`: real, generic pub/sub --
+  `Subscribe(name string, Handler)` / `Publish(name string, payload int32) []int32`, string-named
+  events (any core code or mod can define a new one, no closed enum) with an I32-in/I32-out
+  payload (the same real VS0-across-a-mod-boundary ceiling every ECOWAR/PAPERCRAFT/GFD mod
+  already respects) -- 5 new tests, all green. Real, checked-first finding before building:
+  `apps2/mud` needed BURROW's own Go emission target, not `parena build`'s C target
+  GFD-MACRO-0012's own `action_bar_mod.prn` uses for the C-based `apps2/battlegrounds_gui`
+  client -- this is the first real host anywhere in this monorepo to actually consume BURROW's Go
+  target (shipped 2026-08-30, never used until now). Real content: `PARENA/stdlib/gfd/
+  nm_bonus_mod.prn` compiled to `apps2/mud/internal/burrowgen/nm_bonus_mod_gen.go` (committed,
+  same "generate once, commit, call by name" precedent action_bar_mod's own C-target build
+  already established) -- real decision logic deciding the bonus XP percent for a Notorious
+  Monster kill, wired into `resolveKill`'s own `mob.death` publish (payload: 1 if the kill's ID
+  has the real, existing `nm-` prefix, 0 otherwise). 1 new test on the generated function itself.
+  `go build`/`go vet`/`go test ./...` clean; redeployed live under `gfd-mud.service`;
+  live-verified a normal (non-NM) kill still resolves cleanly with no regression (a full NM pop
+  needs a real 5-30min window plus a probability roll, impractical to wait out live -- covered
+  instead by full unit coverage of every sub-piece).
+
 ## 2026-09-04 (20)
 - feat(server/spawn, apps2/mud): GFD-NM-123 -- "the mob spawn interface can optionally specify
   a notorious monster spawn for one of the base mobs." `spawn.Rule` gained an optional `nm`

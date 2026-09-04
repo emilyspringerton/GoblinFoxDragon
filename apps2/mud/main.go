@@ -64,6 +64,8 @@ import (
 	"dragonsnshit/server/mob"
 	"dragonsnshit/server/moghouse"
 	"dragonsnshit/server/neighborhood"
+	"dragonsnshit/apps2/mud/internal/burrowgen"
+	"dragonsnshit/server/modevent"
 	"dragonsnshit/server/nm"
 	"dragonsnshit/server/npcattention"
 	"dragonsnshit/server/party"
@@ -663,6 +665,7 @@ type world struct {
 	nmSpawns         map[int][]*nm.NMSpawn      // zoneID → NM spawn definitions
 	nmReg            *nm.Registry               // all NMs keyed by ID
 	nmSched          *nm.NMRespawnScheduler     // S126-13 respawn scheduler
+	modBroker        *modevent.Broker           // GFD-x-123/124: real mod event broker (server/modevent)
 	conquestMap      *conquest.Map
 	campaignBattle   *campaign.Battle // S126-14 weekly campaign battle
 	ah               *market.AuctionHouse
@@ -940,6 +943,21 @@ func initWorld() *world {
 	}
 	w.nmSched = nm.NewNMRespawnScheduler(w.nmReg)
 
+	// GFD-x-123/124: real mod event broker, first real slice. "mob.death" is published by
+	// resolveKill with a real I32 payload (1 = the killed mob was a Notorious Monster, 0 =
+	// not); subscribed here to a real PARENA mod compiled via BURROW's Go emission target
+	// (PARENA/stdlib/gfd/nm_bonus_mod.prn -> internal/burrowgen.OnGfdMobDeathXpBonusPercent,
+	// generated Go committed, same "generate once, commit, call by name" precedent
+	// action_bar_mod.prn's own C-target build already established for the GUI client) --
+	// the mod decides the real bonus XP percent for an NM kill, host Go applies it to
+	// resolveKill's own baseXP. Real, deliberately generic: any future core code can Publish a
+	// new named event, any future mod can Subscribe a handler, without touching this broker's
+	// own code.
+	w.modBroker = modevent.NewBroker()
+	w.modBroker.Subscribe("mob.death", func(payload int32) int32 {
+		return burrowgen.OnGfdMobDeathXpBonusPercent(payload)
+	})
+
 	w.zoneMgr = zone.New(zone.DefaultZones())
 
 	w.conquestMap = conquest.NewMap()
@@ -1165,6 +1183,25 @@ func broadcastZoneNoLock(zoneID int, msg, exceptSlot string) {
 // Must be called with gw.mu held.
 func resolveKill(p *player, killedMob *mob.Mob, reg *mob.Registry, now time.Time) {
 	baseXP := killedMob.MaxHP * xpPerHP
+
+	// GFD-x-123/124: real mod event broker "mob.death" publish -- any subscribed mod can react
+	// to a kill with a real, typed I32 decision. Real content today: the "nm-" ID prefix is the
+	// same existing convention this function's own World Crisis intercept check below already
+	// uses to detect an NM kill; a subscribed mod (PARENA/stdlib/gfd/nm_bonus_mod.prn) decides
+	// the real bonus XP percent, summed across every subscriber in case more than one mod wants
+	// to react to the same kill.
+	isNM := int32(0)
+	if strings.HasPrefix(killedMob.ID, "nm-") {
+		isNM = 1
+	}
+	bonusPercent := 0
+	for _, pct := range gw.modBroker.Publish("mob.death", isNM) {
+		bonusPercent += int(pct)
+	}
+	if bonusPercent > 0 {
+		baseXP += baseXP * bonusPercent / 100
+		p.sendf("  [Mod] Notorious Monster bonus: +%d%% XP", bonusPercent)
+	}
 
 	partyID, inParty := gw.playerParty[p.slot]
 	if inParty {
