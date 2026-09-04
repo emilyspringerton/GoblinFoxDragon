@@ -67,11 +67,23 @@ Two real, separable pieces, matching the card's own two-clause structure:
 
 ## Real, phased plan
 
-**Phase 0 — wire a real "use item" command.** Blocking prerequisite for everything else: a
-player needs a real way to USE a consumable at all before any mod hook has anything to attach
-to. Minimal v0: a new MUD command (`use <item>` or similar) that looks up the item via
-`itemdefReg`, checks the player actually owns one, and (for now) no-ops with a real "nothing
-happens yet" message — proving the command path end-to-end before any real effect exists.
+**Phase 0 — DONE, real "use item" command shipped (2026-09-04).** New `use <item-id>` MUD
+command (`cmdUseItem`, `apps2/mud/main.go`): checks the player actually owns the item, looks it
+up via `itemdefReg`, rejects non-`CatConsumable` items by name, then honestly reports "nothing
+happens yet" for a real consumable — no state mutation at all yet, proving the command path
+end-to-end before Phase 1's mod-hook dispatch has anything to attach to. Distinct from the
+pre-existing `eat` command, which is `food.Registry`'s own separate system (real, working
+already — the "no item-use mechanism at all" framing above needed that one caveat). Live,
+end-to-end verified against a real throwaway `apps2/mud` instance + a real IDUNA test character:
+`use hi-potion` after a real `shop buy hi-potion` printed the real "nothing happens yet" message;
+`use potion` with an empty inventory correctly said "you don't have potion." Real, separate,
+pre-existing bug found along the way, not fixed here: `itemdef.Registry.ByName` keys are the raw
+lowercased item `Name` field, so multi-word items (`"Earth Crystal"` → key `"earth crystal"`,
+a space) don't match the shop's own hyphenated item-ID convention (`"earth-crystal"`) at all —
+`Hi-Potion` only worked because its real name already contains a hyphen. Real, separate found
+issue while reading the command-dispatch convention (also not fixed): the existing `eat` command
+requires `len(args) < 2` then reads `args[1]`, but `args[0]` is the actual item-id — a single-word
+`eat potion` always misses and hits the usage error.
 
 **Phase 1 — the mod-hook mechanism.** Port PAPERCRAFT's own real `--mods-manifest` `dlopen`/
 `dlsym` pattern into `apps2/mud/main.go`: a manifest entry maps a mod name (the new
@@ -97,7 +109,8 @@ rather than ever hardcoding a second one-off branch in `apps2/mud/main.go` direc
 
 ## Real, honest, explicitly out of scope for this pass
 
-No item-use command, no mod-loading code, no `ItemDef` schema change, and no authoring tool of
-any kind are built by this doc. The CLI-vs-web-page decision in Phase 2, and exactly which
-existing consumables get real effects first in Phase 3, are both real, open, founder-level or
-follow-up-session decisions this scoping pass does not make on its own.
+Phase 0 shipped (see above) — Phase 1's mod-loading mechanism, any `ItemDef` schema change, and
+the Phase 2 authoring tool itself are not built by this doc. **Update 2026-09-04**: the founder
+resolved Phase 2's own open hosting question directly, real-time — "we need some kind of big gui
+to help us manage our items" — a real web page, not a CLI. Exactly which existing consumables
+get real effects first in Phase 3 stays a real, open follow-up-session decision.

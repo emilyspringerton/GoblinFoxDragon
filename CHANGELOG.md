@@ -1,3 +1,17 @@
+## 2026-09-04 (5)
+- feat(mud): `use <item-id>` command -- `ITEM_BUILDER_NORTHSTAR.md` Phase 0, the blocking
+  prerequisite for real item special-effects. `cmdUseItem` checks ownership, looks the item up
+  via `itemdefReg`, rejects non-consumables by name, and honestly reports "nothing happens yet"
+  for a real consumable -- no state mutation yet, just proving the command path end-to-end.
+  Distinct from `eat`, which is `food.Registry`'s own separate, already-working system. Live,
+  end-to-end verified against a real throwaway instance + a real IDUNA test character (bought a
+  real Hi-Potion via `shop buy`, then `use hi-potion` printed the real message; `use potion` with
+  an empty inventory correctly said "you don't have potion"). Real, separate, pre-existing bugs
+  found and flagged, not fixed: `itemdef.Registry.ByName`'s lowercased-`Name` keys don't match
+  the shop's own hyphenated item-ID convention for multi-word items (`"Earth Crystal"` never
+  matches `"earth-crystal"`); the existing `eat` command reads `args[1]` instead of `args[0]`,
+  so a single-word `eat potion` always misses.
+
 ## 2026-09-04 (4)
 - docs: `docs2/ITEM_BUILDER_NORTHSTAR.md` -- real scoping pass for kanban `GFD-ITEM-SUPPLY-
   CHAIN-000` ("tool for creating and managing the stats on GFD items and weapons... special

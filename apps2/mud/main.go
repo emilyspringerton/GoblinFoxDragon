@@ -2352,6 +2352,13 @@ func handle(p *player, line string) {
 		} else {
 			cmdEat(p, args[1])
 		}
+	case "use":
+		if len(args) < 1 {
+			p.send("Usage: use <item-id>")
+			p.prompt()
+		} else {
+			cmdUseItem(p, args[0])
+		}
 	case "food":
 		cmdFoodBuff(p)
 	case "fame", "reputation", "rep":
@@ -4272,6 +4279,42 @@ func cmdFishPoints(p *player) {
 			pt.SuccessChance(skill), pt.SuccessChance(gather.FishSkill{Level: p.fishingSkill + gather.HQThreshold}), p.fishingSkill)
 	}
 	p.prompt()
+}
+
+// cmdUseItem is Phase 0 of docs2/ITEM_BUILDER_NORTHSTAR.md: a real "use item" command didn't
+// exist at all before this -- every consumable in data/items.json (Potion, Hi-Potion, etc.) was
+// a real, inert data row with no way for a player to even attempt to use one. This is the
+// blocking prerequisite for Phase 1's mod-hook dispatch: it validates ownership and category,
+// then honestly reports that no effect is wired up yet, rather than pretending to do something.
+// Distinct from the existing "eat" command, which is food.Registry's own separate system.
+func cmdUseItem(p *player, itemID string) {
+	if p.inventory[itemID] <= 0 {
+		p.sendf("You don't have %s.", itemDisplayNameOr(itemID))
+		p.prompt()
+		return
+	}
+	def, ok := itemdefReg.ByName(itemID)
+	if !ok {
+		p.sendf("%s can't be used.", itemDisplayNameOr(itemID))
+		p.prompt()
+		return
+	}
+	if def.Category != itemdef.CatConsumable {
+		p.sendf("%s isn't something you use directly (category: %s).", def.Name, def.Category)
+		p.prompt()
+		return
+	}
+	p.sendf("You go to use %s, but nothing happens yet -- its effect isn't wired up.", def.Name)
+	p.prompt()
+}
+
+// itemDisplayNameOr returns the real display name if one is registered, the raw item ID
+// otherwise -- the same fallback cmdEquip's own error messages already rely on.
+func itemDisplayNameOr(itemID string) string {
+	if dn, ok := itemDisplayName[itemID]; ok {
+		return dn
+	}
+	return itemID
 }
 
 func cmdEat(p *player, itemID string) {
@@ -7075,6 +7118,7 @@ Commands:
   fish                — cast a line at a nearby fishing spot
   fish-points / fp    — list fishing spots in this zone
   eat <item-id>       — eat food to gain a stat buff
+  use <item-id>       — use a consumable item from your inventory
   food                — show current food buff status
   fame / rep          — show nation reputation (fame ranks)
   status / st         — show your stats (level, XP, homepoint, party)
