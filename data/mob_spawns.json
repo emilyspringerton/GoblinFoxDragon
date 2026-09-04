@@ -7,7 +7,10 @@
   {"zone_id": 2, "kind": "cave-spider", "enabled": true},
   {"zone_id": 2, "kind": "skeleton", "enabled": true},
   {"zone_id": 3, "kind": "leech", "enabled": true},
-  {"zone_id": 3, "kind": "slime", "enabled": true},
+  {"zone_id": 3, "kind": "slime", "enabled": true, "nm": {
+    "id": "nm-slime-king", "spawn_chance": 0.2, "window_open_sec": 300,
+    "window_close_sec": 1800, "respawn_minutes": 60
+  }},
   {"zone_id": 3, "kind": "lizard", "enabled": true},
   {"zone_id": 4, "kind": "worm", "enabled": true}
 ]

@@ -19,12 +19,28 @@ import (
 	"sync"
 )
 
+// NMRule (GFD-NM-123, "the mob spawn interface can optionally specify a notorious monster
+// spawn for one of the base mobs") is an optional, real config for server/nm.NMSpawn, carried
+// on a Rule so the JSON-driven spawn interface can declare an NM the same way
+// MeadowNMs()/HillsNMs()/etc already do in hardcoded Go -- this doesn't replace those presets
+// (registered separately at world init, left untouched to avoid re-registering/renaming
+// already-live NM IDs), it's the same real mechanism made available data-driven for any OTHER
+// base mob a zone's own designer wants to give an NM to, without writing a new Go function.
+type NMRule struct {
+	ID             string  `json:"id"`               // NM mob ID
+	SpawnChance    float64 `json:"spawn_chance"`     // 0.0-1.0, per nm.NMSpawn.SpawnChance
+	WindowOpenSec  int     `json:"window_open_sec"`  // seconds after placeholder kill the window opens
+	WindowCloseSec int     `json:"window_close_sec"` // seconds after placeholder kill the window closes
+	RespawnMinutes int     `json:"respawn_minutes"`  // 0 = no respawn, per nm.NMSpawn.RespawnMinutes
+}
+
 // Rule is one row of data/mob_spawns.json: whether a given mob Kind is allowed to spawn in a
-// given zone.
+// given zone, plus an optional NM association (GFD-NM-123).
 type Rule struct {
-	ZoneID  int    `json:"zone_id"`
-	Kind    string `json:"kind"`
-	Enabled bool   `json:"enabled"`
+	ZoneID  int     `json:"zone_id"`
+	Kind    string  `json:"kind"`
+	Enabled bool    `json:"enabled"`
+	NM      *NMRule `json:"nm,omitempty"`
 }
 
 type ruleKey struct {
@@ -35,8 +51,9 @@ type ruleKey struct {
 // Registry is the server-authoritative spawn-toggle store. Safe for concurrent reads after
 // construction.
 type Registry struct {
-	mu    sync.RWMutex
-	rules map[ruleKey]bool
+	mu      sync.RWMutex
+	rules   map[ruleKey]bool
+	nmRules map[ruleKey]NMRule // only populated for rules that declared an "nm" block
 }
 
 // NewRegistry constructs an empty registry. With no rules loaded, Enabled defaults every
@@ -44,7 +61,7 @@ type Registry struct {
 // *Spawns() function before this registry existed (an unreachable data file must never silently
 // empty out a zone).
 func NewRegistry() *Registry {
-	return &Registry{rules: make(map[ruleKey]bool)}
+	return &Registry{rules: make(map[ruleKey]bool), nmRules: make(map[ruleKey]NMRule)}
 }
 
 // LoadFile loads spawn rules from a JSON file (array of Rule).
@@ -65,7 +82,11 @@ func (r *Registry) LoadJSON(data []byte) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for _, rule := range rules {
-		r.rules[ruleKey{zoneID: rule.ZoneID, kind: strings.ToLower(rule.Kind)}] = rule.Enabled
+		key := ruleKey{zoneID: rule.ZoneID, kind: strings.ToLower(rule.Kind)}
+		r.rules[key] = rule.Enabled
+		if rule.NM != nil {
+			r.nmRules[key] = *rule.NM
+		}
 	}
 	return nil
 }
@@ -82,6 +103,19 @@ func (r *Registry) Enabled(zoneID int, kind string) bool {
 	return enabled
 }
 
+// NMFor returns the NM config declared for the given (zone, kind), or nil if that rule has no
+// "nm" block (the common case -- most base mobs have no NM). GFD-NM-123.
+func (r *Registry) NMFor(zoneID int, kind string) *NMRule {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	nmRule, ok := r.nmRules[ruleKey{zoneID: zoneID, kind: strings.ToLower(kind)}]
+	if !ok {
+		return nil
+	}
+	out := nmRule
+	return &out
+}
+
 // All returns every registered rule, sorted by zone then kind is left to the caller -- this is
 // a real, small registry (dozens of rows at most), not worth a sort here when every real caller
 // (the admin GUI) already needs to group/sort for display anyway.
@@ -90,7 +124,12 @@ func (r *Registry) All() []Rule {
 	defer r.mu.RUnlock()
 	out := make([]Rule, 0, len(r.rules))
 	for k, enabled := range r.rules {
-		out = append(out, Rule{ZoneID: k.zoneID, Kind: k.kind, Enabled: enabled})
+		rule := Rule{ZoneID: k.zoneID, Kind: k.kind, Enabled: enabled}
+		if nmRule, ok := r.nmRules[k]; ok {
+			nmCopy := nmRule
+			rule.NM = &nmCopy
+		}
+		out = append(out, rule)
 	}
 	return out
 }

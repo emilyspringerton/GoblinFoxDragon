@@ -1,3 +1,25 @@
+## 2026-09-04 (20)
+- feat(server/spawn, apps2/mud): GFD-NM-123 -- "the mob spawn interface can optionally specify
+  a notorious monster spawn for one of the base mobs." `spawn.Rule` gained an optional `nm`
+  block (`NMRule`: id, spawn_chance, window_open_sec, window_close_sec, respawn_minutes) and a
+  new `Registry.NMFor(zoneID, kind)` accessor (5 new tests, all green). `apps2/mud`'s own
+  `spawnInto` closure now registers a real `nm.NMSpawn` (same mechanism `nm.MeadowNMs()`/
+  `HillsNMs()`/etc already use in hardcoded Go) whenever a rule in `data/mob_spawns.json`
+  declares one -- placeholder ID is the first real base-kind mob spawned in that zone, same
+  "spawn right next to the base kind" precedent the difficulty-variant loop already
+  established. Real content added to prove it end to end, not just structurally: `nm-slime-king`
+  (Swampville `slime`, 20% chance, 5-30min window, 60min respawn) -- a genuinely new NM, not a
+  duplicate of an existing hardcoded one. Real, found-live bug fixed in the same pass: world
+  init's own `nmSpawns` map (the placeholder-kill-trigger lookup table) only ever wired zones
+  0/3 (Meadow/Swamp) -- `nm.HillsNMs()`/`CavesNMs()` (`nm-great-beetle`, `nm-ancient-wolf`,
+  `nm-bone-knight`, `nm-venom-queen`) have been real Go data since S126-13 but their
+  placeholder-kill triggers could never fire; zones 1/2 added to the map. `go build`/`go vet`/
+  `go test ./...` clean; redeployed live under `gfd-mud.service`; live-verified real combat
+  resolves cleanly against the newly-wired zones/mobs with no crash (a full NM pop needs a real
+  5-30min window plus a probability roll, deferred to natural gameplay rather than waited out
+  live). Real, honest, NOT done: the web interface for authoring/editing these `nm` blocks
+  (GFD-NM-124, next card in the priority queue) -- this card is the data model/mechanism only.
+
 ## 2026-09-04 (19)
 - feat(apps2/mud): GFD-993944 -- real, playable v0 dungeon gameplay ("have a dungeons button
   lets us select dungeon from a list... basic combat but its super bare bones"). Real, decisive

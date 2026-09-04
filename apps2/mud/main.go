@@ -916,8 +916,17 @@ func initWorld() *world {
 		iduna:            idunaclient.New(),
 		charIDBySlot:     make(map[string]string),
 		npcAttnScenes:    make(map[int]*npcattention.Scene),
+		// GFD-NM-123: real, found-live bug fixed in this same pass -- nm.HillsNMs()/CavesNMs()
+		// (nm-great-beetle, nm-ancient-wolf, nm-bone-knight, nm-venom-queen) have existed as
+		// real Go data since S126-13's own hero-lineup-era work, but were never added here --
+		// only zones 0/3 were ever wired into nmSpawns, so the placeholder-kill trigger loop
+		// below (gw.nmSpawns[p.zoneID]) could never find zone 1/2's own real NM definitions.
+		// Every one of these 4 NMs has been silently unreachable (registered in nmReg for
+		// listing purposes, but never actually triggerable) since they were written.
 		nmSpawns: map[int][]*nm.NMSpawn{
 			0: nm.MeadowNMs(),
+			1: nm.HillsNMs(),
+			2: nm.CavesNMs(),
 			3: nm.SwampNMs(),
 		},
 	}
@@ -983,6 +992,7 @@ func initWorld() *world {
 		fmt.Printf("warn: dungeon roster override: %v (using the compiled-in default roster)\n", err)
 	}
 	variantSpawnedInZone := make(map[string]bool) // "zoneID:displayName" -> already placed one
+	nmSpawnedInZone := make(map[string]bool)      // "zoneID:kind" -> NM already registered for this base kind
 	spawnInto := func(zoneID int, mobs []mob.Mob) {
 		for _, m := range mobs {
 			if !spawnReg.Enabled(zoneID, m.Kind) {
@@ -1004,6 +1014,31 @@ func initWorld() *world {
 				variantSpawnedInZone[key] = true
 				variant := mob.ApplyVariant(m, m.ID+"-variant-"+strings.ToLower(strings.ReplaceAll(v.DisplayName, " ", "-")), v.DisplayName, v.PowerMul)
 				_ = w.mobRegs[zoneID].Spawn(variant)
+			}
+			// GFD-NM-123 ("the mob spawn interface can optionally specify a notorious monster
+			// spawn for one of the base mobs"): data-driven NM registration, same real
+			// mechanism nm.MeadowNMs()/HillsNMs()/etc already use in hardcoded Go, now
+			// reachable from data/mob_spawns.json's own "nm" block without writing a new Go
+			// function -- see server/spawn.NMRule's own doc comment. First real base-kind mob
+			// encountered in this zone becomes the NM's placeholder (real, same "spawn right
+			// next to the base kind" precedent the variant loop above already established),
+			// exactly one NM per rule per zone (a rule with no "nm" block spawns none, the
+			// common case).
+			if cfg := spawnReg.NMFor(zoneID, m.Kind); cfg != nil {
+				key := fmt.Sprintf("%d:%s", zoneID, m.Kind)
+				if !nmSpawnedInZone[key] {
+					nmSpawnedInZone[key] = true
+					nmSpawn := &nm.NMSpawn{
+						ID:             cfg.ID,
+						PlaceholderID:  m.ID,
+						SpawnChance:    cfg.SpawnChance,
+						WindowOpen:     time.Duration(cfg.WindowOpenSec) * time.Second,
+						WindowClose:    time.Duration(cfg.WindowCloseSec) * time.Second,
+						RespawnMinutes: cfg.RespawnMinutes,
+					}
+					w.nmReg.Register(nmSpawn)
+					w.nmSpawns[zoneID] = append(w.nmSpawns[zoneID], nmSpawn)
+				}
 			}
 		}
 	}
