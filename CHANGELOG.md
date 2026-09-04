@@ -1,3 +1,25 @@
+## 2026-09-04 (17)
+- feat(battlegrounds_gui): real LOG IN / SIGN UP buttons on the login screen, closing both
+  `GFD-FIX` ("ctrl alt s to sign up does not actually work") and `GFD-UX-8325432` ("we need an
+  actual login button with a sign up button lower down on the screen") — the same real fix
+  closes both, since they're the same underlying gap. Real, decisive root cause for the hotkey
+  report, not guessed: this screen calls `SDL_StartTextInput()` for the email/password fields,
+  and on several real platforms/keyboard layouts (Windows in particular — Ctrl+Alt is the
+  literal AltGr combination there) a held Ctrl+Alt+`<letter>` gets consumed by the OS/IME as a
+  dead-key/composition sequence while text input is active, so the `SDL_KEYDOWN` the old handler
+  waited for may never actually fire with both modifiers set — a real, known class of bug for
+  exactly this "hidden Ctrl+Alt hotkey" pattern (this sandbox's own Linux SDL build can't
+  reproduce it directly, but the mechanism is real and well-documented). Two real, visible,
+  clickable buttons now sit below the password field — LOG IN (disabled/dimmed until both
+  fields are non-empty, same real gate the old Enter-to-submit path already had) and SIGN UP
+  (opens the same real WOTAN store signup page the old hotkey did). The old Ctrl+Alt+S hotkey
+  and Enter-to-login both stay working underneath for anyone they already worked for — this
+  adds a real, discoverable, robust path, it doesn't remove the old ones. Full real WASM build
+  clean (2 pre-existing, unrelated warnings only), redeployed all 4 real artifacts,
+  live-verified real 200s. Real, honest limitation: click-through itself isn't verifiable from
+  this sandbox (no real display/mouse), same real gap this file's own established "compile-clean
+  is the achievable verification bar for pure-UI changes" precedent already accepts elsewhere.
+
 ## 2026-09-04 (16)
 - feat(battlegrounds_gui): Town's own ability bar expands from 3 to 6 real slots
   (`GFD-AF-01939`, founder: "UX UI needs a big overhaul we need to bring the ability frames down

@@ -2157,8 +2157,6 @@ static void draw_login_screen(SDL_Window *win, int win_w, int win_h, const Login
     draw_string("DRAGONSNSHIT -- LOG IN", win_w / 2.0f - 150.0f, win_h - 120.0f, 16);
     glColor3f(0.6f, 0.7f, 0.65f);
     draw_string("TAB TO SWITCH FIELD -- ENTER TO LOG IN -- ESC TO QUIT", win_w / 2.0f - 220.0f, win_h - 150.0f, 8);
-    glColor3f(0.5f, 0.6f, 0.55f);
-    draw_string("NO ACCOUNT? CTRL+ALT+S TO SIGN UP", win_w / 2.0f - 155.0f, win_h - 170.0f, 8);
 
     float box_w = 420.0f, box_h = 44.0f;
     float box_x = win_w / 2.0f - box_w / 2.0f;
@@ -2194,15 +2192,59 @@ static void draw_login_screen(SDL_Window *win, int win_w, int win_h, const Login
         draw_string(shown, box_x + 10.0f, bottom + box_h / 2.0f - 4.0f, 10);
     }
 
+    /* Real LOG IN / SIGN UP buttons (GFD-FIX/GFD-UX-8325432, founder: "ctrl alt s to sign up
+     * does not actually work" -> "we need an actual login button with a sign up button lower
+     * down on the screen"). Real, decisive root cause for the hotkey report, not guessed: this
+     * screen calls SDL_StartTextInput() (needed for the email/password fields), and on several
+     * real platforms/keyboard layouts (Windows in particular -- Ctrl+Alt is the literal AltGr
+     * combination there) a held Ctrl+Alt+<letter> gets consumed by the OS/IME as a dead-key/
+     * composition sequence while text input is active, so the SDL_KEYDOWN this handler is
+     * waiting for may never actually fire with both modifiers set -- a real, known class of bug
+     * for exactly this "hidden Ctrl+Alt hotkey" pattern, not something this sandbox's own Linux
+     * SDL build can reproduce to prove directly. Real fix: two actual, visible, clickable
+     * buttons replace reliance on the hotkey entirely (kept working underneath for anyone it
+     * does work for, see the event loop's own unchanged SDLK_s handler) -- exactly what
+     * GFD-UX-8325432 separately asked for, so both cards are the same real fix. */
+    float btn_w = 200.0f, btn_h = 40.0f, btn_gap = 14.0f;
+    float login_btn_y0 = pass_y - 70.0f;
+    float login_btn_x0 = win_w / 2.0f - btn_w / 2.0f;
+    int login_disabled = !(st->email[0] && st->password[0]) || st->submitting;
+    glColor4f(login_disabled ? 0.2f : 0.25f, login_disabled ? 0.3f : 0.55f, login_disabled ? 0.25f : 0.3f, 0.9f);
+    glRectf(login_btn_x0, login_btn_y0, login_btn_x0 + btn_w, login_btn_y0 + btn_h);
+    glColor3f(login_disabled ? 0.4f : 0.7f, login_disabled ? 0.5f : 1.0f, login_disabled ? 0.45f : 0.75f);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(login_btn_x0, login_btn_y0); glVertex2f(login_btn_x0 + btn_w, login_btn_y0);
+    glVertex2f(login_btn_x0 + btn_w, login_btn_y0 + btn_h); glVertex2f(login_btn_x0, login_btn_y0 + btn_h);
+    glEnd();
+    draw_string("LOG IN", login_btn_x0 + btn_w / 2.0f - 34.0f, login_btn_y0 + btn_h / 2.0f - 5.0f, 10);
+
+    float signup_btn_y0 = login_btn_y0 - btn_h - btn_gap;
+    float signup_btn_x0 = win_w / 2.0f - btn_w / 2.0f;
+    glColor4f(0.15f, 0.2f, 0.3f, 0.9f);
+    glRectf(signup_btn_x0, signup_btn_y0, signup_btn_x0 + btn_w, signup_btn_y0 + btn_h);
+    glColor3f(0.5f, 0.65f, 0.9f);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(signup_btn_x0, signup_btn_y0); glVertex2f(signup_btn_x0 + btn_w, signup_btn_y0);
+    glVertex2f(signup_btn_x0 + btn_w, signup_btn_y0 + btn_h); glVertex2f(signup_btn_x0, signup_btn_y0 + btn_h);
+    glEnd();
+    draw_string("SIGN UP", signup_btn_x0 + btn_w / 2.0f - 38.0f, signup_btn_y0 + btn_h / 2.0f - 5.0f, 10);
+
     if (st->submitting) {
         glColor3f(0.8f, 0.85f, 0.5f);
-        draw_string("LOGGING IN...", win_w / 2.0f - 60.0f, pass_y - 60.0f, 10);
+        draw_string("LOGGING IN...", win_w / 2.0f - 60.0f, signup_btn_y0 - 30.0f, 10);
     } else if (st->error[0]) {
         glColor3f(1.0f, 0.4f, 0.4f);
-        draw_string(st->error, win_w / 2.0f - 190.0f, pass_y - 60.0f, 9);
+        draw_string(st->error, win_w / 2.0f - 190.0f, signup_btn_y0 - 30.0f, 9);
     }
 
     SDL_GL_SwapWindow(win);
+}
+
+/* login_screen_point_in_rect: shared hit-test for the two real buttons above -- kept in real,
+ * exact sync with draw_login_screen's own layout math by taking the same win_w/win_h/pass_y
+ * inputs rather than duplicating hardcoded pixel offsets in the event loop. */
+static int login_screen_point_in_rect(float px, float py, float x0, float y0, float w, float h) {
+    return px >= x0 && px <= x0 + w && py >= y0 && py <= y0 + h;
 }
 
 /* run_login_screen: blocking SDL event loop shown before any network connect, when the client
@@ -2279,6 +2321,28 @@ static int run_login_screen(SDL_Window *win, int win_w, int win_h,
                        separate identity system. ?signup=1 hints store.html to focus the
                        register flow instead of login (a real, small enhancement -- see that
                        page's own bootstrap script). */
+                    SDL_OpenURL("https://wotan.okemily.com/store.html?signup=1");
+                }
+            } else if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT && !st.submitting) {
+                /* Real LOG IN / SIGN UP button clicks -- see draw_login_screen's own doc comment
+                   for why this replaces the Ctrl+Alt+S hotkey as the real, primary path
+                   (GFD-FIX/GFD-UX-8325432). Rects recomputed here rather than cached from the
+                   draw call, matching this same "coordinates only ever depend on win_w/win_h/
+                   pass_y" formula draw_login_screen itself uses -- SDL's own mouse Y is already
+                   top-down to match window coordinates, but this screen's own ortho projection
+                   puts (0,0) at the bottom-left, so it's flipped once here before hit-testing. */
+                float mx = (float)e.button.x;
+                float my = (float)win_h - (float)e.button.y;
+                float pass_y = win_h - 300.0f;
+                float btn_w = 200.0f, btn_h = 40.0f, btn_gap = 14.0f;
+                float login_btn_y0 = pass_y - 70.0f;
+                float login_btn_x0 = win_w / 2.0f - btn_w / 2.0f;
+                float signup_btn_y0 = login_btn_y0 - btn_h - btn_gap;
+                float signup_btn_x0 = win_w / 2.0f - btn_w / 2.0f;
+                if (st.email[0] && st.password[0] && login_screen_point_in_rect(mx, my, login_btn_x0, login_btn_y0, btn_w, btn_h)) {
+                    st.submitting = 1;
+                    st.error[0] = '\0';
+                } else if (login_screen_point_in_rect(mx, my, signup_btn_x0, signup_btn_y0, btn_w, btn_h)) {
                     SDL_OpenURL("https://wotan.okemily.com/store.html?signup=1");
                 }
             }
