@@ -1,3 +1,26 @@
+## 2026-09-04 (19)
+- feat(apps2/mud): GFD-993944 -- real, playable v0 dungeon gameplay ("have a dungeons button
+  lets us select dungeon from a list... basic combat but its super bare bones"). Real, decisive
+  finding first (AskUserQuestion, founder decision): DUNGEON_NORTHSTAR.md's already-shipped
+  Milestone 1 (`PacketDungeonEnter`, apps2/server-go) is on the wrong side of a real
+  architecture boundary -- server-go has zero mob registry (PvP-only); every real PvE mechanic
+  (`DungeonRoster`, `GenerateDungeonSpawns`, spawn/variant registries) lives in `server/mob`,
+  imported only by `apps2/mud`. Shipped instead, entirely inside `apps2/mud`: 8 real dungeon
+  zones (208-215) registered via `zone.Manager.AddZone` at world init, each populated with a
+  real, deterministically-seeded `GenerateDungeonLayout`+`GenerateDungeonSpawns` roster (the
+  real named boss/elite/minion content from DUNGEON_NORTHSTAR.md §7) through the same
+  `spawnInto` closure gating Hills/Caves/Swampville. New commands `dungeons` (list) and
+  `dungeon-enter <1-8>` (real zone transfer), no job/cost gate. Live-verified end to end over
+  real telnet: list → enter → real named roster → `attack <mob-id>` auto-approaches and lands
+  real damage, multiple aggro'd mobs hit back for real damage. `go build`/`go vet`/`go test
+  ./...` clean, redeployed live under `gfd-mud.service` (systemd, not the manual env-capture
+  method -- the standing going-forward preference once a real unit exists). See
+  `docs2/DUNGEON_NORTHSTAR.md`'s updated Milestone 4 row for the full reasoning, including a
+  real, separate, NOT-fixed-here finding: `apps2/battlegrounds_gui` has no client render path
+  for any zone besides Meadow/Town, so Hills/Caves/Swampville and these new dungeons are all
+  real, playable, and currently text-only (telnet/headless), not yet visually enterable via the
+  GUI -- a real, separate, bigger card, not silently folded into this one.
+
 ## 2026-09-04 (18)
 - feat(battlegrounds_gui): GFD-MACRO-0012 — "GFD macro system make sure we tie the action frame
   stuff into a parena mod based shape so we can easily allow for extension at the action bar

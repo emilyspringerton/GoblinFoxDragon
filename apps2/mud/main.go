@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -76,6 +77,7 @@ import (
 	"dragonsnshit/server/timeline"
 	"dragonsnshit/server/watcher"
 	"dragonsnshit/server/weather"
+	"dragonsnshit/server/worldapi"
 	"dragonsnshit/server/worldcrisis"
 	"dragonsnshit/server/worldevent"
 	"dragonsnshit/server/xp"
@@ -948,6 +950,19 @@ func initWorld() *world {
 	for _, zoneID := range []int{0, 1, 2, 3, 4} {
 		w.mobRegs[zoneID] = mob.New()
 	}
+	// GFD-993944 dungeon zones (208-215, one per mob.DungeonRoster entry): reuses worldapi/
+	// server/mob's own DungeonLayout/GenerateDungeonSpawns pipeline (real and tested since
+	// GFD-MOBSPAWN-001 Phase 5), routed through apps2/mud instead of apps2/server-go -- founder
+	// decision, real-time: apps2/server-go has zero mob registry (PvP-only), every other real
+	// PvE zone (Meadow/Hills/Caves/Swampville/Town) already lives here, so dungeons do too.
+	// Real, honest v0 scope: one shared, persistent instance per named dungeon (same as
+	// Hills/Caves), not per-party procedural instancing -- server/worldapi's own
+	// DungeonInstanceRegistry (apps2/server-go, Milestone 1) stays real and shipped but unused
+	// by this path; true per-party instancing is real, separate, deferred future work, not
+	// silently dropped.
+	for i := range mob.DungeonRoster {
+		w.mobRegs[dungeonZoneBase+i] = mob.New()
+	}
 
 	// Load mob spawn toggles (GFD-MOBSPAWN-001 Phase 2: "control if we want to turn bunnies on
 	// or off in the meadow etc"). Non-fatal: an unreachable file just leaves every kind enabled
@@ -1016,6 +1031,31 @@ func initWorld() *world {
 	// Town scene. See zone.DefaultZones' own doc comment for why this is a real, separate zone
 	// rather than a reuse of Meadow.
 	spawnInto(4, mob.TownSquareWormSpawns())
+
+	// GFD-993944: register the 8 real named dungeon zones (see the mobRegs init loop above for
+	// the real decisive routing reasoning) and populate each with a real, deterministically
+	// seeded layout + mob.GenerateDungeonSpawns roster -- the exact same DungeonRoster content
+	// DUNGEON_NORTHSTAR.md §7 already named, not placeholder content. Seed = dungeon index + 1
+	// (0 reserved, matching GenerateDungeonLayout's own doc comment convention of a real,
+	// meaningful non-zero seed) -- fixed, not per-session-random, since this is a v0 shared
+	// persistent instance, not a per-party procedural one (see above).
+	for i := range mob.DungeonRoster {
+		zoneID := dungeonZoneBase + i
+		seed := int64(i + 1)
+		layout := worldapi.GenerateDungeonLayout(seed)
+		entrance := layout.Rooms[layout.EntranceIdx]
+		if err := w.zoneMgr.AddZone(&zone.Zone{
+			ID:     zoneID,
+			Name:   mob.DungeonRoster[i].Name,
+			SpawnX: float64(entrance.CenterX),
+			SpawnY: 2,
+			SpawnZ: float64(entrance.CenterZ),
+		}); err != nil {
+			fmt.Printf("warn: dungeon zone %d registration: %v\n", zoneID, err)
+			continue
+		}
+		spawnInto(zoneID, mob.GenerateDungeonSpawns(layout, i, zoneID, seed))
+	}
 
 	w.minePoints[0] = gather.MeadowMiningPoints()
 	w.minePoints[3] = gather.SwampMiningPoints()
@@ -1410,6 +1450,11 @@ func gameLoop() {
 // server-configurable"). A flat constant is the VS0-scope config knob the spec asks for; a real
 // admin-tunable value is future work, not attempted here.
 const crisisCooldown = 20 * time.Minute
+
+// dungeonZoneBase: GFD-993944's 8 real named dungeon zones live at dungeonZoneBase..+7, one per
+// mob.DungeonRoster entry (world init registers/populates them; cmdDungeonEnter travels into
+// them). See world init's own doc comment for the real routing/scope reasoning.
+const dungeonZoneBase = 208
 
 func tickAll() {
 	now := time.Now()
@@ -2445,6 +2490,14 @@ func handle(p *player, line string) {
 		p.sendf("Home Point registered at %s.", zoneName(p.zoneID))
 	case "home":
 		cmdHome(p)
+	case "dungeons":
+		cmdDungeons(p)
+	case "dungeon-enter":
+		if len(args) == 0 {
+			p.send("Usage: dungeon-enter <1-8> (see 'dungeons' for the list)")
+			return
+		}
+		cmdDungeonEnter(p, args[0])
 	case "read-manual", "rm":
 		cmdReadManual(p)
 	case "invite":
@@ -6609,6 +6662,50 @@ func cmdCastDarkMagic(p *player, spell string) {
 		resolveKill(p, m, reg, now)
 	}
 	p.prompt()
+}
+
+// cmdDungeons (GFD-993944, "have a dungeons button lets us select dungeon from a list"): real,
+// bare-bones listing of the 8 real named dungeons (DUNGEON_NORTHSTAR.md §7), no job gate, no
+// cost -- same "any player can just go" framing the founder's own "gameplay working... basic
+// combat... super bare bones" ask implies.
+func cmdDungeons(p *player) {
+	p.send("Dungeons:")
+	for i, d := range mob.DungeonRoster {
+		p.sendf("  %d. %s", i+1, d.Name)
+	}
+	p.send("Use 'dungeon-enter <number>' to travel.")
+	p.prompt()
+}
+
+// cmdDungeonEnter: travels the player into one of the 8 real, persistently-populated dungeon
+// zones registered in world init (dungeonZoneBase+i, see that block's own doc comment for why
+// this runs through apps2/mud rather than apps2/server-go). Same real transfer shape
+// cmdCastTeleport/cmdCastTravel already use (zoneMgr.Transfer, zoneID/pos update, syncChatSession,
+// cmdLook) -- deliberately no job/MP gate, matching this ask's own "bare bones" framing.
+func cmdDungeonEnter(p *player, arg string) {
+	n, err := strconv.Atoi(strings.TrimSpace(arg))
+	if err != nil || n < 1 || n > len(mob.DungeonRoster) {
+		p.sendf("Unknown dungeon %q. Use 'dungeons' to see the real list (1-%d).", arg, len(mob.DungeonRoster))
+		p.prompt()
+		return
+	}
+	dest := dungeonZoneBase + (n - 1)
+	destZone, ok := gw.zoneMgr.Get(dest)
+	if !ok {
+		p.sendf("Dungeon %d isn't available right now.", n)
+		p.prompt()
+		return
+	}
+	broadcastZoneNoLock(p.zoneID, fmt.Sprintf("%s heads into a dungeon.", p.name), p.slot)
+	_ = gw.zoneMgr.Transfer(p.slot, dest)
+	p.combat.TargetMobID = ""
+	p.zoneID = dest
+	p.atlas.Visit(dest)
+	p.pos = mob.Pos{X: destZone.SpawnX, Y: destZone.SpawnY, Z: destZone.SpawnZ}
+	syncChatSession(p)
+	p.sendf("You enter %s.", destZone.Name)
+	broadcastZoneNoLock(dest, fmt.Sprintf("%s arrives.", p.name), p.slot)
+	cmdLook(p)
 }
 
 var teleportSpells = map[string]int{
