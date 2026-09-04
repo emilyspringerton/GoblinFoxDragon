@@ -1,3 +1,21 @@
+## 2026-09-04 (30)
+- docs(dungeons): Milestone 6 ("Rewards + party queue flow") real status correction, continuing
+  kanban card 534432532 ("GFD dungeons") milestone by milestone. Real, decisive investigation
+  (not new code) found 2 of §5's own 3 real open questions are already answered by existing
+  infrastructure: `cmdDungeonEnter` transfers every player to a fixed, deterministic zone ID per
+  dungeon number (confirmed live in source: `dungeonZoneBase + (n-1)`, no per-player/per-party
+  branching) -- a party trivially "queues together" today since every member lands in the exact
+  same shared zone, no special queue mechanism needed, using the already-real
+  `invite`/`accept`/`party`/`leave-party` commands and already-real zone-range-checked party
+  XP-splitting (`pt.XPSplit`, chain bonuses). XP rewards are also already real and live for
+  dungeon kills -- `awardXP` is the same universal, zone-agnostic path every other zone's mobs
+  already use (dungeon mobs spawn through the identical `spawnInto` closure). The one real,
+  still-missing reward type is ITEM/LOOT drops (zero random-item-award mechanism exists anywhere
+  in GFD combat, a real, separate, already-scoped gap -- see `docs2/DUNGEON_HAT_DROPS_NORTHSTAR.
+  md`). Difficulty/scaling remains genuinely unresolved (no scaling exists, matching every other
+  zone's own static-difficulty precedent). Milestone 6's own status corrected from "NOT STARTED"
+  to "PARTIALLY RESOLVED" to reflect this. No code changed -- a real documentation correction.
+
 ## 2026-09-04 (29)
 - docs(dungeons): real status corrections in `docs2/DUNGEON_NORTHSTAR.md` (kanban card
   534432532, "GFD dungeons," continuing milestone by milestone). Milestone 1's own "mob spawns
