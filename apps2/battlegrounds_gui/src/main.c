@@ -4761,8 +4761,12 @@ static void town_telecrystal_return(void) {
         return;
     }
     g_dfzone_active = 0;
-    g_town_x = -40.0f;
-    g_town_z = -50.0f;
+    /* GFD-XX-12441 (founder: "teleport to town should teleport to home point crystal not the
+       dragon gate"): was hardcoded to the Dragon Gate's own TOWN_BUILDINGS position (-40,-50) --
+       now the real Home Point Crystal's position instead (TOWN_BUILDINGS' own last entry, same
+       real position town_draw_home_crystal already reads, not a second position source). */
+    g_town_x = TOWN_BUILDINGS[TOWN_BUILDING_COUNT - 1].x;
+    g_town_z = TOWN_BUILDINGS[TOWN_BUILDING_COUNT - 1].z;
     g_town_target_index = -1; /* Meadow's real worm-meadow-N indices have no meaning against Town's ring */
     snprintf(g_travel_overlay_text, sizeof(g_travel_overlay_text), "TRAVELING: NEW HANDINGTON");
     g_travel_overlay_until_ms = SDL_GetTicks() + 1400;
@@ -4782,21 +4786,24 @@ static void town_telecrystal_return(void) {
  * to -- this just also catches OLD, already-corrupted positions that predate that clamp).
  * town_recenter_in_town is the Town-side fix: unlike town_telecrystal_return (a real scene
  * change, MEADOW_RETURN_HANDINGTON's own crystal), there's no scene to leave here -- just reset
- * to a known-good real spot (the Dragon Gate's own position, same one a real Meadow return
- * lands at) and force-sync it to IDUNA immediately (town_sync_position's own real PATCH
- * mechanism) so a corrupted row like TestWarrior's can't come back on the next relaunch. */
+ * to a known-good real spot and force-sync it to IDUNA immediately (town_sync_position's own
+ * real PATCH mechanism) so a corrupted row like TestWarrior's can't come back on the next
+ * relaunch. GFD-XX-12441 (founder: "teleport to town should teleport to home point crystal not
+ * the dragon gate"): that known-good spot is now the real Home Point Crystal's own position
+ * (TOWN_BUILDINGS' own last entry), not the Dragon Gate's -- same real position
+ * town_telecrystal_return and town_draw_home_crystal both already use. */
 static int town_player_lost(void) {
     if (g_dfzone_active) return 1;
     return fabsf(g_town_x) > TOWN_MOVE_HALF_EXTENT || fabsf(g_town_z) > TOWN_MOVE_HALF_EXTENT;
 }
 
 static void town_recenter_in_town(uint32_t now) {
-    g_town_x = -40.0f;
-    g_town_z = -50.0f;
+    g_town_x = TOWN_BUILDINGS[TOWN_BUILDING_COUNT - 1].x;
+    g_town_z = TOWN_BUILDINGS[TOWN_BUILDING_COUNT - 1].z;
     g_town_target_x = g_town_x;
     g_town_target_z = g_town_z;
     town_sync_position(now, 1 /* force -- don't wait for the normal 2s/moved-far-enough throttle */);
-    combat_log_push("You are recentered at the Dragon Gate.");
+    combat_log_push("You are recentered at the Home Point Crystal.");
 }
 
 /* ---------------- telecrystal cast UX (2026-08-03) ----------------

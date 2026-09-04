@@ -1,3 +1,18 @@
+## 2026-09-04 (23)
+- fix(battlegrounds_gui): GFD-XX-12441 -- "teleport to town should teleport to home point
+  crystal not the dragon gate." `town_telecrystal_return` (the real "return to town" scene
+  change fired when leaving Meadow) and `town_recenter_in_town` (the lost-player recovery path)
+  both hardcoded the Dragon Gate's own `TOWN_BUILDINGS` position (-40,-50) as the landing spot --
+  now both use the real Home Point Crystal's own position instead (`TOWN_BUILDINGS`' own last
+  entry, the same real position `town_draw_home_crystal` already reads, not a second position
+  source). The Dragon Gate's own physical location is untouched and still correct where it's
+  genuinely used elsewhere (the real interactive crystal a player stands at, in Town, to cast
+  the outbound Meadow teleport) -- only the "where do you land back in Town" destination
+  changed. `town_recenter_in_town`'s own combat-log message updated to match ("recentered at
+  the Home Point Crystal"). Verified: `gcc -fsyntax-only` clean, a full native link (clean), and
+  a full WASM build (clean) redeployed live to `okemily.com/battlegrounds/` (3/3 artifacts
+  curl-200-verified).
+
 ## 2026-09-04 (22)
 - docs: GFD-DOX-124 -- "do a deep dive stack continuity report linking off the readme fully
   update the readme with the current state of the world and current direction of the project."
