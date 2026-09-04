@@ -1,0 +1,5 @@
+[
+  {"base_kind": "worm", "display_name": "Elder Worm", "power_mul": 1.6},
+  {"base_kind": "rabbit", "display_name": "Fierce Rabbit", "power_mul": 1.8},
+  {"base_kind": "leech", "display_name": "Bloated Leech", "power_mul": 1.7}
+]

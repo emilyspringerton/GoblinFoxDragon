@@ -84,7 +84,15 @@ func (s MobState) String() string {
 // All fields are owned by the single server goroutine.
 type Mob struct {
 	ID       string
-	Kind     string // "skeleton", "wolf", "goblin", …
+	Kind     string // "skeleton", "wolf", "goblin", … -- the real identity used for loot/quest/AI lookups, never overridden by DisplayName
+	// DisplayName is a real, optional player-facing name override for a difficulty-tier variant
+	// of Kind (GFD-MOBSPAWN-001 Phase 4, founder real-time: "they like to have some way harder
+	// mobs pretty close to lower level mobs with the same model and texture just a different
+	// name"). Empty means "just show Kind," the pre-existing behavior. Deliberately does NOT
+	// change Kind itself -- loot (dropsForMob), quest tracking, and AI dispatch all still key off
+	// the real base Kind, so a variant inherits its base's drop table automatically rather than
+	// needing its own (the founder's own real decision on this).
+	DisplayName string
 	SceneID  int
 	Pos      Pos
 	HomePos  Pos // spawn anchor; leash resets here
@@ -112,6 +120,16 @@ type Mob struct {
 
 func (m *Mob) alive() bool     { return m.State != StateDead }
 func (m *Mob) targetable() bool { return m.alive() && m.State != StateBurrowed }
+
+// Label returns the real, player-facing name for this mob -- DisplayName if a difficulty-tier
+// variant set one (see the field's own doc comment), otherwise the plain Kind, matching every
+// caller's pre-existing behavior before variants existed.
+func (m *Mob) Label() string {
+	if m.DisplayName != "" {
+		return m.DisplayName
+	}
+	return m.Kind
+}
 
 // EventKind classifies a combat event returned by Tick.
 type EventKind int

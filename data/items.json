@@ -1506,5 +1506,27 @@
     "stack_size": 1,
     "model_id": "katana_wooden_01",
     "delay": 216
+  },
+  {
+    "id": 1011,
+    "name": "Banjo",
+    "description": "A finely crafted banjo, its melodies capable of inspiring allies.",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "BRD"
+    ],
+    "level": 30,
+    "stats": {
+      "attack": 5,
+      "chr": 4,
+      "magic_attack_bonus": 2,
+      "mnd": 3
+    },
+    "stack_size": 1,
+    "model_id": "banjo_a01",
+    "delay": 280
   }
 ]

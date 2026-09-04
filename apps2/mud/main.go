@@ -52,6 +52,7 @@ import (
 	"dragonsnshit/server/integrity"
 	"dragonsnshit/server/itemdef"
 	"dragonsnshit/server/mobdrop"
+	"dragonsnshit/server/mobvariant"
 	"dragonsnshit/server/spawn"
 	"dragonsnshit/server/job"
 	"dragonsnshit/server/k9"
@@ -690,6 +691,7 @@ var gw *world
 var itemdefReg = itemdef.NewRegistry()
 var mobDropReg = mobdrop.NewRegistry()
 var spawnReg = spawn.NewRegistry()
+var mobVariantReg = mobvariant.NewRegistry()
 
 var (
 	foReg             = fieldoffice.NewRegistry()
@@ -954,10 +956,34 @@ func initWorld() *world {
 	if err := spawnReg.LoadFile("data/mob_spawns.json"); err != nil {
 		fmt.Printf("warn: spawn rules load: %v (all mob kinds enabled by default)\n", err)
 	}
+	// Load difficulty-tier variants (Phase 4: "some way harder mobs pretty close to lower level
+	// mobs with the same model and texture just a different name"). Non-fatal: an unreachable
+	// file just means no variants spawn, never a world-init failure.
+	if err := mobVariantReg.LoadFile("data/mob_variants.json"); err != nil {
+		fmt.Printf("warn: mob variant load: %v (no difficulty-tier variants this run)\n", err)
+	}
+	variantSpawnedInZone := make(map[string]bool) // "zoneID:displayName" -> already placed one
 	spawnInto := func(zoneID int, mobs []mob.Mob) {
 		for _, m := range mobs {
-			if spawnReg.Enabled(zoneID, m.Kind) {
-				_ = w.mobRegs[zoneID].Spawn(m)
+			if !spawnReg.Enabled(zoneID, m.Kind) {
+				continue
+			}
+			_ = w.mobRegs[zoneID].Spawn(m)
+			// Exactly one variant instance per registered rule per zone, templated from the
+			// first real base-kind mob encountered and spawned right next to it -- see
+			// mob.ApplyVariant's own doc comment. "A rare, harder mob near the normal ones," not
+			// a whole parallel roster (a 1:1 variant-per-base-mob would out-populate the base
+			// kind itself, not read as a special encounter). A variant follows the same
+			// spawnReg.Enabled gate as its base kind, so disabling a kind in a zone also
+			// disables its variants there.
+			for _, v := range mobVariantReg.ForBaseKind(m.Kind) {
+				key := fmt.Sprintf("%d:%s", zoneID, v.DisplayName)
+				if variantSpawnedInZone[key] {
+					continue
+				}
+				variantSpawnedInZone[key] = true
+				variant := mob.ApplyVariant(m, m.ID+"-variant-"+strings.ToLower(strings.ReplaceAll(v.DisplayName, " ", "-")), v.DisplayName, v.PowerMul)
+				_ = w.mobRegs[zoneID].Spawn(variant)
 			}
 		}
 	}
@@ -3041,7 +3067,7 @@ func cmdLook(p *player) {
 			} else if m.State == mob.StatePursuing {
 				stateStr = " (!)"
 			}
-			p.sendf("  [%s] %s  HP:%d/%d%s", m.ID, m.Kind, m.HP, m.MaxHP, stateStr)
+			p.sendf("  [%s] %s  HP:%d/%d%s", m.ID, m.Label(), m.HP, m.MaxHP, stateStr)
 		}
 	} else {
 		p.send("No creatures in sight.")
@@ -3162,7 +3188,8 @@ func cmdAttack(p *player, target string) {
 	for _, id := range reg.All() {
 		m, _ := reg.Get(id)
 		if strings.HasPrefix(strings.ToLower(id), strings.ToLower(target)) ||
-			strings.HasPrefix(strings.ToLower(m.Kind), strings.ToLower(target)) {
+			strings.HasPrefix(strings.ToLower(m.Kind), strings.ToLower(target)) ||
+			strings.HasPrefix(strings.ToLower(m.Label()), strings.ToLower(target)) {
 			found = m
 			break
 		}
@@ -3192,7 +3219,7 @@ func cmdAttack(p *player, target string) {
 		p.sendf("You close the distance to %s.", found.ID)
 	}
 	p.combat.TargetMobID = found.ID
-	p.sendf("You target %s (%s). Auto-attacking.", found.ID, found.Kind)
+	p.sendf("You target %s (%s). Auto-attacking.", found.ID, found.Label())
 	p.prompt()
 }
 
@@ -4180,7 +4207,7 @@ func cmdMobs(p *player) {
 	for _, id := range ids {
 		m, _ := reg.Get(id)
 		p.sendf("  %-22s  kind=%-8s  hp=%d/%d  state=%s  XP=%d",
-			id, m.Kind, m.HP, m.MaxHP, m.State, m.MaxHP*xpPerHP)
+			id, m.Label(), m.HP, m.MaxHP, m.State, m.MaxHP*xpPerHP)
 	}
 	p.prompt()
 }

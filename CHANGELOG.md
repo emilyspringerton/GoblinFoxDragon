@@ -1,3 +1,21 @@
+## 2026-09-04 (11)
+- feat(mob): difficulty-tier variants -- "same model, harder name" (GFD-MOBSPAWN-001 Phase 4).
+  New `Mob.DisplayName` field + `Mob.Label()` (falls back to `Kind`), `mob.ApplyVariant` (scales
+  HP/MaxHP/MeleeDamage by a multiplier and offsets position slightly, generalizing
+  `dungeon.go`'s own real `DungeonEliteHPMul`/`DungeonBossHPMul` precedent), and a new
+  `server/mobvariant.Registry` (`data/mob_variants.json`). Real, founder-decided design choice
+  (asked directly, 2026-09-04): a variant's `Kind` field is left untouched, so it inherits its
+  base kind's drop table automatically rather than needing its own. `apps2/mud/main.go` spawns
+  exactly one variant instance per registered rule per zone, right next to a real base-kind mob
+  it's templated from (not a 1:1 parallel roster), gated by the same `spawnReg.Enabled` check as
+  its base kind. Seeded 3 real variants: Elder Worm (worm, 1.6x), Fierce Rabbit (rabbit, 1.8x),
+  Bloated Leech (leech, 1.7x). Target/room/mobs-list display code updated to show `Label()`
+  instead of raw `Kind`; `attack` targeting now also matches by display name. 9 new tests (5
+  `server/mob`, 4 `server/mobvariant`), `go test ./...` clean. Live-verified: restarted the real
+  production `apps2/mud`, confirmed Elder Worm spawns at 144 HP (90 base x 1.6) right next to
+  worm-meadow-0, shows correctly in room look/mobs list/target message, and `attack elder`
+  targets it by display name.
+
 ## 2026-09-04 (10)
 - feat(spawn): data-driven spawn toggles + fixed a real, live "Hills and Caves have been empty
   since S189" bug (GFD-MOBSPAWN-001 Phase 2). New `server/spawn.Registry` (`data/mob_spawns.json`,
