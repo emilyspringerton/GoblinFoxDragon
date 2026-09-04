@@ -1,4 +1,23 @@
-## 2026-09-04 (13)
+## 2026-09-04 (14)
+- docs: real scoping pass for kanban priority-queue card `GFD-AH-93944` ("auction house...
+  does not show the items in our inventory on the next screen"), per Principle 19. New
+  `docs2/INVENTORY_PERSISTENCE_NORTHSTAR.md`. Decisive root cause traced live: `p.inventory`
+  (apps2/mud's own simple id→count map) is never persisted to or loaded from IDUNA on either
+  the telnet or headless connection path — confirmed live via a real telnet kill (mutation
+  logic itself is correct, durability is the gap). Headless sessions (what the GUI/Auction
+  House exclusively uses) get silently idle-evicted after 10 minutes
+  (`headlessIdleTimeout`) with zero persistence, so any founder idle in Town that long, or
+  reconnecting after an `apps2/mud` restart (several happened today during unrelated work),
+  sees a genuinely empty inventory — exactly the reported symptom. IDUNA already has a real
+  Items API (`ListItems`/`CreateItem`/`DestroyItem`) but it's shaped for individually-crafted
+  gear, a real structural mismatch with the simple stackable-material model, and has zero
+  callers anywhere in this repo today. Real 2-phase plan: Phase 0 a new, correctly-shaped
+  `character_inventory` IDUNA table + `GetInventory`/`SetInventory` client methods, Phase 1 a
+  real snapshot sync (load on connect, save on disconnect/eviction, matching the existing
+  level/XP/flow precedent exactly) as the bounded first slice, Phase 2 (per-mutation-site
+  increment/decrement, ~25 real call sites, for mid-session crash-durability) named as real,
+  separate, deferred follow-up. No code written this pass — founder's own explicit "scope it,
+  don't build now" direction.
 - feat(battlegrounds_gui): real goblin/fox NPC rendering, GFD-ENRICHMENT-0013's second slice
   ("can we port some of the skins from SHANKPIT to GFD as NPCs Mobs" -- the first slice,
   draw_ronin_shell, shipped earlier this session for the player's own avatar). The Meadow's real
