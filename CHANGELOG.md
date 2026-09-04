@@ -1,3 +1,17 @@
+## 2026-09-04 (4)
+- docs: `docs2/ITEM_BUILDER_NORTHSTAR.md` -- real scoping pass for kanban `GFD-ITEM-SUPPLY-
+  CHAIN-000` ("tool for creating and managing the stats on GFD items and weapons... special
+  programming... done with mods... expose affordances to the item builder"), Principle 19.
+  Real, checked-live foundation: `data/items.json` is a well-structured FFXI-style stat table
+  (`server/itemdef.go`'s `Registry`), hand-edited, no tool. Decisive finding: no item-use/
+  special-effect mechanism exists anywhere today -- every consumable is a real, inert data row.
+  Real, existing precedent named for "special programming via mods": PAPERCRAFT's own real
+  `--mods-manifest` `dlopen`/`dlsym` pipeline, recommended to port rather than invent fresh.
+  4-phase plan: Phase 0 a real "use item" command (blocking prerequisite, doesn't exist),
+  Phase 1 the mod-hook mechanism + one proof-point mod, Phase 2 the authoring tool itself
+  (CLI vs. web page named as a real, unresolved founder-level decision), Phase 3 broader
+  coverage. No code written -- planning only. Registered as golden doc `ITEM-BUILDER-NORTH`.
+
 ## 2026-09-04 (3)
 - feat(login): `GFD-UA-001` ("GFD needs a sign up button that shells out to IDUNA GFD signup
   form"). Login screen had no sign-up path at all. New `Ctrl+Alt+S` handler (same
