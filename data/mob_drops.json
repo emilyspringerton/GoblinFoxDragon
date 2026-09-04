@@ -1,0 +1,108 @@
+[
+  {
+    "kind": "worm",
+    "items": [
+      {"id": "worm-sinew", "name": "Worm Sinew"},
+      {"id": "earth-crystal", "name": "Earth Crystal"}
+    ]
+  },
+  {
+    "kind": "leech",
+    "items": [
+      {"id": "leech-blood", "name": "Leech Blood"},
+      {"id": "water-crystal", "name": "Water Crystal"}
+    ]
+  },
+  {
+    "kind": "slime",
+    "items": [
+      {"id": "slime-oil", "name": "Slime Oil"},
+      {"id": "echo-drop", "name": "Echo Drop"}
+    ]
+  },
+  {
+    "kind": "lizard",
+    "items": [
+      {"id": "lizard-tail", "name": "Lizard Tail"},
+      {"id": "fire-crystal", "name": "Fire Crystal"}
+    ]
+  },
+  {
+    "kind": "king worm",
+    "items": [
+      {"id": "king-sinew", "name": "King Worm Sinew"},
+      {"id": "nm-worm-shell", "name": "Royal Worm Shell"},
+      {"id": "earth-crystal-hq", "name": "Earth Crystal (HQ)"}
+    ]
+  },
+  {
+    "kind": "marsh leech",
+    "items": [
+      {"id": "marsh-blood", "name": "Marsh Leech Blood"},
+      {"id": "nm-leech-fang", "name": "Marsh Leech Fang"},
+      {"id": "water-crystal-hq", "name": "Water Crystal (HQ)"}
+    ]
+  },
+  {
+    "kind": "rabbit",
+    "items": [
+      {"id": "rabbit-hide", "name": "Rabbit Hide"},
+      {"id": "wind-crystal", "name": "Wind Crystal"}
+    ]
+  },
+  {
+    "kind": "beetle",
+    "items": [
+      {"id": "beetle-shell", "name": "Beetle Shell"},
+      {"id": "earth-crystal", "name": "Earth Crystal"}
+    ]
+  },
+  {
+    "kind": "hills-wolf",
+    "items": [
+      {"id": "wolf-pelt", "name": "Wolf Pelt"},
+      {"id": "wolf-fang", "name": "Wolf Fang"}
+    ]
+  },
+  {
+    "kind": "cave-bat",
+    "items": [
+      {"id": "bat-wing", "name": "Bat Wing"},
+      {"id": "dark-crystal", "name": "Dark Crystal"}
+    ]
+  },
+  {
+    "kind": "cave-spider",
+    "items": [
+      {"id": "spider-silk", "name": "Spider Silk"},
+      {"id": "spider-venom", "name": "Spider Venom"}
+    ]
+  },
+  {
+    "kind": "skeleton",
+    "items": [
+      {"id": "bone-chip", "name": "Bone Chip"},
+      {"id": "dark-crystal", "name": "Dark Crystal"}
+    ]
+  },
+  {
+    "kind": "sunderworm",
+    "items": [
+      {"id": "sunderworm-carapace", "name": "Sunderworm Carapace"},
+      {"id": "earth-crystal-hq", "name": "Earth Crystal (HQ)"}
+    ]
+  },
+  {
+    "kind": "sunderworm-head",
+    "items": [
+      {"id": "sunderworm-fang", "name": "Sunderworm Fang"}
+    ]
+  },
+  {
+    "kind": "sunderworm brood",
+    "items": [
+      {"id": "sunderworm-carapace-hq", "name": "Sunderworm Carapace (HQ)"},
+      {"id": "nm-sunderworm-core", "name": "Sunderworm Core"}
+    ]
+  }
+]

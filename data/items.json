@@ -1205,7 +1205,7 @@
   },
   {
     "id": 305,
-    "name": "Selbina Milk",
+    "name": "Milk",
     "category": "consumable",
     "stats": {
       "str": 1,
@@ -1458,5 +1458,53 @@
     "stack_size": 1,
     "model_id": "weapon_katana_dojigiri",
     "delay": 240
+  },
+  {
+    "id": 1009,
+    "name": "Beestinger",
+    "description": "A slender dagger crafted to resemble a giant bee's stinger, rumored to inflict a mild venom.",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "THF",
+      "RNG",
+      "RDM",
+      "COR",
+      "DNC"
+    ],
+    "level": 10,
+    "stats": {
+      "accuracy": 2,
+      "attack": 5,
+      "dex": 2
+    },
+    "stack_size": 1,
+    "model_id": "dagger_003",
+    "delay": 174
+  },
+  {
+    "id": 1010,
+    "name": "Wooden Katana",
+    "description": "A lightweight training weapon crafted from wood, ideal for beginners.",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WAR",
+      "NIN",
+      "SAM"
+    ],
+    "level": 1,
+    "stats": {
+      "attack": 4,
+      "str": 1
+    },
+    "stack_size": 1,
+    "model_id": "katana_wooden_01",
+    "delay": 216
   }
 ]

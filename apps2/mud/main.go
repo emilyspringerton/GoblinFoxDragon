@@ -51,6 +51,7 @@ import (
 	"dragonsnshit/server/idunaclient"
 	"dragonsnshit/server/integrity"
 	"dragonsnshit/server/itemdef"
+	"dragonsnshit/server/mobdrop"
 	"dragonsnshit/server/job"
 	"dragonsnshit/server/k9"
 	"dragonsnshit/server/ledger"
@@ -686,6 +687,7 @@ var gw *world
 // itemdefReg is the server-authoritative item definition registry, loaded from
 // data/items.json at startup. Used by cmdEquip for CanEquip + stat delta.
 var itemdefReg = itemdef.NewRegistry()
+var mobDropReg = mobdrop.NewRegistry()
 
 var (
 	foReg             = fieldoffice.NewRegistry()
@@ -1192,43 +1194,15 @@ func applyJobStats(p *player) {
 }
 
 // dropsForMob returns the loot items a mob of the given kind drops on death.
+// Backed by mobDropReg (data/mob_drops.json) so drop tables are managed via
+// the GFD-MD-001 admin GUI, not a code change + redeploy.
 func dropsForMob(kind string) []loot.Item {
-	switch strings.ToLower(kind) {
-	case "worm":
-		return []loot.Item{
-			{ID: "worm-sinew", Name: "Worm Sinew"},
-			{ID: "earth-crystal", Name: "Earth Crystal"},
-		}
-	case "leech":
-		return []loot.Item{
-			{ID: "leech-blood", Name: "Leech Blood"},
-			{ID: "water-crystal", Name: "Water Crystal"},
-		}
-	case "slime":
-		return []loot.Item{
-			{ID: "slime-oil", Name: "Slime Oil"},
-			{ID: "echo-drop", Name: "Echo Drop"},
-		}
-	case "lizard":
-		return []loot.Item{
-			{ID: "lizard-tail", Name: "Lizard Tail"},
-			{ID: "fire-crystal", Name: "Fire Crystal"},
-		}
-	case "king worm":
-		return []loot.Item{
-			{ID: "king-sinew", Name: "King Worm Sinew"},
-			{ID: "nm-worm-shell", Name: "Royal Worm Shell"},
-			{ID: "earth-crystal-hq", Name: "Earth Crystal (HQ)"},
-		}
-	case "marsh leech":
-		return []loot.Item{
-			{ID: "marsh-blood", Name: "Marsh Leech Blood"},
-			{ID: "nm-leech-fang", Name: "Marsh Leech Fang"},
-			{ID: "water-crystal-hq", Name: "Water Crystal (HQ)"},
-		}
-	default:
-		return []loot.Item{{ID: "flow-drop", Name: "100 Flow"}}
+	tableItems := mobDropReg.DropsFor(kind)
+	out := make([]loot.Item, len(tableItems))
+	for i, it := range tableItems {
+		out[i] = loot.Item{ID: it.ID, Name: it.Name}
 	}
+	return out
 }
 
 // nmMobFor returns a Mob template for the given NM ID.
@@ -8315,6 +8289,11 @@ func main() {
 	// Load item definitions (non-fatal: equip restrictions skipped if missing).
 	if err := itemdefReg.LoadFile("data/items.json"); err != nil {
 		fmt.Printf("warn: itemdef load: %v (equip restrictions disabled)\n", err)
+	}
+
+	// Load mob drop tables (non-fatal: mobs fall back to flow-drop if missing).
+	if err := mobDropReg.LoadFile("data/mob_drops.json"); err != nil {
+		fmt.Printf("warn: mobdrop load: %v (drop tables disabled, flow-drop only)\n", err)
 	}
 
 	gw = initWorld()
