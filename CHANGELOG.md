@@ -1,3 +1,19 @@
+## 2026-09-04 (25)
+- docs: GFD-XX-1249 -- "every class/job needs to have separate levels... switching to RDM makes
+  me a lvl 10 RDM... every class starts at lvl 1 and can level up to 75." Real investigation, new
+  `docs2/PER_JOB_LEVELS_NORTHSTAR.md`: decisive correction to this repo's own design intent --
+  the single shared `p.charXP.Level` across all jobs is real, deliberate FFXI-parity (real FFXI
+  shares one level across jobs too), not a bug; the founder's ask is a genuine, decisive
+  deviation toward FFXIV/WoW-style independent per-job leveling. Real scope named: an in-memory
+  per-job map refactor is buildable in one pass (~12 real call sites), but real durability is
+  blocked on a new IDUNA schema (the current single flat `level` column can't hold per-job
+  values) -- same class of cross-repo persistence gap as `INVENTORY_PERSISTENCE_NORTHSTAR.md`,
+  not attempted blind. One real, unresolved design question named: does the real FFXI sub-job/
+  `EffectiveSubLevel` mechanic survive per-job leveling, or is it replaced by N independent job
+  slots. No code changed -- diagnosed and scoped only. Registered as golden doc
+  `PER-JOB-LEVELS-NORTH`; `docs2/STACK_CONTINUITY_REPORT.md` §6 corrected (its own earlier
+  framing of this as an FFXI-behavior bug was itself wrong) and updated to point at it.
+
 ## 2026-09-04 (24)
 - docs: GFD-BG-12444 -- "GFD battlegrounds is down never works... migrating redgarden changes to
   gfd battlegrounds maybe something broke." Real root-cause investigation, new

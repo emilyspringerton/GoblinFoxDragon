@@ -104,8 +104,12 @@ publishing for it.
   drifted 78/1161 real lines behind REDGARDEN's current, still-evolving copy. A real,
   founder-level decision among 3 named options (full sync, pin to the fork commit's binaries, or
   give GFD its own native server) is needed before a fix — not resolved here.
-- **Every job shares one level** (`GFD-XX-1249`, open) — switching job does not reset level to 1
-  per-job the way real FFXI does; a real, reported, unfixed bug.
+- **Every job shares one level, and now root-caused** (`GFD-XX-1249`,
+  `docs2/PER_JOB_LEVELS_NORTHSTAR.md`) — real correction to this report's own earlier framing:
+  the single shared level is actually real, deliberate FFXI-parity design (FFXI itself shares one
+  level across jobs), not a bug. The founder's ask is a genuine, decisive deviation toward
+  FFXIV/WoW-style independent per-job leveling — real in-memory refactor scoped (buildable), real
+  durability blocked on a new IDUNA schema (same class of gap as inventory persistence, §5).
 - **`docs/NORTHSTAR.md`** (note: `docs/`, not `docs2/`) is the repo's oldest architecture doc,
   dated 2026-06-14, and was already flagged as stale by the README itself before this report —
   still true, not refreshed here; `docs2/*_NORTHSTAR.md` are the real, current per-system specs.
