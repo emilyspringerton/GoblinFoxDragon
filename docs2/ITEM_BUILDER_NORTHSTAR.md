@@ -163,9 +163,31 @@ real item, port more of the currently-inert consumable roster (Hi-Potion, Ether,
 future weapon/armor "on-hit"/"on-equip" special effects through the same real mod pipeline,
 rather than ever hardcoding a second one-off branch in `apps2/mud/main.go` directly.
 
+**Phase 2d — DONE, real Vertex-powered batch-propose assistant shipped (2026-09-04).** Founder
+real-time: "can we also build a vertex powered assistant where i can drop a list of item names
+onto a textarea and hit go and it like does a batch add with totally halucinated whatever it
+thinks stats... proposing items into a queue where we can review and approve them and edit them
+and approve or just reject." Real, existing Vertex AI credential reused directly (`gcloud auth
+print-access-token`, the same real ADC `emily.cli/cmd/promptoverse.go`'s own `vertexGenerateImage`
+already uses for image generation, confirmed live against a plain text model — `gemini-2.5-flash`,
+not the `-image` variant that package uses — before writing any code). Real, decisive answer to
+"if the item builder already learned some from the image data thats not terrible i dunno if it
+works like that": it doesn't — each Vertex call is stateless; reusing the same GCP project only
+shares auth/billing, not any cross-request memory between the image-generation calls and this
+text-generation one. New `gfd_item_proposals` table (real review queue, never writes straight
+into `items.json`), `POST /admin/gfd-items/api/proposals` (one real Vertex call per item name,
+sequential, capped at 40 names per batch — a real, deliberate cost/latency bound), structured
+JSON output via Gemini's own `responseMimeType: "application/json"` matching `GfdItemDef`'s exact
+schema, `PATCH`/`approve`/`reject` per proposal. Approval reuses `GfdItemsHandler`'s own real
+`createFromDef` — the exact same validation a manual "Add new item" already goes through, not a
+second path. 10 new tests, including one real, live, unmocked Vertex call (skips honestly if no
+real `gcloud` ADC credential is present, rather than fabricating a pass). `go build/vet/test
+./...` clean; live-verified against the redeployed IDUNA instance (`/admin/gfd-items/api/
+proposals` returns a real 401, route registered and correctly auth-gated).
+
 ## Real, honest, explicitly out of scope for this pass
 
-Phases 0 and 2a shipped (see above). Not built: Phase 1's mod-loading mechanism, any `ItemDef`
+Phases 0, 2a, and 2d shipped (see above). Not built: Phase 1's mod-loading mechanism, any `ItemDef`
 schema change (`on_use_mod`/`on_equip_mod` fields don't exist yet), Phase 2b (vendor catalog
 editing — blocked on `npcVendorCatalog` becoming data-driven first), and Phase 2c (the mod-name
 picker, blocked on Phase 1). Exactly which existing consumables get real effects first in Phase

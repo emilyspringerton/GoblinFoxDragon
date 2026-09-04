@@ -1,3 +1,10 @@
+## 2026-09-04 (7)
+- docs: `docs2/ITEM_BUILDER_NORTHSTAR.md` -- Phase 2d shipped (see `IDUNA/CHANGELOG.md`'s own
+  entry for the implementation): a real Vertex-powered batch item-propose assistant. Reuses the
+  same real Vertex AI credential `emily.cli/cmd/promptoverse.go`'s own image generation already
+  uses. Real, decisive design note: each Vertex call is stateless, so reusing the same GCP
+  project shares auth/billing only, not any cross-request "memory" between image and text calls.
+
 ## 2026-09-04 (6)
 - content: 18 new items via `data/items.json` -- 3 swords (Training Sword/Iron Shortsword/
   Broadsword, levels 1/5/10) and 3 full 5-piece armor sets at levels 1/7/10 (Novice/Rugged/
