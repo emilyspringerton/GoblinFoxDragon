@@ -6137,8 +6137,13 @@ func cmdCast(p *player, spell string, targetName string) {
 		p.sneakExpires = now.Add(duration)
 		p.sendf("You cast Sneak. (60s — sound aggro blocked. MP: %d)", p.mp)
 	case "cure":
-		if p.jobID != job.WHM && (p.charJob == nil || p.charJob.Sub != job.WHM) {
-			p.send("Cure requires White Mage job or sub-job.")
+		// GFD-RDM-12422 ("program the real RDM abilities: POISON, FIRE, WATER, STONE, CURE,
+		// BIO, DIA"): real FFXI RDM parity gap found live -- Cure was WHM-only, but RDM
+		// canonically has Cure too (same real "Black Mage OR Red Mage" gate blmSpells'
+		// fire/poison/stone/water already use for this exact job pairing).
+		if p.jobID != job.WHM && p.jobID != job.RDM &&
+			(p.charJob == nil || (p.charJob.Sub != job.WHM && p.charJob.Sub != job.RDM)) {
+			p.send("Cure requires White Mage or Red Mage job or sub-job.")
 			p.prompt()
 			return
 		}
@@ -6328,8 +6333,11 @@ func cmdCast(p *player, spell string, targetName string) {
 		}
 	case "dia":
 		// Dia: debuff DoT on target mob (Poison equivalent — applied to combat target)
-		if p.jobID != job.WHM && (p.charJob == nil || p.charJob.Sub != job.WHM) {
-			p.send("Dia requires White Mage job or sub-job.")
+		// GFD-RDM-12422: same real FFXI RDM parity gap as Cure above -- Dia is a real,
+		// canonical RDM enfeeble too, not WHM-exclusive.
+		if p.jobID != job.WHM && p.jobID != job.RDM &&
+			(p.charJob == nil || (p.charJob.Sub != job.WHM && p.charJob.Sub != job.RDM)) {
+			p.send("Dia requires White Mage or Red Mage job or sub-job.")
 			p.prompt()
 			return
 		}

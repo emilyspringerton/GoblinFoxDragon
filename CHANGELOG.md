@@ -1,3 +1,16 @@
+## 2026-09-04 (27)
+- fix(apps2/mud): GFD-RDM-12422 -- "program the real RDM abilities: POISON, FIRE, WATER, STONE,
+  CURE, BIO, DIA." Real, checked-first finding: 5 of the 7 named spells already worked for RDM
+  (Poison/Fire/Water/Stone via the shared `blmSpells` map's existing "Black Mage OR Red Mage"
+  job gate, Bio from this session's own earlier GFD-AF-01939 work) -- the real, concrete gap
+  was just `cure` and `dia`, both hardcoded WHM-only despite real FFXI RDM canonically having
+  both. Fixed both job gates to the same "WHM or RDM, job or sub-job" shape `blmSpells` already
+  uses. `go build`/`go vet`/`go test ./...` clean. Live-verified end to end over real telnet:
+  `cast cure` as RDM now heals for real (`Cure: +100 HP`, previously rejected with "Cure
+  requires White Mage job or sub-job"), `cast dia` now applies real DoT damage to a target mob
+  (`Dia: -5 HP on worm`, previously rejected the same way). Redeployed live under
+  `gfd-mud.service`.
+
 ## 2026-09-04 (26)
 - feat(server/job, apps2/mud): GFD-JOB-244122 -- "NEW CLASS ENFEEBLE DD SUPPORT SUSTAIN (sorta
   like DNC) ASSASSIN ASN can cast aoe buffs like a bard for different poisons that have
