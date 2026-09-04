@@ -1,3 +1,16 @@
+## 2026-09-04 (9)
+- feat(zone): real FFXI-style grid coordinate system, Phase 1 of `docs2/MOB_SPAWN_NORTHSTAR.md`
+  (kanban GFD-MOBSPAWN-001). New `server/zone/grid.go`: `ZoneBounds` (real per-zone X/Z extents,
+  grounded in the actual spawn positions already baked into every `server/mob` `*Spawns()`
+  function -- Meadow/Hills/Swampville ±40-45, Caves' own real narrowing-away-from-entrance
+  shape, New Handington a named, honest approximation pending a real town-bounds source), a
+  10-unit `GridCellSize`, `CellFor(zoneID, pos) (string, error)` (derives an `I-7`-style label),
+  and `CenterOf(zoneID, cell) (Pos, error)` (the real inverse, for a future spawn table to name
+  a cell instead of a raw X/Z). 7 new tests, including two grounded in real spawn positions
+  (`MeadowWormSpawns`' own (35,2,0), `HillsSpawns`' own perimeter wolf at (42,11,0)) and a
+  round-trip check across every registered zone. `go test ./...` clean. No spawn-table or GUI
+  changes yet -- Phase 2 (data-driving spawn tables into `data/mob_spawns.json`) is next.
+
 ## 2026-09-04 (8)
 - fix(combat): real TP-per-hit bug found and fixed -- `apps2/mud/main.go`'s own melee-hit
   handler always called `combatTp.AddTP` with the hardcoded `combatTp.Delay1HSword` constant,
