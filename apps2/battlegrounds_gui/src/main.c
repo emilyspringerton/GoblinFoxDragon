@@ -2157,6 +2157,8 @@ static void draw_login_screen(SDL_Window *win, int win_w, int win_h, const Login
     draw_string("DRAGONSNSHIT -- LOG IN", win_w / 2.0f - 150.0f, win_h - 120.0f, 16);
     glColor3f(0.6f, 0.7f, 0.65f);
     draw_string("TAB TO SWITCH FIELD -- ENTER TO LOG IN -- ESC TO QUIT", win_w / 2.0f - 220.0f, win_h - 150.0f, 8);
+    glColor3f(0.5f, 0.6f, 0.55f);
+    draw_string("NO ACCOUNT? CTRL+ALT+S TO SIGN UP", win_w / 2.0f - 155.0f, win_h - 170.0f, 8);
 
     float box_w = 420.0f, box_h = 44.0f;
     float box_x = win_w / 2.0f - box_w / 2.0f;
@@ -2261,6 +2263,23 @@ static int run_login_screen(SDL_Window *win, int win_w, int win_h,
                         st.submitting = 1;
                         st.error[0] = '\0';
                     }
+                } else if (e.key.keysym.sym == SDLK_s &&
+                           (SDL_GetModState() & KMOD_CTRL) && (SDL_GetModState() & KMOD_ALT)) {
+                    /* GFD-UA-001 ("GFD needs a sign up button that shells out to IDUNA GFD
+                       signup form") -- Ctrl+Alt+S, same real "special key combo that can't
+                       collide with normal SDL_TEXTINPUT typing into the focused field" pattern
+                       PITVIPER's own Ctrl+Alt+I ("types ssh iduna.farthq.com") already
+                       establishes, not invented fresh here. SDL_OpenURL (real, built into SDL2
+                       since 2.0.14, cross-platform xdg-open/open/ShellExecute under the hood --
+                       checked this box's own SDL2 is 2.30.0, well past that) opens the real,
+                       live WOTAN store page in the system's default browser: its own register
+                       form (WOTAN-997/S247-02, shipped this same session) creates an account
+                       through the EXACT SAME /api/v1/auth/email/login this login screen calls
+                       below, so a freshly-registered account works here immediately, not a
+                       separate identity system. ?signup=1 hints store.html to focus the
+                       register flow instead of login (a real, small enhancement -- see that
+                       page's own bootstrap script). */
+                    SDL_OpenURL("https://wotan.okemily.com/store.html?signup=1");
                 }
             }
         }
