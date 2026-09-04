@@ -1709,6 +1709,41 @@ static void draw_hero_model(ArenaHeroID hero_id, float hero_x, float hero_y, flo
 #undef BOX
 }
 
+/* draw_ronin_shell -- GFD-ENRICHMENT-0013 ("can we port some of the skins from SHANKPIT to GFD
+ * as NPCs Mobs even the yellow ronin shell can stand in for our player character for now").
+ * Real, checked-live finding this closes: Town's own avatar (below, via town_hero_id_for_job)
+ * falls through draw_hero_model's `default:` case above -- a plain undifferentiated box, the
+ * exact "no real player-character visual yet" gap the card names. Deliberately NOT added as a
+ * new ArenaHeroID (would ripple into arena_ai_bridge.c's ARENA_HERO_COUNT-sized NAMES/DESC/
+ * ARENA_HERO_TAGS tables, arena_game.c's RL_POLICY_OBS_SIZE compile-time assumption, and the
+ * PvP draft grid at src/main.c's own `for (hero_id=0; hero_id<ARENA_HERO_COUNT; ...)` loop --
+ * the founder's own ask is specifically about the persistent-world player avatar, not a new
+ * balanced PvP combat hero) -- a standalone function used only by Town's own avatar draw call,
+ * same BOX-macro style as draw_hero_model but outside its switch/ArenaHeroID contract entirely.
+ * Real silhouette, proportion-informed (not pixel-copied -- SHANKPIT's own Ronin is a fully
+ * articulated, separately-limbed model at a different LOD, see apps/lobby/src/player_model.h's
+ * own RONIN_* constants) by that same file's real torso/shoulder-pad/head/horn relationships,
+ * rescaled to this roster's own ~1.3-unit total-height convention (matching e.g. ARENA_HERO_
+ * DAGDA/GARY/ABRAHAM's shared 0.8x1.3x0.8 torso template) rather than SHANKPIT's own absolute
+ * units, which assume a separately-rigged full body this minimalist box style doesn't have.
+ * Real, honest, explicitly NOT done: color ("yellow") -- this whole file's convention colors
+ * every hero box by self/team/enemy RELATIONSHIP only (see draw_hero_model's own doc comment
+ * and this function's own call site, which hardcodes "my hero" cyan) -- there is no real
+ * per-hero/per-skin color dimension anywhere in this rendering path to hang "yellow" on; adding
+ * one would be a real, separate, broader change, not implied by this one avatar shape. */
+static void draw_ronin_shell(float x, float y, float z, float facing_rad, float squish, const Mat4 *vp,
+                              GLint loc_mvp, GLint loc_model, const Mesh *cube_mesh) {
+#define BOX(dx, dy, dz, sx, sy, sz) \
+    draw_hero_box_facing(x, z, facing_rad, dx, (dy) + y, dz, sx, sy, sz, squish, vp, loc_mvp, loc_model, cube_mesh)
+    BOX(0.0f, 0.65f, 0.0f, 0.8f, 1.3f, 0.7f);          /* torso -- wider than deep, matching RONIN_TORSO_W > RONIN_TORSO_D */
+    BOX(-0.55f, 1.05f, 0.0f, 0.28f, 0.28f, 0.35f);     /* left shoulder pad, RONIN_SHOULDER_PAD_OFFSET echoed */
+    BOX(0.55f, 1.05f, 0.0f, 0.28f, 0.28f, 0.35f);      /* right shoulder pad */
+    BOX(0.0f, 1.55f, 0.0f, 0.35f, 0.32f, 0.35f);       /* head / storm mask */
+    BOX(-0.13f, 1.75f, 0.0f, 0.08f, 0.15f, 0.08f);     /* left horn accent, RONIN_HORN */
+    BOX(0.13f, 1.75f, 0.0f, 0.08f, 0.15f, 0.08f);      /* right horn accent */
+#undef BOX
+}
+
 /* ---------------- tiny immediate-mode HUD text (ported from apps/lobby) ---------------- */
 static void draw_char(char c, float x, float y, float s) {
     if (c >= 'a' && c <= 'z') c = (char)(c - 'a' + 'A'); /* fold lowercase -- one glyph set, not two */
@@ -4334,17 +4369,15 @@ static float g_town_jump_age_ms = 9999.0f; /* >= JUMP_DURATION_MS = not jumping 
  * host-config surface for a same-box service. */
 #define TOWN_MUD_API_PORT 7171
 
-/* town_hero_id_for_job: the one real, non-guessed correspondence in this mapping is
- * ARENA_HERO_WARRIOR (arena_game.h's own doc comment: "DragonsNShit's Warrior job, ported as
- * Battlegrounds content") <-> apps2/mud's default job_main "WAR". Every other apps2/mud job
- * (job.JobID's real roster: THF, WHM, BLM, etc.) has no hero-visual counterpart yet -- a real,
- * open design question (see this session's own backlog entry), not resolved by guessing here.
- * Falls back to ARENA_HERO_WARRIOR for any job without a real mapping so Town always has SOME
- * avatar rather than none, honestly named as a placeholder in the comment, not the UI. */
-static ArenaHeroID town_hero_id_for_job(const char *job_main) {
-    (void)job_main; /* only WAR has a real mapping right now; see doc comment above */
-    return ARENA_HERO_WARRIOR;
-}
+/* town_hero_id_for_job removed (GFD-ENRICHMENT-0013, 2026-09-04): Town's own avatar no longer
+ * goes through ArenaHeroID/draw_hero_model at all -- it draws the real Ronin shell directly
+ * (draw_ronin_shell, see its own doc comment) instead of falling through draw_hero_model's
+ * `default:` undifferentiated box via this function's always-ARENA_HERO_WARRIOR mapping. The
+ * real, still-open design question this function's own doc comment named -- a per-job
+ * (job.JobID's real roster: THF, WHM, BLM, etc.) visual identity for Town's avatar -- is still
+ * unresolved, just no longer expressed as an ArenaHeroID lookup; whoever picks that up next
+ * will need a different real hook (e.g. a per-job variant of draw_ronin_shell, or a genuinely
+ * new small function per job), not a revival of this one. */
 
 /* town_fetch_character: resolves g_player_id (captured from login's self-ticket response) to
  * the player's real DragonsNShit character via IDUNA's existing by-player lookup, and seeds
@@ -6584,9 +6617,15 @@ int main(int argc, char *argv[]) {
                        itself is passed through untouched, same as every other caller in this
                        file. */
                     glUniform4f_(loc_color, 0.1f, 0.8f, 0.95f, 1.0f); /* same "my hero" cyan Battlegrounds uses */
-                    draw_hero_model(town_hero_id_for_job(g_town_job), g_town_x,
-                                     town_ground_y + g_town_jump_y_offset, g_town_z,
-                                     g_town_facing_rad, 1.0f, &vp, loc_mvp, loc_model, &cube_mesh);
+                    /* GFD-ENRICHMENT-0013: Town's own avatar used to fall through
+                       draw_hero_model's default: case (town_hero_id_for_job always returns
+                       ARENA_HERO_WARRIOR today, which has no explicit case -- a plain,
+                       undifferentiated box) -- now draws the real Ronin shell silhouette
+                       instead, per the founder's own "can stand in for our player character for
+                       now" ask. See draw_ronin_shell's own doc comment for what this
+                       deliberately does and doesn't port from SHANKPIT. */
+                    draw_ronin_shell(g_town_x, town_ground_y + g_town_jump_y_offset, g_town_z,
+                                      g_town_facing_rad, 1.0f, &vp, loc_mvp, loc_model, &cube_mesh);
                 }
 
                 town_draw_hud(win_w, win_h, queue_host != NULL, town_player_lost(), &vp);
