@@ -1,3 +1,20 @@
+## 2026-09-04 (2)
+- feat(town-avatar): GFD-ENRICHMENT-0013 ("port some of the skins from SHANKPIT to GFD as NPCs
+  Mobs, even the yellow ronin shell can stand in for our player character for now"). Real,
+  checked-live finding: Town's own avatar fell through `draw_hero_model`'s `default:` case
+  (`town_hero_id_for_job` always mapped to `ARENA_HERO_WARRIOR`, which has no explicit shape) --
+  a plain, undifferentiated box, the exact gap the card names. New `draw_ronin_shell`, a
+  standalone function (deliberately NOT a new `ArenaHeroID` -- that would ripple into
+  `arena_ai_bridge.c`'s `ARENA_HERO_COUNT`-sized name/desc/tag tables, the RL policy obs-size
+  compile-time assumption, and the PvP draft grid; this is the persistent-world avatar, not a
+  new balanced combat hero), proportion-informed by SHANKPIT's own `player_model.h` RONIN_*
+  constants (torso/shoulder-pad/head/horn relationships), rescaled to this roster's own
+  ~1.3-unit convention. Removed the now-dead `town_hero_id_for_job`. Real, honest, not done:
+  color ("yellow") -- this file colors every avatar by self/team/enemy relationship only, no
+  per-skin color dimension exists to hang that on. WASM rebuilt (2 pre-existing, unrelated
+  warnings) and redeployed to `/var/www/okemily/battlegrounds/`, live-verified. GFD commit
+  `c694d34`.
+
 ## 2026-09-04
 - feat(dungeons): DUNGEON_NORTHSTAR.md Milestone 1 ("instancing"), real correction + real v0
   shipped. Decisive correction: Milestone 1's own acceptance text assumed REDGARDEN's per-match
