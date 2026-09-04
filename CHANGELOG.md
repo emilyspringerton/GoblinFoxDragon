@@ -1,3 +1,20 @@
+## 2026-09-04 (22)
+- docs: GFD-DOX-124 -- "do a deep dive stack continuity report linking off the readme fully
+  update the readme with the current state of the world and current direction of the project."
+  New `docs2/STACK_CONTINUITY_REPORT.md`, checked directly against the actual source tree, git
+  log (950 commits), and every existing `docs2/*_NORTHSTAR.md` doc as of today, not a
+  restatement of old docs: the 7 real apps/binaries and their roles, all 44 real server packages
+  grouped by domain (each with a real one-line doc-comment-sourced description, not guessed),
+  the real decisive architectural boundary found this session (`apps2/mud` owns all real PvE
+  content, `apps2/server-go` has zero mob registry and is PvP-only), the two real PARENA/BURROW
+  mod-integration paths now live on each host language, a per-initiative real status table, and
+  honestly-named current gaps (no client render path beyond Meadow/Town, inventory has no
+  durability, Battlegrounds reported broken, per-job levels not separated) plus a real,
+  synthesized "current direction" section read off the actual pattern of recent work rather
+  than speculated. `README.md`'s "Current Status" section rewritten from a stale 2026-08-26
+  snapshot to a real 2026-09-04 one, links the new report, and fixes a stale `docs/` vs `docs2/`
+  path reference for the mod-surface doc. Registered as golden doc `GFD-CONTINUITY`.
+
 ## 2026-09-04 (21)
 - feat(server/modevent, apps2/mud): GFD-x-123/GFD-x-124 -- "mod interface for event broker in
   server mods should be able to register and or subscribe to specific named events in the

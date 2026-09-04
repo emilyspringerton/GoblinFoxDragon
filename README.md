@@ -1,23 +1,33 @@
 # GoblinFoxDragon
 
-## Current Status (2026-08-26)
+## Current Status (2026-09-04)
 
-Real, playable: `apps2/mud` (server-authoritative MUD combat backend, real jobs/spells/aggro) +
-`apps2/battlegrounds_gui` (bespoke SDL2/GL client, not the real Bedrock client) rendering Town,
-Meadow, and a separate MOBA-style Battlegrounds arena mode. `apps2/server-go` serves the real
-Bedrock-protocol voxel backend (`:6969`) plus a real `/heightmap` HTTP API (`:7070`, also consumed
-by `WEAKNIGHT_BEDROCK_RACERS`). Recent real fixes: dead-worm visibility, KO auto-respawn + a real
-Home Point Crystal, and auto-recovery of a KO'd character on the next command (not just typing
-`home`) — see `CHANGELOG.md` for the full trail. See `docs/NORTHSTAR.md` for the fuller
-architecture picture (dated 2026-06-14, now stale in places relative to the above).
+**For the full, current, deep-dive picture — apps, server packages, real architectural
+boundaries, initiative-by-initiative status, and honestly-named gaps — see
+`docs2/STACK_CONTINUITY_REPORT.md`.** The short version below is kept in sync with it, not a
+substitute for it.
 
-**New since**: a real combat damage log in `battlegrounds_gui` (S189-01); the King's buff status
-now syncs to the client with a bottom-right buff HUD, plus real King health bars + name tags;
-Meadow (zone 0) seeded with goblin/fox NPCs generated via a real crystal-simulation pass
-(S189-07); chat copy/paste bindings in `battlegrounds_gui` (`Ctrl+V` paste, same pattern as
-PITVIPER); the WASM build's black-screen bug fixed (SDL GL context attributes weren't compatible
-with the browser's GLSL version). The mod-surface scripting-language question (EduScript vs.
-PARENA) was resolved — see `docs/MOD_SURFACE_NORTHSTAR.md`.
+Real, playable: `apps2/mud` (the real PvE/MMO server — jobs/spells/mob AI/loot/quests/auction
+house/dungeons/Notorious Monsters, all server-authoritative) + `apps2/battlegrounds_gui`
+(bespoke SDL2/GL client, not the real Bedrock client) rendering Town, Meadow, and a separate
+MOBA-style Battlegrounds arena mode. `apps2/server-go` is the real PvP/arena UDP backend — a
+real, decisive finding this session: it has **zero mob registry** (PvP-only), so every real PvE
+mechanic lives in `apps2/mud` instead, not there — plus the real Bedrock-protocol voxel backend
+(`:6969`) and `/heightmap`/`/chunks` HTTP API (`:7070`, also consumed by
+`WEAKNIGHT_BEDROCK_RACERS`).
+
+**New since 2026-08-26**: a real, playable v0 dungeon system (8 named dungeons, real boss/elite
+content, live combat — text/telnet-only, no client render path yet); Notorious Monsters made
+data-driven with a real IDUNA admin editor; GFD's first two real PARENA mods, one per host
+language — `action_bar_mod` (C, `apps2/battlegrounds_gui`'s action bar) and `nm_bonus_mod` (Go,
+via BURROW's Go emission target — the first real host anywhere in this monorepo to use it),
+wired through a new real mod event broker (`server/modevent`); real LOG IN/SIGN UP buttons and a
+real Inventory screen in the client; machine-name autocomplete across the GFD admin pages
+(mob kind, dungeon boss); an ~8,600x real speedup fixing a shared IDUNA bottleneck every one of
+these cards went through. Full trail in `CHANGELOG.md`; full picture in
+`docs2/STACK_CONTINUITY_REPORT.md`. `docs/NORTHSTAR.md` (note: `docs/`, not `docs2/`) is this
+repo's oldest architecture doc (2026-06-14) and stays stale — `docs2/*_NORTHSTAR.md` are the
+real, current per-system specs the continuity report synthesizes.
 
 ---
 
@@ -92,6 +102,7 @@ We will simplify and formalize structure as systems stabilize.
 
 ## Key Specs / References
 
+- `docs2/STACK_CONTINUITY_REPORT.md` — the real, current, deep-dive picture of the whole stack (start here)
 - `docs2/specs/WEAKNIGHT_VS0_ACCEPTANCE_CRITERIA.md`
 - `docs2/specs/SHANKPIT_DRAGONSNSHIT_SYSTEMS_SPEC.md`
 - `docs2/specs/THE_BRIDGE_SPEC.md`
