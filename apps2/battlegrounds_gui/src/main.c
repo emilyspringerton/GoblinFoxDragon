@@ -5800,6 +5800,129 @@ static void townshop_draw(int win_w, int win_h) {
     }
 }
 
+/* ---------------- Inventory screen (GFD-INV-93911) ----------------
+ * Founder: "list based inventory system like FFXI list based navigation so keyboard and
+ * controller can navigate we will enhance with click functionality later for now its not
+ * needed." Real, checked-live gap: before this, "inventory" was only reachable as a raw
+ * chat-passthrough command (its output scrolling past in the combat log) or nested inside the
+ * Auction House's own Sell-item picker -- there was no standalone, browsable inventory screen at
+ * all. Deliberately its own dedicated rows/fetch/parse, not a reuse of the Auction House's own
+ * g_ah_* globals -- same real "one menu, one set of globals" convention this file's own Town
+ * shop menu already established over reusing the Auction House's (see that section's own doc
+ * comment). Row parsing reuses the bracket-id shape (`cmdInventory`'s own trailing `[item-id]`),
+ * so this is structurally the exact same real data the Auction House's Sell screen already
+ * fetches -- just reachable directly, without going through Sell first.
+ *
+ * Real, deliberate v0 boundary matching the founder's own "click functionality later, not needed
+ * for now" framing: Up/Down navigate, Escape closes -- Enter is not wired to any action yet
+ * (no real "use"/"examine" affordance exists here), a real, honest placeholder for later, not an
+ * oversight. */
+#define INV_ROW_MAX 96
+#define INV_ID_MAX 40
+#define INV_MAX_ROWS 64
+static int g_inv_open = 0;
+static int g_inv_selected = 0;
+static char g_inv_rows[INV_MAX_ROWS][INV_ROW_MAX];
+static char g_inv_row_ids[INV_MAX_ROWS][INV_ID_MAX];
+static int g_inv_row_count = 0;
+
+/* inv_parse_rows: same real bracket-id extraction shape ah_parse_rows already established
+ * (cmdInventory's own trailing "[item-id]"), duplicated rather than shared -- see this section's
+ * own header comment for why. */
+static void inv_parse_rows(const char *text) {
+    g_inv_row_count = 0;
+    char buf[4096];
+    snprintf(buf, sizeof(buf), "%s", text);
+    char *line = buf;
+    while (line && *line && g_inv_row_count < INV_MAX_ROWS) {
+        char *nl = strstr(line, "\r\n");
+        if (nl) *nl = '\0';
+        char *trimmed = line;
+        while (*trimmed == ' ' || *trimmed == '\t') trimmed++;
+        size_t tlen = strlen(trimmed);
+        while (tlen > 0 && (trimmed[tlen - 1] == ' ' || trimmed[tlen - 1] == '\t')) trimmed[--tlen] = '\0';
+        int is_status_line = (strncmp(trimmed, "[ Lv.", 5) == 0);
+        int is_prompt = (tlen == 1 && trimmed[0] == '>');
+        int is_header = (strncmp(trimmed, "===", 3) == 0);
+        if (tlen > 0 && !is_status_line && !is_prompt && !is_header) {
+            snprintf(g_inv_rows[g_inv_row_count], INV_ROW_MAX, "%s", trimmed);
+            g_inv_row_ids[g_inv_row_count][0] = '\0';
+            char *lb = strchr(trimmed, '[');
+            char *rb = lb ? strchr(lb, ']') : NULL;
+            if (lb && rb && rb > lb + 1) {
+                size_t idlen = (size_t)(rb - lb - 1);
+                if (idlen >= INV_ID_MAX) idlen = INV_ID_MAX - 1;
+                memcpy(g_inv_row_ids[g_inv_row_count], lb + 1, idlen);
+                g_inv_row_ids[g_inv_row_count][idlen] = '\0';
+            }
+            g_inv_row_count++;
+        }
+        line = nl ? nl + 2 : NULL;
+    }
+}
+
+static void inv_refresh(void) {
+    char text[4096];
+    if (ah_fetch("inventory", text, sizeof(text))) {
+        inv_parse_rows(text);
+    } else {
+        g_inv_row_count = 0;
+    }
+}
+
+static void inv_open(void) {
+    g_inv_open = 1;
+    g_inv_selected = 0;
+    inv_refresh();
+}
+
+static void inv_close(void) { g_inv_open = 0; }
+
+static void inv_draw(int win_w, int win_h) {
+    if (!g_inv_open) return;
+    float panel_w = 480.0f, row_h = 20.0f;
+    float panel_h = 76.0f + row_h * (float)(g_inv_row_count > 0 ? g_inv_row_count : 1);
+    float x0 = (float)win_w / 2.0f - panel_w / 2.0f;
+    float y0 = (float)win_h / 2.0f - panel_h / 2.0f;
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glColor4f(0.04f, 0.05f, 0.06f, 0.94f);
+    glRectf(x0, y0, x0 + panel_w, y0 + panel_h);
+    glDisable(GL_BLEND);
+    glColor3f(0.6f, 0.5f, 0.7f); /* real, distinct from AH's amber/shop's green/job's blue */
+    glLineWidth(2.0f);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(x0, y0); glVertex2f(x0 + panel_w, y0);
+    glVertex2f(x0 + panel_w, y0 + panel_h); glVertex2f(x0, y0 + panel_h);
+    glEnd();
+    glLineWidth(1.0f);
+
+    glColor3f(0.85f, 0.75f, 0.95f);
+    draw_string("INVENTORY", x0 + 16.0f, y0 + panel_h - 24.0f, 12);
+    glColor3f(0.5f, 0.55f, 0.55f);
+    draw_string("UP/DOWN - select   ESC - close", x0 + 16.0f, y0 + panel_h - 42.0f, 7);
+
+    float row_y = y0 + panel_h - 68.0f;
+    for (int i = 0; i < g_inv_row_count; i++) {
+        if (i == g_inv_selected) {
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            glColor4f(0.6f, 0.5f, 0.7f, 0.55f);
+            glRectf(x0 + 8.0f, row_y - 4.0f, x0 + panel_w - 8.0f, row_y + row_h - 6.0f);
+            glDisable(GL_BLEND);
+            glColor3f(0.92f, 0.85f, 1.0f);
+        } else {
+            glColor3f(0.8f, 0.8f, 0.78f);
+        }
+        draw_string(g_inv_rows[i], x0 + 16.0f, row_y, 9);
+        row_y -= row_h;
+    }
+    if (g_inv_row_count == 0) {
+        glColor3f(0.6f, 0.6f, 0.6f);
+        draw_string("(empty)", x0 + 16.0f, row_y, 9);
+    }
+}
+
 /* ---------------- Character screen (2026-08-04) ----------------
  * Founder, live: "we need a character screen /check but a hotkey for your own character p" ->
  * "it will show equiped equipment job level etc stats." Real, not invented: fetches apps2/mud's
@@ -6272,6 +6395,24 @@ int main(int argc, char *argv[]) {
                     }
                     continue;
                 }
+                if (g_inv_open) {
+                    /* Inventory screen (GFD-INV-93911) -- same "checked first, consume every
+                       event" precedence as every other menu above. UP/DOWN navigate; ESC (or I
+                       again, matching P's own open/close toggle convention on the character
+                       screen) closes. No Enter action yet -- see this section's own doc comment
+                       on why. */
+                    if (te.type == SDL_QUIT) { running = 0; }
+                    else if (te.type == SDL_KEYDOWN) {
+                        if (te.key.keysym.sym == SDLK_UP) {
+                            g_inv_selected = (g_inv_row_count > 0) ? (g_inv_selected - 1 + g_inv_row_count) % g_inv_row_count : 0;
+                        } else if (te.key.keysym.sym == SDLK_DOWN) {
+                            g_inv_selected = (g_inv_row_count > 0) ? (g_inv_selected + 1) % g_inv_row_count : 0;
+                        } else if (te.key.keysym.sym == SDLK_ESCAPE || te.key.keysym.sym == SDLK_i) {
+                            inv_close();
+                        }
+                    }
+                    continue;
+                }
                 /* C/Y/T also open chat, alongside Enter (2026-08-02, founder: "the reason the
                    auction house menu doesnt work is im trying to hit enter but that is
                    triggering chat can we get a different hotkey than enter to start a chat enter
@@ -6419,6 +6560,13 @@ int main(int argc, char *argv[]) {
                        else (AH/job-menu/shop/character screen itself) is already open, matching
                        G/H's own precedence just above. */
                     charinfo_open();
+                }
+                else if (te.type == SDL_KEYDOWN && te.key.keysym.sym == SDLK_i) {
+                    /* Inventory screen (GFD-INV-93911, founder: "list based inventory system
+                       like FFXI"). Same real "I opens it" mnemonic FFXI itself uses. Reached
+                       this far down only when nothing else is already open, matching P's own
+                       precedence just above. */
+                    inv_open();
                 }
                 else if (te.type == SDL_MOUSEBUTTONDOWN && te.button.button == SDL_BUTTON_RIGHT) {
                     /* Real right-click = attack-move/interact (2026-08-03, founder: "switch right
@@ -6803,6 +6951,7 @@ int main(int argc, char *argv[]) {
                 jobmenu_draw(win_w, win_h);
                 townshop_draw(win_w, win_h);
                 charinfo_draw(win_w, win_h);
+                inv_draw(win_w, win_h);
 
                 SDL_GL_SwapWindow(win);
                 SDL_Delay(16);

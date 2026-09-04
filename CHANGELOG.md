@@ -1,3 +1,20 @@
+## 2026-09-04 (15)
+- feat(battlegrounds_gui): real, standalone, FFXI-style Inventory screen (`GFD-INV-93911`,
+  founder: "list based inventory system like FFXI list based navigation so keyboard and
+  controller can navigate we will enhance with click functionality later for now its not
+  needed"). Before this, `inventory` was only reachable as a raw chat-passthrough command
+  (output scrolling past in the combat log) or nested inside the Auction House's own Sell-item
+  picker — no standalone, browsable screen existed. New `I` keybind opens a real navigable list
+  (`Up`/`Down` to select, `Escape` or `I` again to close), fetching and parsing the same real
+  `[item-id]`-bracketed `cmdInventory` output the Auction House's own Sell screen already
+  parses — deliberately its own dedicated globals/fetch/parse functions rather than reusing the
+  Auction House's, matching this file's own established one-menu-one-set-of-globals convention
+  (Town Shop menu already set this precedent over reusing the Auction House's). Real, deliberate
+  v0 boundary matching the founder's own "click functionality later, not needed for now"
+  framing: no `Enter` action wired yet, browsing only. Full real WASM build clean (2
+  pre-existing, unrelated warnings only), redeployed all 4 real artifacts to
+  `/var/www/okemily/battlegrounds/`, live-verified (real 200s on all four).
+
 ## 2026-09-04 (14)
 - docs: real scoping pass for kanban priority-queue card `GFD-AH-93944` ("auction house...
   does not show the items in our inventory on the next screen"), per Principle 19. New
