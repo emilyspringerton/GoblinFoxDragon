@@ -1,3 +1,29 @@
+## 2026-09-04 (13)
+- feat(battlegrounds_gui): real goblin/fox NPC rendering, GFD-ENRICHMENT-0013's second slice
+  ("can we port some of the skins from SHANKPIT to GFD as NPCs Mobs" -- the first slice,
+  draw_ronin_shell, shipped earlier this session for the player's own avatar). The Meadow's real
+  goblin/fox NPCs (server/mob/crystal.go's S189-07 crystal-simulation pass) have existed
+  server-side since that pass but were never actually visible client-side -- confirmed directly,
+  no goblin/fox draw call existed anywhere in `apps2/battlegrounds_gui` before this.
+  Founder-decided design (asked directly, 2026-09-04): the client reads the exact same crystal
+  seed JSON file `server/mob.MeadowCrystalSpawns` already reads server-side (same real
+  "positions known ahead of time" shape `town_draw_worms`' own hand-mirrored arrays already use),
+  rather than a new live server-client position-sync protocol. New `load_crystal_seed` (a
+  minimal, format-specific scanner -- no JSON library linked in this client at all, matching its
+  bespoke-everything style), `draw_goblin_shell`/`draw_fox_shell` (same BOX-based stacked
+  silhouette technique every hero/worm already uses, kind-specific color only). Decorative only,
+  not targetable -- matching this pass's own real, bounded scope.
+  Generated a real crystal seed (`data/crystal_seed_meadow.json`, 48 goblins + 32 foxes via
+  `apps2/crystal -seed 200 -seed-out`) and wired `CRYSTAL_SEED_PATH` into the live `apps2/mud`
+  systemd env file (`~/.config/gfd-mud/env`) so the server actually spawns these NPCs for the
+  first time too, not just the client rendering them. WASM build gained a real
+  `--preload-file` (`build_wasm.sh`) bundling the seed data into the browser build's virtual
+  filesystem. Rebuilt cleanly (2 pre-existing, unrelated warnings only) and redeployed all 4
+  real artifacts (`battlegrounds.html`/`.js`/`.wasm`/`.data`) to `/var/www/okemily/battlegrounds/`,
+  live-verified (real 200s on all four at `okemily.com/battlegrounds/`). Live-verified server-side
+  too: a real test character's `mobs` command now lists real goblin/fox NPCs in the Meadow for
+  the first time ever.
+
 ## 2026-09-04 (12)
 - feat(mob): dungeon roster override, GFD-MOBSPAWN-001 Phase 5 (final phase). New
   `mob.LoadDungeonRosterOverride(path)`: replaces the package-level `DungeonRoster` from

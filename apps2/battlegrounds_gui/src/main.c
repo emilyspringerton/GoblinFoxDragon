@@ -3902,6 +3902,141 @@ static const float WORM_SEG_DY[WORM_SEG_COUNT]   = { 0.0f,  0.3f, 0.45f, 0.3f, 0
 static const float WORM_SEG_SIZE[WORM_SEG_COUNT] = { 0.4f,  0.6f, 0.7f, 0.6f, 0.5f};   /* tapers at both ends, widest mid-body */
 #define WORM_FLOAT_Y 1.1f /* how far above real ground the whole body hovers */
 
+/* GFD-ENRICHMENT-0013's real, bounded second slice ("can we port some of the skins from
+ * SHANKPIT to GFD as NPCs Mobs" -- the first slice, draw_ronin_shell, already shipped for the
+ * player's own avatar). Renders the Meadow's real goblin/fox NPCs (server/mob/crystal.go's own
+ * S189-07 crystal-simulation pass, MeadowCrystalSpawns) for the first time -- they've existed
+ * server-side since that pass but were never actually visible client-side (checked directly:
+ * no goblin/fox draw call existed anywhere in this file before this).
+ *
+ * Real, founder-decided design (asked directly, 2026-09-04): the client reads the exact same
+ * crystal seed JSON file server/mob.MeadowCrystalSpawns already reads server-side, rather than a
+ * new live server->client position-sync protocol -- the same real "positions known ahead of
+ * time" shape town_draw_worms' own hand-mirrored MEADOW_TARGET_* arrays already use, just from a
+ * dynamic file instead of hardcoded constants. This file has no JSON library linked at all
+ * (matching this client's own bespoke-everything style, no new dependency pulled in for this),
+ * so crystal_parse_npc_array below is a minimal, format-specific scanner for the exact shape
+ * apps2/crystal's own JSON encoder produces -- NOT a general JSON parser, would break on
+ * hand-edited or differently-shaped input. Acceptable since this file is only ever produced by
+ * apps2/crystal's own real -seed-out flag, never hand-authored.
+ *
+ * Real, honest scope: decorative only, not targetable/combat-interactive -- the worm ring's own
+ * real hit-test/HP-sync (town_worm_hit_test, town_poll_target_hp) took several separate founder
+ * iterations to get right; matching that level of interactivity for goblins/foxes is real,
+ * separate follow-up, not attempted here. */
+typedef struct { float x, z; char kind[16]; } CrystalNpc;
+#define MAX_CRYSTAL_NPCS 256
+static CrystalNpc g_crystal_goblins[MAX_CRYSTAL_NPCS];
+static int g_crystal_goblin_count = 0;
+static CrystalNpc g_crystal_foxes[MAX_CRYSTAL_NPCS];
+static int g_crystal_fox_count = 0;
+
+/* crystal_world_pos mirrors server/mob/crystal.go's own crystalWorldPos exactly (same real 44x44
+ * grid, same 21.5 offset / (70/44) scale) -- a goblin/fox renders at the exact same real-world
+ * position the server itself computes when MeadowCrystalSpawns loads the same seed file. */
+static void crystal_world_pos(int grid_x, int grid_y, float *out_x, float *out_z) {
+    const float offset = 21.5f;
+    const float scale = 70.0f / 44.0f;
+    *out_x = ((float)grid_x - offset) * scale;
+    *out_z = ((float)grid_y - offset) * scale;
+}
+
+static int crystal_parse_npc_array(const char *section, const char *section_end, CrystalNpc *out, int max_out) {
+    int count = 0;
+    const char *p = section;
+    while (p < section_end && count < max_out) {
+        const char *xk = strstr(p, "\"X\":");
+        if (!xk || xk >= section_end) break;
+        int grid_x = atoi(xk + 4);
+        const char *yk = strstr(xk, "\"Y\":");
+        if (!yk || yk >= section_end) break;
+        int grid_y = atoi(yk + 4);
+        const char *kk = strstr(yk, "\"Kind\":");
+        if (!kk || kk >= section_end) break;
+        const char *kq1 = strchr(kk + 7, '"');
+        if (!kq1) break;
+        const char *kq2 = strchr(kq1 + 1, '"');
+        if (!kq2) break;
+        float wx, wz;
+        crystal_world_pos(grid_x, grid_y, &wx, &wz);
+        out[count].x = wx;
+        out[count].z = wz;
+        size_t klen = (size_t)(kq2 - kq1 - 1);
+        if (klen >= sizeof(out[count].kind)) klen = sizeof(out[count].kind) - 1;
+        memcpy(out[count].kind, kq1 + 1, klen);
+        out[count].kind[klen] = '\0';
+        count++;
+        p = kq2 + 1;
+    }
+    return count;
+}
+
+/* load_crystal_seed -- non-fatal if the file is missing: goblins/foxes are optional atmosphere
+ * content, matching MeadowCrystalSpawns' own real (nil, nil) "no seed, no NPCs" contract
+ * server-side. Called once at startup (see main()'s own init sequence). */
+static void load_crystal_seed(const char *path) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return;
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (size <= 0) { fclose(f); return; }
+    char *buf = (char *)malloc((size_t)size + 1);
+    if (!buf) { fclose(f); return; }
+    size_t nread = fread(buf, 1, (size_t)size, f);
+    buf[nread] = '\0';
+    fclose(f);
+
+    const char *goblins_key = strstr(buf, "\"goblins\"");
+    const char *foxes_key = strstr(buf, "\"foxes\"");
+    if (goblins_key && foxes_key && foxes_key > goblins_key) {
+        g_crystal_goblin_count = crystal_parse_npc_array(goblins_key, foxes_key, g_crystal_goblins, MAX_CRYSTAL_NPCS);
+    }
+    if (foxes_key) {
+        g_crystal_fox_count = crystal_parse_npc_array(foxes_key, buf + nread, g_crystal_foxes, MAX_CRYSTAL_NPCS);
+    }
+    printf("crystal: loaded %d goblins, %d foxes from %s\n", g_crystal_goblin_count, g_crystal_fox_count, path);
+    free(buf);
+}
+
+/* draw_goblin_shell / draw_fox_shell -- same BOX-based stacked silhouette technique every
+ * hero/worm in this file already uses. Kind-specific color only (not shape) -- a real, cheap way
+ * to read "these are different NPC types" at a glance, matching crystal.go's own real
+ * goblinStatsByKind typing (Raider/Merchant/Tinkerer/Scavenger) without needing per-kind
+ * geometry. */
+static void draw_goblin_shell(float x, float z, const char *kind, const Mat4 *vp, GLint loc_mvp, GLint loc_model, GLint loc_color, const Mesh *cube_mesh) {
+    float ground_y = 0.0f;
+    dfzone_height_at(x, z, &ground_y);
+    float r, g, b;
+    if (strcmp(kind, "raider") == 0)        { r = 0.55f; g = 0.15f; b = 0.12f; } /* aggressive fighter -- dull red */
+    else if (strcmp(kind, "merchant") == 0) { r = 0.65f; g = 0.55f; b = 0.15f; } /* trader -- gold-brown */
+    else if (strcmp(kind, "tinkerer") == 0) { r = 0.25f; g = 0.45f; b = 0.55f; } /* fixer -- steel blue */
+    else                                    { r = 0.35f; g = 0.5f;  b = 0.3f; } /* scavenger (real default, matches crystal.go's own fallback) -- mossy green */
+    glUniform4f_(loc_color, r, g, b, 1.0f);
+    draw_hero_box(x, z, 0.0f, ground_y + 0.4f, 0.0f, 0.4f, 0.5f, 0.3f, 1.0f, vp, loc_mvp, loc_model, cube_mesh); /* torso */
+    glUniform4f_(loc_color, r * 1.15f, g * 1.15f, b * 1.15f, 1.0f);
+    draw_hero_box(x, z, 0.0f, ground_y + 0.85f, 0.0f, 0.28f, 0.28f, 0.28f, 1.0f, vp, loc_mvp, loc_model, cube_mesh); /* head, slightly brighter than the torso */
+}
+
+static void draw_fox_shell(float x, float z, const Mat4 *vp, GLint loc_mvp, GLint loc_model, GLint loc_color, const Mesh *cube_mesh) {
+    float ground_y = 0.0f;
+    dfzone_height_at(x, z, &ground_y);
+    glUniform4f_(loc_color, 0.85f, 0.45f, 0.2f, 1.0f); /* fox-orange body/head */
+    draw_hero_box(x, z, 0.0f, ground_y + 0.2f, 0.0f, 0.35f, 0.22f, 0.18f, 1.0f, vp, loc_mvp, loc_model, cube_mesh); /* body */
+    draw_hero_box(x, z, 0.32f, ground_y + 0.28f, 0.0f, 0.16f, 0.16f, 0.16f, 1.0f, vp, loc_mvp, loc_model, cube_mesh); /* head */
+    glUniform4f_(loc_color, 0.95f, 0.95f, 0.92f, 1.0f); /* white tail tip, the one real "this is a fox not a blob" cue */
+    draw_hero_box(x, z, -0.35f, ground_y + 0.3f, 0.0f, 0.14f, 0.14f, 0.3f, 1.0f, vp, loc_mvp, loc_model, cube_mesh); /* tail */
+}
+
+static void town_draw_crystal_npcs(const Mat4 *vp, GLint loc_mvp, GLint loc_model, GLint loc_color, const Mesh *cube_mesh) {
+    for (int i = 0; i < g_crystal_goblin_count; i++) {
+        draw_goblin_shell(g_crystal_goblins[i].x, g_crystal_goblins[i].z, g_crystal_goblins[i].kind, vp, loc_mvp, loc_model, loc_color, cube_mesh);
+    }
+    for (int i = 0; i < g_crystal_fox_count; i++) {
+        draw_fox_shell(g_crystal_foxes[i].x, g_crystal_foxes[i].z, vp, loc_mvp, loc_model, loc_color, cube_mesh);
+    }
+}
+
 static void town_draw_worms(const Mat4 *vp, GLint loc_mvp, GLint loc_model, GLint loc_color, const Mesh *cube_mesh) {
     int count;
     const char *const *names;
@@ -5757,6 +5892,13 @@ int main(int argc, char *argv[]) {
        rand()-based nonce (used only when IDUNA isn't reachable) was silently using the default
        seed=1 sequence, identical every single launch, a real if minor pre-existing weakness. */
     srand((unsigned int)time(NULL));
+    /* GFD-ENRICHMENT-0013's second slice -- see load_crystal_seed's own doc comment. Real,
+       honest coupling, not hidden: this path must match whatever CRYSTAL_SEED_PATH the live
+       apps2/mud process is run with (no compiled-in default on either side -- an unset env var
+       there means MeadowCrystalSpawns spawns no server-side NPCs either), so the client renders
+       the same NPCs the server actually populated, not a stale or mismatched set. Non-fatal if
+       the file is absent. */
+    load_crystal_seed("data/crystal_seed_meadow.json");
     /* squish_age_ms[] zero-initializes with the rest of static storage, but 0.0f reads as
        "animation just started" (compute_squish's own neutral sentinel is anything >=
        SQUISH_ANIM_MS) -- without this every hero would appear squashed for one frame the instant
@@ -6618,6 +6760,10 @@ int main(int argc, char *argv[]) {
                        area?") -- town_draw_worms itself resolves Town vs Meadow via
                        town_active_targets/g_dfzone_active, same shared function used below. */
                     town_draw_worms(&vp, loc_mvp, loc_model, loc_color, &cube_mesh);
+                    /* GFD-ENRICHMENT-0013's second slice: real Meadow goblin/fox NPCs from the
+                       crystal-simulation seed, Meadow (zone 0) only -- see
+                       server/mob.MeadowCrystalSpawns' own SceneID: 0. */
+                    town_draw_crystal_npcs(&vp, loc_mvp, loc_model, loc_color, &cube_mesh);
                 } else {
                     town_draw_ground(loc_mvp, loc_model, loc_color, vp, &plane_mesh);
                     town_draw_buildings(&vp, loc_mvp, loc_model, loc_color, &cube_mesh);

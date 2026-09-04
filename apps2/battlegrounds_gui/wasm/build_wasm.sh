@@ -43,11 +43,16 @@ fi
 
 GUI_ROOT="$(cd .. && pwd)"
 
+# --preload-file below (GFD-ENRICHMENT-0013's second slice): src/main.c's own load_crystal_seed
+# calls a plain fopen(), which only sees files actually bundled into Emscripten's virtual FS --
+# this maps the real, committed seed file to the exact same relative path the native build reads
+# directly off disk.
 emcc -std=c99 -D_DEFAULT_SOURCE -O2 \
     -s USE_SDL=2 \
     -s LEGACY_GL_EMULATION=1 \
     -s ALLOW_MEMORY_GROWTH=1 \
     --pre-js websocket_proxy_pre.js \
+    --preload-file "$GUI_ROOT/../../data/crystal_seed_meadow.json@data/crystal_seed_meadow.json" \
     -o battlegrounds.html \
     "$GUI_ROOT/src/main.c" \
     "$GUI_ROOT/packages/simulation/arena_game.c" \
