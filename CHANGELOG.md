@@ -1,3 +1,28 @@
+## 2026-09-04 (29)
+- docs(dungeons): real status corrections in `docs2/DUNGEON_NORTHSTAR.md` (kanban card
+  534432532, "GFD dungeons," continuing milestone by milestone). Milestone 1's own "mob spawns
+  aren't wired into a live instance yet" and Milestone 3's own "IN PROGRESS" status both predated
+  Milestone 4's real, later shipped work (real dungeon combat live in `apps2/mud`, confirmed live
+  in source: `spawnInto(zoneID, mob.GenerateDungeonSpawns(layout, i, zoneID, seed))`) — corrected
+  both rows to reflect that mob spawning IS now real and live (via `apps2/mud`, GFD's own real
+  PvE-content owner), while honestly keeping what's still genuinely true: `apps2/server-go`'s own
+  `DungeonInstanceRegistry` path specifically has no live mobs, and driving REDGARDEN's real
+  `arena_bot` AI (vs. generic mob behavior) remains a real, separate, unstarted gap. No code
+  changed — a real documentation-accuracy correction, not new functionality.
+- docs: `docs2/DUNGEON_HAT_DROPS_NORTHSTAR.md` — real scoping pass (Principle 19) for kanban
+  `BPGFD-INTEROP-000` ("GFD dungeons have a super rare chance to drop brawlpit hats and those
+  hats are sellable on the GFD auction house"). Real, checked-live foundation: GFD dungeons are
+  real and live (Milestone 4 above), a real auction house already exists (`server/market/ah.go`,
+  no strict item-registry validation, no dedicated cosmetics category yet), BRAWLPIT hats already
+  have a real IDUNA-backed schema/API (`WOTAN_HAT_STORE_NORTHSTAR.md`, already shipped). Real gap
+  named: zero drop-chance/loot-roll mechanic exists anywhere in GFD combat today (Milestone 6,
+  "Rewards + party queue flow," is itself real and unstarted — this card is a real special case
+  of it). 3 real open questions named (real drop-rate number; dungeon-exclusive vs. existing-
+  catalog hats; whether a GFD-side "sale" needs real IDUNA-side ownership transfer — the one
+  structural question most worth a founder decision). 3-phase plan: Phase 1 a real loot-roll on
+  dungeon kill, Phase 2 a real cross-repo hat-award API, Phase 3 a real auction-house listing
+  path. No code written — planning only.
+
 ## 2026-09-04 (28)
 - perf(apps2/server-go): GFD-994001 -- "GFD core game loop performance tuning." Real, decisive
   root cause found by direct investigation (not guessed), after checking every real hot-path
