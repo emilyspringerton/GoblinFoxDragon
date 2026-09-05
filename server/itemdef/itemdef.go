@@ -226,10 +226,21 @@ func (r *Registry) LoadJSON(data []byte) error {
 			d.StackSize = 1
 		}
 		r.byID[d.ID] = d
-		r.byName[strings.ToLower(d.Name)] = d
+		r.byName[nameKey(d.Name)] = d
 	}
 	return nil
 }
+
+// nameKey normalizes an item name for ByName's lookup map: lowercased, with
+// spaces collapsed to hyphens (S251-09 -- real, found-live bug: a multi-word
+// item like "Earth Crystal" registered under its own literal, spaced,
+// lowercased Name ("earth crystal"), but every real shop-facing call site
+// (apps2/mud/main.go's own market/craft/consumable code) passes the
+// hyphenated convention ("earth-crystal") instead -- ByName("earth-crystal")
+// never matched, so no multi-word item was ever reachable by its real
+// shop id. Normalizing both the stored key and the lookup key the same way
+// fixes every call site without touching ItemDef.Name itself (still the
+// real, unmodified display string everywhere else).
 
 // ByID returns the ItemDef for the given numeric ID.
 func (r *Registry) ByID(id int) (*ItemDef, bool) {
@@ -243,8 +254,12 @@ func (r *Registry) ByID(id int) (*ItemDef, bool) {
 func (r *Registry) ByName(name string) (*ItemDef, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	d, ok := r.byName[strings.ToLower(name)]
+	d, ok := r.byName[nameKey(name)]
 	return d, ok
+}
+
+func nameKey(name string) string {
+	return strings.ReplaceAll(strings.ToLower(name), " ", "-")
 }
 
 // All returns all registered item definitions.

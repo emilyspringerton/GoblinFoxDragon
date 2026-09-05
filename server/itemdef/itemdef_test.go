@@ -88,6 +88,29 @@ func TestByName(t *testing.T) {
 	}
 }
 
+// TestByName_HyphenatedMultiWordName -- S251-09's real, found-live bug: a
+// multi-word item name registered under its own literal, spaced, lowercased
+// form ("fire crystal"), but every real shop-facing call site in
+// apps2/mud/main.go passes the hyphenated convention ("fire-crystal")
+// instead, so no multi-word item was ever reachable by its real shop id.
+func TestByName_HyphenatedMultiWordName(t *testing.T) {
+	r := NewRegistry()
+	r.LoadJSON(seedJSON)
+	d, ok := r.ByName("fire-crystal")
+	if !ok {
+		t.Fatal("ByName(fire-crystal) not found -- the real shop-facing id must resolve")
+	}
+	if d.ID != 4 {
+		t.Errorf("id=%d want 4", d.ID)
+	}
+	// The un-hyphenated, spaced form (and mixed case) must keep working too --
+	// this fix normalizes both sides of the lookup, not just one.
+	d2, ok := r.ByName("Fire Crystal")
+	if !ok || d2.ID != 4 {
+		t.Fatalf("ByName(Fire Crystal) = %v, %v -- want id 4, ok", d2, ok)
+	}
+}
+
 func TestJobMask(t *testing.T) {
 	r := NewRegistry()
 	r.LoadJSON(seedJSON)

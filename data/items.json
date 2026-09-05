@@ -87,7 +87,7 @@
     ],
     "level": 7,
     "stats": {
-      "attack": 18,
+      "attack": 13,
       "str": 3
     },
     "stack_size": 1,
@@ -362,8 +362,8 @@
     "name": "Leather Gloves",
     "category": "armor",
     "equip_slots": [
-      "handl",
-      "handr"
+      "hand-l",
+      "hand-r"
     ],
     "jobs": [
       "WAR",
@@ -635,8 +635,8 @@
     "name": "Spiked Knuckles",
     "category": "armor",
     "equip_slots": [
-      "handl",
-      "handr"
+      "hand-l",
+      "hand-r"
     ],
     "jobs": [
       "MNK",
@@ -1528,5 +1528,1947 @@
     "stack_size": 1,
     "model_id": "banjo_a01",
     "delay": 280
+  },
+  {
+    "id": 1012,
+    "name": "Icewraith Claymore",
+    "description": "A greatsword forged from perpetual ice, resonating with a freezing aura. Its chilling touch drains the warmth from all it strikes.",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RUN"
+    ],
+    "level": 60,
+    "stats": {
+      "accuracy": 10,
+      "attack": 25,
+      "int": 6,
+      "magic_attack_bonus": 5,
+      "mnd": 4,
+      "str": 8
+    },
+    "stack_size": 1,
+    "model_id": "greatsword_icewraith",
+    "delay": 450
+  },
+  {
+    "id": 1013,
+    "name": "Minestrone",
+    "description": "A hearty soup, rich with vegetables and pasta.",
+    "category": "consumable",
+    "level": 30,
+    "stats": {
+      "defense": 5,
+      "hp_regen": 3,
+      "mnd": 1,
+      "mp_regen": 2,
+      "vit": 2
+    },
+    "stack_size": 12,
+    "model_id": "item_food_minestrone"
+  },
+  {
+    "id": 1014,
+    "name": "Gummy Candy",
+    "description": "A chewy, fruit-flavored treat. Restores a small amount of HP.",
+    "category": "consumable",
+    "level": 10,
+    "stats": {
+      "hp_restored": 50
+    },
+    "stack_size": 12,
+    "model_id": "item_gummy_candy_01"
+  },
+  {
+    "id": 1015,
+    "name": "Boots of Winter",
+    "description": "Warm, insulated boots designed for traversing snowy landscapes, offering protection against the cold.",
+    "category": "armor",
+    "equip_slots": [
+      "feet"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "MNK",
+      "DRG",
+      "SCH",
+      "GEO",
+      "RUN",
+      "THF",
+      "ASN"
+    ],
+    "level": 45,
+    "stats": {
+      "evasion": 5,
+      "int": 3,
+      "magic_defense_bonus": 5,
+      "mnd": 3,
+      "mp": 10,
+      "vit": 2
+    },
+    "stack_size": 1,
+    "model_id": "boots_winter_01"
+  },
+  {
+    "id": 1016,
+    "name": "Swift Blade",
+    "description": "A finely balanced one-handed sword, crafted for rapid, precise strikes.",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "THF",
+      "PLD",
+      "DRK",
+      "SAM",
+      "NIN",
+      "DNC",
+      "RUN"
+    ],
+    "level": 19,
+    "stats": {
+      "accuracy": 5,
+      "attack": 20,
+      "dex": 4,
+      "haste": 9
+    },
+    "stack_size": 1,
+    "model_id": "w_sword_swift_blade",
+    "delay": 199
+  },
+  {
+    "id": 1017,
+    "name": "Sunken Dagger of Kali",
+    "description": "A dagger salvaged from the abyssal depths, its blade etched with arcane symbols that whisper of ancient, dark power.",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "THF",
+      "RDM",
+      "NIN",
+      "COR",
+      "DNC"
+    ],
+    "level": 35,
+    "stats": {
+      "accuracy": 5,
+      "attack": 11,
+      "dex": 3,
+      "magic_attack_bonus": 3
+    },
+    "stack_size": 1,
+    "model_id": "dagger_sunken_kali",
+    "delay": 176
+  },
+  {
+    "id": 1018,
+    "name": "Hidden Dagger of Kali",
+    "description": "A finely balanced dagger rumored to have been used by assassins in service to a forgotten deity.",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "RDM",
+      "COR"
+    ],
+    "level": 25,
+    "stats": {
+      "accuracy": 4,
+      "agi": 2,
+      "attack": 18,
+      "dex": 3,
+      "evasion": 3
+    },
+    "stack_size": 1,
+    "model_id": "dagger_kali_01",
+    "delay": 170
+  },
+  {
+    "id": 1019,
+    "name": "Crown of the Eternal Vagrant",
+    "description": "A well-worn crown said to be bestowed upon a legendary traveler who never settled, granting keen senses and resilience.",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "THF",
+      "RNG",
+      "DNC",
+      "COR",
+      "RDM",
+      "BRD",
+      "NIN"
+    ],
+    "level": 75,
+    "stats": {
+      "accuracy": 7,
+      "agi": 15,
+      "chr": 14,
+      "defense": 18,
+      "dex": 15,
+      "evasion": 6,
+      "hp": 50,
+      "mnd": -3,
+      "mp": 50
+    },
+    "stack_size": 1,
+    "model_id": "head_vag_crown_a"
+  },
+  {
+    "id": 1020,
+    "name": "Snow Owl Mittens",
+    "description": "Warm mittens crafted from the down of the mythical snow owl. Imbued with a faint magical chill.",
+    "category": "armor",
+    "equip_slots": [
+      "hand-l",
+      "hand-r"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "BRD",
+      "SCH",
+      "GEO",
+      "THF",
+      "ASN"
+    ],
+    "level": 25,
+    "stats": {
+      "defense": 5,
+      "int": 3,
+      "magic_defense_bonus": 3,
+      "mnd": 3,
+      "mp": 15
+    },
+    "stack_size": 1,
+    "model_id": "item_glove_snow_owl"
+  },
+  {
+    "id": 1021,
+    "name": "Keen Edge",
+    "description": "A masterfully honed one-handed blade, its edge capable of piercing through the toughest hides.",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WAR",
+      "RDM",
+      "THF",
+      "PLD",
+      "DRK",
+      "NIN",
+      "DNC",
+      "RUN"
+    ],
+    "level": 45,
+    "stats": {
+      "accuracy": 5,
+      "attack": 22,
+      "dex": 2,
+      "str": 6
+    },
+    "stack_size": 1,
+    "model_id": "weapon_sword_keen_edge",
+    "delay": 222
+  },
+  {
+    "id": 1022,
+    "name": "Filthy Trinket",
+    "description": "A small, tarnished trinket found in a refuse pile. It smells faintly of something unpleasant.",
+    "category": "accessory",
+    "equip_slots": [
+      "ring-l",
+      "ring-r"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "WHM",
+      "BLM",
+      "RDM",
+      "THF",
+      "PLD",
+      "DRK",
+      "BST",
+      "BRD",
+      "RNG",
+      "SAM",
+      "NIN",
+      "DRG",
+      "SMN",
+      "BLU",
+      "COR",
+      "PUP",
+      "DNC",
+      "SCH",
+      "GEO",
+      "RUN"
+    ],
+    "level": 70,
+    "stats": {
+      "chr": -11,
+      "defense": 11,
+      "evasion": 11
+    },
+    "stack_size": 1,
+    "model_id": "acc_filthy_trinket"
+  },
+  {
+    "id": 1023,
+    "name": "Debt's Favor",
+    "description": "A peculiar ring, said to grant its wearer a portion of power borrowed from the ether, though at a subtle, unspoken cost.",
+    "category": "accessory",
+    "equip_slots": [
+      "ring-l",
+      "ring-r"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "COR"
+    ],
+    "level": 68,
+    "stats": {
+      "INT": 5,
+      "MND": 5,
+      "Magic Attack Bonus": 5,
+      "Magic Defense Bonus": 5
+    },
+    "stack_size": 1,
+    "model_id": "ring_magic_a01"
+  },
+  {
+    "id": 1024,
+    "name": "Fealty Stone",
+    "description": "A stone said to pulse with the unwavering essence of true loyalty. Highly prized in the creation of artifacts bound by oath.",
+    "category": "material",
+    "level": 72,
+    "stack_size": 99,
+    "model_id": "item_fealty_stone"
+  },
+  {
+    "id": 1025,
+    "name": "Operator's Tunic",
+    "description": "A specialized tunic designed for efficient operation in the field, granting enhanced precision and agility.",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "THF",
+      "RNG",
+      "COR",
+      "DNC"
+    ],
+    "level": 60,
+    "stats": {
+      "accuracy": 7,
+      "agi": 4,
+      "defense": 28,
+      "dex": 4,
+      "evasion": 7,
+      "hp": 15
+    },
+    "stack_size": 1,
+    "model_id": "body_cloth_m08"
+  },
+  {
+    "id": 1026,
+    "name": "Crown of Icarus",
+    "description": "A lightweight crown said to imbue its wearer with the agility of flight, though one must be mindful not to fly too close to the sun.",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "THF",
+      "RNG",
+      "RDM",
+      "BRD",
+      "DNC",
+      "SCH",
+      "GEO"
+    ],
+    "level": 35,
+    "stats": {
+      "agi": 6,
+      "defense": 2,
+      "evasion": 4,
+      "haste": 2,
+      "int": 6
+    },
+    "stack_size": 1,
+    "model_id": "head_icarus_crown"
+  },
+  {
+    "id": 1027,
+    "name": "Helm of the Dragon King",
+    "description": "A helm crafted from the scales and essence of a mighty dragon, once worn by ancient kings to inspire awe and strike fear.",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG"
+    ],
+    "level": 68,
+    "stats": {
+      "HP": 90,
+      "STR": 8,
+      "VIT": 7,
+      "accuracy": 5,
+      "defense": 35,
+      "evasion": -3
+    },
+    "stack_size": 1,
+    "model_id": "helm_dragon_king_01"
+  },
+  {
+    "id": 1028,
+    "name": "Light's End",
+    "description": "A radiant one-handed sword that banishes shadows. Its holy light empowers divine magic.",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "PLD",
+      "RDM",
+      "WHM",
+      "BLU",
+      "DNC",
+      "SCH"
+    ],
+    "level": 55,
+    "stats": {
+      "accuracy": 5,
+      "attack": 35,
+      "int": 3,
+      "light_damage": 5,
+      "magic_attack_bonus": 4,
+      "mnd": 7
+    },
+    "stack_size": 1,
+    "model_id": "sword_lights_end",
+    "delay": 290
+  },
+  {
+    "id": 1029,
+    "name": "Bow of the Gorgon Outcast",
+    "description": "A bow rumored to have once belonged to a shunned Gorgon, its design hinting at both serpentine grace and deadly precision.",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "RNG",
+      "THF",
+      "COR",
+      "ASN",
+      "BRD"
+    ],
+    "level": 50,
+    "stats": {
+      "accuracy": 5,
+      "agi": 4,
+      "attack": 45,
+      "dex": 3
+    },
+    "stack_size": 1,
+    "model_id": "bow_gorgon_01",
+    "delay": 280
+  },
+  {
+    "id": 1030,
+    "name": "Utzu Mah Turi",
+    "description": "A finely crafted blade rumored to hum with ancient, silent power.",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "THF",
+      "RDM",
+      "NIN",
+      "BLU"
+    ],
+    "level": 55,
+    "stats": {
+      "accuracy": 7,
+      "attack": 27,
+      "dex": 3,
+      "haste": 1,
+      "str": 3
+    },
+    "stack_size": 1,
+    "model_id": "s0053",
+    "delay": 211
+  },
+  {
+    "id": 1031,
+    "name": "King's Alibi",
+    "description": "An ornate ring, said to have been worn by a king who always found a way to escape certain doom.",
+    "category": "accessory",
+    "equip_slots": [
+      "ring-r"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "PLD",
+      "DRK",
+      "BST",
+      "RNG",
+      "SAM",
+      "NIN",
+      "DRG",
+      "PUP",
+      "DNC",
+      "RUN"
+    ],
+    "level": 75,
+    "stats": {
+      "agi": 7,
+      "defense": 10,
+      "evasion": 20,
+      "haste": 3,
+      "magic_defense_bonus": 10,
+      "vit": 5
+    },
+    "stack_size": 1,
+    "model_id": "ring_kings_alibi"
+  },
+  {
+    "id": 1032,
+    "name": "Enigma's Curse",
+    "description": "A peculiar amulet said to whisper secrets of forgotten lore, granting potent magical insights at a minor cost to physical fortitude and health.",
+    "category": "accessory",
+    "equip_slots": [
+      "neck"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "BRD",
+      "SMN",
+      "SCH",
+      "GEO"
+    ],
+    "level": 55,
+    "stats": {
+      "evasion": -5,
+      "hp": -10,
+      "int": 5,
+      "magic_attack_bonus": 7,
+      "magic_defense_bonus": 7,
+      "mnd": 5
+    },
+    "stack_size": 1,
+    "model_id": "enigma_curse_neck"
+  },
+  {
+    "id": 1033,
+    "name": "Bone Plate Gauntlets",
+    "description": "Sturdy gauntlets fashioned from hardened bone plates, offering solid protection.",
+    "category": "armor",
+    "equip_slots": [
+      "hand-l",
+      "hand-r"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "PLD",
+      "DRK",
+      "BST",
+      "SAM",
+      "NIN",
+      "DRG",
+      "PUP",
+      "DNC",
+      "RUN"
+    ],
+    "level": 32,
+    "stats": {
+      "accuracy": 1,
+      "defense": 11,
+      "str": 2,
+      "vit": 2
+    },
+    "stack_size": 1,
+    "model_id": "bone_plate_gauntlets_m"
+  },
+  {
+    "id": 1034,
+    "name": "B0ne Plate Helm",
+    "description": "A crude helm crafted from reinforced bone plates. Surprisingly sturdy.",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 38,
+    "stats": {
+      "defense": 12,
+      "str": 1,
+      "vit": 2
+    },
+    "stack_size": 1,
+    "model_id": "helm_bone_plate_mk1"
+  },
+  {
+    "id": 1035,
+    "name": "Sheepskin Leggings",
+    "description": "Comfortable leggings crafted from soft sheepskin, offering light protection.",
+    "category": "armor",
+    "equip_slots": [
+      "legs"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "WHM",
+      "BLM",
+      "RDM",
+      "THF",
+      "PLD",
+      "DRK",
+      "BST",
+      "BRD",
+      "RNG",
+      "SAM",
+      "NIN",
+      "DRG",
+      "SMN",
+      "BLU",
+      "COR",
+      "PUP",
+      "DNC",
+      "SCH",
+      "GEO",
+      "RUN"
+    ],
+    "level": 24,
+    "stats": {
+      "agi": 2,
+      "defense": 12,
+      "hp": 8
+    },
+    "stack_size": 1,
+    "model_id": "leggings_sheepskin_01"
+  },
+  {
+    "id": 1036,
+    "name": "Robe of Solitude",
+    "description": "A simple robe said to enhance the mental fortitude of its wearer, ideal for quiet contemplation.",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "BRD",
+      "SMN",
+      "SCH",
+      "GEO"
+    ],
+    "level": 25,
+    "stats": {
+      "defense": 12,
+      "int": 2,
+      "magic_attack_bonus": 1,
+      "magic_defense_bonus": 1,
+      "mnd": 2,
+      "mp": 15
+    },
+    "stack_size": 1,
+    "model_id": "body_robe_solitude_01"
+  },
+  {
+    "id": 1037,
+    "name": "Paltry Bastard Sword",
+    "description": "A crudely forged, yet surprisingly effective bastard sword for the aspiring adventurer. Its balance is poor.",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM"
+    ],
+    "level": 18,
+    "stats": {
+      "attack": 12,
+      "str": 1
+    },
+    "stack_size": 1,
+    "model_id": "bastard_sword_01",
+    "delay": 250
+  },
+  {
+    "id": 1038,
+    "name": "Turtle Helm",
+    "description": "A durable helmet crafted from a hardened turtle shell.",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG"
+    ],
+    "level": 25,
+    "stats": {
+      "defense": 10,
+      "hp": 10,
+      "str": 1,
+      "vit": 2
+    },
+    "stack_size": 1,
+    "model_id": "helm_turtle_01"
+  },
+  {
+    "id": 1039,
+    "name": "Threads of the Missing Gods",
+    "description": "A shimmering mantle woven from the faint echoes of forgotten deities, granting a whisper of their ancient wisdom and protection.",
+    "category": "accessory",
+    "equip_slots": [
+      "back"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "BRD",
+      "SMN",
+      "SCH",
+      "GEO"
+    ],
+    "level": 38,
+    "stats": {
+      "defense": 4,
+      "int": 4,
+      "magic_defense_bonus": 2,
+      "mnd": 4,
+      "mp": 15
+    },
+    "stack_size": 1,
+    "model_id": "threads_of_missing_gods_mantle"
+  },
+  {
+    "id": 1040,
+    "name": "Death's Gambit",
+    "description": "A dark blade rumored to offer overwhelming power, but at a hidden cost only the wielder can pay.",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "DRK",
+      "THF",
+      "RDM"
+    ],
+    "level": 35,
+    "stats": {
+      "accuracy": 5,
+      "attack": 18,
+      "dex": 3,
+      "str": 3
+    },
+    "stack_size": 1,
+    "model_id": "deaths_gambit_sword",
+    "delay": 240
+  },
+  {
+    "id": 1041,
+    "name": "Parlay of the Shy Priestess",
+    "description": "A delicate necklace, imbued with the soft-spoken wisdom of a devoted priestess, said to calm even the most heated of disputes.",
+    "category": "accessory",
+    "equip_slots": [
+      "neck"
+    ],
+    "jobs": [
+      "WHM",
+      "RDM",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 50,
+    "stats": {
+      "chr": 5,
+      "magic_defense_bonus": 10,
+      "mnd": 4,
+      "mp": 10,
+      "resist_sleep": 15
+    },
+    "stack_size": 1,
+    "model_id": "neck_priestess_charm"
+  },
+  {
+    "id": 1042,
+    "name": "Bloodstained Gladiator Helm",
+    "description": "A dented and bloodstained helm worn by a veteran gladiator. Its grim appearance belies its protective qualities.",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "NIN",
+      "RUN"
+    ],
+    "level": 45,
+    "stats": {
+      "accuracy": 5,
+      "defense": 18,
+      "hp": 15,
+      "str": 3,
+      "vit": 3
+    },
+    "stack_size": 1,
+    "model_id": "head_gladiator_bloodstained_01"
+  },
+  {
+    "id": 1043,
+    "name": "Fourth Remorse",
+    "description": "A blade pulsating with the weight of forgotten vows and profound regret. It whispers forgotten secrets to its wielder.",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "THF",
+      "DNC",
+      "NIN"
+    ],
+    "level": 55,
+    "stats": {
+      "Accuracy": 10,
+      "Attack": 25,
+      "Critical Hit Rate": 3,
+      "DEX": 5,
+      "INT": 3,
+      "MND": 3,
+      "Magic Attack Bonus": 5,
+      "STR": 5
+    },
+    "stack_size": 1,
+    "model_id": "ws_remorse_dark",
+    "delay": 235
+  },
+  {
+    "id": 1044,
+    "name": "Cow Fat",
+    "description": "Fat rendered from a cow. Used in various crafting recipes.",
+    "category": "material",
+    "level": 15,
+    "stack_size": 99,
+    "model_id": "item_cow_fat"
+  },
+  {
+    "id": 1045,
+    "name": "Duck Fat",
+    "description": "Rendered duck fat, often used in cooking.",
+    "category": "material",
+    "level": 15,
+    "stack_size": 99,
+    "model_id": "material_duck_fat_01"
+  },
+  {
+    "id": 1046,
+    "name": "Chicken Egg",
+    "description": "An ordinary chicken egg. Used in various cooking recipes.",
+    "category": "material",
+    "level": 1,
+    "stack_size": 12,
+    "model_id": "item_egg_chicken"
+  },
+  {
+    "id": 1047,
+    "name": "Duck Egg",
+    "description": "An egg laid by a common duck. A versatile ingredient in many culinary and alchemical recipes.",
+    "category": "material",
+    "level": 1,
+    "stack_size": 99,
+    "model_id": "item_egg_duck"
+  },
+  {
+    "id": 1048,
+    "name": "Pig Fat",
+    "description": "Fat rendered from a wild boar. A common ingredient in cooking and alchemy.",
+    "category": "material",
+    "level": 1,
+    "stack_size": 99,
+    "model_id": "item_material_fat"
+  },
+  {
+    "id": 1049,
+    "name": "Goose Egg",
+    "description": "A large, pale egg, surprisingly durable. Prized by culinarians and alchemists alike for its rich contents.",
+    "category": "material",
+    "level": 10,
+    "stack_size": 12,
+    "model_id": "item_egg_goose_01"
+  },
+  {
+    "id": 1050,
+    "name": "Grass Skirt",
+    "description": "A simple skirt woven from sturdy, dried island grasses. Offers minimal protection.",
+    "category": "armor",
+    "equip_slots": [
+      "legs"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "WHM",
+      "BLM",
+      "RDM",
+      "THF",
+      "PLD",
+      "DRK",
+      "BST",
+      "BRD",
+      "RNG",
+      "SAM",
+      "NIN",
+      "DRG",
+      "SMN",
+      "BLU",
+      "COR",
+      "PUP",
+      "DNC",
+      "SCH",
+      "GEO",
+      "RUN"
+    ],
+    "level": 5,
+    "stats": {
+      "defense": 3,
+      "evasion": 1
+    },
+    "stack_size": 1,
+    "model_id": "item_grass_skirt_01"
+  },
+  {
+    "id": 1051,
+    "name": "Lost Sweater",
+    "description": "A well-worn, comfortable sweater that seems to have a story behind its faded colors.",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "MNK",
+      "WHM",
+      "BLM",
+      "RDM",
+      "THF",
+      "BRD",
+      "RNG",
+      "SAM",
+      "NIN",
+      "SMN",
+      "BLU",
+      "COR",
+      "PUP",
+      "DNC",
+      "SCH",
+      "GEO",
+      "RUN"
+    ],
+    "level": 25,
+    "stats": {
+      "chr": 2,
+      "defense": 10,
+      "magic_defense_bonus": 2,
+      "mnd": 2
+    },
+    "stack_size": 1,
+    "model_id": "sweater_03_lost"
+  },
+  {
+    "id": 1052,
+    "name": "Filth of Agamemnon",
+    "description": "A congealed mass of dark, odorous matter. Though repulsive, it radiates a strange, potent energy, hinting at its legendary origin.",
+    "category": "material",
+    "level": 60,
+    "stack_size": 99,
+    "model_id": "slime_glob"
+  },
+  {
+    "id": 1053,
+    "name": "Taint's Embrace",
+    "description": "A ring radiating a subtle, dark aura. It is said to grant its wearer a deeper connection to the forbidden arts, though at a hidden cost.",
+    "category": "accessory",
+    "equip_slots": [
+      "ring-l",
+      "ring-r"
+    ],
+    "jobs": [
+      "BLM",
+      "RDM",
+      "DRK",
+      "SMN",
+      "BLU",
+      "SCH",
+      "GEO"
+    ],
+    "level": 65,
+    "stats": {
+      "int": 6,
+      "magic_attack_bonus": 4,
+      "magic_defense_bonus": 4,
+      "mnd": 6,
+      "mp": 25
+    },
+    "stack_size": 1,
+    "model_id": "ring_taint_embrace"
+  },
+  {
+    "id": 1054,
+    "name": "Rune of Cain",
+    "description": "A dark, blood-red rune, said to thrum with the primal curse of the First Slayer. Grants unnatural strength and precision.",
+    "category": "accessory",
+    "equip_slots": [
+      "ring-l"
+    ],
+    "jobs": [
+      "DRK",
+      "WAR",
+      "THF",
+      "NIN"
+    ],
+    "level": 60,
+    "stats": {
+      "accuracy": 5,
+      "attack": 8,
+      "evasion": 3,
+      "str": 6,
+      "vit": 4
+    },
+    "stack_size": 1,
+    "model_id": "acc_ring_cain01"
+  },
+  {
+    "id": 1055,
+    "name": "Loki's Favor",
+    "description": "A ring said to be gifted by Loki himself, granting its wearer a touch of his cunning and agility.",
+    "category": "accessory",
+    "equip_slots": [
+      "ring-l"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "WHM",
+      "BLM",
+      "RDM",
+      "THF",
+      "PLD",
+      "DRK",
+      "BST",
+      "BRD",
+      "RNG",
+      "SAM",
+      "NIN",
+      "DRG",
+      "SMN",
+      "BLU",
+      "COR",
+      "PUP",
+      "DNC",
+      "SCH",
+      "GEO",
+      "RUN"
+    ],
+    "level": 60,
+    "stats": {
+      "accuracy": 5,
+      "agi": 3,
+      "evasion": 7,
+      "haste": 7,
+      "int": 3,
+      "mnd": 3
+    },
+    "stack_size": 1,
+    "model_id": "ring_loki01"
+  },
+  {
+    "id": 1056,
+    "name": "Raven's Gift",
+    "description": "A dark, polished ring said to be blessed by a spirit of the night. Enhances one's perception and agility.",
+    "category": "accessory",
+    "equip_slots": [
+      "ring-l"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "RNG",
+      "COR",
+      "RDM"
+    ],
+    "level": 45,
+    "stats": {
+      "accuracy": 4,
+      "agi": 4,
+      "dex": 2,
+      "evasion": 6,
+      "mp": 10
+    },
+    "stack_size": 1,
+    "model_id": "raven_ring_a"
+  },
+  {
+    "id": 1057,
+    "name": "Blue Garter",
+    "description": "A garter of deep blue, said to bring forth magical inspiration and nimble steps.",
+    "category": "accessory",
+    "equip_slots": [
+      "waist"
+    ],
+    "jobs": [
+      "BLM",
+      "WHM",
+      "RDM",
+      "BLU",
+      "SMN",
+      "SCH",
+      "GEO",
+      "DNC"
+    ],
+    "level": 60,
+    "stats": {
+      "accuracy": 15,
+      "chr": 25,
+      "dex": 15,
+      "evasion": 15,
+      "haste": 15,
+      "hp": 100,
+      "int": 15,
+      "magic_attack_bonus": 15,
+      "magic_defense_bonus": 15,
+      "mnd": 15,
+      "mp": 50,
+      "str": 15,
+      "vit": 15
+    },
+    "stack_size": 1,
+    "model_id": "item_garter_blue"
+  },
+  {
+    "id": 1058,
+    "name": "Crown of Madness",
+    "description": "A crown said to twist the wearer's mind, granting unsettling insights at a cost.",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "BLM",
+      "DRK",
+      "RDM",
+      "SCH",
+      "GEO",
+      "SMN"
+    ],
+    "level": 50,
+    "stats": {
+      "chr": 3,
+      "defense": 15,
+      "haste": 2,
+      "int": 5,
+      "magic_attack_bonus": 5,
+      "magic_defense_bonus": 3,
+      "mnd": 5
+    },
+    "stack_size": 1,
+    "model_id": "head_crown_madness_01"
+  },
+  {
+    "id": 1059,
+    "name": "Dark Robe",
+    "description": "An ominous robe, said to enhance the forbidden arts of its wearer.",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "BLM",
+      "DRK",
+      "RDM",
+      "SMN",
+      "BLU",
+      "SCH",
+      "GEO"
+    ],
+    "level": 25,
+    "stats": {
+      "defense": 20,
+      "int": 3
+    },
+    "stack_size": 1,
+    "model_id": "robe_dark"
+  },
+  {
+    "id": 1060,
+    "name": "simple dagger",
+    "description": "A basic, unadorned dagger. Suitable for beginners.",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "THF",
+      "RDM",
+      "BRD",
+      "RNG",
+      "NIN"
+    ],
+    "level": 3,
+    "stats": {
+      "accuracy": 2,
+      "attack": 3
+    },
+    "stack_size": 1,
+    "model_id": "weap_dagger_001",
+    "delay": 171
+  },
+  {
+    "id": 1061,
+    "name": "Green Hat",
+    "description": "A simple, forest-green hat. Provides minor protection for adventurers.",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "PLD",
+      "DRK",
+      "BST",
+      "RNG",
+      "SAM",
+      "NIN",
+      "DRG",
+      "PUP",
+      "DNC",
+      "RUN"
+    ],
+    "level": 5,
+    "stats": {
+      "defense": 4,
+      "str": 1,
+      "vit": 1
+    },
+    "stack_size": 1,
+    "model_id": "armor_head_greenhat"
+  },
+  {
+    "id": 1062,
+    "name": "Yellow Cape",
+    "description": "A simple cape, dyed a vibrant yellow, favored by newer adventurers.",
+    "category": "accessory",
+    "equip_slots": [
+      "back"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "WHM",
+      "BLM",
+      "RDM",
+      "THF",
+      "PLD",
+      "DRK",
+      "BST",
+      "BRD",
+      "RNG",
+      "SAM",
+      "NIN",
+      "DRG",
+      "SMN",
+      "BLU",
+      "COR",
+      "PUP",
+      "DNC",
+      "SCH",
+      "GEO",
+      "RUN"
+    ],
+    "level": 12,
+    "stats": {
+      "chr": 1,
+      "defense": 2
+    },
+    "stack_size": 1,
+    "model_id": "cape_yellow_01"
+  },
+  {
+    "id": 1063,
+    "name": "Crimson Robe",
+    "description": "A vibrant red robe, favored by mages for its protective qualities and striking appearance.",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "BRD",
+      "SMN",
+      "SCH",
+      "GEO"
+    ],
+    "level": 25,
+    "stats": {
+      "defense": 15,
+      "hp": 10,
+      "int": 6,
+      "magic_defense_bonus": 15,
+      "mnd": 3
+    },
+    "stack_size": 1,
+    "model_id": "robe_crimson_mdl"
+  },
+  {
+    "id": 1064,
+    "name": "Glass Ring",
+    "description": "A delicate ring crafted from polished glass, granting a slight boost to mental clarity.",
+    "category": "accessory",
+    "equip_slots": [
+      "ring-l",
+      "ring-r"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "WHM",
+      "BLM",
+      "RDM",
+      "THF",
+      "PLD",
+      "DRK",
+      "BST",
+      "BRD",
+      "RNG",
+      "SAM",
+      "NIN",
+      "DRG",
+      "SMN",
+      "BLU",
+      "COR",
+      "PUP",
+      "DNC",
+      "SCH",
+      "GEO",
+      "RUN"
+    ],
+    "level": 55,
+    "stats": {
+      "int": 11
+    },
+    "stack_size": 1,
+    "model_id": "ring_glass_01"
+  },
+  {
+    "id": 1065,
+    "name": "Brass Ring",
+    "description": "A simple ring made of brass. Offers a minor defensive boost.",
+    "category": "accessory",
+    "equip_slots": [
+      "ring-l",
+      "ring-r"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "WHM",
+      "BLM",
+      "RDM",
+      "THF",
+      "PLD",
+      "DRK",
+      "BST",
+      "BRD",
+      "RNG",
+      "SAM",
+      "NIN",
+      "DRG",
+      "SMN",
+      "BLU",
+      "COR",
+      "PUP",
+      "DNC",
+      "SCH",
+      "GEO",
+      "RUN"
+    ],
+    "level": 12,
+    "stats": {
+      "defense": 3,
+      "evasion": 1
+    },
+    "stack_size": 1,
+    "model_id": "ring_brass_01"
+  },
+  {
+    "id": 1066,
+    "name": "Helm of the Forgotten Kingdom",
+    "description": "A sturdy helm, once worn by a knight of a long-lost empire, imbued with the tenacity of ancient heroes.",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 69,
+    "stats": {
+      "accuracy": 6,
+      "defense": 38,
+      "enmity_increase": 4,
+      "haste": 2,
+      "str": 7,
+      "vit": 6
+    },
+    "stack_size": 1,
+    "model_id": "helm_forgotten_kingdom_01"
+  },
+  {
+    "id": 1067,
+    "name": "Gloves of the Faithful",
+    "description": "Gloves worn by devout magic users, imbuing them with spiritual strength.",
+    "category": "armor",
+    "equip_slots": [
+      "hand-l",
+      "hand-r"
+    ],
+    "jobs": [
+      "WHM",
+      "RDM",
+      "BLM",
+      "SCH",
+      "GEO"
+    ],
+    "level": 60,
+    "stats": {
+      "defense": 10,
+      "haste": 2,
+      "int": 4,
+      "magic_defense_bonus": 3,
+      "mnd": 5,
+      "mp": 20
+    },
+    "stack_size": 1,
+    "model_id": "glove_faithful_01"
+  },
+  {
+    "id": 1068,
+    "name": "White Gloves",
+    "description": "Simple white gloves favored by practitioners of healing and protective magic.",
+    "category": "armor",
+    "equip_slots": [
+      "hand-l",
+      "hand-r"
+    ],
+    "jobs": [
+      "WHM",
+      "RDM",
+      "BLM",
+      "BRD",
+      "SMN",
+      "SCH",
+      "GEO"
+    ],
+    "level": 73,
+    "stats": {
+      "defense": 10,
+      "int": 6,
+      "magic_defense_bonus": 13,
+      "mnd": 6
+    },
+    "stack_size": 1,
+    "model_id": "armor_gloves_white_01"
+  },
+  {
+    "id": 1069,
+    "name": "Wolf Skin Gaiters",
+    "description": "Gaiters crafted from the durable hide of a fierce wolf, offering modest protection.",
+    "category": "armor",
+    "equip_slots": [
+      "legs"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "RDM",
+      "RNG",
+      "SAM",
+      "NIN",
+      "DRG",
+      "COR",
+      "DNC",
+      "PUP",
+      "RUN"
+    ],
+    "level": 15,
+    "stats": {
+      "agi": 1,
+      "defense": 7,
+      "dex": 1,
+      "evasion": 2,
+      "hp": 5,
+      "str": 1
+    },
+    "stack_size": 1,
+    "model_id": "legs_wolfskin_01"
+  },
+  {
+    "id": 1070,
+    "name": "Stone of the Gentle Plague",
+    "description": "A stone pulsing with a faint, sickly green light, said to ward off contagion.",
+    "category": "accessory",
+    "equip_slots": [
+      "ring-l"
+    ],
+    "jobs": [
+      "DRK",
+      "BLM",
+      "RDM",
+      "SCH",
+      "GEO",
+      "SMN",
+      "WHM"
+    ],
+    "level": 68,
+    "stats": {
+      "evasion": 2,
+      "int": 3,
+      "magic_defense_bonus": 6,
+      "mnd": 4,
+      "mp": 15
+    },
+    "stack_size": 1,
+    "model_id": "item_stone_103"
+  },
+  {
+    "id": 1071,
+    "name": "Kitchen Knife",
+    "description": "A common household knife, surprisingly sharp. Not ideal for combat, but better than nothing.",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "RDM",
+      "THF",
+      "DNC"
+    ],
+    "level": 2,
+    "stats": {
+      "attack": 2,
+      "dex": 1
+    },
+    "stack_size": 1,
+    "model_id": "wp_knife_kitchen_01",
+    "delay": 176
+  },
+  {
+    "id": 1072,
+    "name": "Pink Apron",
+    "description": "A frilly pink apron, beloved by chefs and charming adventurers alike.",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "WHM",
+      "BLM",
+      "RDM",
+      "THF",
+      "PLD",
+      "DRK",
+      "BST",
+      "BRD",
+      "RNG",
+      "SAM",
+      "NIN",
+      "DRG",
+      "SMN",
+      "BLU",
+      "COR",
+      "PUP",
+      "DNC",
+      "SCH",
+      "GEO",
+      "RUN"
+    ],
+    "level": 15,
+    "stats": {
+      "CHR": 4,
+      "Defense": 2,
+      "INT": 1
+    },
+    "stack_size": 1,
+    "model_id": "pink_apron_model"
+  },
+  {
+    "id": 1073,
+    "name": "Shepherd's Staff",
+    "description": "A rustic staff, carved from ancient wood, imbued with the spirit of the wilds.",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "BST",
+      "SMN",
+      "SCH",
+      "GEO"
+    ],
+    "level": 58,
+    "stats": {
+      "int": 3,
+      "magic_attack_bonus": 8,
+      "magic_defense_bonus": 4,
+      "mnd": 5,
+      "mp": 20
+    },
+    "stack_size": 1,
+    "model_id": "staff_shepherd_01",
+    "delay": 352
+  },
+  {
+    "id": 1074,
+    "name": "Tin Ore",
+    "description": "A common, soft metallic ore often used in alloys.",
+    "category": "material",
+    "level": 1,
+    "stack_size": 99,
+    "model_id": "ore_tin"
+  },
+  {
+    "id": 1075,
+    "name": "Gold Ore",
+    "description": "A chunk of raw gold, sought after by goldsmiths and jewelcrafters.",
+    "category": "material",
+    "level": 1,
+    "stack_size": 12,
+    "model_id": "mat_gold_ore"
+  },
+  {
+    "id": 1076,
+    "name": "Copper Ore",
+    "description": "A reddish-brown ore.",
+    "category": "material",
+    "level": 1,
+    "stack_size": 99,
+    "model_id": "ore_copper_01"
+  },
+  {
+    "id": 1077,
+    "name": "Last Regret",
+    "description": "A blade said to be forged from the tears of a vanquished hero, imbued with their final, lingering regret.",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "THF",
+      "DNC"
+    ],
+    "level": 72,
+    "stats": {
+      "accuracy": 10,
+      "attack": 52,
+      "dex": 5,
+      "haste": 2,
+      "magic_attack_bonus": 5,
+      "str": 7
+    },
+    "stack_size": 1,
+    "model_id": "sword_last_regret_01",
+    "delay": 230
+  },
+  {
+    "id": 1078,
+    "name": "Soul of Jordan",
+    "description": "An earring pulsing with the indomitable spirit of the legendary hero, Jordan. Its wearer feels a surge of their own inherent potential.",
+    "category": "accessory",
+    "equip_slots": [
+      "ear-l"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "WHM",
+      "BLM",
+      "RDM",
+      "THF",
+      "PLD",
+      "DRK",
+      "BST",
+      "BRD",
+      "RNG",
+      "SAM",
+      "NIN",
+      "DRG",
+      "SMN",
+      "BLU",
+      "COR",
+      "PUP",
+      "DNC",
+      "SCH",
+      "GEO",
+      "RUN"
+    ],
+    "level": 75,
+    "stats": {
+      "agi": 3,
+      "chr": 3,
+      "defense": 5,
+      "dex": 3,
+      "evasion": 5,
+      "hp": 15,
+      "int": 3,
+      "magic_defense_bonus": 2,
+      "mnd": 3,
+      "mp": 15,
+      "str": 3,
+      "vit": 3
+    },
+    "stack_size": 1,
+    "model_id": "earring_jordan_01"
+  },
+  {
+    "id": 1079,
+    "name": "Simple Bow",
+    "description": "A crudely made bow, suitable for beginners.",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WAR",
+      "RNG"
+    ],
+    "level": 8,
+    "stats": {
+      "accuracy": 1,
+      "attack": 7,
+      "dex": 1
+    },
+    "stack_size": 1,
+    "model_id": "bow_simple_01",
+    "delay": 270
+  },
+  {
+    "id": 1080,
+    "name": "Sabre",
+    "description": "A light and well-balanced single-edged sword, popular among new adventurers.",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "RDM",
+      "PLD",
+      "DRK",
+      "BLU",
+      "DNC",
+      "RUN"
+    ],
+    "level": 8,
+    "stats": {
+      "attack": 5,
+      "str": 1
+    },
+    "stack_size": 1,
+    "model_id": "sabre_01",
+    "delay": 240
+  },
+  {
+    "id": 1081,
+    "name": "Qi Tornado",
+    "description": "A pair of weighted handguards imbued with tempestuous energies, allowing the wearer to strike with the force of a whirlwind.",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WAR",
+      "THF",
+      "MNK",
+      "DNC"
+    ],
+    "level": 45,
+    "stats": {
+      "accuracy": 8,
+      "agi": 2,
+      "attack": 15,
+      "dex": 3,
+      "e_wind": 5,
+      "haste": 2,
+      "str": 3
+    },
+    "stack_size": 1,
+    "model_id": "weapon_h2h_qitornado_01",
+    "delay": 190
+  },
+  {
+    "id": 1082,
+    "name": "Heavy Claws",
+    "description": "A pair of weighted metal claws designed for delivering powerful, crushing blows.",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "MNK"
+    ],
+    "level": 45,
+    "stats": {
+      "accuracy": 6,
+      "attack": 12,
+      "dex": 4,
+      "hp": 15,
+      "str": 6,
+      "vit": 3
+    },
+    "stack_size": 1,
+    "model_id": "h2h_heavy_claws_01",
+    "delay": 150
+  },
+  {
+    "id": 1083,
+    "name": "Titanium Claws",
+    "description": "Claws forged from lightweight yet incredibly durable titanium, granting speed and defense.",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "MNK",
+      "THF",
+      "DNC"
+    ],
+    "level": 45,
+    "stats": {
+      "accuracy": 5,
+      "attack": 25,
+      "defense": 5,
+      "dex": 3,
+      "str": 3
+    },
+    "stack_size": 1,
+    "model_id": "titanium_claws_mdl",
+    "delay": 180
+  },
+  {
+    "id": 1084,
+    "name": "Simple Robe",
+    "description": "A basic, unadorned robe commonly worn by fledgling mages.",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "BRD",
+      "SMN",
+      "SCH",
+      "GEO"
+    ],
+    "level": 12,
+    "stats": {
+      "defense": 6,
+      "int": 1,
+      "mp": 5
+    },
+    "stack_size": 1,
+    "model_id": "robe_simple_01"
   }
 ]

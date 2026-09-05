@@ -2485,11 +2485,11 @@ func handle(p *player, line string) {
 	case "fish-points", "fp":
 		cmdFishPoints(p)
 	case "eat":
-		if len(args) < 2 {
+		if len(args) < 1 {
 			p.send("Usage: eat <item-id>")
 			p.prompt()
 		} else {
-			cmdEat(p, args[1])
+			cmdEat(p, args[0])
 		}
 	case "use":
 		if len(args) < 1 {

@@ -1,3 +1,21 @@
+## 2026-09-05 (1)
+- fix(items): S251-09/10/11 -- three real, found-live bugs from the Item Builder sprint plan,
+  fixed together. **S251-09**: `itemdef.Registry.ByName` registered a multi-word item ("Earth
+  Crystal") under its own literal spaced, lowercased name ("earth crystal"), but every real
+  shop-facing call site in `apps2/mud/main.go` passes the hyphenated convention
+  ("earth-crystal") — no multi-word item was ever reachable by its real shop id. Fixed by
+  normalizing both the stored key and the lookup key (spaces → hyphens) via a new `nameKey`
+  helper, leaving `ItemDef.Name` itself untouched for display. New test
+  `TestByName_HyphenatedMultiWordName`. **S251-10**: the `eat` command's dispatch checked
+  `len(args) < 2` then read `args[1]` for the item id, when `args[0]` is the actual item id (a
+  single-word `eat potion` always missed and hit the usage error) — fixed to match the adjacent,
+  already-correct `use` command's own pattern. **S251-11**: `data/items.json` ids 103 (Leather
+  Gloves) and 115 (Spiked Knuckles) used `equip_slots: ["handl","handr"]` (no hyphen) against
+  `server/gear.AllSlots`'s real canonical `"hand-l"`/`"hand-r"` — neither item was ever
+  equippable as authored; corrected both rows. `go build/test ./...` clean. Live-verified:
+  zero active player connections confirmed first, rebuilt + restarted the real `gfd-mud.service`,
+  confirmed listening cleanly on :2323/:7171.
+
 ## 2026-09-04 (30)
 - docs(dungeons): Milestone 6 ("Rewards + party queue flow") real status correction, continuing
   kanban card 534432532 ("GFD dungeons") milestone by milestone. Real, decisive investigation
