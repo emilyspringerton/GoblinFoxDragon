@@ -935,18 +935,23 @@ func main() {
 			}
 			fmt.Printf("[chat/%s] %s: %s\n", channelName(channel), slot, msg)
 
-			// S171-04 chat bridge: only ChatYell relays to EINHORN_SURVIVAL --
-			// GFD's own zone-wide broadcast is the one channel public enough
-			// to bridge (see GoblinFoxDragon/docs2/
-			// CHAT_BRIDGE_TO_EINHORN_SURVIVAL_SPEC.md's Design Decisions).
+			// S232-01 fix (2026-09-06): this used to relay ONLY ChatYell, which meant a
+			// player using the default/local chat channel (ChatSay) -- the one most GFD
+			// clients' plain chat box actually sends -- never reached EINHORN_SURVIVAL at
+			// all, a real, founder-confirmed one-directional bridge bug. apps2/mud's own
+			// deliverChat has already relayed say+yell+guild for a while (see its own
+			// comment: "tell (private) is deliberately not relayed -- a DM isn't meant for
+			// a wider audience") -- this brings server-go to parity with that
+			// already-established, already-correct precedent instead of inventing a new
+			// policy. ChatTell stays excluded for the same reason.
 			// Async: a slow/failed IDUNA call must never stall the packet loop.
-			if channel == chat.ChatYell {
+			if relayChannel, ok := map[int]string{chat.ChatSay: "say", chat.ChatYell: "yell", chat.ChatGuild: "guild"}[channel]; ok {
 				if sess, ok := chatRouter.GetSession(slot); ok {
-					go func(name, body string) {
-						if err := idunaClient.PostChatMessageAs("yell", name, "gfd_server", body); err != nil {
+					go func(relayChannel, name, body string) {
+						if err := idunaClient.PostChatMessageAs(relayChannel, name, "gfd_server", body); err != nil {
 							fmt.Printf("[chat-bridge] post failed: %v\n", err)
 						}
-					}(sess.Name, msg)
+					}(relayChannel, sess.Name, msg)
 				}
 			}
 		}
