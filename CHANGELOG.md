@@ -1,3 +1,7 @@
+## 2026-09-06
+
+- Fixed the one-directional GFD<->EINHORN_SURVIVAL chat bridge (S232-01): server-go now relays say+guild to Minecraft, not just yell, matching apps2/mud's own established precedent. (sess-20260905-0720-ec33e7c5)
+
 ## 2026-09-05 (1)
 - fix(items): S251-09/10/11 -- three real, found-live bugs from the Item Builder sprint plan,
   fixed together. **S251-09**: `itemdef.Registry.ByName` registered a multi-word item ("Earth
