@@ -434,6 +434,59 @@ func tickMob(m *Mob, now time.Time, dt float64, players []PlayerPositions) []Eve
 	return events
 }
 
+// ReadyToSwing performs TickPlayer's own real timing/target-validity/range gating WITHOUT
+// resolving any damage -- split out (2026-09-12, GoblinFoxDragon/docs2/
+// JOB_SPELL_SYSTEM_NORTHSTAR.md §5) so a caller with access to real per-job STR/DEX/VIT/AGI
+// stats (apps2/mud, which this package deliberately stays agnostic of -- server/mob has no
+// server/job import anywhere) can compute a real accuracy/crit/damage roll itself before calling
+// Hit, instead of always using combat's own flat BaseDamage the way TickPlayer below still does.
+// TickPlayer itself is UNCHANGED (calls this internally, then Hit with the flat damage) --
+// existing callers/tests keep working exactly as before this split.
+//
+// Returns ("", nil) if it is not yet time to swing (not an error -- same "not yet time" case
+// TickPlayer's own doc comment already describes), one of TickPlayer's own real error sentinels
+// (ErrNoTarget/ErrMobNotFound/ErrMobDead/ErrOutOfRange) for a genuine problem, or the real target
+// mobID once it's time to swing and the target is a real, in-range, alive mob -- at which point
+// combat.lastSwing has already been advanced, exactly as TickPlayer's own swing-timer gate always
+// did, so the caller must not call this again this tick expecting a second real swing.
+func (reg *Registry) ReadyToSwing(combat *PlayerCombat, playerPos Pos, playerSceneID int, now time.Time) (string, error) {
+	if combat.TargetMobID == "" {
+		return "", ErrNoTarget
+	}
+	if combat.SwingDelay == 0 {
+		combat.SwingDelay = DefaultPlayerSwingDelay
+	}
+	if combat.MeleeRange == 0 {
+		combat.MeleeRange = DefaultPlayerMeleeRange
+	}
+
+	// Swing timer gate.
+	if now.Sub(combat.lastSwing) < combat.SwingDelay {
+		return "", nil // not yet time
+	}
+
+	m, ok := reg.mobs[combat.TargetMobID]
+	if !ok {
+		return "", ErrMobNotFound
+	}
+	if !m.alive() {
+		combat.TargetMobID = ""
+		return "", ErrMobDead
+	}
+	if !m.targetable() {
+		return "", ErrMobDead // burrowed
+	}
+	if m.SceneID != playerSceneID {
+		return "", ErrOutOfRange
+	}
+	if dist(playerPos, m.Pos) > combat.MeleeRange {
+		return "", ErrOutOfRange
+	}
+
+	combat.lastSwing = now
+	return combat.TargetMobID, nil
+}
+
 // TickPlayer processes one player's auto-attack for the current tick.
 // playerPos and playerSceneID describe the attacker's current state.
 // Returns a HitResult and any events (including EvtMobDied) if a swing landed.
@@ -446,44 +499,17 @@ func (reg *Registry) TickPlayer(
 	playerSceneID int,
 	now time.Time,
 ) (HitResult, []Event, error) {
-	if combat.TargetMobID == "" {
-		return HitResult{}, nil, ErrNoTarget
-	}
-	if combat.SwingDelay == 0 {
-		combat.SwingDelay = DefaultPlayerSwingDelay
-	}
 	if combat.BaseDamage == 0 {
 		combat.BaseDamage = DefaultPlayerDamage
 	}
-	if combat.MeleeRange == 0 {
-		combat.MeleeRange = DefaultPlayerMeleeRange
+	mobID, err := reg.ReadyToSwing(combat, playerPos, playerSceneID, now)
+	if err != nil {
+		return HitResult{}, nil, err
 	}
-
-	// Swing timer gate.
-	if now.Sub(combat.lastSwing) < combat.SwingDelay {
+	if mobID == "" {
 		return HitResult{}, nil, nil // not yet time
 	}
-
-	m, ok := reg.mobs[combat.TargetMobID]
-	if !ok {
-		return HitResult{}, nil, ErrMobNotFound
-	}
-	if !m.alive() {
-		combat.TargetMobID = ""
-		return HitResult{}, nil, ErrMobDead
-	}
-	if !m.targetable() {
-		return HitResult{}, nil, ErrMobDead // burrowed
-	}
-	if m.SceneID != playerSceneID {
-		return HitResult{}, nil, ErrOutOfRange
-	}
-	if dist(playerPos, m.Pos) > combat.MeleeRange {
-		return HitResult{}, nil, ErrOutOfRange
-	}
-
-	combat.lastSwing = now
-	return reg.Hit(combat.TargetMobID, slot, combat.BaseDamage)
+	return reg.Hit(mobID, slot, combat.BaseDamage)
 }
 
 func findPlayer(slot string, sceneID int, players []PlayerPositions) (Pos, bool) {
