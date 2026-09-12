@@ -229,6 +229,36 @@ func (reg *Registry) Get(id string) (*Mob, bool) {
 	return m, ok
 }
 
+// Revive resets an already-registered mob back to a fresh, alive state in
+// place, at pos. Hit never removes a dead mob from the registry -- it only
+// flips State to StateDead -- so the corpse's ID is always still present.
+// That means Spawn is the wrong call for bringing a mob back: it rejects any
+// ID already in the registry, so a caller that (reasonably) tried Spawn to
+// respawn a dead mob got "mob already exists" back and, if that error went
+// unchecked, the mob just sat there dead forever (the real, live bug this
+// method fixes -- founder-reported: "mobs just sit dead in the mobs table
+// and dont respawn"). Combat state (aggro, tag, death time, burrow) is
+// cleared too, so the revived mob behaves as a genuinely fresh spawn rather
+// than a corpse with its old life's tag still attached.
+// Returns ErrMobNotFound if id was never registered -- callers should Spawn
+// in that case instead.
+func (reg *Registry) Revive(id string, pos Pos) error {
+	m, ok := reg.mobs[id]
+	if !ok {
+		return ErrMobNotFound
+	}
+	m.HP = m.MaxHP
+	m.State = StateIdle
+	m.Pos = pos
+	m.AggroSlot = ""
+	m.TaggerSlot = ""
+	m.TaggedAt = time.Time{}
+	m.DiedAt = time.Time{}
+	m.lastBurrow = time.Time{}
+	m.burrowEnd = time.Time{}
+	return nil
+}
+
 // All returns a snapshot of all mob IDs.
 func (reg *Registry) All() []string {
 	out := make([]string, 0, len(reg.mobs))

@@ -51,6 +51,69 @@ func TestSpawnDuplicateErrors(t *testing.T) {
 	}
 }
 
+// TestReviveBringsDeadMobBack documents the real bug Revive fixes: a dead
+// mob's ID is still present in the registry (Hit never removes it), so
+// re-Spawning the same ID to "respawn" it always errors -- the mob sits
+// dead in the table forever. Revive resets it in place instead.
+func TestReviveBringsDeadMobBack(t *testing.T) {
+	reg := New()
+	reg.Spawn(skeleton("m1", Pos{0, 0, 0}))
+	if _, _, err := reg.Hit("m1", "attacker", 100); err != nil {
+		t.Fatalf("Hit: %v", err)
+	}
+	m, _ := reg.Get("m1")
+	if m.State != StateDead {
+		t.Fatalf("precondition: mob should be dead, got %v", m.State)
+	}
+
+	// The bug: Spawn-ing the same ID to "respawn" it always fails.
+	if err := reg.Spawn(skeleton("m1", Pos{0, 0, 0})); err == nil {
+		t.Fatal("Spawn over a dead mob's ID should still error (documents why Revive exists)")
+	}
+
+	if err := reg.Revive("m1", Pos{1, 0, 1}); err != nil {
+		t.Fatalf("Revive: %v", err)
+	}
+	m, ok := reg.Get("m1")
+	if !ok {
+		t.Fatal("Get: mob missing after Revive")
+	}
+	if m.State != StateIdle {
+		t.Errorf("State after Revive: got %v, want Idle", m.State)
+	}
+	if m.HP != m.MaxHP {
+		t.Errorf("HP after Revive: got %d, want MaxHP %d", m.HP, m.MaxHP)
+	}
+	if m.Pos != (Pos{1, 0, 1}) {
+		t.Errorf("Pos after Revive: got %v, want {1 0 1}", m.Pos)
+	}
+	if m.TaggerSlot != "" {
+		t.Errorf("TaggerSlot after Revive: got %q, want cleared", m.TaggerSlot)
+	}
+	if m.AggroSlot != "" {
+		t.Errorf("AggroSlot after Revive: got %q, want cleared", m.AggroSlot)
+	}
+	if !m.DiedAt.IsZero() {
+		t.Errorf("DiedAt after Revive: got %v, want zero", m.DiedAt)
+	}
+
+	// Revived mob can be hit and tagged again like a fresh spawn.
+	if _, _, err := reg.Hit("m1", "new-attacker", 10); err != nil {
+		t.Fatalf("Hit after Revive: %v", err)
+	}
+	m, _ = reg.Get("m1")
+	if m.TaggerSlot != "new-attacker" {
+		t.Errorf("TaggerSlot after post-Revive Hit: got %q, want %q", m.TaggerSlot, "new-attacker")
+	}
+}
+
+func TestReviveUnknownIDErrors(t *testing.T) {
+	reg := New()
+	if err := reg.Revive("nope", Pos{}); err != ErrMobNotFound {
+		t.Errorf("Revive unknown ID: got %v, want ErrMobNotFound", err)
+	}
+}
+
 func TestSpawnSetsDefaults(t *testing.T) {
 	reg := New()
 	reg.Spawn(Mob{ID: "m1", Kind: "wolf", SceneID: 1, HP: 50, MaxHP: 50})

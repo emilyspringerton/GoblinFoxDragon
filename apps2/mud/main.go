@@ -1772,11 +1772,21 @@ func tickAll() {
 	remaining := gw.deadQueue[:0]
 	for _, d := range gw.deadQueue {
 		if now.After(d.respawnAt) {
-			m := d.m
-			m.HP = m.MaxHP
-			m.State = mob.StateIdle
-			m.Pos = m.HomePos
-			_ = gw.mobRegs[d.zoneID].Spawn(m)
+			// Revive the still-present dead entry in place (see Registry.Revive's
+			// own doc comment for why Spawn -- the old call here -- can never
+			// actually respawn anything: it rejects d.m.ID as a duplicate every
+			// time, since Hit leaves dead mobs in the registry rather than
+			// removing them). Fall back to Spawn only if the mob is genuinely
+			// gone from the registry (e.g. a zone reset since it died).
+			if reg, ok := gw.mobRegs[d.zoneID]; ok {
+				if err := reg.Revive(d.m.ID, d.m.HomePos); err != nil {
+					m := d.m
+					m.HP = m.MaxHP
+					m.State = mob.StateIdle
+					m.Pos = m.HomePos
+					_ = reg.Spawn(m)
+				}
+			}
 		} else {
 			remaining = append(remaining, d)
 		}
