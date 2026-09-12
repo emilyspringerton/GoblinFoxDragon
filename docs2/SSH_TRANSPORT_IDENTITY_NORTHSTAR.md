@@ -3,7 +3,8 @@
 **Status:** Stage 1 (§4 economy gate + Amendment 1 chat/guest-tier gate) shipped 2026-09-12.
 Stage 2 (§7 GUI login) shipped 2026-09-12. Stage 3 (§5 process isolation + data backup) shipped
 2026-09-12, partially — see its own section for the real, honest, root-blocked remainder.
-Stage 4 (§2 SSH listener) shipped 2026-09-12. Stages 5-8 scoped, not started.
+Stage 4 (§2 SSH listener) shipped 2026-09-12. Stage 5 (§3 identity binding + key management)
+shipped 2026-09-12. Stages 6-8 scoped, not started.
 **Source spec is founder-authored and verbatim-authoritative** —
 this doc is the phased-status tracker + real, checked findings against this codebase, not a
 paraphrase. Full source spec text lives in `docs2/SSH_TRANSPORT_IDENTITY_SPEC.md` (verbatim) and
@@ -304,13 +305,55 @@ a real restart of the throwaway instance. GoblinFoxDragon commits `86c7b95` (cod
   process is ever scaled to more than one instance) doesn't share state across instances. Not a
   real problem at gfd-mud's current single-process scale; named for whenever that changes.
 
-## Stages 5-8 — scoped by the source spec, not started
+## Stage 5 — SHIPPED 2026-09-12 (§3 identity binding + key management)
+
+**Real, permanent fingerprint-to-character binding shipped end to end.** IDUNA
+(`character_ssh_keys` table + `/api/v1/ssh-keys` + `/api/v1/characters/:id/ssh-keys`) and GFD
+(`resolveSSHIdentity`/`runSSHClaimFlow` in `ssh_listener.go`, `keys`/`key-add`/`key-revoke`
+commands in `main.go`) — see IDUNA commits `8a319ab`/`3627140`/`1288adc` and GoblinFoxDragon
+commits `d6c29d9`/`4c7ab90`/`e4c5bca`.
+
+- **§3.1 model:** known fingerprint → resume that character, isGuest=false, no prompt. Unknown
+  fingerprint → claim flow (rate-limited, validated name, real `CreateCharacter` + `BindSSHKey`).
+  A different key claiming an already-taken name gets IDUNA's own real 409 surfaced as a
+  re-prompt, never a silent reassignment — the exact acceptance bullet, live-verified via a
+  throwaway instance against real production IDUNA.
+- **§3.2 key management:** `keys` (list, marks the current session's own fingerprint),
+  `key-add <authorized_keys line>` (real OpenSSH key parsing via `golang.org/x/crypto/ssh`),
+  `key-revoke <fingerprint>` (refuses to revoke the key currently in use — enforced GFD-side,
+  IDUNA has no concept of "the session using this key"). Live-verified: added a second key,
+  revoked it, confirmed it can no longer resume the character (falls to its own fresh claim).
+- **§3.3 abuse controls:** per-IP-per-hour claim rate limit (in-memory, real 1-hour expiry, hit
+  for real during live testing), name validation (2-20 chars, letters/digits only, a real
+  starting reserved-name list — not exhaustive, named as a starting point).
+- **Real, positive design finding:** `handleConn` now takes `(isGuest bool, preset
+  *presetIdentity)` — `nil` preset is byte-for-byte the existing telnet path; a non-nil preset
+  skips the prompt and loads the character directly via a new `applyFetchedCharacter` helper
+  factored out of (not duplicating) the existing by-name cache-hit branch. Guest-gating "just
+  works" for identified SSH sessions with zero new gate code, since `guestGate` already checks
+  `p.isGuest` and this is now `false` the moment identity resolves.
+
+### Real, honest, NOT done in Stage 5 (named, not silently skipped)
+
+- **§3.4 full WOTAN account linkage** ("SSH fingerprints and browser-based WOTAN logins resolve
+  to the same account and the same character"). What's built is fingerprint → character, a real
+  and permanent binding, but NOT unified with IDUNA's existing OAuth/local-auth account model —
+  a character claimed via SSH today has no browser-login counterpart. Real, scoped, deferred:
+  would need a new account-level mapping distinct from the character-level one built here, and a
+  way for an SSH session to prove it corresponds to a specific existing WOTAN account (the
+  device-flow infra IDUNA already has for a different consumer, named in Stage 2's own NORTHSTAR
+  section, is the leading real candidate).
+- **Operator namespace reservation (§3.3)** is a small, real, starting list
+  (`sshReservedNames`), not a formal pre-announcement reservation process — extend as real need
+  appears, per that variable's own doc comment.
+- **Claim rate limiting is in-memory, per-process** — resets on restart, same real, accepted
+  limitation as Stage 4's per-IP session cap at gfd-mud's current single-process scale.
+
+## Stages 6-8 — scoped by the source spec, not started
 
 Real, honest status against each remaining stage (source spec §8's own numbering):
 
-5. **§3 identity binding + key management.** Not started. Depends on stage 4 existing first
-   (there's no SSH public key to bind a fingerprint to yet) — now unblocked.
-6. **§1 port swap to 22.** Not started. Depends on stages 3-5.
+6. **§1 port swap to 22.** Not started. Depends on stages 3-5 (5 now shipped).
 7. **§6 device-flow hardening (number matching, OTP-to-session binding, TTL/attempt caps).** Not
    investigated this pass — real, separate work against whatever WOTAN/IDUNA device-flow
    implementation already exists (`IDUNA/internal/auth/device`).
