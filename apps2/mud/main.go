@@ -2348,6 +2348,14 @@ var guestBlockedCommands = map[string]string{
 	"guild": "chat", "g": "chat",
 }
 
+// sshUpgradeHint (SSH_TRANSPORT_IDENTITY_SPEC.md Stage 4/5, both real and live since 2026-09-12)
+// is the one, real, concrete instruction every guest-facing "this needs SSH" message points to --
+// replacing the earlier "coming soon" wording, stale the moment Stage 4/5 actually shipped
+// (founder, live, 2026-09-12: "it needs to say ssh in at okemily.com -p 2222 or something like
+// that make it nice"). A first connection with a never-before-seen key runs the real claim flow
+// (choose a permanent name, done); a returning key just resumes straight in.
+const sshUpgradeHint = "ssh -p 2222 okemily.com -- first time binds a fresh key to a permanent name, no password, no signup form."
+
 // guestBlockedMessage explains the real reason and the real upgrade path, per the spec's own
 // "Blocked-command responses explain the upgrade rather than only denying" requirement -- a bare
 // "command not found"/"permission denied" would just look broken, and wouldn't build toward the
@@ -2356,11 +2364,11 @@ var guestBlockedCommands = map[string]string{
 func guestBlockedMessage(category string) string {
 	switch category {
 	case "economy":
-		return "[Guest] The bank, auction house, and bazaar are SSH-only -- a guest connection has no durable identity to trust with economy state. Combat, exploration, jobs, and progression are still fully open. SSH key binding is coming soon."
+		return "[Guest] The bank, auction house, and bazaar are SSH-only -- a guest connection has no durable identity to trust with economy state. Combat, exploration, jobs, and progression are still fully open. Want in? " + sshUpgradeHint
 	case "chat":
-		return "[Guest] Player-to-player chat (say/tell/yell/linkshell) is SSH-only -- an anonymous guest name is too easy to impersonate. Combat, exploration, jobs, and progression are still fully open. SSH key binding is coming soon."
+		return "[Guest] Player-to-player chat (say/tell/yell/linkshell) is SSH-only -- an anonymous guest name is too easy to impersonate. Combat, exploration, jobs, and progression are still fully open. Want in? " + sshUpgradeHint
 	default:
-		return "[Guest] That command requires an SSH-bound identity."
+		return "[Guest] That command requires an SSH-bound identity. " + sshUpgradeHint
 	}
 }
 
@@ -7905,7 +7913,7 @@ func cmdJobs(p *player) {
 
 func requireSSHIdentity(p *player) (characterID string, ok bool) {
 	if p.sshFingerprint == "" {
-		p.send("This requires an SSH-bound identity. Guests can't manage keys they don't have.")
+		p.send("This requires an SSH-bound identity. Guests can't manage keys they don't have. " + sshUpgradeHint)
 		p.prompt()
 		return "", false
 	}
@@ -8448,7 +8456,8 @@ func handleConn(conn net.Conn, isGuest bool, preset *presetIdentity, echoInput b
 		send("carry over between connections -- reconnecting starts a brand-new level 1.")
 		send("Guests can fight, explore, quest, and level up freely, but cannot use the bank,")
 		send("auction house, bazaar, or talk to other players (say/tell/yell/linkshell) --")
-		send("those require an SSH-bound identity, coming soon.")
+		send("those require an SSH-bound identity. Want a permanent character instead?")
+		send("  " + sshUpgradeHint)
 		send("Enter your character name: ")
 		w.Flush()
 

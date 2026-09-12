@@ -74,3 +74,21 @@ func TestGuestGate_MessageExplainsUpgradeNotBareDenial(t *testing.T) {
 		t.Errorf("expected the chat block message to mention SSH (the real upgrade path), got: %s", chatMsg)
 	}
 }
+
+// TestGuestGate_MessageGivesTheRealConnectCommandNotComingSoon guards the real, founder-reported
+// live gap (2026-09-12): SSH has been live since Stage 4/5 (2026-09-12), but every guest-facing
+// message still said "coming soon" -- stale the moment it shipped. Every guest-blocked message
+// must now name the actual, concrete command (not a vague "coming soon"), and none may regress
+// back to that wording.
+func TestGuestGate_MessageGivesTheRealConnectCommandNotComingSoon(t *testing.T) {
+	for _, category := range []string{"economy", "chat", "unknown-category"} {
+		msg := guestBlockedMessage(category)
+		lower := strings.ToLower(msg)
+		if strings.Contains(lower, "coming soon") {
+			t.Errorf("guestBlockedMessage(%q) still says \"coming soon\" -- SSH is live, this must name the real command: %s", category, msg)
+		}
+		if !strings.Contains(msg, "ssh -p 2222 okemily.com") {
+			t.Errorf("guestBlockedMessage(%q) should give the real, concrete connect command (ssh -p 2222 okemily.com), got: %s", category, msg)
+		}
+	}
+}
