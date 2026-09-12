@@ -8908,6 +8908,7 @@ func startWorldEventAPI(port int) {
 func main() {
 	port := flag.Int("port", mudPort, "MUD TCP port")
 	apiPort := flag.Int("api-port", 7171, "world-events HTTP API port (0 = disabled)")
+	sshPort := flag.Int("ssh-port", 2222, "SSH listener port, public-key/TOFU only, no identity binding yet (SSH_TRANSPORT_IDENTITY_SPEC.md Stage 4; 0 = disabled)")
 	flag.Parse()
 
 	// Load item definitions (non-fatal: equip restrictions skipped if missing).
@@ -8928,6 +8929,13 @@ func main() {
 	// Start world-event HTTP API if enabled.
 	if *apiPort > 0 {
 		go startWorldEventAPI(*apiPort)
+	}
+
+	// SSH_TRANSPORT_IDENTITY_SPEC.md Stage 4 (§2): a second, real listener alongside telnet, not
+	// a replacement -- §1's own port-22 swap is a later, separate stage (6), gated on identity
+	// binding (5) landing first. See ssh_listener.go for the real implementation.
+	if *sshPort > 0 {
+		go startSSHListener(*sshPort)
 	}
 
 	addr := fmt.Sprintf(":%d", *port)
