@@ -821,29 +821,36 @@ type player struct {
 	// cmdKeyRevoke's own "revoke a key other than the one in use" enforcement: a session can
 	// never revoke the exact key it's currently connected with.
 	sshFingerprint string
-	inventory      map[string]int // itemID → quantity
-	craftSkill     *craft.CraftSkill
-	flow           int
-	guildID        string // linkshell guild ID ("" = none)
-	equip          *gear.Equipment
-	isInvisible    bool
-	invisExpires   time.Time
-	isSneaking     bool
-	sneakExpires   time.Time
-	isResting      bool
-	charJob        *job.CharJob // main+sub job pairing (nil until initialized)
-	meritBank      *merit.MeritBank
-	recastTracker  *job.RecastTracker
-	petSlot        *pet.Slot             // BST pet companion (non-nil always; pet.IsAlive() = has pet)
-	petHeel        bool                  // true = pet does not attack (heel mode)
-	k9Swarm        *k9.Swarm             // TRAPX: active K9 swarm (nil if none deployed)
-	disguise       npcattention.Disguise // stealth identity (S130-02); default = no disguise
-	questJournal   *quest.Journal        // NPC quest progress
-	atlas          *cartography.Atlas    // explored zone map
-	chatLang       autotranslate.Lang    // preferred chat language; default EN
-	conn           net.Conn
-	w              *bufio.Writer
-	inbox          chan string
+	// lastActionAt (JOB_SPELL_SYSTEM_NORTHSTAR.md §1, universal lockout -- founder direction
+	// 2026-09-12, "do a 1 s lockout") backs checkUniversalLockout's own real recovery window,
+	// shared across BOTH /ja and cast (a single spell/ability action economy, not one timer per
+	// command) so a player can't chain-spam different abilities back to back with zero real gap.
+	// Zero value (time.Time{}) means "never acted" -- time.Since of that is enormous, so a
+	// brand-new player's very first action is never blocked by it.
+	lastActionAt  time.Time
+	inventory     map[string]int // itemID → quantity
+	craftSkill    *craft.CraftSkill
+	flow          int
+	guildID       string // linkshell guild ID ("" = none)
+	equip         *gear.Equipment
+	isInvisible   bool
+	invisExpires  time.Time
+	isSneaking    bool
+	sneakExpires  time.Time
+	isResting     bool
+	charJob       *job.CharJob // main+sub job pairing (nil until initialized)
+	meritBank     *merit.MeritBank
+	recastTracker *job.RecastTracker
+	petSlot       *pet.Slot             // BST pet companion (non-nil always; pet.IsAlive() = has pet)
+	petHeel       bool                  // true = pet does not attack (heel mode)
+	k9Swarm       *k9.Swarm             // TRAPX: active K9 swarm (nil if none deployed)
+	disguise      npcattention.Disguise // stealth identity (S130-02); default = no disguise
+	questJournal  *quest.Journal        // NPC quest progress
+	atlas         *cartography.Atlas    // explored zone map
+	chatLang      autotranslate.Lang    // preferred chat language; default EN
+	conn          net.Conn
+	w             *bufio.Writer
+	inbox         chan string
 	// headlessBuf (2026-08-02, HEADLESS_SESSION_NORTHSTAR.md Milestone 1+, founder: "the real MUD
 	// combat system" for GoblinFoxDragon's Town scene): non-nil only for a headless player (see
 	// getOrCreateHeadlessPlayer) -- w wraps this buffer instead of a real net.Conn, same
@@ -6110,7 +6117,38 @@ func abilitiesForJob(jobID string) []job.Ability {
 	}
 }
 
+// universalLockout (JOB_SPELL_SYSTEM_NORTHSTAR.md §1, founder direction 2026-09-12: "do a 1 s
+// lockout") is a real recovery window shared across every spell/ability action -- distinct from
+// (and layered on top of, not a replacement for) each ability's own individual recast timer
+// (RecastTracker) and each spell's own MP cost. Its whole purpose is preventing a player from
+// chaining N different abilities/spells back to back with zero real gap between them, the same
+// real reason FFXI's own "global recast"/"animation lockout" exists.
+const universalLockout = 1 * time.Second
+
+// checkUniversalLockout enforces universalLockout for both cmdJA and cmdCast (the two real entry
+// points into this action economy -- cmdCast's own further delegates, cmdCastBlackMagic et al.,
+// are only ever reached through cmdCast itself, so gating there covers them too). Real, named
+// simplification, not an oversight: the lockout starts on ANY attempt that reaches this check
+// (i.e. every real call site calls this first, before its own job-gate/silence/MP/target
+// validation), not only a successful cast -- tracking success/failure all the way through
+// cmdCast's six further delegate functions would need a real, larger refactor (naturally Phase
+// 1's own follow-up, once the universal Ability struct unifies them), not this bounded slice.
+// Being told "still recovering" does NOT reset the caller's own timer -- only a check that finds
+// the window already elapsed advances it, so spamming during lockout can't perpetually extend it.
+func (p *player) checkUniversalLockout() bool {
+	if remaining := universalLockout - time.Since(p.lastActionAt); remaining > 0 {
+		p.sendf("You are still recovering. (%s)", remaining.Round(100*time.Millisecond))
+		p.prompt()
+		return false
+	}
+	p.lastActionAt = time.Now()
+	return true
+}
+
 func cmdJA(p *player, abilityID string) {
+	if !p.checkUniversalLockout() {
+		return
+	}
 	now := time.Now()
 	err := p.recastTracker.Use(abilityID, now, p.charXP.Level)
 	switch err {
@@ -6411,6 +6449,9 @@ func resolveSpellTarget(p *player, targetName string) (*player, string) {
 }
 
 func cmdCast(p *player, spell string, targetName string) {
+	if !p.checkUniversalLockout() {
+		return
+	}
 	if p.statFX.IsSilenced() {
 		p.send("You are silenced and cannot cast spells.")
 		p.prompt()
