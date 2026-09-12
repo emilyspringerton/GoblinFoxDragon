@@ -827,7 +827,19 @@ type player struct {
 	// command) so a player can't chain-spam different abilities back to back with zero real gap.
 	// Zero value (time.Time{}) means "never acted" -- time.Since of that is enormous, so a
 	// brand-new player's very first action is never blocked by it.
-	lastActionAt  time.Time
+	lastActionAt time.Time
+	// pityOwnHit/pityOwnCrit/pityAvoidHit/pityAvoidCrit (JOB_SPELL_SYSTEM_NORTHSTAR.md §5, combat
+	// formula overhaul) back combat_formula.go's own pityRoll -- real per-player marble-bag+
+	// pity state (server/rng.MarbleBagPick's own [2]int pity slice), one pair per real binary
+	// combat roll this player can be on either side of. Own* = this player's own attacks
+	// landing/critting; Avoid* = incoming mob attacks missing/not-critting this player. All four
+	// are independent counters (a landing streak on offense says nothing about a defense
+	// drought) and persist for the whole session -- a real, named v0 simplification, not reset
+	// per-encounter/per-target yet (§5's own doc names this as a real future refinement).
+	pityOwnHit    [2]int
+	pityOwnCrit   [2]int
+	pityAvoidHit  [2]int
+	pityAvoidCrit [2]int
 	inventory     map[string]int // itemID → quantity
 	craftSkill    *craft.CraftSkill
 	flow          int
@@ -1689,7 +1701,14 @@ func tickAll() {
 			continue
 		}
 		reg := gw.mobRegs[p.zoneID]
-		res, evts, err := reg.TickPlayer(p.slot, p.combat, p.pos, p.zoneID, now)
+		// JOB_SPELL_SYSTEM_NORTHSTAR.md §5: ReadyToSwing does TickPlayer's own real timing/
+		// target-validity/range gating without resolving damage, so the real STR-scaled,
+		// pity-boosted accuracy/crit/damage roll below (resolvePlayerAutoAttackDamage) can
+		// replace the previous flat combat.BaseDamage TickPlayer always used. Real, deliberate
+		// scope boundary: PvP duel combat (this same loop's own earlier "Duel combat" branch,
+		// above) still calls TickPlayer directly and keeps the old flat-damage behavior --
+		// touching that mob-registry-based duel mechanic wasn't part of this pass.
+		mobID, err := reg.ReadyToSwing(p.combat, p.pos, p.zoneID, now)
 		if err != nil {
 			if err == mob.ErrMobDead || err == mob.ErrMobNotFound {
 				p.combat.TargetMobID = ""
@@ -1709,9 +1728,32 @@ func tickAll() {
 			}
 			continue
 		}
+		if mobID == "" {
+			continue // not yet time to swing
+		}
+		hit, isCrit, dmg := resolvePlayerAutoAttackDamage(p, p.combat.BaseDamage)
+		if !hit {
+			p.send("\r\nYou miss!")
+			p.prompt()
+			continue
+		}
+		res, evts, err := reg.Hit(mobID, p.slot, dmg)
+		if err != nil {
+			// A real, narrow race: the target died/vanished between ReadyToSwing's own check
+			// and this Hit call (e.g. another player's own swing this same tick killed it
+			// first) -- same "target's gone" handling as the ReadyToSwing-level check above.
+			p.combat.TargetMobID = ""
+			p.send("\r\n[Your target is gone.]")
+			p.prompt()
+			continue
+		}
 		if res.Dealt > 0 {
 			gained := p.tp.AddTP(weaponDelayFor(p), float64(p.statFX.NetHastePct()))
-			p.sendf("\r\nYou hit for %d damage. (TP: %d [+%d])", res.Dealt, p.tp.Current, gained)
+			critTag := ""
+			if isCrit {
+				critTag = " Critical hit!"
+			}
+			p.sendf("\r\nYou hit for %d damage.%s (TP: %d [+%d])", res.Dealt, critTag, p.tp.Current, gained)
 			// Enmity: damage generates CE.
 			mobID := p.combat.TargetMobID
 			if mobID != "" {
@@ -2222,13 +2264,28 @@ func broadcastMobEvent(zoneID int, ev mob.Event) {
 				if p.homePoint.IsKO {
 					continue
 				}
-				p.hp -= ev.Damage
+				// JOB_SPELL_SYSTEM_NORTHSTAR.md §5: ev.Damage is the mob's own flat configured
+				// MeleeDamage -- resolveMobAutoAttackDamage turns that into a real, pity-
+				// boosted accuracy/crit roll (the player's own AGI raises their real chance to
+				// avoid it entirely) and a real VIT-reduced final number, replacing what used
+				// to be an unconditional `p.hp -= ev.Damage`.
+				hit, isCrit, dmg := resolveMobAutoAttackDamage(p, ev.Damage)
+				if !hit {
+					p.sendf("\r\n[!] %s attacks -- you evade!", ev.MobID)
+					p.prompt()
+					continue
+				}
+				p.hp -= dmg
+				critTag := ""
+				if isCrit {
+					critTag = " Critical hit!"
+				}
 				if p.hp <= 0 {
 					p.hp = 0
-					p.sendf("\r\n[!] %s hits you for %d damage!", ev.MobID, ev.Damage)
+					p.sendf("\r\n[!] %s hits you for %d damage!%s", ev.MobID, dmg, critTag)
 					knockOut(p)
 				} else {
-					p.sendf("\r\n[!] %s hits you for %d damage! HP: %d/%d", ev.MobID, ev.Damage, p.hp, p.maxHP)
+					p.sendf("\r\n[!] %s hits you for %d damage!%s HP: %d/%d", ev.MobID, dmg, critTag, p.hp, p.maxHP)
 					mobSpellcast(p, ev.MobID, time.Now())
 					p.prompt()
 				}
