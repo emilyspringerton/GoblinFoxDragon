@@ -8410,7 +8410,13 @@ func applyFetchedCharacter(p *player, ch *idunaclient.Character) {
 	}
 }
 
-func handleConn(conn net.Conn, isGuest bool, preset *presetIdentity) {
+// echoInput (terminal_io.go, founder-reported live bug 2026-09-12: "it wont let me type" over a
+// real Windows OpenSSH client) is false for every telnet connection (the client already echoes
+// locally -- echoing here too would double every character on screen) and true only for an SSH
+// connection that actually negotiated a real PTY (sshConnAdapter.ptyRequested) -- once a PTY is
+// negotiated, a real SSH client disables its own local echo and expects the remote side to echo,
+// same as a real remote shell's own tty driver would.
+func handleConn(conn net.Conn, isGuest bool, preset *presetIdentity, echoInput bool) {
 	defer conn.Close()
 	w := bufio.NewWriter(conn)
 	r := bufio.NewReader(conn)
@@ -8446,7 +8452,7 @@ func handleConn(conn net.Conn, isGuest bool, preset *presetIdentity) {
 		send("Enter your character name: ")
 		w.Flush()
 
-		nameRaw, err := r.ReadString('\n')
+		nameRaw, err := readTerminalLine(r, conn, echoInput)
 		if err != nil {
 			return
 		}
@@ -8645,7 +8651,7 @@ func handleConn(conn net.Conn, isGuest bool, preset *presetIdentity) {
 	gw.mu.Unlock()
 
 	for {
-		line, err := r.ReadString('\n')
+		line, err := readTerminalLine(r, conn, echoInput)
 		if err != nil {
 			return
 		}
@@ -9366,6 +9372,6 @@ func main() {
 			fmt.Printf("accept: %v\n", err)
 			continue
 		}
-		go handleConn(conn, true, nil) // every real telnet connection is a guest, no preset identity
+		go handleConn(conn, true, nil, false) // telnet: guest, no preset identity, client echoes locally
 	}
 }

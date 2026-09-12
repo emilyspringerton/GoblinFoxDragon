@@ -14,7 +14,7 @@ package main
 // zero SetDeadline/SetReadDeadline/SetWriteDeadline/LocalAddr calls exist). That means an
 // `ssh.Channel` (Read/Write/Close, plus SendRequest/CloseWrite/Stderr that nothing here ever
 // calls) needs only RemoteAddr/LocalAddr/three deadline no-ops bolted on to satisfy net.Conn --
-// sshConnAdapter below -- and `handleConn(adapter, isGuest, preset)` runs the exact same struct
+// sshConnAdapter below -- and `handleConn(adapter, isGuest, preset, echo)` runs the exact same struct
 // literal, IDUNA fetch-or-create, and disconnect sync a telnet connection does, for both guest
 // and identified SSH sessions alike. This is the real, positive finding the NORTHSTAR doc named
 // after Stage 1/2/3: the dispatch layer really is transport-agnostic.
@@ -122,6 +122,14 @@ type sshConnAdapter struct {
 	ssh.Channel
 	underlying net.Conn // the real TCP conn, for RemoteAddr/LocalAddr only -- never read/written directly
 	lastActive int64    // unix nanoseconds, atomic
+	// ptyRequested (terminal_io.go, founder-reported live bug 2026-09-12: "it wont let me type")
+	// is set true the moment a real "pty-req" arrives, before "shell" (and therefore before
+	// handleConn/runSSHClaimFlow ever read anything) -- read-then-write-once by the single
+	// per-channel goroutine in handleSSHChannels, so no lock is needed. Once a PTY is negotiated,
+	// a real SSH client disables its OWN local echo and expects the remote side to echo -- a
+	// non-PTY (scripted/exec) client never sets this and gets no server-side echo, matching real
+	// sshd behavior.
+	ptyRequested bool
 }
 
 func newSSHConnAdapter(ch ssh.Channel, underlying net.Conn) *sshConnAdapter {
@@ -210,6 +218,7 @@ func handleSSHChannels(sshConn *ssh.ServerConn, chans <-chan ssh.NewChannel, und
 					if req.WantReply {
 						_ = req.Reply(true, nil)
 					}
+					adapter.ptyRequested = true
 				case "shell":
 					// The one request type that actually starts the game session -- matches
 					// real sshd behavior (pty-req then shell for an interactive login), and
@@ -223,7 +232,7 @@ func handleSSHChannels(sshConn *ssh.ServerConn, chans <-chan ssh.NewChannel, und
 						isGuest, preset := resolveSSHIdentity(sshConn, adapter)
 						done := make(chan struct{})
 						go sshSessionWatchdog(adapter, done)
-						handleConn(adapter, isGuest, preset)
+						handleConn(adapter, isGuest, preset, adapter.ptyRequested)
 						close(done)
 					}
 				default:
@@ -371,7 +380,12 @@ func runSSHClaimFlow(adapter *sshConnAdapter, fingerprint, pubKeyLine string) *p
 	const maxAttempts = 5 // bounded retry loop -- a client stuck retyping an invalid/taken name forever still terminates
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		send("Name: ")
-		line, err := reader.ReadString('\n')
+		// terminal_io.go: real line editing + CR/LF normalization, and echoes each keystroke
+		// back when this session negotiated a real PTY -- a plain ReadString('\n') here is
+		// exactly the founder-reported live bug ("it wont let me type"): a real PTY client sends
+		// a bare '\r' on Enter (ReadString('\n') never returns) and does its OWN local echo only
+		// when there's no PTY, so a PTY session sees nothing it types without this.
+		line, err := readTerminalLine(reader, adapter, adapter.ptyRequested)
 		if err != nil {
 			return nil
 		}
