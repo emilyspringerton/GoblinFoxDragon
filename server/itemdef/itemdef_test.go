@@ -231,3 +231,52 @@ func TestMarshalRoundtrip(t *testing.T) {
 		t.Errorf("roundtrip len %d → %d", len(defs), len(defs2))
 	}
 }
+
+// TestLoadJSON_NormalizesInconsistentStatKeyCasing guards the real, found-live bug (2026-09-12,
+// founder scoping a starting-weapon feature): data/items.json's own real items use inconsistent
+// stat-key casing ("STR" alongside "str", "Attack" alongside "attack", "Magic Attack Bonus" with
+// literal spaces alongside "magic_attack_bonus"). gear.Equipment.ComputeStats sums by raw string
+// key with zero normalization of its own, so two items differing only in key casing would land
+// in separate map keys and silently not combine -- this must be fixed once, at load time, not
+// left for every future reader of Stats to rediscover.
+func TestLoadJSON_NormalizesInconsistentStatKeyCasing(t *testing.T) {
+	r := NewRegistry()
+	raw := []byte(`[
+		{"id": 900, "name": "Upper Item", "category": "weapon", "stats": {"STR": 5, "Attack": 10}},
+		{"id": 901, "name": "Lower Item", "category": "weapon", "stats": {"str": 3, "attack": 7}},
+		{"id": 902, "name": "Spaced Item", "category": "weapon", "stats": {"Magic Attack Bonus": 12}}
+	]`)
+	if err := r.LoadJSON(raw); err != nil {
+		t.Fatalf("LoadJSON: %v", err)
+	}
+	upper, _ := r.ByID(900)
+	if upper.Stats["str"] != 5 || upper.Stats["attack"] != 10 {
+		t.Errorf("uppercase-keyed item did not normalize: %+v", upper.Stats)
+	}
+	if _, hasRawUpper := upper.Stats["STR"]; hasRawUpper {
+		t.Error("raw uppercase key 'STR' should not survive normalization")
+	}
+	lower, _ := r.ByID(901)
+	if lower.Stats["str"] != 3 || lower.Stats["attack"] != 7 {
+		t.Errorf("lowercase-keyed item changed unexpectedly: %+v", lower.Stats)
+	}
+	spaced, _ := r.ByID(902)
+	if spaced.Stats["magic_attack_bonus"] != 12 {
+		t.Errorf("spaced key did not normalize to underscored form: %+v", spaced.Stats)
+	}
+}
+
+func TestNormalizeStatKeys_NilMapStaysNil(t *testing.T) {
+	if got := normalizeStatKeys(nil); got != nil {
+		t.Errorf("normalizeStatKeys(nil) = %v, want nil", got)
+	}
+}
+
+func TestNormalizeStatKeys_CollidingKeysCombineRatherThanOverwrite(t *testing.T) {
+	// A real, defensive case: two raw keys that normalize to the same real stat (not expected in
+	// today's data, but a real possibility for hand-authored JSON) must sum, not silently drop one.
+	got := normalizeStatKeys(map[string]int{"STR": 5, "str": 3})
+	if got["str"] != 8 {
+		t.Errorf("normalizeStatKeys colliding keys = %v, want str=8 (5+3)", got)
+	}
+}

@@ -43,20 +43,62 @@ const (
 // seeded one in tests that need deterministic output.
 var combatRNG = rand.New(rand.NewSource(time.Now().UnixNano()))
 
-// playerCombatStats returns p's real, current job (+ sub-job) stats -- the same
-// CombinedStats()-or-fall-back-to-StatsFor(jobID) pattern cmdCastBlackMagic's own INT-bonus
-// lookup already established, reused here rather than duplicated with slightly different
-// fallback behavior.
+// playerCombatStats returns p's real, current job (+ sub-job) stats PLUS real equipment stat
+// bonuses -- the same CombinedStats()-or-fall-back-to-StatsFor(jobID) pattern cmdCastBlackMagic's
+// own INT-bonus lookup already established for the job half, extended here (2026-09-12, real,
+// found-live gap the founder scoped while asking for a starting weapon: "the IDUNA backend item
+// database... seems like its not hooked up at all") to actually apply equipped gear. Before this
+// fix, `gear.Equipment.ComputeStats` was computed at equip/unequip time ONLY to print a cosmetic
+// "Stat changes:" line -- every real combat roll (accuracy, crit, damage) read pure job-table
+// stats with zero contribution from anything a player has equipped, including a weapon's own
+// "attack"/"str" stats. See equipAttackBonus below for the OTHER real half (base weapon damage,
+// not an attribute).
 func playerCombatStats(p *player) job.Stats {
+	var s job.Stats
 	if p.charJob != nil {
-		if s, err := p.charJob.CombinedStats(); err == nil {
-			return s
+		if cs, err := p.charJob.CombinedStats(); err == nil {
+			s = cs
 		}
 	}
-	if s, err := job.StatsFor(p.jobID); err == nil {
-		return s
+	if s == (job.Stats{}) {
+		if cs, err := job.StatsFor(p.jobID); err == nil {
+			s = cs
+		}
 	}
-	return job.Stats{}
+	eq := equipStatTotals(p)
+	s.STR += eq["str"]
+	s.DEX += eq["dex"]
+	s.VIT += eq["vit"]
+	s.AGI += eq["agi"]
+	s.INT += eq["int"]
+	s.MND += eq["mnd"]
+	s.CHR += eq["chr"]
+	return s
+}
+
+// equipStatTotals is the one, real, shared read of a player's own equipped-gear stat totals --
+// itemdefReg (this package's own server-authoritative item catalog, already normalized to
+// consistent lowercase/underscored keys at load time, see itemdef.normalizeStatKeys) is the same
+// registry cmdEquip's own existing "Stat changes:" display already reads, just never previously
+// fed back into anything that mattered mechanically. Nil-safe: a player struct built without a
+// real Equipment (should not happen in practice, defensive regardless) degrades to "no bonus"
+// rather than panicking.
+func equipStatTotals(p *player) map[string]int {
+	if p.equip == nil {
+		return nil
+	}
+	return p.equip.ComputeStats(itemdefReg)
+}
+
+// equipAttackBonus is the real, direct weapon "attack" stat (data/items.json's own real key, e.g.
+// the starting Sword's {"attack":10,"str":1}) -- a flat bonus to a player's own base melee damage,
+// separate from the STR attribute equipStatTotals above already feeds into playerCombatStats
+// (real FFXI precedent: a weapon's own DMG rating and the wielder's STR attribute are two
+// independent inputs to melee damage, not the same number). Zero for an unarmed player or any
+// equipped item with no "attack" stat of its own (armor, accessories, a weapon that just hasn't
+// had one authored) -- a real, honest default, not an error.
+func equipAttackBonus(p *player) int {
+	return equipStatTotals(p)["attack"]
 }
 
 func clampPercent(v, lo, hi int) int {
@@ -128,6 +170,10 @@ func resolvePlayerAutoAttackDamage(p *player, baseDamage int) (hit bool, crit bo
 		return false, false, 0
 	}
 
+	// Real equipped-weapon "attack" stat (e.g. the starting Sword's own real 10) added to the
+	// caller's own flat baseline BEFORE STR scaling -- see equipAttackBonus's own doc comment for
+	// why this is a separate input from the STR multiplier just below, not folded into it.
+	baseDamage += equipAttackBonus(p)
 	mean := baseDamage
 	if stats.STR > 0 {
 		mean = baseDamage * stats.STR / 10

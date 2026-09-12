@@ -110,11 +110,11 @@ func (m JobMask) CanEquipJob(job string) bool {
 }
 
 var (
-	ErrNotFound       = errors.New("itemdef: item not found")
-	ErrLevelTooLow    = errors.New("itemdef: character level too low")
-	ErrJobRestricted  = errors.New("itemdef: job cannot equip this item")
-	ErrSlotMismatch   = errors.New("itemdef: item cannot be equipped in that slot")
-	ErrNotEquipment   = errors.New("itemdef: item is not equipment")
+	ErrNotFound      = errors.New("itemdef: item not found")
+	ErrLevelTooLow   = errors.New("itemdef: character level too low")
+	ErrJobRestricted = errors.New("itemdef: job cannot equip this item")
+	ErrSlotMismatch  = errors.New("itemdef: item cannot be equipped in that slot")
+	ErrNotEquipment  = errors.New("itemdef: item is not equipment")
 )
 
 // ItemDef describes what an item is.
@@ -142,8 +142,8 @@ type ItemDef struct {
 	Delay int `json:"delay,omitempty"`
 
 	// Computed at load time — not in JSON.
-	jobMask  JobMask
-	flags    ItemFlags
+	jobMask JobMask
+	flags   ItemFlags
 }
 
 // IsDisguise reports whether this item grants a stealth identity when worn.
@@ -186,8 +186,8 @@ func (d *ItemDef) CanEquip(slot, job string, level int) error {
 // Registry is the server-authoritative item definition store.
 // Safe for concurrent reads after construction.
 type Registry struct {
-	mu    sync.RWMutex
-	byID  map[int]*ItemDef
+	mu     sync.RWMutex
+	byID   map[int]*ItemDef
 	byName map[string]*ItemDef // lowercase name
 }
 
@@ -225,10 +225,38 @@ func (r *Registry) LoadJSON(data []byte) error {
 		if d.StackSize == 0 {
 			d.StackSize = 1
 		}
+		d.Stats = normalizeStatKeys(d.Stats)
 		r.byID[d.ID] = d
 		r.byName[nameKey(d.Name)] = d
 	}
 	return nil
+}
+
+// normalizeStatKeys fixes a real, found-live data-quality bug (2026-09-12, founder scoping a
+// starting-weapon feature: "the IDUNA backend item database... seems like its not hooked up at
+// all"): data/items.json's own real stat keys were authored inconsistently across its 155 items
+// -- "STR" alongside "str", "Attack" alongside "attack", "Magic Attack Bonus" (with literal
+// spaces) alongside "magic_attack_bonus". ComputeStats (server/gear/gear.go) sums this map by
+// its raw string key with no normalization of its own, so an item using "STR" and another using
+// "str" silently land in TWO SEPARATE map keys -- any real caller reading a canonical key like
+// total["str"] would miss every item authored with the other casing entirely, even after gear
+// stats are wired into real combat math. Normalizing HERE, once, at load time, rather than
+// hand-fixing 155 JSON entries (higher-risk, easy to miss one) or normalizing at every read site
+// (the same bug waiting to recur at the next new read site) -- same lowercase+underscore
+// convention nameKey already established for item names just above.
+func normalizeStatKeys(stats map[string]int) map[string]int {
+	if stats == nil {
+		return nil
+	}
+	out := make(map[string]int, len(stats))
+	for k, v := range stats {
+		out[normalizeStatKey(k)] += v // += so two raw keys that normalize to the same real stat (a real, defensive case, not expected in today's data) combine rather than one silently overwriting the other
+	}
+	return out
+}
+
+func normalizeStatKey(key string) string {
+	return strings.ReplaceAll(strings.ToLower(key), " ", "_")
 }
 
 // nameKey normalizes an item name for ByName's lookup map: lowercased, with

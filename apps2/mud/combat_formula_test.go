@@ -4,6 +4,8 @@ import (
 	"math/rand"
 	"testing"
 
+	"dragonsnshit/server/gear"
+	"dragonsnshit/server/itemdef"
 	"dragonsnshit/server/job"
 	"dragonsnshit/server/rng"
 )
@@ -204,18 +206,33 @@ func TestResolvePlayerAutoAttackDamage_PendingAttackBonusAppliesOnceThenClears(t
 	}
 }
 
+// Real, found-live flake fixed (2026-09-12, same root cause as
+// TestResolvePlayerAutoAttackDamage_PendingGuaranteedCritNotConsumedByAMiss's own doc comment
+// just below in this file): pity[1]=10 heavily biases toward a miss, it does not guarantee one.
 func TestResolvePlayerAutoAttackDamage_PendingAttackBonusNotConsumedByAMiss(t *testing.T) {
+	withSeededCombatRNG(t, 5)
 	p := newTestPlayer()
 	p.jobID = job.WAR
-	p.pityOwnHit = [2]int{0, 10} // force a miss: Miss (index 1) fully favored
+	p.pityOwnHit = [2]int{0, 10} // heavily favors a miss, not a hard guarantee -- see above
 	p.pendingAttackBonus = combatBoostBonus
 
-	hit, _, _ := resolvePlayerAutoAttackDamage(p, 30)
-	if hit {
-		t.Fatal("expected a guaranteed miss (full pity drought on Miss)")
+	sawMiss := false
+	for i := 0; i < 100; i++ {
+		hit, _, _ := resolvePlayerAutoAttackDamage(p, 30)
+		if !hit {
+			sawMiss = true
+			if p.pendingAttackBonus != combatBoostBonus {
+				t.Error("a missed swing must not consume pendingAttackBonus -- it should still be armed for the next real attempt")
+			}
+			break
+		}
+		// A rare "surprise" hit along the way would consume pendingAttackBonus itself (real,
+		// expected behavior on a landed hit) -- re-arm it so the loop keeps testing the real
+		// invariant this test is about (a MISS never consumes it).
+		p.pendingAttackBonus = combatBoostBonus
 	}
-	if p.pendingAttackBonus != combatBoostBonus {
-		t.Error("a missed swing must not consume pendingAttackBonus -- it should still be armed for the next real attempt")
+	if !sawMiss {
+		t.Fatal("expected at least one miss over 100 heavily-favored-miss rolls -- suspiciously deterministic")
 	}
 }
 
@@ -245,17 +262,135 @@ func TestResolvePlayerAutoAttackDamage_PendingGuaranteedCritAppliesOnceThenClear
 	}
 }
 
+// Real, found-live flake fixed (2026-09-12, hit intermittently 3+ times this same session):
+// pity[1]=10 heavily BIASES toward a miss (rng.MarbleBagPick's own Fibonacci-weighted odds), it
+// does not GUARANTEE one -- a single-shot "expected a guaranteed miss" assertion was always a
+// real, if rare, false failure waiting to happen. Fixed the same way this file's own sibling
+// tests already handle a biased-not-certain roll (TestResolvePlayerAutoAttackDamage_
+// MissAlwaysReportsZeroDamage, above): loop until a real miss is observed (heavily favored, so
+// this resolves in a handful of iterations essentially always) and assert the real invariant on
+// that miss, with a real seed so the loop itself is reproducible.
 func TestResolvePlayerAutoAttackDamage_PendingGuaranteedCritNotConsumedByAMiss(t *testing.T) {
+	withSeededCombatRNG(t, 3)
 	p := newTestPlayer()
 	p.jobID = job.WAR
-	p.pityOwnHit = [2]int{0, 10} // force a miss
+	p.pityOwnHit = [2]int{0, 10} // heavily favors a miss, not a hard guarantee -- see above
 	p.pendingGuaranteedCrit = true
 
-	hit, _, _ := resolvePlayerAutoAttackDamage(p, 30)
-	if hit {
-		t.Fatal("expected a guaranteed miss")
+	sawMiss := false
+	for i := 0; i < 100; i++ {
+		hit, _, _ := resolvePlayerAutoAttackDamage(p, 30)
+		if !hit {
+			sawMiss = true
+			if !p.pendingGuaranteedCrit {
+				t.Error("a missed swing must not consume pendingGuaranteedCrit -- it should still be armed for the next real attempt")
+			}
+			break
+		}
+		// A rare "surprise" hit along the way would consume pendingGuaranteedCrit itself (real,
+		// expected behavior on a landed hit) -- re-arm it so the loop keeps testing the real
+		// invariant this test is actually about (a MISS never consumes it), not accidentally
+		// depending on never landing a hit across 100 rolls.
+		p.pendingGuaranteedCrit = true
 	}
-	if !p.pendingGuaranteedCrit {
-		t.Error("a missed swing must not consume pendingGuaranteedCrit -- it should still be armed for the next real attempt")
+	if !sawMiss {
+		t.Fatal("expected at least one miss over 100 heavily-favored-miss rolls -- suspiciously deterministic")
+	}
+}
+
+// Real, found-live gap (2026-09-12, founder scoping a starting-weapon feature): equipping
+// anything, including a weapon's own real "attack"/attribute stats, previously had ZERO effect
+// on combat math -- ComputeStats was computed only to print a cosmetic "Stat changes:" line.
+// These tests guard the real fix: playerCombatStats/equipAttackBonus actually reading equipped
+// gear now.
+
+func testRegistryWithSword(t *testing.T) *itemdef.Registry {
+	t.Helper()
+	reg := itemdef.NewRegistry()
+	if err := reg.LoadJSON([]byte(`[{"id":3,"name":"Sword","category":"weapon",
+		"equip_slots":["main","off"],"stack_size":1,"stats":{"attack":10,"str":1}}]`)); err != nil {
+		t.Fatalf("load test sword: %v", err)
+	}
+	return reg
+}
+
+func TestPlayerCombatStats_EquippedItemAddsAttributeBonus(t *testing.T) {
+	oldReg := itemdefReg
+	itemdefReg = testRegistryWithSword(t)
+	t.Cleanup(func() { itemdefReg = oldReg })
+
+	unarmed := newTestPlayer()
+	unarmed.jobID = job.WAR
+	unarmed.equip = gear.NewEquipment()
+	unarmedSTR := playerCombatStats(unarmed).STR
+
+	armed := newTestPlayer()
+	armed.jobID = job.WAR
+	armed.equip = gear.NewEquipment()
+	if err := armed.equip.Equip(gear.SlotMainHand, gear.ItemEntry{ItemID: "sword", DefID: 3}); err != nil {
+		t.Fatalf("equip: %v", err)
+	}
+	armedSTR := playerCombatStats(armed).STR
+
+	if armedSTR != unarmedSTR+1 {
+		t.Errorf("STR with Sword equipped (+1 str) = %d, want %d (unarmed %d + 1)", armedSTR, unarmedSTR+1, unarmedSTR)
+	}
+}
+
+func TestPlayerCombatStats_NilEquipDoesNotPanic(t *testing.T) {
+	p := newTestPlayer()
+	p.jobID = job.WAR
+	p.equip = nil // real, defensive case -- a player struct built without a real Equipment
+	_ = playerCombatStats(p)
+}
+
+func TestEquipAttackBonus_UnarmedIsZero(t *testing.T) {
+	p := newTestPlayer()
+	p.equip = gear.NewEquipment()
+	if got := equipAttackBonus(p); got != 0 {
+		t.Errorf("equipAttackBonus(unarmed) = %d, want 0", got)
+	}
+}
+
+func TestEquipAttackBonus_EquippedSwordAddsRealAttackStat(t *testing.T) {
+	oldReg := itemdefReg
+	itemdefReg = testRegistryWithSword(t)
+	t.Cleanup(func() { itemdefReg = oldReg })
+
+	p := newTestPlayer()
+	p.equip = gear.NewEquipment()
+	if err := p.equip.Equip(gear.SlotMainHand, gear.ItemEntry{ItemID: "sword", DefID: 3}); err != nil {
+		t.Fatalf("equip: %v", err)
+	}
+	if got := equipAttackBonus(p); got != 10 {
+		t.Errorf("equipAttackBonus(Sword equipped) = %d, want 10 (the real Sword's own attack stat)", got)
+	}
+}
+
+func TestResolvePlayerAutoAttackDamage_EquippedWeaponIncreasesAverageDamage(t *testing.T) {
+	oldReg := itemdefReg
+	itemdefReg = testRegistryWithSword(t)
+	t.Cleanup(func() { itemdefReg = oldReg })
+
+	withSeededCombatRNG(t, 11)
+	unarmed := newTestPlayer()
+	unarmed.jobID = job.WAR
+	unarmed.equip = gear.NewEquipment()
+
+	armed := newTestPlayer()
+	armed.jobID = job.WAR
+	armed.equip = gear.NewEquipment()
+	armed.equip.Equip(gear.SlotMainHand, gear.ItemEntry{ItemID: "sword", DefID: 3})
+
+	sumUnarmed, sumArmed := 0, 0
+	const trials = 300
+	for i := 0; i < trials; i++ {
+		_, _, dmg := resolvePlayerAutoAttackDamage(unarmed, 30)
+		sumUnarmed += dmg
+		_, _, dmg = resolvePlayerAutoAttackDamage(armed, 30)
+		sumArmed += dmg
+	}
+	if sumArmed <= sumUnarmed {
+		t.Errorf("equipping a real weapon should deal more average damage than unarmed over %d trials: armed sum=%d, unarmed sum=%d", trials, sumArmed, sumUnarmed)
 	}
 }
