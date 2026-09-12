@@ -29,6 +29,9 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/crypto/ssh"
+
+	"dragonsnshit/apps2/mud/internal/burrowgen"
 	"dragonsnshit/server/attention"
 	"dragonsnshit/server/autotranslate"
 	"dragonsnshit/server/campaign"
@@ -52,9 +55,6 @@ import (
 	"dragonsnshit/server/idunaclient"
 	"dragonsnshit/server/integrity"
 	"dragonsnshit/server/itemdef"
-	"dragonsnshit/server/mobdrop"
-	"dragonsnshit/server/mobvariant"
-	"dragonsnshit/server/spawn"
 	"dragonsnshit/server/job"
 	"dragonsnshit/server/k9"
 	"dragonsnshit/server/ledger"
@@ -62,10 +62,11 @@ import (
 	"dragonsnshit/server/market"
 	"dragonsnshit/server/merit"
 	"dragonsnshit/server/mob"
+	"dragonsnshit/server/mobdrop"
+	"dragonsnshit/server/mobvariant"
+	"dragonsnshit/server/modevent"
 	"dragonsnshit/server/moghouse"
 	"dragonsnshit/server/neighborhood"
-	"dragonsnshit/apps2/mud/internal/burrowgen"
-	"dragonsnshit/server/modevent"
 	"dragonsnshit/server/nm"
 	"dragonsnshit/server/npcattention"
 	"dragonsnshit/server/party"
@@ -73,6 +74,7 @@ import (
 	"dragonsnshit/server/quest"
 	"dragonsnshit/server/schedule"
 	"dragonsnshit/server/skillchain"
+	"dragonsnshit/server/spawn"
 	"dragonsnshit/server/status"
 	"dragonsnshit/server/techpressure"
 	"dragonsnshit/server/telecrystal"
@@ -779,30 +781,30 @@ func initTRAPXCity() {
 // ── player ────────────────────────────────────────────────────────────────────
 
 type player struct {
-	slot          string
-	name          string
-	zoneID        int
-	pos           mob.Pos
-	hp, maxHP     int
-	mp, maxMP     int
-	tp            *combatTp.TPState
-	statFX        *status.Stack
-	combat        *mob.PlayerCombat
-	miningSkill   float64
-	fishingSkill  float64
-	foodEffect    *food.FoodEffect
-	fameStore     *fame.Store
-	charXP        *xp.CharXP // ALWAYS an alias into jobXP[p.jobID] -- see switchActiveJob's own doc comment
+	slot         string
+	name         string
+	zoneID       int
+	pos          mob.Pos
+	hp, maxHP    int
+	mp, maxMP    int
+	tp           *combatTp.TPState
+	statFX       *status.Stack
+	combat       *mob.PlayerCombat
+	miningSkill  float64
+	fishingSkill float64
+	foodEffect   *food.FoodEffect
+	fameStore    *fame.Store
+	charXP       *xp.CharXP // ALWAYS an alias into jobXP[p.jobID] -- see switchActiveJob's own doc comment
 	// jobXP (GFD-124433, founder: "when you are a lvl 10 warrior in gfd and you switch to RDM
 	// for the first time you go back to lvl 1... separate lvls/job") holds every job this
 	// character has ever played, each with its own real, independently-earned level/XP.
 	// charXP above is kept as a live alias into this map's entry for p.jobID, so every existing
 	// read/write of p.charXP.* throughout this file stays correct with zero changes -- only
 	// switchActiveJob (called from cmdSetJob) needs to know this map exists at all.
-	jobXP         map[string]*xp.CharXP
-	homePoint     *homepoint.State
-	wsSkill       string         // current weapon skill name (from CanonicalWeaponSkills)
-	jobID         string         // current job (job.JobID, default "WAR")
+	jobXP     map[string]*xp.CharXP
+	homePoint *homepoint.State
+	wsSkill   string // current weapon skill name (from CanonicalWeaponSkills)
+	jobID     string // current job (job.JobID, default "WAR")
 	// isGuest (SSH_TRANSPORT_IDENTITY_SPEC.md Stage 1, founder-supplied spec + Amendment 1,
 	// 2026-09-12) marks an anonymous telnet connection -- true for every real handleConn
 	// session, always false (Go's own zero value) for a headless/Town-GUI session, which
@@ -812,30 +814,36 @@ type player struct {
 	// not built yet), a real SSH connection with no bound identity is still a guest -- the
 	// distinction this flag draws is "has a durable, accountable identity," not "which
 	// transport." Every real connection today is telnet, so this is always true for now.
-	isGuest       bool
-	inventory     map[string]int // itemID → quantity
-	craftSkill    *craft.CraftSkill
-	flow          int
-	guildID       string // linkshell guild ID ("" = none)
-	equip         *gear.Equipment
-	isInvisible   bool
-	invisExpires  time.Time
-	isSneaking    bool
-	sneakExpires  time.Time
-	isResting     bool
-	charJob       *job.CharJob // main+sub job pairing (nil until initialized)
-	meritBank     *merit.MeritBank
-	recastTracker *job.RecastTracker
-	petSlot       *pet.Slot             // BST pet companion (non-nil always; pet.IsAlive() = has pet)
-	petHeel       bool                  // true = pet does not attack (heel mode)
-	k9Swarm       *k9.Swarm             // TRAPX: active K9 swarm (nil if none deployed)
-	disguise      npcattention.Disguise // stealth identity (S130-02); default = no disguise
-	questJournal  *quest.Journal        // NPC quest progress
-	atlas         *cartography.Atlas    // explored zone map
-	chatLang      autotranslate.Lang    // preferred chat language; default EN
-	conn          net.Conn
-	w             *bufio.Writer
-	inbox         chan string
+	isGuest bool
+	// sshFingerprint (SSH_TRANSPORT_IDENTITY_SPEC.md §3.2, Stage 5) is the real SSH public key
+	// fingerprint that authenticated this session, non-empty only for an identified (non-guest)
+	// SSH connection -- empty for telnet and for headless sessions. Its only real use is
+	// cmdKeyRevoke's own "revoke a key other than the one in use" enforcement: a session can
+	// never revoke the exact key it's currently connected with.
+	sshFingerprint string
+	inventory      map[string]int // itemID → quantity
+	craftSkill     *craft.CraftSkill
+	flow           int
+	guildID        string // linkshell guild ID ("" = none)
+	equip          *gear.Equipment
+	isInvisible    bool
+	invisExpires   time.Time
+	isSneaking     bool
+	sneakExpires   time.Time
+	isResting      bool
+	charJob        *job.CharJob // main+sub job pairing (nil until initialized)
+	meritBank      *merit.MeritBank
+	recastTracker  *job.RecastTracker
+	petSlot        *pet.Slot             // BST pet companion (non-nil always; pet.IsAlive() = has pet)
+	petHeel        bool                  // true = pet does not attack (heel mode)
+	k9Swarm        *k9.Swarm             // TRAPX: active K9 swarm (nil if none deployed)
+	disguise       npcattention.Disguise // stealth identity (S130-02); default = no disguise
+	questJournal   *quest.Journal        // NPC quest progress
+	atlas          *cartography.Atlas    // explored zone map
+	chatLang       autotranslate.Lang    // preferred chat language; default EN
+	conn           net.Conn
+	w              *bufio.Writer
+	inbox          chan string
 	// headlessBuf (2026-08-02, HEADLESS_SESSION_NORTHSTAR.md Milestone 1+, founder: "the real MUD
 	// combat system" for GoblinFoxDragon's Town scene): non-nil only for a headless player (see
 	// getOrCreateHeadlessPlayer) -- w wraps this buffer instead of a real net.Conn, same
@@ -2743,6 +2751,17 @@ func handle(p *player, line string) {
 		cmdSetJob(p, strings.ToUpper(args[0]))
 	case "jobs":
 		cmdJobs(p)
+	case "keys":
+		cmdKeys(p)
+	case "key-add":
+		cmdKeyAdd(p, strings.Join(args, " "))
+	case "key-revoke":
+		if len(args) == 0 {
+			p.send("Usage: key-revoke <fingerprint>")
+			p.prompt()
+			return
+		}
+		cmdKeyRevoke(p, args[0])
 	case "bst", "charm", "tame":
 		if len(args) == 0 {
 			p.send("Usage: bst <mob-id>  — attempt to charm the target mob (BST job required)")
@@ -7243,7 +7262,7 @@ var blmSpells = map[string]blmSpellDef{
 	// real elemental-DoT idiom (server/mob/worm.go carries it, WHM's dia is described as its own
 	// "Poison equivalent"), so this keeps that same real, already-established convention rather
 	// than inventing a new element from scratch.
-	"poison":    {MPCost: 30, BaseDmg: 50, Element: "Poison"},
+	"poison": {MPCost: 30, BaseDmg: 50, Element: "Poison"},
 	// bio/distract/frazzle (GFD-AF-01939, founder real-time: "hallucinaate the RDM skills gimme
 	// some random ones it doesnt have to toally work they can all be copy paste of poison as
 	// long as they call their own fucnctions") -- real FFXI Red Mage enfeeble/DoT spell names,
@@ -7660,6 +7679,116 @@ func cmdJobs(p *player) {
 	p.prompt()
 }
 
+// ── SSH key management (SSH_TRANSPORT_IDENTITY_SPEC.md §3.2, Stage 5) ─────────
+//
+// All three commands require an identified (non-guest, SSH-bound) session -- guestGate itself
+// doesn't need to gate these explicitly (they're not in guestBlockedCommands), because a guest
+// session's characterID/sshFingerprint are simply never set, so each command below checks that
+// directly and explains the real requirement rather than failing confusingly.
+
+func requireSSHIdentity(p *player) (characterID string, ok bool) {
+	if p.sshFingerprint == "" {
+		p.send("This requires an SSH-bound identity. Guests can't manage keys they don't have.")
+		p.prompt()
+		return "", false
+	}
+	characterID, hasChar := gw.charIDBySlot[p.slot]
+	if !hasChar {
+		p.send("No character identity on file for this session -- try reconnecting.")
+		p.prompt()
+		return "", false
+	}
+	return characterID, true
+}
+
+// cmdKeys lists every active key bound to the current character (§3.2 "list bound keys"),
+// marking whichever one authenticated THIS session so a player can tell them apart.
+func cmdKeys(p *player) {
+	characterID, ok := requireSSHIdentity(p)
+	if !ok {
+		return
+	}
+	keys, err := gw.iduna.ListSSHKeys(characterID)
+	if err != nil {
+		p.send("Could not reach IDUNA to list keys -- try again shortly.")
+		p.prompt()
+		return
+	}
+	p.send("\r\n=== Bound SSH keys ===")
+	for _, k := range keys {
+		marker := ""
+		if k.Fingerprint == p.sshFingerprint {
+			marker = " <-- this session"
+		}
+		p.sendf("  %s%s", k.Fingerprint, marker)
+	}
+	p.send("Use 'key-add <authorized_keys line>' to bind another key, 'key-revoke <fingerprint>' to remove one.")
+	p.prompt()
+}
+
+// cmdKeyAdd implements §3.2's "add an additional public key to the current account." The player
+// pastes a real OpenSSH authorized_keys-format line (e.g. the contents of their own
+// ~/.ssh/id_ed25519.pub) -- parsed here exactly as an SSH server would parse one, not a bespoke
+// format. §3.1's own "one WOTAN account may hold multiple fingerprints" is what this enables.
+func cmdKeyAdd(p *player, rawLine string) {
+	characterID, ok := requireSSHIdentity(p)
+	if !ok {
+		return
+	}
+	rawLine = strings.TrimSpace(rawLine)
+	if rawLine == "" {
+		p.send("Usage: key-add <authorized_keys line> (paste your public key file's contents)")
+		p.prompt()
+		return
+	}
+	pubKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(rawLine))
+	if err != nil {
+		p.send("That doesn't parse as a real SSH public key (expected an authorized_keys-format line, e.g. \"ssh-ed25519 AAAA... comment\").")
+		p.prompt()
+		return
+	}
+	fingerprint := ssh.FingerprintSHA256(pubKey)
+	switch err := gw.iduna.BindSSHKey(characterID, fingerprint, rawLine); {
+	case err == nil:
+		p.sendf("Key bound: %s", fingerprint)
+	case errors.Is(err, idunaclient.ErrConflict):
+		p.send("That key is already bound to a different character -- it can't be added here.")
+	default:
+		p.send("Could not reach IDUNA to bind that key -- try again shortly.")
+	}
+	p.prompt()
+}
+
+// cmdKeyRevoke implements §3.2's "revoke a key other than the one in use." The "other than the
+// one in use" half is enforced HERE, not by IDUNA (IDUNA's own handleRevokeSSHKey has no concept
+// of which key authenticated which live session) -- refusing to ever let a session cut off its
+// own currently-active key, which would otherwise be an easy way to lock yourself out mid-session
+// with no way to finish the command.
+func cmdKeyRevoke(p *player, fingerprint string) {
+	characterID, ok := requireSSHIdentity(p)
+	if !ok {
+		return
+	}
+	fingerprint = strings.TrimSpace(fingerprint)
+	if fingerprint == "" {
+		p.send("Usage: key-revoke <fingerprint> (see 'keys' for the exact fingerprint string)")
+		p.prompt()
+		return
+	}
+	if fingerprint == p.sshFingerprint {
+		p.send("Can't revoke the key you're currently connected with -- add and switch to a different key first.")
+		p.prompt()
+		return
+	}
+	if err := gw.iduna.RevokeSSHKey(characterID, fingerprint); err != nil {
+		p.send("Could not reach IDUNA to revoke that key -- try again shortly.")
+		p.prompt()
+		return
+	}
+	p.sendf("Revoked: %s", fingerprint)
+	p.prompt()
+}
+
 func cmdHelp(p *player) {
 	// Found live 2026-07-23, playing as a real new character: shop, bazaar,
 	// bank, quests, npcs/talk, equip/gear, and craft are all real, working
@@ -7896,23 +8025,23 @@ func getOrCreateHeadlessPlayer(characterID string) (*player, error) {
 	buf := &bytes.Buffer{}
 	w := bufio.NewWriter(buf)
 	p := &player{
-		slot:          slot,
-		name:          ch.Name,
-		zoneID:        ch.SceneID,
-		pos:           mob.Pos{X: ch.PosX, Y: ch.PosY, Z: ch.PosZ},
-		hp:            startHP,
-		maxHP:         startHP,
-		mp:            startMP,
-		maxMP:         startMP,
-		tp:            &combatTp.TPState{},
-		statFX:        status.New(),
-		combat:        &mob.PlayerCombat{BaseDamage: playerDamage, MeleeRange: playerMeleeRng},
-		miningSkill:   0,
-		charXP:        activeXP,
-		jobXP:         jobXP,
-		homePoint:     homepoint.NewState(ch.SceneID),
-		wsSkill:       "Fast Blade",
-		jobID:         startJobID,
+		slot:        slot,
+		name:        ch.Name,
+		zoneID:      ch.SceneID,
+		pos:         mob.Pos{X: ch.PosX, Y: ch.PosY, Z: ch.PosZ},
+		hp:          startHP,
+		maxHP:       startHP,
+		mp:          startMP,
+		maxMP:       startMP,
+		tp:          &combatTp.TPState{},
+		statFX:      status.New(),
+		combat:      &mob.PlayerCombat{BaseDamage: playerDamage, MeleeRange: playerMeleeRng},
+		miningSkill: 0,
+		charXP:      activeXP,
+		jobXP:       jobXP,
+		homePoint:   homepoint.NewState(ch.SceneID),
+		wsSkill:     "Fast Blade",
+		jobID:       startJobID,
 		charJob: func() *job.CharJob {
 			subLvl := 0
 			if ch.JobSub != "" {
@@ -8031,7 +8160,40 @@ func runHeadlessCommand(characterID, line string) (string, error) {
 
 // ── connection handler ────────────────────────────────────────────────────────
 
-func handleConn(conn net.Conn) {
+// presetIdentity (SSH_TRANSPORT_IDENTITY_SPEC.md §3, Stage 5) carries an already-resolved
+// identity into handleConn -- either an SSH connection whose key fingerprint is already bound to
+// a real character (resumed, no prompt), or one that just finished the claim flow (a fresh
+// character, already bound). nil means "no preset," i.e. every real telnet connection today:
+// prompt for a name, resolve/create via the existing local-cache-by-name path, unchanged.
+type presetIdentity struct {
+	name        string
+	characterID string
+	fingerprint string // the SSH key fingerprint that resolved/claimed this identity (§3.2)
+}
+
+// applyFetchedCharacter copies a real, already-fetched IDUNA character's own level/job/gold/
+// inventory onto p -- the exact same real logic handleConn's own by-name cache-hit branch always
+// ran, extracted here so Stage 5's preset-identity branch (which resolves a character directly by
+// ID, never touching the by-name cache at all) can share it instead of duplicating it.
+func applyFetchedCharacter(p *player, ch *idunaclient.Character) {
+	// GFD-124433 (per-job leveling): same real loadJobXP/switchActiveJob seeding as
+	// getOrCreateHeadlessPlayer's own connect path -- see that function's own comment. Real,
+	// found-live twin bug fixed in the same edit: this used to never call applyJobStats after
+	// loading a returning character's real level, so p.maxHP/maxMP stayed at the level-1
+	// defaults regardless of the character's real level.
+	persistedLevels, plErr := gw.iduna.GetJobLevels(ch.CharacterID)
+	if plErr != nil {
+		persistedLevels = map[string]idunaclient.JobLevel{}
+	}
+	p.jobXP = loadJobXP(persistedLevels, p.jobID, ch.Level, ch.CurrentXP)
+	p.charXP = switchActiveJob(p.jobXP, p.jobID)
+	applyJobStats(p)
+	if ch.GoldBalance > 0 {
+		p.flow = ch.GoldBalance
+	}
+}
+
+func handleConn(conn net.Conn, isGuest bool, preset *presetIdentity) {
 	defer conn.Close()
 	w := bufio.NewWriter(conn)
 	r := bufio.NewReader(conn)
@@ -8041,28 +8203,41 @@ func handleConn(conn net.Conn) {
 		w.Flush()
 	}
 
-	send("Welcome to DragonsNShit MUD.")
-	// SSH_TRANSPORT_IDENTITY_SPEC.md Stage 1 (Amendment 1 §C.1/§D): ephemerality and guest-mode
-	// scope must be stated plainly BEFORE the name prompt, not discovered at the moment of first
-	// refusal. Real, confirmed-live behavior (founder, 2026-09-12, tested directly): reconnecting
-	// with the same name does not resume a character today -- treated here as this tier's real,
-	// deliberate, permanent model, not a bug to hide or silently fix.
-	send("This is a GUEST connection: no login, no persistence. Your character does not")
-	send("carry over between connections -- reconnecting starts a brand-new level 1.")
-	send("Guests can fight, explore, quest, and level up freely, but cannot use the bank,")
-	send("auction house, bazaar, or talk to other players (say/tell/yell/linkshell) --")
-	send("those require an SSH-bound identity, coming soon.")
-	send("Enter your character name: ")
-	w.Flush()
+	var name string
 
-	nameRaw, err := r.ReadString('\n')
-	if err != nil {
-		return
-	}
-	name := strings.TrimSpace(nameRaw)
-	if len(name) < 2 || len(name) > 20 {
-		send("Name must be 2–20 characters.")
-		return
+	if preset != nil {
+		// SSH_TRANSPORT_IDENTITY_SPEC.md Stage 5: an already-identified connection (an SSH key
+		// bound to a real character, resumed or freshly claimed by runSSHClaimFlow) skips the
+		// guest name prompt entirely -- there is nothing left to ask, identity is already
+		// resolved before handleConn is ever called.
+		name = preset.name
+		send("Welcome to DragonsNShit MUD.")
+		send(fmt.Sprintf("SSH-bound identity confirmed: %s. Full access -- bank, auction house,", name))
+		send("bazaar, and player chat are all unlocked.")
+	} else {
+		send("Welcome to DragonsNShit MUD.")
+		// SSH_TRANSPORT_IDENTITY_SPEC.md Stage 1 (Amendment 1 §C.1/§D): ephemerality and guest-mode
+		// scope must be stated plainly BEFORE the name prompt, not discovered at the moment of first
+		// refusal. Real, confirmed-live behavior (founder, 2026-09-12, tested directly): reconnecting
+		// with the same name does not resume a character today -- treated here as this tier's real,
+		// deliberate, permanent model, not a bug to hide or silently fix.
+		send("This is a GUEST connection: no login, no persistence. Your character does not")
+		send("carry over between connections -- reconnecting starts a brand-new level 1.")
+		send("Guests can fight, explore, quest, and level up freely, but cannot use the bank,")
+		send("auction house, bazaar, or talk to other players (say/tell/yell/linkshell) --")
+		send("those require an SSH-bound identity, coming soon.")
+		send("Enter your character name: ")
+		w.Flush()
+
+		nameRaw, err := r.ReadString('\n')
+		if err != nil {
+			return
+		}
+		name = strings.TrimSpace(nameRaw)
+		if len(name) < 2 || len(name) > 20 {
+			send("Name must be 2–20 characters.")
+			return
+		}
 	}
 
 	slot := conn.RemoteAddr().String()
@@ -8108,12 +8283,34 @@ func handleConn(conn net.Conn) {
 		equip:         gear.NewEquipment(),
 		conn:          conn,
 		w:             w,
-		isGuest:       true, // SSH_TRANSPORT_IDENTITY_SPEC.md Stage 1: every real telnet connection is a guest
+		// SSH_TRANSPORT_IDENTITY_SPEC.md Stage 1/5: true for every real telnet connection
+		// (isGuest is always passed true from that call site); false for an SSH connection with
+		// a resolved/claimed bound identity (preset != nil implies isGuest == false in practice,
+		// but this is the caller's parameter, not derived from preset here, so a future non-guest
+		// path that isn't preset-based still works without touching this line).
+		isGuest: isGuest,
+	}
+	if preset != nil {
+		p.sshFingerprint = preset.fingerprint
 	}
 
 	// IDUNA character fetch-or-create (best-effort; non-blocking).
 	// charCache maps name → character_id and persists to var/mud-chars.json.
-	if cachedID := mudCharCache.get(name); cachedID != "" {
+	if preset != nil {
+		// SSH_TRANSPORT_IDENTITY_SPEC.md Stage 5: identity is already resolved (resumed from an
+		// existing fingerprint binding, or just claimed) -- load the real character directly by
+		// ID, never touching the by-name local cache at all (that cache is telnet's own
+		// ephemeral-guest mechanism, not this tier's identity model).
+		if ch, err := gw.iduna.GetCharacter(preset.characterID); err == nil {
+			gw.mu.Lock()
+			gw.charIDBySlot[slot] = ch.CharacterID
+			gw.mu.Unlock()
+			applyFetchedCharacter(p, ch)
+			if inv, err := gw.iduna.GetInventory(ch.CharacterID); err == nil {
+				p.inventory = inv
+			}
+		}
+	} else if cachedID := mudCharCache.get(name); cachedID != "" {
 		if ch, err := gw.iduna.GetCharacter(cachedID); err == nil {
 			gw.mu.Lock()
 			gw.charIDBySlot[slot] = ch.CharacterID
@@ -8952,6 +9149,6 @@ func main() {
 			fmt.Printf("accept: %v\n", err)
 			continue
 		}
-		go handleConn(conn)
+		go handleConn(conn, true, nil) // every real telnet connection is a guest, no preset identity
 	}
 }

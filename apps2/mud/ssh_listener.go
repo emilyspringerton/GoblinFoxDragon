@@ -1,39 +1,44 @@
 package main
 
-// SSH_TRANSPORT_IDENTITY_SPEC.md §2 / Stage 4 (docs2/SSH_TRANSPORT_IDENTITY_NORTHSTAR.md):
-// "Game SSH server" -- a real SSH listener on a high port, public-key-only, trust-on-first-use
-// (any offered key is accepted for the CONNECTION; binding a key to a specific character/account
-// is §3, Stage 5, not built here). No identity yet means every SSH session today is exactly as
-// anonymous as a telnet one -- see handleConn's own player struct literal, reused completely
-// unchanged for both transports, which is why `isGuest: true` there already applies correctly to
-// SSH sessions with zero extra code: an SSH connection with no bound identity is still a guest,
-// per the spec's own explicit framing (see the player struct's `isGuest` field doc comment).
+// SSH_TRANSPORT_IDENTITY_SPEC.md §2/§3 / Stages 4-5 (docs2/SSH_TRANSPORT_IDENTITY_NORTHSTAR.md):
+// "Game SSH server" (§2, Stage 4) -- a real SSH listener on a high port, public-key-only,
+// trust-on-first-use for the raw TCP/SSH handshake itself (any syntactically valid key is
+// accepted for the CONNECTION). "Identity" (§3, Stage 5) -- resolveSSHIdentity/runSSHClaimFlow
+// below turn that connection into either a resumed, permanently-bound character (isGuest=false)
+// or a fresh one claimed on the spot, falling back to an anonymous guest (isGuest=true, same
+// treatment telnet gets) only if IDUNA is unreachable or the player abandons the claim prompt.
 //
-// Design choice, checked against this file before writing a line of this: `handle()`'s own
+// Design choice, checked against this file before writing a line of Stage 4: `handle()`'s own
 // command dispatch and `handleConn`'s own read/write loop only ever call four methods on
 // `p.conn` (net.Conn) anywhere in this file -- Read, Write, Close, and RemoteAddr (grepped:
 // zero SetDeadline/SetReadDeadline/SetWriteDeadline/LocalAddr calls exist). That means an
 // `ssh.Channel` (Read/Write/Close, plus SendRequest/CloseWrite/Stderr that nothing here ever
 // calls) needs only RemoteAddr/LocalAddr/three deadline no-ops bolted on to satisfy net.Conn --
-// sshConnAdapter below -- and `handleConn(adapter)` runs completely unmodified, same struct
-// literal, same guest gate, same IDUNA fetch-or-create, same disconnect sync. This is the real,
-// positive finding the NORTHSTAR doc named after Stage 1/2/3: the dispatch layer really is
-// transport-agnostic, exercised for real here for the first time.
+// sshConnAdapter below -- and `handleConn(adapter, isGuest, preset)` runs the exact same struct
+// literal, IDUNA fetch-or-create, and disconnect sync a telnet connection does, for both guest
+// and identified SSH sessions alike. This is the real, positive finding the NORTHSTAR doc named
+// after Stage 1/2/3: the dispatch layer really is transport-agnostic.
 
 import (
+	"bufio"
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"log"
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"golang.org/x/crypto/ssh"
+
+	"dragonsnshit/server/idunaclient"
+	"dragonsnshit/server/job"
 )
 
 const (
@@ -175,7 +180,9 @@ func sshSessionWatchdog(adapter *sshConnAdapter, done <-chan struct{}) {
 // connection (a client may open more than one, e.g. a second shell -- each gets its own
 // handleConn/player, same as two separate telnet connections would). Non-"session" channel types
 // (direct-tcpip, etc.) are rejected outright -- this is a game server, not a general SSH gateway.
-func handleSSHChannels(chans <-chan ssh.NewChannel, underlying net.Conn) {
+// sshConn is passed through so the "shell" case can read the fingerprint/authorized-key-line
+// buildSSHServerConfig's own PublicKeyCallback stashed in its Permissions.Extensions during auth.
+func handleSSHChannels(sshConn *ssh.ServerConn, chans <-chan ssh.NewChannel, underlying net.Conn) {
 	for newChannel := range chans {
 		if newChannel.ChannelType() != "session" {
 			_ = newChannel.Reject(ssh.UnknownChannelType, "only session channels are supported")
@@ -213,9 +220,10 @@ func handleSSHChannels(chans <-chan ssh.NewChannel, underlying net.Conn) {
 					}
 					if !started {
 						started = true
+						isGuest, preset := resolveSSHIdentity(sshConn, adapter)
 						done := make(chan struct{})
 						go sshSessionWatchdog(adapter, done)
-						handleConn(adapter)
+						handleConn(adapter, isGuest, preset)
 						close(done)
 					}
 				default:
@@ -229,6 +237,179 @@ func handleSSHChannels(chans <-chan ssh.NewChannel, underlying net.Conn) {
 			}
 		}()
 	}
+}
+
+// resolveSSHIdentity implements §3.1 end to end for one SSH session: known fingerprint -> resume
+// that character, no prompt, isGuest=false; unknown fingerprint -> run the claim flow (which
+// either returns a freshly bound identity or, on abandonment/failure, nothing); IDUNA unreachable
+// -> fall back to guest, same best-effort posture every other idunaclient call in this codebase
+// already has, rather than refusing the connection outright over a transient lookup failure.
+func resolveSSHIdentity(sshConn *ssh.ServerConn, adapter *sshConnAdapter) (isGuest bool, preset *presetIdentity) {
+	var fingerprint, pubKeyLine string
+	if sshConn.Permissions != nil {
+		fingerprint = sshConn.Permissions.Extensions["fingerprint"]
+		pubKeyLine = sshConn.Permissions.Extensions["pubkey-authorized-line"]
+	}
+	if fingerprint == "" {
+		// Should be unreachable (PublicKeyCallback always sets this on the only auth path this
+		// server accepts), but a missing fingerprint must never crash a session -- degrade to
+		// guest, same as any other identity-resolution failure.
+		return true, nil
+	}
+
+	characterID, err := gw.iduna.ResolveSSHFingerprint(fingerprint)
+	switch {
+	case err == nil:
+		ch, err := gw.iduna.GetCharacter(characterID)
+		if err != nil {
+			log.Printf("[ssh] fingerprint resolved to %s but GetCharacter failed, falling back to guest: %v", characterID, err)
+			return true, nil
+		}
+		log.Printf("[ssh] known fingerprint, resuming character=%s name=%s remote=%s", characterID, ch.Name, adapter.RemoteAddr())
+		return false, &presetIdentity{name: ch.Name, characterID: characterID, fingerprint: fingerprint}
+	case errors.Is(err, idunaclient.ErrNotFound):
+		if preset := runSSHClaimFlow(adapter, fingerprint, pubKeyLine); preset != nil {
+			return false, preset
+		}
+		return true, nil
+	default:
+		log.Printf("[ssh] fingerprint lookup failed, falling back to guest: %v", err)
+		return true, nil
+	}
+}
+
+const (
+	sshClaimMaxAttemptsPerIPPerHour = 3 // §3.3 "rate-limit new character claims per source IP per hour"
+	sshClaimNameMinLen              = 2
+	sshClaimNameMaxLen              = 20
+)
+
+// sshReservedNames (§3.3 "reserve an operator namespace before any public announcement") -- a
+// real, honest starting list, not exhaustive: this codebase has no broader operator-namespace
+// reservation system yet, so these are the specific names most likely to be used for
+// impersonation (the game's own name, common staff-role words). Extend as real need appears.
+var sshReservedNames = map[string]bool{
+	"dragonsnshit":  true,
+	"admin":         true,
+	"administrator": true,
+	"moderator":     true,
+	"mod":           true,
+	"gm":            true,
+	"gamemaster":    true,
+	"system":        true,
+	"wotan":         true,
+	"iduna":         true,
+	"support":       true,
+}
+
+var (
+	sshClaimAttemptsMu sync.Mutex
+	sshClaimAttempts   = map[string][]time.Time{}
+)
+
+// sshClaimRateLimited enforces §3.3's per-IP-per-hour claim cap, pruning attempts older than an
+// hour on every check rather than keeping a separate cleanup goroutine.
+func sshClaimRateLimited(ip string) bool {
+	sshClaimAttemptsMu.Lock()
+	defer sshClaimAttemptsMu.Unlock()
+	now := time.Now()
+	cutoff := now.Add(-time.Hour)
+	kept := sshClaimAttempts[ip][:0]
+	for _, t := range sshClaimAttempts[ip] {
+		if t.After(cutoff) {
+			kept = append(kept, t)
+		}
+	}
+	if len(kept) >= sshClaimMaxAttemptsPerIPPerHour {
+		sshClaimAttempts[ip] = kept
+		return true
+	}
+	sshClaimAttempts[ip] = append(kept, now)
+	return false
+}
+
+// validateSSHClaimName applies §3.3's abuse controls to a chosen name: length, a conservative
+// charset (letters and digits only -- no impersonation via lookalike punctuation/whitespace), and
+// the reserved-name list above. Collision against an already-existing DIFFERENT character's name
+// is NOT checked here -- that's enforced by characters.name's own real UNIQUE constraint at the
+// CreateCharacter layer (IDUNA's handleCreateCharacter already returns 409, surfaced here as
+// idunaclient.ErrConflict), so it isn't duplicated.
+func validateSSHClaimName(name string) (ok bool, reason string) {
+	if len(name) < sshClaimNameMinLen || len(name) > sshClaimNameMaxLen {
+		return false, fmt.Sprintf("Name must be %d-%d characters.", sshClaimNameMinLen, sshClaimNameMaxLen)
+	}
+	for _, r := range name {
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9')) {
+			return false, "Name must be letters and digits only."
+		}
+	}
+	if sshReservedNames[strings.ToLower(name)] {
+		return false, "That name is reserved."
+	}
+	return true, ""
+}
+
+// runSSHClaimFlow implements §3.1's "unknown key -> claim flow -> fingerprint bound to chosen
+// name, permanently." Prompts directly over the raw channel (handleConn hasn't taken over yet --
+// there is no player/game-world state until a real character exists to attach it to). Returns nil
+// (caller falls back to guest) on rate-limit, read error/disconnect, or repeated abandonment --
+// never blocks forever.
+func runSSHClaimFlow(adapter *sshConnAdapter, fingerprint, pubKeyLine string) *presetIdentity {
+	ip := ipOnly(adapter.RemoteAddr())
+	send := func(s string) { adapter.Write([]byte(s + "\r\n")) }
+
+	if sshClaimRateLimited(ip) {
+		send("Too many new-character attempts from your address recently -- try again later.")
+		log.Printf("[ssh-claim] rate-limited ip=%s", ip)
+		return nil
+	}
+
+	send("No character is bound to this SSH key yet.")
+	send("Choose a permanent character name (2-20 letters/digits) -- this key will be bound to it for good.")
+
+	reader := bufio.NewReader(adapter)
+	const maxAttempts = 5 // bounded retry loop -- a client stuck retyping an invalid/taken name forever still terminates
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		send("Name: ")
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			return nil
+		}
+		name := strings.TrimSpace(line)
+		if ok, reason := validateSSHClaimName(name); !ok {
+			send(reason)
+			continue
+		}
+
+		newID, err := gw.iduna.CreateCharacter(mudPlayerIDFor(name), name, job.WAR)
+		switch {
+		case err == nil:
+			if bindErr := gw.iduna.BindSSHKey(newID, fingerprint, pubKeyLine); bindErr != nil {
+				// Real, honest failure mode: the character now exists in IDUNA but the key
+				// didn't bind -- logged loudly (not just best-effort-silent) since this leaves a
+				// real orphaned character behind, unlike every other best-effort IDUNA call in
+				// this file. Falls back to guest for THIS session rather than leaving the player
+				// stuck; the character can be claimed properly on a future attempt once IDUNA is
+				// reachable again (CreateCharacter's own name-collision handling below covers a
+				// retry with the same name failing safely).
+				log.Printf("[ssh-claim] character %s created but BindSSHKey failed (orphaned): %v", newID, bindErr)
+				send("Character created, but the key binding failed -- reconnect to try again.")
+				return nil
+			}
+			log.Printf("[ssh-claim] new identity claimed character=%s name=%s ip=%s", newID, name, ip)
+			send(fmt.Sprintf("Welcome, %s! Your SSH key is now permanently bound to this character.", name))
+			return &presetIdentity{name: name, characterID: newID, fingerprint: fingerprint}
+		case errors.Is(err, idunaclient.ErrConflict):
+			// §3.1 acceptance: "Different key, same claimed name -> refused, not silently
+			// reassigned." Re-prompt rather than silently falling back to some other identity.
+			send("That name is already taken. Choose another.")
+		default:
+			send("Could not reach IDUNA to create that character -- try again shortly.")
+			return nil
+		}
+	}
+	send("Too many attempts -- disconnecting.")
+	return nil
 }
 
 // startSSHListener implements §2.1's transport requirements end to end: public-key-only
@@ -268,7 +449,15 @@ func buildSSHServerConfig(hostKey ssh.Signer) *ssh.ServerConfig {
 			// character-name hint... must not error," and there is no character-name-hint
 			// feature built yet (that belongs with §3/Stage 5's real identity binding), so
 			// "ignore" is the accurate, honest behavior today, not "hint, half-wired."
-			return &ssh.Permissions{}, nil
+			//
+			// Stashing the fingerprint + full authorized_keys-line here (Stage 5, §3.1) is the
+			// standard x/crypto/ssh pattern for passing auth-time data forward to the session --
+			// Permissions survives on the resulting *ssh.ServerConn, read back in
+			// resolveSSHIdentity once a "shell" request actually starts a session.
+			return &ssh.Permissions{Extensions: map[string]string{
+				"fingerprint":            ssh.FingerprintSHA256(key),
+				"pubkey-authorized-line": string(ssh.MarshalAuthorizedKey(key)),
+			}}, nil
 		},
 		ServerVersion: "SSH-2.0-DragonsNShit",
 	}
@@ -323,7 +512,7 @@ func serveSSH(ln net.Listener, config *ssh.ServerConfig) {
 			log.Printf("[ssh] connected remote=%s client_version=%q", rawConn.RemoteAddr(), sshConn.ClientVersion())
 
 			go ssh.DiscardRequests(reqs)
-			handleSSHChannels(chans, rawConn)
+			handleSSHChannels(sshConn, chans, rawConn)
 		}()
 	}
 }
