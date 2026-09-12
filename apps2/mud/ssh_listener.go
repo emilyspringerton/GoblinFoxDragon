@@ -365,7 +365,7 @@ func validateSSHClaimName(name string) (ok bool, reason string) {
 // never blocks forever.
 func runSSHClaimFlow(adapter *sshConnAdapter, fingerprint, pubKeyLine string) *presetIdentity {
 	ip := ipOnly(adapter.RemoteAddr())
-	send := func(s string) { adapter.Write([]byte(s + "\r\n")) }
+	send := func(s string) { adapter.Write([]byte(normalizeLineEndings(s) + "\r\n")) }
 
 	if sshClaimRateLimited(ip) {
 		send("Too many new-character attempts from your address recently -- try again later.")

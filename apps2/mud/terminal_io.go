@@ -44,9 +44,32 @@ import (
 	"io"
 	"log"
 	"net"
+	"strings"
 )
 
 const maxLineLen = 256
+
+// normalizeLineEndings makes every line break in s a real "\r\n" pair, regardless of what mix of
+// bare '\n' and already-correct "\r\n" it arrived with. Real, live bug found (2026-09-12,
+// founder screenshot: `help` renders as a garbled, wrapped mess in a real Windows Git Bash/
+// MINGW64 terminal): every multi-line message this MUD ever sent (cmdHelp's own block, `map`,
+// `status`, `jobs`, and many more -- any p.send()/p.sendf() call whose string literal embeds a
+// bare '\n' between lines) relied on the CLIENT to translate a lone line-feed into a real
+// carriage-return-plus-line-feed. Telnet clients conventionally do this translation themselves
+// (NVT ASCII's own newline is CRLF, and well-behaved telnet clients accept a bare LF as
+// shorthand for compatibility) -- a real Windows terminal driving an SSH session over a
+// negotiated PTY has no such obligation and, per this live report, does not: a bare '\n' just
+// moves the cursor down a row without returning it to column 0, which is exactly the staggered,
+// word-wrapped-looking garbage in the screenshot. Two-pass replace (collapse any already-correct
+// "\r\n" back to bare '\n' first, THEN re-expand every '\n' to "\r\n") rather than a single
+// blind ReplaceAll("\n", "\r\n") -- a naive single pass would turn an already-correct "\r\n"
+// into "\r\r\n" (this codebase already has ~120 real call sites that manually prepend a leading
+// "\r\n" for blank-line spacing before a single-line message, e.g. `p.send("\r\n" + msg)` --
+// those must come through unchanged, not double up).
+func normalizeLineEndings(s string) string {
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	return strings.ReplaceAll(s, "\n", "\r\n")
+}
 
 // disableNagle sets TCP_NODELAY on a freshly accepted connection -- a real, live bug this
 // session's own echo fix (readTerminalLine, above) exposed: real-time per-keystroke echo writes

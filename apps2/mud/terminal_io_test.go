@@ -175,6 +175,38 @@ func TestReadTerminalLine_EOFPropagatesAsError(t *testing.T) {
 	}
 }
 
+// TestNormalizeLineEndings_BareLFBecomesRealCRLF guards the real, founder-reported live bug
+// (2026-09-12, screenshot of `help` rendering as a garbled mess in a real Windows Git Bash/
+// MINGW64 terminal): a multi-line message built with plain '\n' between lines (exactly how
+// cmdHelp's own raw string literal is written) must render every line break as a real "\r\n".
+func TestNormalizeLineEndings_BareLFBecomesRealCRLF(t *testing.T) {
+	got := normalizeLineEndings("line one\nline two\nline three")
+	want := "line one\r\nline two\r\nline three"
+	if got != want {
+		t.Errorf("normalizeLineEndings(bare LF) = %q, want %q", got, want)
+	}
+}
+
+// TestNormalizeLineEndings_AlreadyCorrectCRLFIsNotDoubled guards the real reason this isn't a
+// naive strings.ReplaceAll("\n", "\r\n") -- ~120 existing call sites in this codebase already
+// manually prepend a leading "\r\n" for blank-line spacing before a single-line message (e.g.
+// `p.send("\r\n" + msg)`). A blind single-pass replace would turn that into "\r\r\n".
+func TestNormalizeLineEndings_AlreadyCorrectCRLFIsNotDoubled(t *testing.T) {
+	got := normalizeLineEndings("\r\nsomething happened")
+	want := "\r\nsomething happened"
+	if got != want {
+		t.Errorf("normalizeLineEndings(already-correct CRLF) = %q, want %q (unchanged, not doubled)", got, want)
+	}
+}
+
+func TestNormalizeLineEndings_MixedEndingsBothNormalize(t *testing.T) {
+	got := normalizeLineEndings("\r\nheader\nbody line\nfooter")
+	want := "\r\nheader\r\nbody line\r\nfooter"
+	if got != want {
+		t.Errorf("normalizeLineEndings(mixed) = %q, want %q", got, want)
+	}
+}
+
 // TestDisableNagle_RealTCPConnDoesNotError guards the real, founder-reported live bug
 // (2026-09-12): "i have to hit enter twice... it wont send until i hit enter or another key" --
 // Nagle's algorithm (Go's own net.TCPConn default) batching this file's own new per-keystroke

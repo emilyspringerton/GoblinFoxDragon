@@ -910,7 +910,7 @@ type player struct {
 }
 
 func (p *player) send(msg string) {
-	p.w.WriteString(msg + "\r\n")
+	p.w.WriteString(normalizeLineEndings(msg) + "\r\n")
 	p.w.Flush()
 }
 
@@ -8458,7 +8458,7 @@ func handleConn(conn net.Conn, isGuest bool, preset *presetIdentity, echoInput b
 	r := bufio.NewReader(conn)
 
 	send := func(s string) {
-		w.WriteString(s + "\r\n")
+		w.WriteString(normalizeLineEndings(s) + "\r\n")
 		w.Flush()
 	}
 
