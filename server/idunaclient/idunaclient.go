@@ -155,6 +155,36 @@ func (c *Client) GetCharacter(characterID string) (*Character, error) {
 	return &ch, nil
 }
 
+// GetCharacterByName resolves name to its character record via IDUNA's real, case-INSENSITIVE
+// lookup (SSH_TRANSPORT_IDENTITY_SPEC.md's own real name-collision gap, founder real-time
+// 2026-09-12: "it should not allow the guest to login as EMILY thats my character on the ssh
+// also Emily should be taken too"). Returns ErrNotFound for an unclaimed name -- callers treat
+// that as "this name is free," the real, common case a guest picking any ordinary name hits.
+// url.PathEscape (not QueryEscape, which encodes a space as "+" -- correct for a query string,
+// wrong for a path segment) -- defensive regardless of caller, even though this codebase's own
+// real name charset (validateSSHClaimName/normalizePlayerName, letters and digits only) is
+// already URL-safe by construction and would never actually need escaping in practice.
+func (c *Client) GetCharacterByName(name string) (*Character, error) {
+	req, _ := http.NewRequest(http.MethodGet,
+		c.baseURL+"/api/v1/characters/by-name/"+url.PathEscape(name), nil)
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, fmt.Errorf("idunaclient: GetCharacterByName: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+	var ch Character
+	if err := json.NewDecoder(resp.Body).Decode(&ch); err != nil {
+		return nil, fmt.Errorf("idunaclient: GetCharacterByName decode: %w", err)
+	}
+	return &ch, nil
+}
+
 // UpdateHome patches the character's real, persisted Home Point (2026-08-04, founder: "iterate" --
 // real gap found live earlier the same day: sethome only ever mutated apps2/mud's own in-memory
 // homePoint struct, never IDUNA, so a custom Home Point silently reverted to unset on every fresh

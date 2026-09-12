@@ -8498,6 +8498,43 @@ func handleConn(conn net.Conn, isGuest bool, preset *presetIdentity, echoInput b
 			send("Name must be 2–20 characters.")
 			return
 		}
+		// Real, found-live gap (2026-09-12, founder: "it should not allow the guest to login as
+		// EMILY thats my character on the ssh also Emily should be taken too"): a guest name had
+		// NO charset restriction beyond length, and NO collision check against either a real,
+		// permanent SSH-bound character's name OR another currently-connected player -- a guest
+		// could freely squat "EMILY" (or "Emily"/"eMiLy") while the founder's own real character of
+		// that exact name was online, indistinguishable at a glance except for the [Guest] tag
+		// `who` only recently learned to show. Reusing validateSSHClaimName's own real charset +
+		// reserved-name rules for guests too -- one shared validity rule instead of two, and
+		// "letters/digits only" is what makes every accepted name here URL-safe by construction if
+		// that's ever wanted (founder: "so that we can have names in urls if we really wanted to"),
+		// with no separate escaping step needed beyond the case-fold the collision checks already do.
+		if ok, reason := validateSSHClaimName(name); !ok {
+			send(reason)
+			return
+		}
+		// Case-insensitive collision check against every real, permanent (SSH-bound) character,
+		// online or not -- IDUNA's own GetCharacterByName does the real LOWER(name)=LOWER(?) lookup
+		// (idunaclient.go's own doc comment explains why the plain UNIQUE(name) constraint alone
+		// isn't case-insensitive). Best-effort like every other idunaclient call in this file: a
+		// transient IDUNA outage degrades to "didn't check" rather than refusing every guest
+		// connection outright.
+		if _, err := gw.iduna.GetCharacterByName(name); err == nil {
+			send(fmt.Sprintf("The name %q is already claimed by a permanent character. Choose another.", name))
+			return
+		} else if !errors.Is(err, idunaclient.ErrNotFound) {
+			log.Printf("[guest] name-collision check against IDUNA failed for %q, allowing through best-effort: %v", name, err)
+		}
+		// Case-insensitive collision check against every OTHER currently-connected player (guest
+		// or SSH-bound) -- IDUNA's own lookup above only covers permanent characters, not two
+		// simultaneous guests picking the identical name.
+		gw.mu.Lock()
+		collides := nameCollidesWithOnlinePlayer(gw.players, name)
+		gw.mu.Unlock()
+		if collides {
+			send(fmt.Sprintf("%q is already in use by someone currently online. Choose another.", name))
+			return
+		}
 	}
 
 	slot := conn.RemoteAddr().String()
