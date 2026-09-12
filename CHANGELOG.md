@@ -1,4 +1,5 @@
 ## 2026-09-12
+- fix(mob): dead mobs now respawn -- Registry.Revive resets an already-registered (dead) mob in place instead of re-Spawning its ID, which server/mob.Registry.Hit never removes and Spawn always rejects as a duplicate (GitHub #33: "mobs just sit dead in the mobs table and dont respawn"). apps2/mud's tickAll() deadQueue processing now calls Revive, falling back to Spawn only if the mob is genuinely gone from the registry. (sess-20260905-0720-ec33e7c5)
 
 - docs(readme): full rewrite for external/agent readers -- founder: "give me a full updated GFD
   readme explain some of the limited capabilities of the gui and then go extensively into the
