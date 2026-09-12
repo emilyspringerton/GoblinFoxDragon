@@ -3,6 +3,7 @@
     "id": 1,
     "name": "Willow Wand",
     "category": "weapon",
+    "weapon_type": "staff",
     "equip_slots": [
       "main"
     ],
@@ -26,6 +27,7 @@
     "id": 2,
     "name": "Dagger",
     "category": "weapon",
+    "weapon_type": "dagger",
     "equip_slots": [
       "main",
       "off"
@@ -52,6 +54,7 @@
     "id": 3,
     "name": "Sword",
     "category": "weapon",
+    "weapon_type": "sword",
     "equip_slots": [
       "main",
       "off"
@@ -76,6 +79,7 @@
     "id": 4,
     "name": "Hand Axe",
     "category": "weapon",
+    "weapon_type": "axe",
     "equip_slots": [
       "main",
       "off"
@@ -98,6 +102,7 @@
     "id": 5,
     "name": "Brass Staff",
     "category": "weapon",
+    "weapon_type": "staff",
     "equip_slots": [
       "main"
     ],
@@ -122,6 +127,7 @@
     "id": 6,
     "name": "Steel Sword",
     "category": "weapon",
+    "weapon_type": "sword",
     "equip_slots": [
       "main",
       "off"
@@ -146,6 +152,7 @@
     "id": 7,
     "name": "Composite Bow",
     "category": "weapon",
+    "weapon_type": "bow",
     "equip_slots": [
       "main"
     ],
@@ -167,6 +174,7 @@
     "id": 8,
     "name": "Mythril Sword",
     "category": "weapon",
+    "weapon_type": "sword",
     "equip_slots": [
       "main",
       "off"
@@ -195,6 +203,7 @@
     "id": 9,
     "name": "Healing Staff",
     "category": "weapon",
+    "weapon_type": "staff",
     "equip_slots": [
       "main"
     ],
@@ -217,6 +226,7 @@
     "id": 10,
     "name": "Excalibur",
     "category": "weapon",
+    "weapon_type": "sword",
     "equip_slots": [
       "main"
     ],
@@ -242,6 +252,7 @@
     "id": 11,
     "name": "Training Sword",
     "category": "weapon",
+    "weapon_type": "sword",
     "equip_slots": [
       "main",
       "off"
@@ -265,6 +276,7 @@
     "id": 12,
     "name": "Iron Shortsword",
     "category": "weapon",
+    "weapon_type": "sword",
     "equip_slots": [
       "main",
       "off"
@@ -289,6 +301,7 @@
     "id": 13,
     "name": "Broadsword",
     "category": "weapon",
+    "weapon_type": "sword",
     "equip_slots": [
       "main",
       "off"
@@ -1347,6 +1360,7 @@
     "name": "Mikazuki",
     "description": "A legendary katana named for its crescent moon blade, said to grant its wielder swiftness in combat.",
     "category": "weapon",
+    "weapon_type": "katana",
     "equip_slots": [
       "main"
     ],
@@ -1370,6 +1384,7 @@
     "name": "Juzumaru",
     "description": "A legendary katana whispered to possess a profound, ancient spirit, said to empower its wielder with unparalleled precision.",
     "category": "weapon",
+    "weapon_type": "katana",
     "equip_slots": [
       "main"
     ],
@@ -1394,6 +1409,7 @@
     "name": "Onimaru",
     "description": "A legendary katana, said to be imbued with the essence of a vengeful spirit, granting its wielder supernatural speed and precision.",
     "category": "weapon",
+    "weapon_type": "katana",
     "equip_slots": [
       "main"
     ],
@@ -1418,6 +1434,7 @@
     "name": "Ōdenta",
     "description": "A legendary katana, one of the Five Great Swords of Japan, imbued with the spirit of a fierce guardian.",
     "category": "weapon",
+    "weapon_type": "katana",
     "equip_slots": [
       "main"
     ],
@@ -1440,6 +1457,7 @@
     "name": "Dōjigiri",
     "description": "One of the Five Great Swords of legend, said to have slain the oni Shuten Dōji. Its edge hums with an ancient, formidable power.",
     "category": "weapon",
+    "weapon_type": "katana",
     "equip_slots": [
       "main"
     ],
@@ -1464,6 +1482,7 @@
     "name": "Beestinger",
     "description": "A slender dagger crafted to resemble a giant bee's stinger, rumored to inflict a mild venom.",
     "category": "weapon",
+    "weapon_type": "dagger",
     "equip_slots": [
       "main",
       "off"
@@ -1490,6 +1509,7 @@
     "name": "Wooden Katana",
     "description": "A lightweight training weapon crafted from wood, ideal for beginners.",
     "category": "weapon",
+    "weapon_type": "katana",
     "equip_slots": [
       "main"
     ],
@@ -1512,6 +1532,7 @@
     "name": "Banjo",
     "description": "A finely crafted banjo, its melodies capable of inspiring allies.",
     "category": "weapon",
+    "weapon_type": "instrument",
     "equip_slots": [
       "main"
     ],
@@ -1534,6 +1555,7 @@
     "name": "Icewraith Claymore",
     "description": "A greatsword forged from perpetual ice, resonating with a freezing aura. Its chilling touch drains the warmth from all it strikes.",
     "category": "weapon",
+    "weapon_type": "greatsword",
     "equip_slots": [
       "main"
     ],
@@ -1621,6 +1643,7 @@
     "name": "Swift Blade",
     "description": "A finely balanced one-handed sword, crafted for rapid, precise strikes.",
     "category": "weapon",
+    "weapon_type": "sword",
     "equip_slots": [
       "main",
       "off"
@@ -1651,6 +1674,7 @@
     "name": "Sunken Dagger of Kali",
     "description": "A dagger salvaged from the abyssal depths, its blade etched with arcane symbols that whisper of ancient, dark power.",
     "category": "weapon",
+    "weapon_type": "dagger",
     "equip_slots": [
       "main",
       "off"
@@ -1678,6 +1702,7 @@
     "name": "Hidden Dagger of Kali",
     "description": "A finely balanced dagger rumored to have been used by assassins in service to a forgotten deity.",
     "category": "weapon",
+    "weapon_type": "dagger",
     "equip_slots": [
       "main",
       "off"
@@ -1768,6 +1793,7 @@
     "name": "Keen Edge",
     "description": "A masterfully honed one-handed blade, its edge capable of piercing through the toughest hides.",
     "category": "weapon",
+    "weapon_type": "sword",
     "equip_slots": [
       "main"
     ],
@@ -1957,6 +1983,7 @@
     "name": "Light's End",
     "description": "A radiant one-handed sword that banishes shadows. Its holy light empowers divine magic.",
     "category": "weapon",
+    "weapon_type": "sword",
     "equip_slots": [
       "main"
     ],
@@ -1986,6 +2013,7 @@
     "name": "Bow of the Gorgon Outcast",
     "description": "A bow rumored to have once belonged to a shunned Gorgon, its design hinting at both serpentine grace and deadly precision.",
     "category": "weapon",
+    "weapon_type": "bow",
     "equip_slots": [
       "main"
     ],
@@ -2012,6 +2040,7 @@
     "name": "Utzu Mah Turi",
     "description": "A finely crafted blade rumored to hum with ancient, silent power.",
     "category": "weapon",
+    "weapon_type": "dagger",
     "equip_slots": [
       "main"
     ],
@@ -2229,6 +2258,7 @@
     "name": "Paltry Bastard Sword",
     "description": "A crudely forged, yet surprisingly effective bastard sword for the aspiring adventurer. Its balance is poor.",
     "category": "weapon",
+    "weapon_type": "sword",
     "equip_slots": [
       "main",
       "off"
@@ -2306,6 +2336,7 @@
     "name": "Death's Gambit",
     "description": "A dark blade rumored to offer overwhelming power, but at a hidden cost only the wielder can pay.",
     "category": "weapon",
+    "weapon_type": "sword",
     "equip_slots": [
       "main"
     ],
@@ -2383,6 +2414,7 @@
     "name": "Fourth Remorse",
     "description": "A blade pulsating with the weight of forgotten vows and profound regret. It whispers forgotten secrets to its wielder.",
     "category": "weapon",
+    "weapon_type": "sword",
     "equip_slots": [
       "main"
     ],
@@ -2651,7 +2683,6 @@
   {
     "id": 1056,
     "name": "Raven's Gift",
-    "description": "A dark, polished ring said to be blessed by a spirit of the night. Enhances one's perception and agility.",
     "category": "accessory",
     "equip_slots": [
       "ring-l"
@@ -2666,10 +2697,8 @@
     "level": 45,
     "stats": {
       "accuracy": 4,
-      "agi": 4,
-      "dex": 2,
-      "evasion": 6,
-      "mp": 10
+      "evasion": 16,
+      "mp": 50
     },
     "stack_size": 1,
     "model_id": "raven_ring_a"
@@ -2770,6 +2799,7 @@
     "name": "simple dagger",
     "description": "A basic, unadorned dagger. Suitable for beginners.",
     "category": "weapon",
+    "weapon_type": "dagger",
     "equip_slots": [
       "main",
       "off"
@@ -3123,6 +3153,7 @@
     "name": "Kitchen Knife",
     "description": "A common household knife, surprisingly sharp. Not ideal for combat, but better than nothing.",
     "category": "weapon",
+    "weapon_type": "dagger",
     "equip_slots": [
       "main",
       "off"
@@ -3188,6 +3219,7 @@
     "name": "Shepherd's Staff",
     "description": "A rustic staff, carved from ancient wood, imbued with the spirit of the wilds.",
     "category": "weapon",
+    "weapon_type": "staff",
     "equip_slots": [
       "main"
     ],
@@ -3244,6 +3276,7 @@
     "name": "Last Regret",
     "description": "A blade said to be forged from the tears of a vanquished hero, imbued with their final, lingering regret.",
     "category": "weapon",
+    "weapon_type": "sword",
     "equip_slots": [
       "main"
     ],
@@ -3323,6 +3356,7 @@
     "name": "Simple Bow",
     "description": "A crudely made bow, suitable for beginners.",
     "category": "weapon",
+    "weapon_type": "bow",
     "equip_slots": [
       "main"
     ],
@@ -3345,6 +3379,7 @@
     "name": "Sabre",
     "description": "A light and well-balanced single-edged sword, popular among new adventurers.",
     "category": "weapon",
+    "weapon_type": "sword",
     "equip_slots": [
       "main",
       "off"
@@ -3372,6 +3407,7 @@
     "name": "Qi Tornado",
     "description": "A pair of weighted handguards imbued with tempestuous energies, allowing the wearer to strike with the force of a whirlwind.",
     "category": "weapon",
+    "weapon_type": "h2h",
     "equip_slots": [
       "main"
     ],
@@ -3400,6 +3436,7 @@
     "name": "Heavy Claws",
     "description": "A pair of weighted metal claws designed for delivering powerful, crushing blows.",
     "category": "weapon",
+    "weapon_type": "h2h",
     "equip_slots": [
       "main"
     ],
@@ -3424,6 +3461,7 @@
     "name": "Titanium Claws",
     "description": "Claws forged from lightweight yet incredibly durable titanium, granting speed and defense.",
     "category": "weapon",
+    "weapon_type": "h2h",
     "equip_slots": [
       "main",
       "off"
