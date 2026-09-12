@@ -1433,7 +1433,11 @@ func applyJobStats(p *player) {
 // Backed by mobDropReg (data/mob_drops.json) so drop tables are managed via
 // the GFD-MD-001 admin GUI, not a code change + redeploy.
 func dropsForMob(kind string) []loot.Item {
-	tableItems := mobDropReg.DropsFor(kind)
+	// S412-09, founder real-time: "the gfd-mob-drops admin interface needs to be able to tune
+	// drop rates for each item" -- RollDropsFor (not DropsFor) is the real gameplay path now,
+	// rolling each configured item independently against its own real, admin-editable
+	// DropChance instead of always dropping the entire table on every kill.
+	tableItems := mobDropReg.RollDropsFor(kind, gw.rng)
 	out := make([]loot.Item, len(tableItems))
 	for i, it := range tableItems {
 		out[i] = loot.Item{ID: it.ID, Name: it.Name}
