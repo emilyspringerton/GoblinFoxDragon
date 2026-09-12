@@ -840,29 +840,37 @@ type player struct {
 	pityOwnCrit   [2]int
 	pityAvoidHit  [2]int
 	pityAvoidCrit [2]int
-	inventory     map[string]int // itemID → quantity
-	craftSkill    *craft.CraftSkill
-	flow          int
-	guildID       string // linkshell guild ID ("" = none)
-	equip         *gear.Equipment
-	isInvisible   bool
-	invisExpires  time.Time
-	isSneaking    bool
-	sneakExpires  time.Time
-	isResting     bool
-	charJob       *job.CharJob // main+sub job pairing (nil until initialized)
-	meritBank     *merit.MeritBank
-	recastTracker *job.RecastTracker
-	petSlot       *pet.Slot             // BST pet companion (non-nil always; pet.IsAlive() = has pet)
-	petHeel       bool                  // true = pet does not attack (heel mode)
-	k9Swarm       *k9.Swarm             // TRAPX: active K9 swarm (nil if none deployed)
-	disguise      npcattention.Disguise // stealth identity (S130-02); default = no disguise
-	questJournal  *quest.Journal        // NPC quest progress
-	atlas         *cartography.Atlas    // explored zone map
-	chatLang      autotranslate.Lang    // preferred chat language; default EN
-	conn          net.Conn
-	w             *bufio.Writer
-	inbox         chan string
+	// pendingAttackBonus/pendingGuaranteedCrit (JOB_SPELL_SYSTEM_NORTHSTAR.md §0.5/§6, founder
+	// direct follow-up: "does boost increase your attack? does sneak attack guarantee a
+	// critical...?") are real, one-shot effects consumed by this player's own NEXT LANDED
+	// auto-attack (resolvePlayerAutoAttackDamage) -- Boost/Sneak Attack used to just print a
+	// message with no real effect at all. Deliberately NOT consumed by a missed swing (checked
+	// before either flag is read), so whiffing right after activating one doesn't waste it.
+	pendingAttackBonus    float64
+	pendingGuaranteedCrit bool
+	inventory             map[string]int // itemID → quantity
+	craftSkill            *craft.CraftSkill
+	flow                  int
+	guildID               string // linkshell guild ID ("" = none)
+	equip                 *gear.Equipment
+	isInvisible           bool
+	invisExpires          time.Time
+	isSneaking            bool
+	sneakExpires          time.Time
+	isResting             bool
+	charJob               *job.CharJob // main+sub job pairing (nil until initialized)
+	meritBank             *merit.MeritBank
+	recastTracker         *job.RecastTracker
+	petSlot               *pet.Slot             // BST pet companion (non-nil always; pet.IsAlive() = has pet)
+	petHeel               bool                  // true = pet does not attack (heel mode)
+	k9Swarm               *k9.Swarm             // TRAPX: active K9 swarm (nil if none deployed)
+	disguise              npcattention.Disguise // stealth identity (S130-02); default = no disguise
+	questJournal          *quest.Journal        // NPC quest progress
+	atlas                 *cartography.Atlas    // explored zone map
+	chatLang              autotranslate.Lang    // preferred chat language; default EN
+	conn                  net.Conn
+	w                     *bufio.Writer
+	inbox                 chan string
 	// headlessBuf (2026-08-02, HEADLESS_SESSION_NORTHSTAR.md Milestone 1+, founder: "the real MUD
 	// combat system" for GoblinFoxDragon's Town scene): non-nil only for a headless player (see
 	// getOrCreateHeadlessPlayer) -- w wraps this buffer instead of a real net.Conn, same
@@ -6231,6 +6239,11 @@ func cmdJA(p *player, abilityID string) {
 				p.send("No target for Provoke.")
 			}
 		case "berserk":
+			// JOB_SPELL_SYSTEM_NORTHSTAR.md §0.5 (founder: "does boost increase your attack?"):
+			// this used to just print the line below with no real effect -- same real status.Haste
+			// mechanism the "haste" spell already applies, same real potency/duration this
+			// ability's own message has always claimed.
+			p.statFX.Apply(status.Effect{Kind: status.Haste, Potency: 30, ExpiresAt: now.Add(3 * time.Minute)})
 			p.sendf("You enter Berserk! (Haste +30%% for 3 minutes)")
 		case "warcry":
 			// Real bug fixed 2026-08-03, same self-deadlock class as cmdTravel -- broadcastZone
@@ -6254,6 +6267,12 @@ func cmdJA(p *player, abilityID string) {
 			p.hp += healed
 			p.sendf("Chakra! +%d HP. (HP: %d/%d)", healed, p.hp, p.maxHP)
 		case "boost":
+			// JOB_SPELL_SYSTEM_NORTHSTAR.md §0.5 (founder: "does boost increase your attack?"):
+			// this used to just print the line below with no real effect. pendingAttackBonus is
+			// a real, one-shot +50% damage multiplier consumed by the caster's own next landed
+			// auto-attack (resolvePlayerAutoAttackDamage) -- a missed swing does NOT consume it,
+			// so a whiffed attack right after Boost doesn't waste the buff.
+			p.pendingAttackBonus = combatBoostBonus
 			p.sendf("Boost! Your next attack will land harder.")
 		case "clear_mind":
 			restored := p.maxMP / 4
@@ -6266,6 +6285,12 @@ func cmdJA(p *player, abilityID string) {
 			p.mp += restored
 			p.sendf("Clear Mind! +%d MP. (MP: %d/%d)", restored, p.mp, p.maxMP)
 		case "elemental_seal":
+			// Real, honest, NOT fixed yet (JOB_SPELL_SYSTEM_NORTHSTAR.md §0.5/§6): still flavor
+			// text only. Unlike Boost/Sneak Attack/Berserk above, this one has a real, larger
+			// dependency -- no spell ever rolls accuracy today (only auto-attacks do, via
+			// combat_formula.go's own resolvePlayerAutoAttackDamage), so "guaranteed to land"
+			// has nothing to guarantee against yet. Needs a real spell-accuracy system first,
+			// deliberately not built here.
 			p.sendf("Elemental Seal! Your next spell is guaranteed to land.")
 		case "convert":
 			// Real FFXI RDM Lv1 ability: trade HP for MP. Up to 25% of max HP converts to MP,
@@ -6285,10 +6310,29 @@ func cmdJA(p *player, abilityID string) {
 			p.mp += mpGain
 			p.sendf("Convert! -%d HP, +%d MP. (HP: %d/%d  MP: %d/%d)", hpCost, mpGain, p.hp, p.maxHP, p.mp, p.maxMP)
 		case "chainspell":
+			// Real, honest, NOT fixed yet (JOB_SPELL_SYSTEM_NORTHSTAR.md §0.5/§6): still flavor
+			// text only. A real fix needs a free-MP-window check at every one of cmdCast's own
+			// dozens of "p.mp -= cost" sites (across cmdCast itself and its six delegate
+			// functions) -- a real, separate, larger change than Boost/Sneak Attack/Berserk's
+			// own single-consumption-point fixes above, deliberately not attempted in this pass.
 			p.sendf("Chainspell! Your spells cost no MP for a short time.")
 		case "sneak_attack":
+			// JOB_SPELL_SYSTEM_NORTHSTAR.md §0.5 (founder: "does sneak attack guarantee a
+			// critical on the next hit... on top of that?"): this used to just print the line
+			// below with no real effect. pendingGuaranteedCrit forces the caster's own next
+			// landed auto-attack to crit (resolvePlayerAutoAttackDamage), bypassing the normal
+			// crit roll entirely -- a missed swing does NOT consume it. Real, honest, NOT done:
+			// the founder's own follow-up "and give bonus attack on top of that?" -- a genuine
+			// second effect (an extra attack, not just a guaranteed crit on the one attack) is
+			// real, separate scope, not bundled into this fix silently.
+			p.pendingGuaranteedCrit = true
 			p.sendf("Sneak Attack! Your next strike lands a critical blow from the shadows.")
 		case "trick_attack":
+			// Real, honest, NOT fixed yet (JOB_SPELL_SYSTEM_NORTHSTAR.md §0.5/§6): still flavor
+			// text only. A real fix needs a genuine design decision this pass didn't make --
+			// which "nearby ally" receives the transferred enmity (auto-selected? does the
+			// caster need to type a target the way Provoke does?) -- deliberately not guessed
+			// at silently.
 			p.sendf("Trick Attack! Your next strike transfers enmity to a nearby ally.")
 		case "venom":
 			cmdAssassinVenom(p)

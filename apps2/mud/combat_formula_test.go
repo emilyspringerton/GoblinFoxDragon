@@ -170,3 +170,92 @@ func TestResolveMobAutoAttackDamage_MissReportsNoDamage(t *testing.T) {
 		t.Error("expected at least one miss over 200 mob attack rolls at a ~85%% hit chance -- suspiciously deterministic")
 	}
 }
+
+// JOB_SPELL_SYSTEM_NORTHSTAR.md §0.5 real-effect tests -- founder direct follow-up: "does boost
+// increase your attack? does sneak attack guarantee a critical on the next hit...?"
+
+func TestResolvePlayerAutoAttackDamage_PendingAttackBonusAppliesOnceThenClears(t *testing.T) {
+	withSeededCombatRNG(t, 1)
+	p := newTestPlayer()
+	p.jobID = job.WAR
+	// Force a guaranteed hit by giving Hit a full pity drought -- isolates the bonus itself from
+	// whether this particular swing happened to land.
+	p.pityOwnHit = [2]int{10, 0}
+	p.pendingAttackBonus = combatBoostBonus
+
+	hit, _, boosted := resolvePlayerAutoAttackDamage(p, 30)
+	if !hit {
+		t.Fatal("expected a guaranteed hit (full pity drought on Hit)")
+	}
+	if p.pendingAttackBonus != 0 {
+		t.Error("pendingAttackBonus should be cleared after a landed hit consumes it")
+	}
+
+	// A second swing, immediately after, with the SAME seed reset must deal LESS damage than the
+	// first (no bonus active anymore) -- a real, structural check that the bonus actually did
+	// something, not just that the flag got cleared.
+	withSeededCombatRNG(t, 1)
+	p2 := newTestPlayer()
+	p2.jobID = job.WAR
+	p2.pityOwnHit = [2]int{10, 0}
+	_, _, unboosted := resolvePlayerAutoAttackDamage(p2, 30)
+	if boosted <= unboosted {
+		t.Errorf("boosted damage (%d) should exceed the same roll unboosted (%d)", boosted, unboosted)
+	}
+}
+
+func TestResolvePlayerAutoAttackDamage_PendingAttackBonusNotConsumedByAMiss(t *testing.T) {
+	p := newTestPlayer()
+	p.jobID = job.WAR
+	p.pityOwnHit = [2]int{0, 10} // force a miss: Miss (index 1) fully favored
+	p.pendingAttackBonus = combatBoostBonus
+
+	hit, _, _ := resolvePlayerAutoAttackDamage(p, 30)
+	if hit {
+		t.Fatal("expected a guaranteed miss (full pity drought on Miss)")
+	}
+	if p.pendingAttackBonus != combatBoostBonus {
+		t.Error("a missed swing must not consume pendingAttackBonus -- it should still be armed for the next real attempt")
+	}
+}
+
+func TestResolvePlayerAutoAttackDamage_PendingGuaranteedCritAppliesOnceThenClears(t *testing.T) {
+	withSeededCombatRNG(t, 2)
+	p := newTestPlayer()
+	p.jobID = job.WAR
+	p.pityOwnHit = [2]int{10, 0}  // guaranteed hit
+	p.pityOwnCrit = [2]int{0, 10} // crit itself fully NOT favored by the normal roll
+	p.pendingGuaranteedCrit = true
+
+	hit, crit, _ := resolvePlayerAutoAttackDamage(p, 30)
+	if !hit {
+		t.Fatal("expected a guaranteed hit")
+	}
+	if !crit {
+		t.Error("pendingGuaranteedCrit should force a crit even though the normal crit roll fully favors Normal")
+	}
+	if p.pendingGuaranteedCrit {
+		t.Error("pendingGuaranteedCrit should be cleared after a landed hit consumes it")
+	}
+
+	// Next swing (crit still disfavored, no more guarantee) should NOT crit.
+	_, crit2, _ := resolvePlayerAutoAttackDamage(p, 30)
+	if crit2 {
+		t.Error("expected no crit on the follow-up swing -- the guarantee should already be consumed")
+	}
+}
+
+func TestResolvePlayerAutoAttackDamage_PendingGuaranteedCritNotConsumedByAMiss(t *testing.T) {
+	p := newTestPlayer()
+	p.jobID = job.WAR
+	p.pityOwnHit = [2]int{0, 10} // force a miss
+	p.pendingGuaranteedCrit = true
+
+	hit, _, _ := resolvePlayerAutoAttackDamage(p, 30)
+	if hit {
+		t.Fatal("expected a guaranteed miss")
+	}
+	if !p.pendingGuaranteedCrit {
+		t.Error("a missed swing must not consume pendingGuaranteedCrit -- it should still be armed for the next real attempt")
+	}
+}

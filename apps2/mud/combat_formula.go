@@ -108,11 +108,19 @@ func reduceIncomingDamage(incoming, defenderVIT int) int {
 	return reduced
 }
 
+// combatBoostBonus is the real, chosen multiplier MNK's Boost ability adds to the caster's own
+// next landed auto-attack (JOB_SPELL_SYSTEM_NORTHSTAR.md §0.5) -- a real, concrete number picked
+// here (Boost's own in-game text, "your next attack will land harder," never specified one),
+// not left as an unfixed flavor-text claim.
+const combatBoostBonus = 0.5 // +50%
+
 // resolvePlayerAutoAttackDamage computes one real player auto-attack swing against a mob: a
 // pity-boosted accuracy roll (mob defender AGI is 0 -- no comparable mob stat block exists yet,
 // same real v0 simplification combatMobBaseHitChance/CritChance name above), STR-scaled damage
-// with real ±20% variance, and a pity-boosted DEX-based crit. Returns (hit, crit, damage) --
-// damage is 0 and crit is false whenever hit is false.
+// with real ±20% variance, and a pity-boosted DEX-based crit -- plus MNK's Boost
+// (pendingAttackBonus) and THF's Sneak Attack (pendingGuaranteedCrit), both real, one-shot
+// effects consumed here on a landed hit only (a miss leaves them armed for the next real swing).
+// Returns (hit, crit, damage) -- damage is 0 and crit is false whenever hit is false.
 func resolvePlayerAutoAttackDamage(p *player, baseDamage int) (hit bool, crit bool, damage int) {
 	stats := playerCombatStats(p)
 	hitChance := clampPercent(combatBaseHitChance+stats.DEX/2, combatMinHitChance, combatMaxHitChance)
@@ -125,9 +133,17 @@ func resolvePlayerAutoAttackDamage(p *player, baseDamage int) (hit bool, crit bo
 		mean = baseDamage * stats.STR / 10
 	}
 	dmg := rollDamageVariance(mean)
+	if p.pendingAttackBonus > 0 {
+		dmg = int(float64(dmg) * (1 + p.pendingAttackBonus))
+		p.pendingAttackBonus = 0
+	}
 
 	critChance := clampPercent(combatBaseCritChance+stats.DEX/10, 0, combatMaxCritChance)
 	isCrit := pityRoll(critChance, &p.pityOwnCrit)
+	if p.pendingGuaranteedCrit {
+		isCrit = true
+		p.pendingGuaranteedCrit = false
+	}
 	if isCrit {
 		dmg = int(float64(dmg) * combatCritMultiplier)
 	}
