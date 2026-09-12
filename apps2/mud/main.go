@@ -916,6 +916,13 @@ type player struct {
 	headlessSyncedLevel int
 	headlessSyncedXP    int
 	headlessSyncedFlow  int
+	// headlessSyncedInventory (S252-00/01, GFD-AH-93944 -- real fix for the Auction House
+	// "no items shown" bug): same real reasoning as headlessSyncedLevel/XP/Flow above, applied
+	// to the flat stackable-material map. A snapshot of what IDUNA already has, so
+	// runHeadlessCommand's own delta check only pushes a real whole-map upsert when p.inventory
+	// has actually changed since the last sync -- not every command, most of which never touch
+	// inventory at all.
+	headlessSyncedInventory map[string]int
 	// headlessLastActive (2026-08-02, HEADLESS_SESSION_NORTHSTAR.md M4, founder: "sync up town
 	// with the MUD" arc's own named follow-up): updated on every runHeadlessCommand call. A
 	// background sweep (see evictIdleHeadlessSessions) drops any headless session idle past
@@ -1650,6 +1657,16 @@ func tickAll() {
 	}
 
 	for _, p := range gw.players {
+		// S412-XX real production data-loss fix (2026-09-12, founder real-time: "ok we lost data
+		// somehow - did you roll the server back?" -> "i was lvl 11 warrior before losing
+		// connection" -> "this is unacceptable we can never lose player progress like that"):
+		// level/XP/Flow used to ONLY persist on a clean disconnect (handleConn's own defer) --
+		// this process has no SIGTERM/graceful-shutdown handling anywhere, so any
+		// `systemctl restart` kills the process immediately and skips every in-flight
+		// connection's disconnect defer, silently losing any progress since the last save. Now
+		// synced every tick (1Hz) for every player, not just headless ones -- see
+		// char_progress_sync.go.
+		syncCharLevelAndFlow(p)
 		// Expire Invisible/Sneak.
 		if p.isInvisible && now.After(p.invisExpires) {
 			p.isInvisible = false
@@ -8268,6 +8285,15 @@ func getOrCreateHeadlessPlayer(characterID string) (*player, error) {
 	if err != nil {
 		return nil, err
 	}
+	// S252-00/01: load whatever real stackable-material inventory IDUNA already has for this
+	// character -- the literal GFD-AH-93944 fix, "kill a mob for a real item ... reconnect,
+	// confirm the item is still there." A GetInventory failure (IDUNA unreachable, etc.) falls
+	// back to a fresh, empty inventory rather than blocking the whole session from starting --
+	// same best-effort posture every other idunaclient call in this file already has.
+	loadedInventory, err := gw.iduna.GetInventory(characterID)
+	if err != nil {
+		loadedInventory = make(map[string]int)
+	}
 	// Real job seeding (2026-08-05, diagnosing "1/2/3 ability hotkeys don't match my real spells
 	// in Meadow"): this used to hardcode job.WAR unconditionally -- IDUNA's own job_main (now
 	// actually persisted by cmdSetJob, see that function's own doc comment) was never read back
@@ -8340,7 +8366,7 @@ func getOrCreateHeadlessPlayer(characterID string) (*player, error) {
 		questJournal:  quest.NewJournal(),
 		atlas:         cartography.NewAtlas(),
 		fameStore:     fame.NewStore(),
-		inventory:     make(map[string]int),
+		inventory:     loadedInventory,
 		craftSkill:    craft.NewCraftSkill(),
 		flow:          500,
 		equip:         gear.NewEquipment(),
@@ -8366,6 +8392,7 @@ func getOrCreateHeadlessPlayer(characterID string) (*player, error) {
 	p.headlessSyncedLevel = p.charXP.Level
 	p.headlessSyncedXP = p.charXP.CurrentXP
 	p.headlessSyncedFlow = p.flow
+	p.headlessSyncedInventory = cloneInventory(loadedInventory)
 	gw.charIDBySlot[slot] = ch.CharacterID
 	gw.players[slot] = p
 	p.atlas.Visit(p.zoneID)
@@ -8435,9 +8462,42 @@ func runHeadlessCommand(characterID, line string) (string, error) {
 			}
 			p.headlessSyncedFlow = p.flow
 		}
+		// S252-00/01 (GFD-AH-93944): same delta-sync shape as level/XP/flow above, applied to
+		// the flat stackable-material map. Whole-map upsert (SetInventory), not a per-item
+		// delta call -- matches IDUNA's own real API shape (S252-00's "real, whole-map upsert,
+		// simplest to reason about").
+		if !inventoryEqual(p.inventory, p.headlessSyncedInventory) {
+			_ = gw.iduna.SetInventory(charID, p.inventory)
+			p.headlessSyncedInventory = cloneInventory(p.inventory)
+		}
 	}
 
 	return out, nil
+}
+
+// cloneInventory returns an independent copy of inv, so a snapshot taken for delta-sync
+// comparison isn't silently mutated when the live map it was copied from changes afterward.
+func cloneInventory(inv map[string]int) map[string]int {
+	out := make(map[string]int, len(inv))
+	for k, v := range inv {
+		out[k] = v
+	}
+	return out
+}
+
+// inventoryEqual reports whether two stackable-material maps hold exactly the same non-zero
+// entries -- used by both the headless per-command delta-sync and the telnet disconnect-time
+// sync to decide whether a real IDUNA write is even needed.
+func inventoryEqual(a, b map[string]int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if b[k] != v {
+			return false
+		}
+	}
+	return true
 }
 
 // ── connection handler ────────────────────────────────────────────────────────
@@ -8551,40 +8611,38 @@ func handleConn(conn net.Conn, isGuest bool, preset *presetIdentity, echoInput b
 			return
 		}
 		name = strings.TrimSpace(nameRaw)
-		if len(name) < 2 || len(name) > 20 {
-			send("Name must be 2–20 characters.")
-			return
-		}
 		// Real, found-live gap (2026-09-12, founder: "it should not allow the guest to login as
 		// EMILY thats my character on the ssh also Emily should be taken too"): a guest name had
-		// NO charset restriction beyond length, and NO collision check against either a real,
-		// permanent SSH-bound character's name OR another currently-connected player -- a guest
-		// could freely squat "EMILY" (or "Emily"/"eMiLy") while the founder's own real character of
-		// that exact name was online, indistinguishable at a glance except for the [Guest] tag
-		// `who` only recently learned to show. Reusing validateSSHClaimName's own real charset +
-		// reserved-name rules for guests too -- one shared validity rule instead of two, and
-		// "letters/digits only" is what makes every accepted name here URL-safe by construction if
-		// that's ever wanted (founder: "so that we can have names in urls if we really wanted to"),
-		// with no separate escaping step needed beyond the case-fold the collision checks already do.
+		// NO charset restriction at all (only a length check) and NO collision check against
+		// either a real, permanent SSH-bound character's name OR another currently-connected
+		// player -- a guest could freely squat "EMILY" (or "Emily"/"eMiLy") while the founder's
+		// own real character of that exact name was online, indistinguishable at a glance except
+		// for the [Guest] tag `who` only recently learned to show. Reusing
+		// validateSSHClaimName's own real rules (length, letters/digits only, reserved-name list)
+		// for guests too -- one shared validity rule instead of two, and "letters/digits only"
+		// is what makes every accepted name here URL-safe by construction if that's ever wanted
+		// (founder: "so that we can have names in urls if we really wanted to"), with no separate
+		// escaping/normalization step needed beyond the case-fold already required for the
+		// collision checks below.
 		if ok, reason := validateSSHClaimName(name); !ok {
 			send(reason)
 			return
 		}
 		// Case-insensitive collision check against every real, permanent (SSH-bound) character,
-		// online or not -- IDUNA's own GetCharacterByName does the real LOWER(name)=LOWER(?) lookup
-		// (idunaclient.go's own doc comment explains why the plain UNIQUE(name) constraint alone
-		// isn't case-insensitive). Best-effort like every other idunaclient call in this file: a
-		// transient IDUNA outage degrades to "didn't check" rather than refusing every guest
-		// connection outright.
+		// online or not -- IDUNA's own GetCharacterByName does the real LOWER(name)=LOWER(?)
+		// lookup (idunaclient.go's own doc comment explains why the plain UNIQUE(name) constraint
+		// alone isn't case-insensitive). Best-effort like every other idunaclient call in this
+		// file: a transient IDUNA outage degrades to "didn't check" rather than refusing every
+		// guest connection outright.
 		if _, err := gw.iduna.GetCharacterByName(name); err == nil {
 			send(fmt.Sprintf("The name %q is already claimed by a permanent character. Choose another.", name))
 			return
 		} else if !errors.Is(err, idunaclient.ErrNotFound) {
 			log.Printf("[guest] name-collision check against IDUNA failed for %q, allowing through best-effort: %v", name, err)
 		}
-		// Case-insensitive collision check against every OTHER currently-connected player (guest
-		// or SSH-bound) -- IDUNA's own lookup above only covers permanent characters, not two
-		// simultaneous guests picking the identical name.
+		// Case-insensitive collision check against every OTHER currently-connected player
+		// (guest or SSH-bound) -- IDUNA's own lookup above only covers permanent characters, not
+		// two simultaneous guests picking the identical name.
 		gw.mu.Lock()
 		collides := nameCollidesWithOnlinePlayer(gw.players, name)
 		gw.mu.Unlock()
@@ -8695,6 +8753,13 @@ func handleConn(conn net.Conn, isGuest bool, preset *presetIdentity, echoInput b
 			if ch.GoldBalance > 0 {
 				p.flow = ch.GoldBalance
 			}
+			// S252-00/01 (GFD-AH-93944): load whatever real stackable-material inventory IDUNA
+			// already has for a returning character. A brand-new character (the else branch
+			// below) has nothing to load -- the empty map from the struct literal above is
+			// already correct.
+			if inv, err := gw.iduna.GetInventory(ch.CharacterID); err == nil {
+				p.inventory = inv
+			}
 		}
 	} else {
 		if newID, err := gw.iduna.CreateCharacter(mudPlayerIDFor(name), name, job.WAR); err == nil {
@@ -8755,6 +8820,12 @@ func handleConn(conn net.Conn, isGuest bool, preset *presetIdentity, echoInput b
 			} else if flowDelta < 0 {
 				_ = gw.iduna.DeductGold(charID, -flowDelta)
 			}
+			// S252-00/01 (GFD-AH-93944): the literal reported bug -- a real telnet disconnect
+			// used to drop p.inventory entirely, so a reconnecting (or headless/GUI) session
+			// always started with nothing. Unconditional write, same convention
+			// UpdateCharacterLevel/UpdatePosition just above already use (a one-shot disconnect
+			// event, not a repeated per-command call like runHeadlessCommand's own diffed sync).
+			_ = gw.iduna.SetInventory(charID, p.inventory)
 		}
 
 		gw.mu.Lock()
