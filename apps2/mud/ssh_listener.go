@@ -412,7 +412,7 @@ func runSSHClaimFlow(adapter *sshConnAdapter, fingerprint, pubKeyLine string) *p
 			}
 			log.Printf("[ssh-claim] new identity claimed character=%s name=%s ip=%s", newID, name, ip)
 			send(fmt.Sprintf("Welcome, %s! Your SSH key is now permanently bound to this character.", name))
-			return &presetIdentity{name: name, characterID: newID, fingerprint: fingerprint}
+			return &presetIdentity{name: name, characterID: newID, fingerprint: fingerprint, justCreated: true}
 		case errors.Is(err, idunaclient.ErrConflict):
 			// §3.1 acceptance: "Different key, same claimed name -> refused, not silently
 			// reassigned." Re-prompt rather than silently falling back to some other identity.

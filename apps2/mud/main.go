@@ -294,6 +294,14 @@ var npcVendorCatalog = map[string][]VendorItem{
 		{ID: "antidote", Price: 80},
 		{ID: "hi-potion", Price: 250},
 		{ID: "earth-crystal", Price: 120},
+		// Real, founder-scoped feature (2026-09-12, S412-04): new characters are now given this
+		// exact real item (id 3, "Sword", {"attack":10,"str":1} -- see cmdCreateStartingGear's
+		// own doc comment) auto-equipped at creation, but it's also here so a returning
+		// character who sold/lost theirs (or any character wanting a second one for another job)
+		// can buy a real replacement without a code change. Price sits between hi-potion and
+		// leather-legs (scout's own tier-1 armor) -- a real, deliberate v0 number, not derived
+		// from any established pricing formula.
+		{ID: "sword", Price: 300},
 	},
 	"merchant": {
 		{ID: "echo-drop", Price: 50},
@@ -8401,6 +8409,13 @@ type presetIdentity struct {
 	name        string
 	characterID string
 	fingerprint string // the SSH key fingerprint that resolved/claimed this identity (§3.2)
+	// justCreated (S412-03, founder real-time: "we need a sword given to the player when they
+	// make their account") is true only when this identity came from runSSHClaimFlow actually
+	// creating a brand-new IDUNA character -- false when it came from resolving an EXISTING
+	// fingerprint (a returning character should never be re-granted starting gear on every
+	// reconnect). handleConn's own preset != nil branch checks this once, after the real
+	// character record is loaded, to decide whether to call grantStartingGear.
+	justCreated bool
 }
 
 // applyFetchedCharacter copies a real, already-fetched IDUNA character's own level/job/gold/
@@ -8606,6 +8621,12 @@ func handleConn(conn net.Conn, isGuest bool, preset *presetIdentity, echoInput b
 			if inv, err := gw.iduna.GetInventory(ch.CharacterID); err == nil {
 				p.inventory = inv
 			}
+			// S412-03: only a character runSSHClaimFlow just created gets the real starting
+			// weapon -- a returning character (existing fingerprint) never gets re-granted one
+			// on every reconnect.
+			if preset.justCreated {
+				grantStartingGear(p)
+			}
 		}
 	} else if cachedID := mudCharCache.get(name); cachedID != "" {
 		if ch, err := gw.iduna.GetCharacter(cachedID); err == nil {
@@ -8637,6 +8658,7 @@ func handleConn(conn net.Conn, isGuest bool, preset *presetIdentity, echoInput b
 			gw.mu.Lock()
 			gw.charIDBySlot[slot] = newID
 			gw.mu.Unlock()
+			grantStartingGear(p) // S412-03: a real, brand-new character either way
 		}
 	}
 	// Backend-unification follow-up (2026-07-31, EMILY/BACKLOG.md "unify the backends"): p.flow
@@ -9414,6 +9436,20 @@ func main() {
 	if err := mobDropReg.LoadFile("data/mob_drops.json"); err != nil {
 		fmt.Printf("warn: mobdrop load: %v (drop tables disabled, flow-drop only)\n", err)
 	}
+
+	// S412-05/S412-10, founder real-time: "we need hot reload for that" (item data) / "also that
+	// should be hot reload" (mob-drop rates). Both registries' own LoadFile/LoadJSON are already
+	// safe to call more than once -- each is a plain map keyed by a stable ID
+	// (itemdef.Registry.byID/byName, mobdrop.Registry.byKind), so re-loading just overwrites the
+	// same keys rather than duplicating or leaking entries. A real SIGHUP handler (standard,
+	// long-established Unix daemon convention for "reload config without restart" -- e.g. nginx,
+	// most syslog daemons) rather than a new in-game command: this MUD has no admin/GM role
+	// concept in its own command dispatch at all today (checked directly, real gap named, not
+	// silently invented here), so a bare in-game command would be reachable by any guest with no
+	// gate; a signal only reaches someone who already has shell access to the box, the same real
+	// trust boundary every other ops action in this monorepo (systemctl restart, editing
+	// data/items.json itself) already relies on.
+	go watchForReloadSignal()
 
 	gw = initWorld()
 	initTRAPXCity()
