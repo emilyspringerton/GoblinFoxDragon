@@ -848,29 +848,39 @@ type player struct {
 	// before either flag is read), so whiffing right after activating one doesn't waste it.
 	pendingAttackBonus    float64
 	pendingGuaranteedCrit bool
-	inventory             map[string]int // itemID → quantity
-	craftSkill            *craft.CraftSkill
-	flow                  int
-	guildID               string // linkshell guild ID ("" = none)
-	equip                 *gear.Equipment
-	isInvisible           bool
-	invisExpires          time.Time
-	isSneaking            bool
-	sneakExpires          time.Time
-	isResting             bool
-	charJob               *job.CharJob // main+sub job pairing (nil until initialized)
-	meritBank             *merit.MeritBank
-	recastTracker         *job.RecastTracker
-	petSlot               *pet.Slot             // BST pet companion (non-nil always; pet.IsAlive() = has pet)
-	petHeel               bool                  // true = pet does not attack (heel mode)
-	k9Swarm               *k9.Swarm             // TRAPX: active K9 swarm (nil if none deployed)
-	disguise              npcattention.Disguise // stealth identity (S130-02); default = no disguise
-	questJournal          *quest.Journal        // NPC quest progress
-	atlas                 *cartography.Atlas    // explored zone map
-	chatLang              autotranslate.Lang    // preferred chat language; default EN
-	conn                  net.Conn
-	w                     *bufio.Writer
-	inbox                 chan string
+	// castingSpell/castingCompletesAt (JOB_SPELL_SYSTEM_NORTHSTAR.md §1 Phase 1 remainder, "real
+	// cast time" -- case 3 of the four timing models named there) back the real deferred-cast
+	// mechanism in ability.go: non-empty/non-zero only while a spell with CastTime > 0 is resolving.
+	// Checked by checkNotCasting (shared by both cmdCast and cmdJA -- casting a spell blocks a JA
+	// attempt and vice versa, one shared action economy, matching lastActionAt's own reasoning
+	// above) and cleared either when the deferred completion runs or (see ability.go's own doc
+	// comment) never, if the player disconnects first -- a dead player is simply never looked up
+	// again by slot, so a stale non-zero value on an abandoned struct is harmless.
+	castingSpell       string
+	castingCompletesAt time.Time
+	inventory          map[string]int // itemID → quantity
+	craftSkill         *craft.CraftSkill
+	flow               int
+	guildID            string // linkshell guild ID ("" = none)
+	equip              *gear.Equipment
+	isInvisible        bool
+	invisExpires       time.Time
+	isSneaking         bool
+	sneakExpires       time.Time
+	isResting          bool
+	charJob            *job.CharJob // main+sub job pairing (nil until initialized)
+	meritBank          *merit.MeritBank
+	recastTracker      *job.RecastTracker
+	petSlot            *pet.Slot             // BST pet companion (non-nil always; pet.IsAlive() = has pet)
+	petHeel            bool                  // true = pet does not attack (heel mode)
+	k9Swarm            *k9.Swarm             // TRAPX: active K9 swarm (nil if none deployed)
+	disguise           npcattention.Disguise // stealth identity (S130-02); default = no disguise
+	questJournal       *quest.Journal        // NPC quest progress
+	atlas              *cartography.Atlas    // explored zone map
+	chatLang           autotranslate.Lang    // preferred chat language; default EN
+	conn               net.Conn
+	w                  *bufio.Writer
+	inbox              chan string
 	// headlessBuf (2026-08-02, HEADLESS_SESSION_NORTHSTAR.md Milestone 1+, founder: "the real MUD
 	// combat system" for GoblinFoxDragon's Town scene): non-nil only for a headless player (see
 	// getOrCreateHeadlessPlayer) -- w wraps this buffer instead of a real net.Conn, same
@@ -6214,6 +6224,13 @@ func cmdJA(p *player, abilityID string) {
 	if !p.checkUniversalLockout() {
 		return
 	}
+	// ability.go, JOB_SPELL_SYSTEM_NORTHSTAR.md §1 Phase 1 remainder: one real shared action
+	// economy with cmdCast -- every current JA still has CastTime=0 so this rarely bites in
+	// practice today, but a player mid-cast on a real cast-time spell cannot also fire off a JA
+	// (and the reverse, cmdCast's own checkNotCasting call, already held before this session).
+	if !p.checkNotCasting() {
+		return
+	}
 	now := time.Now()
 	err := p.recastTracker.Use(abilityID, now, p.charXP.Level)
 	switch err {
@@ -6549,6 +6566,14 @@ func resolveSpellTarget(p *player, targetName string) (*player, string) {
 	return nil, fmt.Sprintf("Cannot find %q in this zone.", targetName)
 }
 
+// cmdCast is the real entry point `cast <spell> [target]` dispatches to. Everything that must be
+// checked BEFORE a cast even begins (universal lockout, silence, "already casting something
+// else") lives here; the actual spell effect logic lives in castNow below, unchanged from before
+// this file's own real cast-time work (ability.go, JOB_SPELL_SYSTEM_NORTHSTAR.md §1 Phase 1
+// remainder) except for its new name. A spell with a real, non-zero cast time (spellCastTimes)
+// goes through beginCast's own deferred path; everything else (every current job ability's own
+// still-instant spells, general utility like invisible/sneak, and every currently-disabled job's
+// content) resolves exactly as it always has, immediately.
 func cmdCast(p *player, spell string, targetName string) {
 	if !p.checkUniversalLockout() {
 		return
@@ -6558,6 +6583,21 @@ func cmdCast(p *player, spell string, targetName string) {
 		p.prompt()
 		return
 	}
+	if !p.checkNotCasting() {
+		return
+	}
+	if castTime := spellCastTimes[spell]; castTime > 0 {
+		beginCast(p, spell, targetName, castTime)
+		return
+	}
+	castNow(p, spell, targetName)
+}
+
+// castNow is the real, unchanged (relocated only) spell-effect switch cmdCast used to run
+// directly. Still the ONLY place any of these spells' own real job-gate/MP-deduction/target-
+// resolution logic lives -- ability.go's own castPreflight is a cheap, separate, EARLY check for
+// the deferred-cast path only, never a substitute for what runs here.
+func castNow(p *player, spell string, targetName string) {
 	const mpCostInvis = 50
 	const mpCostSneak = 50
 	const duration = 60 * time.Second
