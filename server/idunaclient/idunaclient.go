@@ -388,6 +388,56 @@ func (c *Client) DestroyItem(itemID string) error {
 	}
 }
 
+// GetInventory returns a character's flat stackable-material inventory
+// (S252-00/GFD-AH-93944 -- real fix for the Auction House "no items shown"
+// bug: p.inventory was never persisted anywhere). Calls IDUNA's
+// GET /api/v1/characters/:id/materials, deliberately NOT the existing
+// /inventory route (that one is a different, slot-based bag/equipment
+// system -- see IDUNA's own gfd_stackable_items migration comment for the
+// real, checked structural mismatch). A character with nothing stored yet
+// returns an empty, non-nil map, not an error.
+func (c *Client) GetInventory(characterID string) (map[string]int, error) {
+	req, _ := http.NewRequest(http.MethodGet,
+		c.baseURL+"/api/v1/characters/"+characterID+"/materials", nil)
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, fmt.Errorf("idunaclient: GetInventory: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+	var body struct {
+		Materials map[string]int `json:"materials"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		return nil, fmt.Errorf("idunaclient: GetInventory decode: %w", err)
+	}
+	if body.Materials == nil {
+		body.Materials = map[string]int{}
+	}
+	return body.Materials, nil
+}
+
+// SetInventory replaces a character's ENTIRE stackable-material inventory
+// with inv (a real, whole-map upsert -- the caller always sends its full,
+// current in-memory map.inventory, not a delta). Calls IDUNA's
+// PUT /api/v1/characters/:id/materials.
+func (c *Client) SetInventory(characterID string, inv map[string]int) error {
+	body, _ := json.Marshal(map[string]any{"materials": inv})
+	req, _ := http.NewRequest(http.MethodPut,
+		c.baseURL+"/api/v1/characters/"+characterID+"/materials", bytes.NewReader(body))
+	resp, err := c.do(req)
+	if err != nil {
+		return fmt.Errorf("idunaclient: SetInventory: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+	return nil
+}
+
 // IncrementSkill adds delta to character's skill_name, capped at 110.0.
 func (c *Client) IncrementSkill(characterID, skillName string, delta float64) error {
 	body, _ := json.Marshal(map[string]interface{}{
@@ -481,6 +531,61 @@ func (c *Client) UpdateCharacterLevel(characterID string, level, currentXP int) 
 	resp, err := c.do(req)
 	if err != nil {
 		return fmt.Errorf("idunaclient: UpdateCharacterLevel: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+	return nil
+}
+
+// JobLevel is one job's own real, independently-earned level/XP (GFD-124433: "when you are a
+// lvl 10 warrior in gfd and you switch to RDM for the first time you go back to lvl 1... separate
+// lvls/job").
+type JobLevel struct {
+	Job       string `json:"job"`
+	Level     int    `json:"level"`
+	CurrentXP int    `json:"current_xp"`
+}
+
+// GetJobLevels returns every job this character has ever played, keyed by job ID. A character
+// with no per-job history yet (either brand new, or one that predates this feature) returns an
+// empty, non-nil map, not an error -- the caller (main.go's own loadJobXP) treats an absent job
+// the same way either way: a fresh level-1 start.
+func (c *Client) GetJobLevels(characterID string) (map[string]JobLevel, error) {
+	req, _ := http.NewRequest(http.MethodGet,
+		c.baseURL+"/api/v1/characters/"+characterID+"/job-levels", nil)
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, fmt.Errorf("idunaclient: GetJobLevels: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+	var entries []JobLevel
+	if err := json.NewDecoder(resp.Body).Decode(&entries); err != nil {
+		return nil, fmt.Errorf("idunaclient: GetJobLevels decode: %w", err)
+	}
+	out := make(map[string]JobLevel, len(entries))
+	for _, e := range entries {
+		out[e.Job] = e
+	}
+	return out, nil
+}
+
+// UpdateJobLevel persists one job's own level/current_xp (GFD-124433) -- a real upsert, same
+// real "same shape as UpdateCharacterLevel, one extra path segment" convention that function's
+// own doc comment already established for this route family.
+func (c *Client) UpdateJobLevel(characterID, jobID string, level, currentXP int) error {
+	body, _ := json.Marshal(map[string]any{
+		"level":      level,
+		"current_xp": currentXP,
+	})
+	req, _ := http.NewRequest(http.MethodPatch, c.baseURL+"/api/v1/characters/"+characterID+"/job-levels/"+jobID, bytes.NewReader(body))
+	resp, err := c.do(req)
+	if err != nil {
+		return fmt.Errorf("idunaclient: UpdateJobLevel: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {

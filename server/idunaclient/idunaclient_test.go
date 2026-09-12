@@ -316,3 +316,185 @@ func TestListCharacterHatsSuccess(t *testing.T) {
 		t.Errorf("unexpected hats: %+v", hats)
 	}
 }
+
+// TestGetInventorySuccess -- S252-00's real read path, and the deliberate route choice: hits
+// /materials, not /inventory (that one is IDUNA's own separate slot-based bag system).
+func TestGetInventorySuccess(t *testing.T) {
+	var gotPath, gotMethod string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotMethod = r.Method
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"materials": map[string]int{"earth-crystal": 3}})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	inv, err := c.GetInventory("char-1")
+	if err != nil {
+		t.Fatalf("GetInventory: unexpected error: %v", err)
+	}
+	if gotMethod != http.MethodGet {
+		t.Errorf("expected GET, got %s", gotMethod)
+	}
+	if gotPath != "/api/v1/characters/char-1/materials" {
+		t.Errorf("expected /api/v1/characters/char-1/materials, got %s", gotPath)
+	}
+	if inv["earth-crystal"] != 3 || len(inv) != 1 {
+		t.Errorf("unexpected inventory: %+v", inv)
+	}
+}
+
+// TestGetInventoryEmptyIsNonNilMap -- a character with nothing stored yet must come back as an
+// empty, non-nil map, matching every real call site's own "safe to range over" assumption.
+func TestGetInventoryEmptyIsNonNilMap(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"materials": nil})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	inv, err := c.GetInventory("char-1")
+	if err != nil {
+		t.Fatalf("GetInventory: unexpected error: %v", err)
+	}
+	if inv == nil {
+		t.Fatal("expected a non-nil empty map, got nil")
+	}
+	if len(inv) != 0 {
+		t.Errorf("expected empty map, got %+v", inv)
+	}
+}
+
+// TestSetInventorySuccess -- S252-01's real write path: a whole-map upsert, PUT to /materials.
+func TestSetInventorySuccess(t *testing.T) {
+	var gotPath, gotMethod, gotBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotMethod = r.Method
+		b, _ := io.ReadAll(r.Body)
+		gotBody = string(b)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	if err := c.SetInventory("char-1", map[string]int{"earth-crystal": 2}); err != nil {
+		t.Fatalf("SetInventory: unexpected error: %v", err)
+	}
+	if gotMethod != http.MethodPut {
+		t.Errorf("expected PUT, got %s", gotMethod)
+	}
+	if gotPath != "/api/v1/characters/char-1/materials" {
+		t.Errorf("expected /api/v1/characters/char-1/materials, got %s", gotPath)
+	}
+	if gotBody != `{"materials":{"earth-crystal":2}}` {
+		t.Errorf(`unexpected body: %s`, gotBody)
+	}
+}
+
+func TestSetInventoryServerError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	if err := c.SetInventory("char-1", map[string]int{"x": 1}); !errors.Is(err, ErrServer) {
+		t.Fatalf("expected ErrServer, got %v", err)
+	}
+}
+
+// GFD-124433: per-job leveling ("when you are a lvl 10 warrior in gfd and you switch to RDM for
+// the first time you go back to lvl 1... separate lvls/job").
+
+func TestGetJobLevelsSuccess(t *testing.T) {
+	var gotPath, gotMethod string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotMethod = r.Method
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode([]map[string]any{
+			{"job": "WAR", "level": 10, "current_xp": 500},
+			{"job": "RDM", "level": 1, "current_xp": 0},
+		})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	levels, err := c.GetJobLevels("char-1")
+	if err != nil {
+		t.Fatalf("GetJobLevels: unexpected error: %v", err)
+	}
+	if gotMethod != http.MethodGet {
+		t.Errorf("expected GET, got %s", gotMethod)
+	}
+	if gotPath != "/api/v1/characters/char-1/job-levels" {
+		t.Errorf("expected /api/v1/characters/char-1/job-levels, got %s", gotPath)
+	}
+	if len(levels) != 2 || levels["WAR"].Level != 10 || levels["RDM"].Level != 1 {
+		t.Errorf("unexpected job levels: %+v", levels)
+	}
+}
+
+// TestGetJobLevelsEmptyIsNonNilMap -- a character with no per-job history yet (brand new, or
+// predating this feature) must come back as an empty, non-nil map, matching GetInventory's own
+// established convention for exactly this shape of "nothing yet" response.
+func TestGetJobLevelsEmptyIsNonNilMap(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode([]map[string]any{})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	levels, err := c.GetJobLevels("char-1")
+	if err != nil {
+		t.Fatalf("GetJobLevels: unexpected error: %v", err)
+	}
+	if levels == nil {
+		t.Fatal("expected a non-nil empty map, got nil")
+	}
+	if len(levels) != 0 {
+		t.Errorf("expected empty map, got %+v", levels)
+	}
+}
+
+func TestUpdateJobLevelSuccess(t *testing.T) {
+	var gotPath, gotMethod, gotBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotMethod = r.Method
+		b, _ := io.ReadAll(r.Body)
+		gotBody = string(b)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	if err := c.UpdateJobLevel("char-1", "RDM", 5, 120); err != nil {
+		t.Fatalf("UpdateJobLevel: unexpected error: %v", err)
+	}
+	if gotMethod != http.MethodPatch {
+		t.Errorf("expected PATCH, got %s", gotMethod)
+	}
+	if gotPath != "/api/v1/characters/char-1/job-levels/RDM" {
+		t.Errorf("expected /api/v1/characters/char-1/job-levels/RDM, got %s", gotPath)
+	}
+	if gotBody != `{"current_xp":120,"level":5}` {
+		t.Errorf("unexpected body: %s", gotBody)
+	}
+}
+
+func TestUpdateJobLevelServerError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	if err := c.UpdateJobLevel("char-1", "WAR", 10, 0); !errors.Is(err, ErrServer) {
+		t.Fatalf("expected ErrServer, got %v", err)
+	}
+}

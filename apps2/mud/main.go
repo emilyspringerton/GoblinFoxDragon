@@ -792,7 +792,14 @@ type player struct {
 	fishingSkill  float64
 	foodEffect    *food.FoodEffect
 	fameStore     *fame.Store
-	charXP        *xp.CharXP
+	charXP        *xp.CharXP // ALWAYS an alias into jobXP[p.jobID] -- see switchActiveJob's own doc comment
+	// jobXP (GFD-124433, founder: "when you are a lvl 10 warrior in gfd and you switch to RDM
+	// for the first time you go back to lvl 1... separate lvls/job") holds every job this
+	// character has ever played, each with its own real, independently-earned level/XP.
+	// charXP above is kept as a live alias into this map's entry for p.jobID, so every existing
+	// read/write of p.charXP.* throughout this file stays correct with zero changes -- only
+	// switchActiveJob (called from cmdSetJob) needs to know this map exists at all.
+	jobXP         map[string]*xp.CharXP
 	homePoint     *homepoint.State
 	wsSkill       string         // current weapon skill name (from CanonicalWeaponSkills)
 	jobID         string         // current job (job.JobID, default "WAR")
@@ -5656,6 +5663,37 @@ func cmdCraft(p *player, recipeID string) {
 	p.prompt()
 }
 
+func switchActiveJob(jobXP map[string]*xp.CharXP, jobID string) *xp.CharXP {
+	if existing, ok := jobXP[jobID]; ok {
+		return existing
+	}
+	fresh := xp.NewCharXP()
+	jobXP[jobID] = fresh
+	return fresh
+}
+
+// loadJobXP builds the initial per-job XP map for a newly-connecting character (GFD-124433).
+// persisted holds whatever real per-job rows IDUNA already has (idunaclient.GetJobLevels) --
+// possibly empty for a character that predates this feature or is brand new. mainJob/legacyLevel/
+// legacyXP are the character's own real, pre-existing single level/current_xp columns
+// (characters.level/current_xp): if mainJob has no persisted per-job row yet AND legacyLevel > 1,
+// that legacy level seeds mainJob's own first-ever row -- a real, one-time backward-compat
+// migration so a character's already-earned progress on whatever job it was last playing isn't
+// lost just because this feature is new. Every other job with no persisted row is left absent
+// here on purpose (not eagerly created at level 1) -- switchActiveJob creates it lazily the
+// first time it's actually switched to, matching "a job played for the first time starts at 1"
+// exactly rather than pre-populating 23 rows nobody asked for.
+func loadJobXP(persisted map[string]idunaclient.JobLevel, mainJob string, legacyLevel, legacyXP int) map[string]*xp.CharXP {
+	out := make(map[string]*xp.CharXP, len(persisted)+1)
+	for jobID, jl := range persisted {
+		out[jobID] = &xp.CharXP{Level: jl.Level, CurrentXP: jl.CurrentXP}
+	}
+	if _, ok := out[mainJob]; !ok && legacyLevel > 1 {
+		out[mainJob] = &xp.CharXP{Level: legacyLevel, CurrentXP: legacyXP}
+	}
+	return out
+}
+
 func cmdSetJob(p *player, jobID string) {
 	if p.homePoint.IsKO {
 		p.send("You cannot change jobs while KO'd.")
@@ -5668,7 +5706,27 @@ func cmdSetJob(p *player, jobID string) {
 		p.prompt()
 		return
 	}
+	// GFD-124433: switch to (or start, if this is the first time ever) jobID's own real,
+	// independently-earned level/XP -- the actual fix. Everything below that reads p.charXP
+	// (applyJobStats included) now sees the NEW job's own level, not whatever job was active a
+	// moment ago -- must happen before p.jobID/applyJobStats, since applyJobStats' own HP/MP
+	// formula reads both together.
+	if p.jobXP == nil {
+		p.jobXP = map[string]*xp.CharXP{}
+	}
+	_, alreadyPlayed := p.jobXP[jobID]
+	p.charXP = switchActiveJob(p.jobXP, jobID)
 	p.jobID = jobID
+	// GFD-124433: real, found-live twin bug -- cmdSetJob never refreshed p.charJob.Main/MainLvl
+	// on a plain main-job switch (only cmdSetSubJob did, as a side effect of also touching sub).
+	// Harmless before this feature (every job shared the one global level, so a stale MainLvl
+	// still happened to be numerically correct); now that jobs genuinely diverge, `sub`'s own
+	// status display (and BST's own pet-level calc, MainLvl's other real reader) would show the
+	// PREVIOUS job's level under the new job's name without this.
+	if p.charJob != nil {
+		p.charJob.Main = jobID
+		p.charJob.MainLvl = p.charXP.Level
+	}
 	p.recastTracker = job.NewRecastTracker(abilitiesForJob(jobID))
 	applyJobStats(p)
 	// Restore HP to full on job change (FFXI-style rest at moogle).
@@ -5686,12 +5744,20 @@ func cmdSetJob(p *player, jobID string) {
 	}
 	if charID := gw.charIDBySlot[p.slot]; charID != "" {
 		_ = gw.iduna.UpdateJob(charID, jobID, subJobID)
+		// GFD-124433: persist this job's own level/XP too, in case it's a genuinely new row
+		// (a job played for the first time ever) -- every later level-up persists it again via
+		// the same real headless-sync/disconnect paths that already save the active job's level,
+		// but a job that's switched to and then immediately switched away from without earning
+		// any XP would otherwise never get a real row of its own at all.
+		if !alreadyPlayed {
+			_ = gw.iduna.UpdateJobLevel(charID, jobID, p.charXP.Level, p.charXP.CurrentXP)
+		}
 	}
 	mpStr := fmt.Sprintf("MP: %d", p.maxMP)
 	if s.BaseMP == 0 {
 		mpStr = "MP: --  (melee job)"
 	}
-	p.sendf("Job changed to %s. HP: %d  %s", jobID, p.maxHP, mpStr)
+	p.sendf("Job changed to %s. Lv.%d  HP: %d  %s", jobID, p.charXP.Level, p.maxHP, mpStr)
 	p.prompt()
 }
 
@@ -7495,10 +7561,18 @@ func cmdJobs(p *player) {
 		if j == p.jobID {
 			cur = " <--"
 		}
-		p.sendf("  %-4s  %-12s %-12s  STR:%d DEX:%d VIT:%d AGI:%d INT:%d MND:%d CHR:%d%s",
-			j, hpStr, mpStr, s.STR, s.DEX, s.VIT, s.AGI, s.INT, s.MND, s.CHR, cur)
+		// GFD-124433: each job levels independently -- show that job's own real, already-earned
+		// level (not p.charXP.Level, which is only the CURRENTLY active job). A job never played
+		// yet reads as Lv.1 without eagerly creating a jobXP entry for it (switchActiveJob does
+		// that lazily, only on an actual 'setjob').
+		lvl := 1
+		if jx, ok := p.jobXP[j]; ok {
+			lvl = jx.Level
+		}
+		p.sendf("  %-4s  Lv.%-3d %-12s %-12s  STR:%d DEX:%d VIT:%d AGI:%d INT:%d MND:%d CHR:%d%s",
+			j, lvl, hpStr, mpStr, s.STR, s.DEX, s.VIT, s.AGI, s.INT, s.MND, s.CHR, cur)
 	}
-	p.send("Use 'setjob <ABBR>' to change your job (restores HP/MP).")
+	p.send("Use 'setjob <ABBR>' to change your job (restores HP/MP). Each job levels separately.")
 	p.prompt()
 }
 
@@ -7717,10 +7791,19 @@ func getOrCreateHeadlessPlayer(characterID string) (*player, error) {
 	if _, err := job.StatsFor(startJobID); err != nil {
 		startJobID = job.WAR
 	}
-	startLevel := 1
-	if ch.Level > 1 {
-		startLevel = ch.Level
+	// GFD-124433 (per-job leveling): load every job this character has ever independently
+	// leveled, best-effort (a GetJobLevels failure just means every job looks unplayed yet --
+	// no worse than this feature not existing). loadJobXP also seeds startJobID's own first-ever
+	// row from the character's legacy single level/current_xp columns when no per-job row exists
+	// for it yet, so a character that predates this feature doesn't lose real, already-earned
+	// progress on whatever job it was last playing.
+	persistedLevels, err := gw.iduna.GetJobLevels(characterID)
+	if err != nil {
+		persistedLevels = map[string]idunaclient.JobLevel{}
 	}
+	jobXP := loadJobXP(persistedLevels, startJobID, ch.Level, ch.CurrentXP)
+	activeXP := switchActiveJob(jobXP, startJobID)
+	startLevel := activeXP.Level
 	startHP, _ := job.HPAtLevel(startJobID, startLevel)
 	startMP, _ := job.MPAtLevel(startJobID, startLevel)
 	if startHP == 0 {
@@ -7741,7 +7824,8 @@ func getOrCreateHeadlessPlayer(characterID string) (*player, error) {
 		statFX:        status.New(),
 		combat:        &mob.PlayerCombat{BaseDamage: playerDamage, MeleeRange: playerMeleeRng},
 		miningSkill:   0,
-		charXP:        xp.NewCharXP(),
+		charXP:        activeXP,
+		jobXP:         jobXP,
 		homePoint:     homepoint.NewState(ch.SceneID),
 		wsSkill:       "Fast Blade",
 		jobID:         startJobID,
@@ -7766,10 +7850,6 @@ func getOrCreateHeadlessPlayer(characterID string) (*player, error) {
 		conn:          nil,
 		w:             w,
 		headlessBuf:   buf,
-	}
-	if ch.Level > 1 {
-		p.charXP.Level = ch.Level
-		p.charXP.CurrentXP = ch.CurrentXP
 	}
 	if ch.GoldBalance > 0 {
 		p.flow = ch.GoldBalance
@@ -7845,6 +7925,10 @@ func runHeadlessCommand(characterID, line string) (string, error) {
 	if charID != "" {
 		if p.charXP.Level != p.headlessSyncedLevel || p.charXP.CurrentXP != p.headlessSyncedXP {
 			_ = gw.iduna.UpdateCharacterLevel(charID, p.charXP.Level, p.charXP.CurrentXP)
+			// GFD-124433: also persist to the currently-active JOB's own row -- characters.level
+			// above stays a "whichever job is active right now" mirror for anything else reading
+			// a character's plain level; this is the real, per-job source of truth.
+			_ = gw.iduna.UpdateJobLevel(charID, p.jobID, p.charXP.Level, p.charXP.CurrentXP)
 			p.headlessSyncedLevel = p.charXP.Level
 			p.headlessSyncedXP = p.charXP.CurrentXP
 		}
@@ -7894,6 +7978,11 @@ func handleConn(conn net.Conn) {
 	if startHP == 0 {
 		startHP = defaultHP
 	}
+	// GFD-124433: charXP/jobXP[WAR] must be the SAME pointer from the start (see the player
+	// struct's own field comment on the invariant switchActiveJob/loadJobXP depend on below) --
+	// a brand-new character's real per-job history is empty until the cache-hit branch below
+	// (if any) replaces jobXP wholesale via loadJobXP.
+	initialXP := xp.NewCharXP()
 	p := &player{
 		slot:          slot,
 		name:          name,
@@ -7907,7 +7996,8 @@ func handleConn(conn net.Conn) {
 		statFX:        status.New(),
 		combat:        &mob.PlayerCombat{BaseDamage: playerDamage, MeleeRange: playerMeleeRng},
 		miningSkill:   0,
-		charXP:        xp.NewCharXP(),
+		charXP:        initialXP,
+		jobXP:         map[string]*xp.CharXP{job.WAR: initialXP},
 		homePoint:     homepoint.NewState(0),
 		wsSkill:       "Fast Blade",
 		jobID:         job.WAR,
@@ -7933,10 +8023,21 @@ func handleConn(conn net.Conn) {
 			gw.mu.Lock()
 			gw.charIDBySlot[slot] = ch.CharacterID
 			gw.mu.Unlock()
-			if ch.Level > 1 {
-				p.charXP.Level = ch.Level
-				p.charXP.CurrentXP = ch.CurrentXP
+			// GFD-124433 (per-job leveling): same real loadJobXP/switchActiveJob seeding as
+			// getOrCreateHeadlessPlayer's own connect path -- see that function's own comment.
+			// Real, found-live twin bug fixed in the same edit: this branch never called
+			// applyJobStats after loading a returning character's real level, so p.maxHP/maxMP
+			// stayed at the level-1 defaults computed above regardless of the character's real
+			// level -- harmless before this feature (nothing here changed p.charXP.Level's
+			// effect on stats mid-connection), a real, live-felt gap once level actually
+			// varies per job.
+			persistedLevels, plErr := gw.iduna.GetJobLevels(ch.CharacterID)
+			if plErr != nil {
+				persistedLevels = map[string]idunaclient.JobLevel{}
 			}
+			p.jobXP = loadJobXP(persistedLevels, p.jobID, ch.Level, ch.CurrentXP)
+			p.charXP = switchActiveJob(p.jobXP, p.jobID)
+			applyJobStats(p)
 			if ch.GoldBalance > 0 {
 				p.flow = ch.GoldBalance
 			}
@@ -7982,10 +8083,14 @@ func handleConn(conn net.Conn) {
 		gw.mu.Lock()
 		charID, hasChar := gw.charIDBySlot[slot]
 		lvl, cxp := p.charXP.Level, p.charXP.CurrentXP
+		activeJob := p.jobID
 		flowDelta := p.flow - startingFlow
 		gw.mu.Unlock()
 		if hasChar {
 			_ = gw.iduna.UpdateCharacterLevel(charID, lvl, cxp)
+			// GFD-124433: also persist to the currently-active job's own row -- see the matching
+			// headless-sync call site's own comment for why characters.level isn't retired.
+			_ = gw.iduna.UpdateJobLevel(charID, activeJob, lvl, cxp)
 			_ = gw.iduna.UpdatePosition(charID, p.zoneID, p.pos.X, p.pos.Y, float64(p.zoneID)*1000)
 			// Sync this session's net Flow change (2026-07-31 follow-up, see startingFlow's own
 			// comment above). Best-effort, same silent-discard convention the two calls just
