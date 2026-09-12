@@ -8305,13 +8305,11 @@ func getOrCreateHeadlessPlayer(characterID string) (*player, error) {
 	// day: sethome only ever mutated this in-memory struct, never IDUNA, so a custom Home Point
 	// silently reverted to unset on every fresh session (idle eviction, service restart). Now
 	// that IDUNA actually persists+returns home_scene_id/home_pos_x/y/z (mmo.go's own new
-	// handleUpdateHome/characterResponse fields), seed it back here. Guarded on "not the exact
-	// default row" rather than a real is-set flag (the schema has none) -- a false negative here
-	// (a real home genuinely set at Meadow's own literal origin) just means that one edge case
-	// falls back to the same "no home set" behavior as before, not a regression.
-	if ch.HomeSceneID != 0 || ch.HomePosX != 0 || ch.HomePosY != 0 || ch.HomePosZ != 0 {
-		p.homePoint.SetHome(ch.HomeSceneID, mob.Pos{X: ch.HomePosX, Y: ch.HomePosY, Z: ch.HomePosZ})
-	}
+	// handleUpdateHome/characterResponse fields), seed it back here -- shared with
+	// applyFetchedCharacter's own identical real SSH-reconnect restore (2026-09-12) via
+	// restoreHomePointFromCharacter, one implementation instead of two that can silently drift
+	// apart the way they already once did (this path had the fix; applyFetchedCharacter didn't).
+	restoreHomePointFromCharacter(p, ch)
 	// Baseline for runHeadlessCommand's own delta-sync -- matches what was just loaded from
 	// IDUNA, so the very first sync check doesn't false-positive on values that haven't
 	// actually changed yet this session.
@@ -8424,6 +8422,27 @@ func applyFetchedCharacter(p *player, ch *idunaclient.Character) {
 	applyJobStats(p)
 	if ch.GoldBalance > 0 {
 		p.flow = ch.GoldBalance
+	}
+	// Real Home Point restore -- found-live gap, founder 2026-09-12: "home point does not
+	// persist after logouts." getOrCreateHeadlessPlayer's own connect path already restores this
+	// exact same data (2026-08-04 fix, "iterate") but this function -- the one every REAL SSH
+	// reconnect actually goes through (handleConn's preset != nil branch) -- never did, so a
+	// `sethome` set via SSH was correctly persisted to IDUNA (UpdateHome) but never loaded back
+	// on the next connection: p.homePoint was always constructed fresh/unset (handleConn's own
+	// `homePoint: homepoint.NewState(0)`) regardless of what IDUNA actually had on file.
+	restoreHomePointFromCharacter(p, ch)
+}
+
+// restoreHomePointFromCharacter is split out of applyFetchedCharacter purely so this real, once-
+// missed piece of restore logic is directly unit-testable without needing a live/mock IDUNA
+// client behind the rest of that function's own GetJobLevels call. Guarded on "not the exact
+// default row" rather than a real is-set flag (the characters table has none) -- a false
+// negative here (a real home genuinely set at Meadow's own literal origin, scene 0 / 0,0,0) just
+// falls back to "no home set" behavior, not a regression; getOrCreateHeadlessPlayer's own restore
+// uses this identical guard already.
+func restoreHomePointFromCharacter(p *player, ch *idunaclient.Character) {
+	if ch.HomeSceneID != 0 || ch.HomePosX != 0 || ch.HomePosY != 0 || ch.HomePosZ != 0 {
+		p.homePoint.SetHome(ch.HomeSceneID, mob.Pos{X: ch.HomePosX, Y: ch.HomePosY, Z: ch.HomePosZ})
 	}
 }
 
