@@ -35,6 +35,32 @@
 #   ENV
 #   chmod 600 ~/.config/gfd-mud/env
 #
+# RECURRED 2026-09-12: founder real-time report ("ssh login kinda works... presents us with the
+# warning about the character not saving (should not be seeing this)") traced back to this EXACT
+# same gap -- ~/.config/gfd-mud/env did not exist on disk at all (confirmed: `ls` on it returned
+# "No such file or directory"), so IDUNA_AGENT_NAME/IDUNA_AGENT_SECRET were unset for this run,
+# `idunaclient.Client.do()` sent every request with no Authorization header at all (see that
+# package's own doc comment: `do()` only calls `ensureToken`/sets the header `if c.agentSecret !=
+# ""`), and every real SSH connection got `[ssh] fingerprint lookup failed, falling back to guest:
+# idunaclient: server error: status 401` -- silently reproducing the exact 2026-08-02 bug this
+# comment already documents, not a new one. Root cause of the recurrence: this file lives
+# deliberately OUTSIDE the repo (it's a secret, correctly git-ignored) and outside
+# GoblinFoxDragon/var (so it is NOT covered by the `emily backup run --target gfd` path either,
+# `emily.cli/cmd/backup.go`'s own `gfd` target only tars `GoblinFoxDragon/var`) -- when this box's
+# $HOME state was reset/recreated at some point this session (confirmed: `~/.config`, `~/.ssh`,
+# `~/.bashrc` etc. all showed as untracked-from-scratch in git status), this one file had no
+# backup anywhere to restore from and silently vanished. Re-created from the real secret in
+# `IDUNA/var/agent-secrets.env` (`IDUNA_SECRET_DRAGONSNSHIT_MUD`) and live-verified end to end:
+# fresh SSH key -> claim flow -> `[ssh-claim] new identity claimed` -> reconnect with the same key
+# -> `[ssh] known fingerprint, resuming character=...` (not another guest fallback). Real, honest,
+# NOT fixed as part of this pass: there is still no backup coverage for this file anywhere in the
+# monorepo, so this can recur again exactly the same way after another $HOME reset -- flagged in
+# EMILY/BACKLOG.md rather than silently building a new encrypted-secrets-backup mechanism
+# unprompted (this file's own secret is exactly the class of thing `looksLikeSecret`/`Encrypt:
+# false` on the plain `gfd` backup target was built to keep OUT of an unencrypted backup, so
+# fixing the gap properly needs a real encrypted path, not just adding this file to the existing
+# target).
+#
 # Sandboxing directives below added 2026-09-12 (SSH_TRANSPORT_IDENTITY_SPEC.md §5 / Stage 3,
 # docs2/SSH_TRANSPORT_IDENTITY_NORTHSTAR.md) -- real, honest, found-live limit: this is a
 # `systemctl --user` unit, so it runs inside the normal, unprivileged per-user systemd instance
