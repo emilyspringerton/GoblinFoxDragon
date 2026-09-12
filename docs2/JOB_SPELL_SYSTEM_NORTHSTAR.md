@@ -1,9 +1,10 @@
 # Job & Spell System Overhaul — NORTHSTAR
 
 **Status:** Phase 0 (advanced jobs disabled), the universal 1s lockout, the shared
-`server/rng` marble-bag+pity utility, and Phase 4.5 (real combat damage formula) all shipped
-2026-09-12. Phase 1's remaining scope (universal `Ability` model) + Phases 2-3-4-5 scoped, not
-started. Founder real-time direction, routed through `emily observe` (Apple #19178) per
+`server/rng` marble-bag+pity utility, Phase 4.5 (real combat damage formula), and real effects
+for Berserk/Boost/Sneak Attack all shipped 2026-09-12. Phase 1's remaining scope (universal
+`Ability` model) + Phases 2-3-4-5 scoped, not started. Founder real-time direction, routed
+through `emily observe` (Apple #19178) per
 Principle 1a: "we make everything a spell... we need to disable all of the advanced jobs for
 now including ASN... design the first tier of spells... start tracking skill levels for each of
 the weapon types... /ja /ma both map to the same spell casting affordance... plan this next
@@ -242,11 +243,23 @@ real KO flow all correct even stacked with an existing Poison DoT). GoblinFoxDra
   scope).** `p.lastActionAt` + `checkUniversalLockout`, gating both `cmdCast` and `cmdJA` (and
   `cmdCast`'s six further delegate spell functions, all reached only through it). The founder's
   own resolution of open question 1 below.
+- [x] **Real effects for Berserk/Boost/Sneak Attack (shipped 2026-09-12, part of Phase 1's own
+  real scope).** Founder direct follow-up after §0.5's audit ("does boost increase your attack?
+  does sneak attack guarantee a critical...?"). Berserk now really applies `status.Haste`
+  (Potency 30, 3m) -- the exact same mechanism the `haste` spell already uses. Boost/Sneak Attack
+  get a real, one-shot `pendingAttackBonus`/`pendingGuaranteedCrit` on the player, consumed by
+  their own next LANDED auto-attack (`resolvePlayerAutoAttackDamage`, from Phase 4.5) -- a missed
+  swing does not consume either, so whiffing right after activating one doesn't waste it. 8 new
+  tests; live-verified (`ja boost` then a real, visibly bigger hit: 31 damage vs. the surrounding
+  20-26 range). Real, honest, NOT done: Elemental Seal (needs a real spell-accuracy system that
+  doesn't exist yet -- only auto-attacks roll accuracy today), Chainspell (needs a free-MP check
+  at every one of `cmdCast`'s own dozens of MP-deduction sites across its six delegate
+  functions), and Trick Attack (needs a real "which ally" targeting design) all remain flavor
+  text only, each for its own real, named, larger reason -- see the `case` for each in `cmdJA`.
 - [ ] **Phase 1 (remainder) — universal `Ability` model.** Still real, separate scope: MP cost/
-  cast time/recast as one shared struct unifying `/ja` and `cast` into one `cmdAbility`, plus the
-  real "pending effect, consumed by the next matching action" mechanism named in §0.5 (fixing
-  Berserk/Boost/Elemental Seal/Chainspell/Sneak Attack/Trick Attack for real). The universal
-  lockout above shipped as its own bounded slice rather than waiting on this larger refactor.
+  cast time/recast as one shared struct unifying `/ja` and `cast` into one `cmdAbility`. The
+  universal lockout and the three real pending-effect fixes above both shipped as their own
+  bounded slices rather than waiting on this larger refactor.
 - [ ] **Phase 2 — weapon skill per-type leveling.** `p.weaponSkills`, skill-gain-on-hit,
   `MinSkillLevel` gate on `setws`.
 - [ ] **Phase 3 — new first-tier content.** RAISE, Polymorph (pending the real design questions
