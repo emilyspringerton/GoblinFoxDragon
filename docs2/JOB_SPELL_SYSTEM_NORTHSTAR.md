@@ -45,6 +45,29 @@ actually true, not the stated premise:
 - Advanced jobs (everything past the FFXI original 6 — PLD/DRK/BST/BRD/RNG/SAM/NIN/DRG/SMN/BLU/
   COR/PUP/DNC/SCH/GEO/RUN/ASN) are fully playable today, no gate at all.
 
+## 0.5. Real, itemized finding: which existing abilities actually DO something
+
+Founder asked directly ("ok but do the abilities actually do anything?") — checked `cmdJA`'s own
+switch statement line by line rather than trusting the ability existing at all:
+
+**Mechanically real** (state actually changes): Provoke (real enmity-table update, can flip mob
+aggro), Chakra (real HP heal), Clear Mind (real MP restore), Convert (real HP→MP trade),
+Benediction (real full restore), Venom/Siphon (ASN — real AoE poison / real MP-regen buff).
+
+**Pure flavor text — the sent message claims an effect, but no code applies one**: Berserk
+("+30% Haste for 3 min" — nothing sets a haste buff), Boost ("next attack lands harder" —
+nothing flags the next attack), Elemental Seal ("next spell guaranteed to land" — no accuracy
+system exists at all yet, so nothing to guarantee), Chainspell ("spells cost no MP" — no
+MP-waiver state), Sneak Attack/Trick Attack ("critical blow"/"transfers enmity" — no crit system
+exists, and Trick Attack never touches the enmity table).
+
+This is the same root cause as §0's cast-time gap, more precisely located: everything in this
+second list is a "pop a buff, consumed by your next action" pattern with no `pending effect`
+state on the player to actually consume — not a content gap, a real missing mechanism. Phase 1
+(the universal `Ability` model below) is the natural place to add a real
+`p.pendingNextAttack`/`p.pendingNextSpell`-shaped flag, checked and cleared by the next matching
+attack/cast/JA rather than each of these six growing its own one-off bolt-on.
+
 ## 1. Universal Ability model (the real core of this phase)
 
 One data shape for everything a player can activate — a job ability (today's `/ja`) and a spell
