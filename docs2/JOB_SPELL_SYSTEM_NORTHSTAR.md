@@ -177,6 +177,42 @@ direction. This is real and confirmed, not assumed from the founder's own report
   separate "dodge" roll layered on top of the attacker's own accuracy check, it's the term that
   already reduces the attacker's effective hit chance. One roll, not two, per swing.
 
+**RNG mechanism (founder direction, same session): the hit/miss and crit/normal rolls must use
+this monorepo's own standing "weighted marble-bag + Fibonacci pity" pull algorithm, not
+independent per-swing rolls.** Real, shipped this same pass (not just specified): new
+`server/rng` package (`Fibonacci`, `MarbleBagPick`), a faithful Go port of the first real
+implementation of this pattern, ECOWAR/REDGARDEN's `arena_fibonacci`/`arena_marble_bag_pick`
+(`packages/simulation/arena_game.c`, S202-09/S202-42 — per-hero Cart-delivery outcome
+selection), which the founder's own quoted design note names as the shared-utility precedent
+this should reuse rather than reinvent. A second, independently-built precedent for the same
+underlying idea exists too (`emily.cli/cmd/promptoverse_pity.go`, Prompt-o-verse's style/subject
+discovery pity) — that one escalates a binary trigger probability ahead of a separate weighted
+draw, rather than folding pity directly into one draw's own weights; the founder's own note names
+the ECOWAR shape specifically for combat, which is what got ported. 7 real tests, including one
+that caught and fixed a real off-by-one in ECOWAR's own header comment (`fib(10)=55` claimed;
+tracing the real C loop shows the actual value is 89 — `fib(9)=55`) — the Go port matches the
+real executable algorithm, not the comment, and the mismatch is named rather than silently
+carried forward or silently "corrected" in a way that would diverge from the C original's real
+behavior.
+
+**How this plugs into the formulas above** (not yet wired into `apps2/mud`'s real combat code —
+`server/rng` itself is real and tested; this is the design for Phase 4.5's own implementation):
+- **Accuracy**: a 2-outcome bag `[Hit, Miss]` with base weights from the `hitChance` formula
+  above (e.g. `[hitChance, 100-hitChance]`), pity tracked **per player, per opponent-class**
+  (`p.combatPity.accuracy [2]int` is enough for a single ongoing fight — reset when combat ends/
+  target changes, matching the existing `p.combat.TargetMobID` lifecycle) on **Hit** specifically:
+  a miss streak makes the next swing progressively more likely to land, the real anti-frustration
+  property this mechanism exists for. Symmetric for a mob attacking a player.
+- **Critical hit**: a 2-outcome bag `[Normal, Critical]`, base weights from `critChance` above,
+  pity tracked on **Critical** — a real crit drought becomes progressively more likely to break,
+  matching the founder's own "legendary pull" framing exactly.
+- **Damage magnitude** (the ±20% variance band) stays a plain uniform roll, not a marble-bag
+  pick — marble-bag+pity is for a small, fixed set of discrete outcomes (which of N tiers/
+  results), not a continuous quantity; forcing damage magnitude itself through discrete "buckets"
+  just to reuse the same primitive would be a real, honest mismatch of the mechanism, not asked
+  for by the founder's own wording either (RNG-with-pity was tied to *whether* a hit/crit
+  happens, not the exact number rolled once it does).
+
 This touches `server/mob.Registry.Hit`/`TickPlayer` (player→mob) and the `EvtMobAttack` handling
 in `apps2/mud/main.go`'s event loop (mob→player) — real, core, shared combat code, not
 job-specific, so this is honestly a bigger, more foundational change than the spell-timing work
