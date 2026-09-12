@@ -812,7 +812,14 @@ type player struct {
 	jobXP     map[string]*xp.CharXP
 	homePoint *homepoint.State
 	wsSkill   string // current weapon skill name (from CanonicalWeaponSkills)
-	jobID     string // current job (job.JobID, default "WAR")
+	// weaponSkills (S412-06, founder real-time weapon-skill-leveling design burst) is real,
+	// new per-weapon-TYPE mastery -- the same fishing/mining-shaped skill-gain-on-use shape as
+	// miningSkill/fishingSkill above, keyed by itemdef.ItemDef.WeaponType ("sword", "dagger",
+	// "axe", "h2h", etc.), not by wsSkill (the currently SELECTED weapon skill ABILITY name).
+	// See apps2/mud/weapon_skill_level.go. Nil until first use -- gainWeaponSkill lazily
+	// initializes it, matching every other lazily-initialized player map in this file.
+	weaponSkills map[string]int
+	jobID        string // current job (job.JobID, default "WAR")
 	// isGuest (SSH_TRANSPORT_IDENTITY_SPEC.md Stage 1, founder-supplied spec + Amendment 1,
 	// 2026-09-12) marks an anonymous telnet connection -- true for every real handleConn
 	// session, always false (Go's own zero value) for a headless/Town-GUI session, which
@@ -3602,6 +3609,21 @@ func cmdWS(p *player, overrideName string) {
 		p.prompt()
 		return
 	}
+	// S412-06 real gate: a weapon skill only fires with the RIGHT weapon type equipped, at or
+	// above its own real MinSkillLevel -- before this pass `setws`/`ws` accepted any canonical
+	// name with zero check against what's actually equipped or how skilled the player really is.
+	// TP is NOT consumed on a refusal here (the check runs before p.tp.UseWeaponSkill() below).
+	wt := currentWeaponType(p)
+	if ws.WeaponType != "" && wt != ws.WeaponType {
+		p.sendf("%s requires a %s equipped (you have %s).", ws.Name, ws.WeaponType, wt)
+		p.prompt()
+		return
+	}
+	if lvl := weaponSkillLevel(p, wt); lvl < ws.MinSkillLevel {
+		p.sendf("Not skilled enough with %s yet for %s (skill %d/%d).", wt, ws.Name, lvl, ws.MinSkillLevel)
+		p.prompt()
+		return
+	}
 
 	reg := gw.mobRegs[p.zoneID]
 	baseDamage := playerDamage * 3
@@ -3696,6 +3718,7 @@ func cmdWSList(p *player) {
 		names = append(names, n)
 	}
 	sort.Strings(names)
+	wt := currentWeaponType(p)
 	for _, n := range names {
 		ws := skillchain.CanonicalWeaponSkills[n]
 		attrs := make([]string, len(ws.Attrs))
@@ -3706,8 +3729,18 @@ func cmdWSList(p *player) {
 		if n == p.wsSkill {
 			cur = " <--"
 		}
-		p.sendf("  %-20s  [%s]%s", n, strings.Join(attrs, ", "), cur)
+		// S412-06: real, live gating info -- which weapon type this WS needs, the player's own
+		// current skill in it, and whether it's usable right now (matches wt AND at/above
+		// MinSkillLevel) -- so "why can't I use this" is answered by `wslist` itself, not left to
+		// a refusal message discovered only by trying.
+		usable := "no"
+		if ws.WeaponType == "" || (wt == ws.WeaponType && weaponSkillLevel(p, wt) >= ws.MinSkillLevel) {
+			usable = "yes"
+		}
+		p.sendf("  %-20s  [%s]  %s skill %d/%d  usable:%s%s", n, strings.Join(attrs, ", "),
+			ws.WeaponType, weaponSkillLevel(p, ws.WeaponType), ws.MinSkillLevel, usable, cur)
 	}
+	p.sendf("Your current weapon type: %s.", wt)
 	p.send("Use 'setws <name>' to change your weapon skill.")
 	p.prompt()
 }
@@ -8286,8 +8319,13 @@ func getOrCreateHeadlessPlayer(characterID string) (*player, error) {
 		charXP:      activeXP,
 		jobXP:       jobXP,
 		homePoint:   homepoint.NewState(ch.SceneID),
-		wsSkill:     "Fast Blade",
-		jobID:       startJobID,
+		// S412-06, founder real-time: "when we first start out we dont have a weapon so hand to
+		// hand should level up and the weapon skill should be combo instead of fast blade" -- a
+		// brand-new character has no weapon equipped yet (h2h, unarmed), so Combo (h2h's own real
+		// lowest-tier WS) is the coherent default, not Fast Blade (a sword WS they have no sword
+		// -- and, before hitting weapon skill 10, no real ability -- to use).
+		wsSkill: "Combo",
+		jobID:   startJobID,
 		charJob: func() *job.CharJob {
 			subLvl := 0
 			if ch.JobSub != "" {
@@ -8569,22 +8607,24 @@ func handleConn(conn net.Conn, isGuest bool, preset *presetIdentity, echoInput b
 	// (if any) replaces jobXP wholesale via loadJobXP.
 	initialXP := xp.NewCharXP()
 	p := &player{
-		slot:          slot,
-		name:          name,
-		zoneID:        0,
-		pos:           mob.Pos{X: 0, Y: 2, Z: 0},
-		hp:            startHP,
-		maxHP:         startHP,
-		mp:            startMP,
-		maxMP:         startMP,
-		tp:            &combatTp.TPState{},
-		statFX:        status.New(),
-		combat:        &mob.PlayerCombat{BaseDamage: playerDamage, MeleeRange: playerMeleeRng},
-		miningSkill:   0,
-		charXP:        initialXP,
-		jobXP:         map[string]*xp.CharXP{job.WAR: initialXP},
-		homePoint:     homepoint.NewState(0),
-		wsSkill:       "Fast Blade",
+		slot:        slot,
+		name:        name,
+		zoneID:      0,
+		pos:         mob.Pos{X: 0, Y: 2, Z: 0},
+		hp:          startHP,
+		maxHP:       startHP,
+		mp:          startMP,
+		maxMP:       startMP,
+		tp:          &combatTp.TPState{},
+		statFX:      status.New(),
+		combat:      &mob.PlayerCombat{BaseDamage: playerDamage, MeleeRange: playerMeleeRng},
+		miningSkill: 0,
+		charXP:      initialXP,
+		jobXP:       map[string]*xp.CharXP{job.WAR: initialXP},
+		homePoint:   homepoint.NewState(0),
+		// S412-06: see the matching comment on the other real character-creation path above --
+		// Combo (h2h) is the coherent unarmed default, not Fast Blade (sword).
+		wsSkill:       "Combo",
 		jobID:         job.WAR,
 		charJob:       func() *job.CharJob { cj, _ := job.NewCharJob(job.WAR, "", 1, 0); return cj }(),
 		meritBank:     merit.NewMeritBank(),

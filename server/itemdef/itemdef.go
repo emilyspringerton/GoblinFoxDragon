@@ -140,6 +140,14 @@ type ItemDef struct {
 	// weapon whose real delay hasn't been set yet" -- real, honest, callers must not treat 0 as
 	// "instant." Only meaningful for `Category == CatWeapon`.
 	Delay int `json:"delay,omitempty"`
+	// WeaponType (S412-06, founder real-time weapon-skill-leveling design burst) is a real,
+	// authored classification distinct from Category ("weapon" alone doesn't say sword vs.
+	// dagger vs. axe) -- one of the apps2/mud weaponSkillLevel package's own real constants
+	// ("sword", "greatsword", "axe", "dagger", "club", "staff", "polearm", "h2h", "katana",
+	// "bow", "instrument"). Empty for every non-weapon item (armor, accessories, consumables)
+	// and for any weapon not yet backfilled with a real type. Only meaningful for
+	// `Category == CatWeapon`.
+	WeaponType string `json:"weapon_type,omitempty"`
 
 	// Computed at load time — not in JSON.
 	jobMask JobMask
