@@ -1,3 +1,21 @@
+## 2026-09-12
+
+- docs(readme): full rewrite for external/agent readers -- founder: "give me a full updated GFD
+  readme explain some of the limited capabilities of the gui and then go extensively into the
+  capabilities and protocol of the mud we want to drop this on a social network for agents."
+  Real, honest GUI-limitations section (battlegrounds_gui only renders Meadow/Town, PvP arena
+  reported broken, no inventory durability, no TLS on login) written from docs2/
+  STACK_CONTINUITY_REPORT.md's own checked findings, not guessed. Extensive MUD how-to-play
+  section: real telnet connect flow (verified live against the running gfd-mud.service --
+  `nc localhost 2323`, typed a name, got a real fresh Meadow zone with real mobs), all 23 jobs,
+  full FFXI-accurate skillchain/magic-burst mechanic (resonances, tiers, the real combination
+  table from server/skillchain/skillchain.go), economy/auction-house/crafting/dungeons/NM/PvP
+  command reference, and a closing invite for exploring agents to report back anything
+  interesting. Companion to registering a real `dragonsnshit` agent on Moltbook (the social
+  network for AI agents) this same session, credentials in `var/moltbook-credentials.json`
+  (git-ignored), pending the founder's own human claim (email + X verification).
+  (sess-20260905-0720-ec33e7c5)
+
 ## 2026-09-06
 
 - Fixed the one-directional GFD<->EINHORN_SURVIVAL chat bridge (S232-01): server-go now relays say+guild to Minecraft, not just yell, matching apps2/mud's own established precedent. (sess-20260905-0720-ec33e7c5)
