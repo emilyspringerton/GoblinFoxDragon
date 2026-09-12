@@ -21,6 +21,7 @@ package mobdrop
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"os"
 	"strings"
 	"sync"
@@ -29,9 +30,45 @@ import (
 // Item is one entry in a drop table — deliberately the same shape as
 // server/loot.Item so a DropTable's Items slice can be passed straight into
 // loot.NewPool with no conversion.
+//
+// DropChance (S412-09, founder real-time: "the gfd-mob-drops admin interface needs to be able to
+// tune drop rates for each item") is real, new, and additive -- every item in every existing
+// data/mob_drops.json table drops unconditionally today (checked directly: dropsForMob/DropsFor
+// return the WHOLE table on every single kill, no roll of any kind exists anywhere in this
+// codebase), which is exactly why the admin page could never expose a rate control -- there was
+// no rate concept in the data model to expose. A pointer (not a plain float64) so JSON can tell
+// "this key was never in the file" (nil -- an existing entry authored before this field existed)
+// apart from "an operator explicitly configured 0%" (a real, deliberate "never drops right now"
+// setting, e.g. to temporarily disable one item without deleting it from the table) -- a plain
+// float64's own zero value can't distinguish those two real, different intents, and a real
+// tuning tool needs the full 0-100% range including a genuine zero, not just "unset defaults to
+// always."
 type Item struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID         string   `json:"id"`
+	Name       string   `json:"name"`
+	DropChance *float64 `json:"drop_chance,omitempty"` // nil = unset (always, pre-existing behavior); 0.0-1.0 otherwise
+}
+
+// EffectiveDropChance returns i's real roll probability -- nil (the key was never in the JSON at
+// all) normalizes to 1.0 (always drops, the exact real, pre-existing behavior every table had
+// before this field existed), so every pre-existing drop table's real, current behavior is
+// completely unchanged unless an operator explicitly sets a rate. An explicit value outside
+// [0, 1] is clamped rather than trusted verbatim (a real, malformed admin-page edit -- e.g. "150"
+// typed into a percent-shaped field by mistake -- should degrade to a sane bound, not silently
+// guarantee or forbid a drop in a way the operator didn't actually intend); an explicit 0 is
+// respected as a real, deliberate "never drops."
+func (i Item) EffectiveDropChance() float64 {
+	if i.DropChance == nil {
+		return 1.0
+	}
+	v := *i.DropChance
+	if v < 0 {
+		return 0
+	}
+	if v > 1 {
+		return 1.0
+	}
+	return v
 }
 
 // DropTable is the full set of items a mob of a given Kind can drop.
@@ -80,9 +117,12 @@ func (r *Registry) LoadJSON(data []byte) error {
 	return nil
 }
 
-// DropsFor returns the loot items a mob of the given kind drops on death.
-// A kind with no registered table falls back to DefaultDrop, matching the
-// old hardcoded switch statement's own default branch.
+// DropsFor returns the FULL configured drop table for the given kind, unaffected by
+// DropChance/randomness -- the real, raw "what's in the table" view the admin API's own listing
+// endpoint needs (an operator editing rates wants to see and change every entry, not a randomly
+// filtered subset of them). A kind with no registered table falls back to DefaultDrop, matching
+// the old hardcoded switch statement's own default branch. Real gameplay drop resolution goes
+// through RollDropsFor below, not this function directly.
 func (r *Registry) DropsFor(kind string) []Item {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -92,6 +132,28 @@ func (r *Registry) DropsFor(kind string) []Item {
 		return out
 	}
 	return []Item{DefaultDrop}
+}
+
+// RollDropsFor is the real, per-item chance roll (S412-09) -- each configured item independently
+// rolls against its own EffectiveDropChance, so a kill can drop anywhere from zero to every item
+// in the table, not always the whole thing. DefaultDrop (the no-table fallback) is never rolled
+// against -- a mob with no real, configured table keeps its existing, unconditional 100% flow
+// drop rather than gaining a new, unintended chance to drop nothing at all.
+func (r *Registry) RollDropsFor(kind string, rng *rand.Rand) []Item {
+	all := r.DropsFor(kind)
+	r.mu.RLock()
+	_, hasRealTable := r.byKind[strings.ToLower(kind)]
+	r.mu.RUnlock()
+	if !hasRealTable {
+		return all // DefaultDrop -- always drops, unaffected by rate rolling
+	}
+	out := make([]Item, 0, len(all))
+	for _, item := range all {
+		if rng.Float64() < item.EffectiveDropChance() {
+			out = append(out, item)
+		}
+	}
+	return out
 }
 
 // All returns every registered drop table.
