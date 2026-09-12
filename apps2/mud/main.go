@@ -3821,7 +3821,16 @@ func cmdWho(p *player) {
 		if op.homePoint.IsKO {
 			koStr = " [KO]"
 		}
-		p.sendf("  Lv.%-3d %-16s  %s%s%s", op.charXP.Level, op.name, zoneName(op.zoneID), partyStr, koStr)
+		// [Guest] tag (real, found-live gap, founder 2026-09-12: "missing [guest] tags in who
+		// listing") -- an anonymous guest name is real, unaccountable, and duplicable (see
+		// isGuest's own doc comment on this player struct field); a `who` listing that shows a
+		// guest identically to a permanent, SSH-bound identity is exactly the kind of ambiguity
+		// the impersonation-risk reasoning behind gating guest chat/economy already names.
+		guestStr := ""
+		if op.isGuest {
+			guestStr = " [Guest]"
+		}
+		p.sendf("  Lv.%-3d %-16s  %s%s%s%s", op.charXP.Level, op.name, zoneName(op.zoneID), partyStr, koStr, guestStr)
 	}
 	p.prompt()
 }
