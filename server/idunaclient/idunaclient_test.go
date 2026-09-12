@@ -498,3 +498,132 @@ func TestUpdateJobLevelServerError(t *testing.T) {
 		t.Fatalf("expected ErrServer, got %v", err)
 	}
 }
+
+// SSH_TRANSPORT_IDENTITY_SPEC.md §3 / Stage 5 client tests. testFingerprintWithSlash matches the
+// real shape ssh.FingerprintSHA256 produces (unpadded standard base64 -- "/" and "+" both legal)
+// specifically to catch a regression back to sending it as a path segment instead of a query
+// parameter.
+const testFingerprintWithSlash = "SHA256:ab/cd+ef01234567890123456789012345678901234"
+
+func TestResolveSSHFingerprintSuccess(t *testing.T) {
+	var gotPath, gotQuery string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotQuery = r.URL.Query().Get("fingerprint")
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"character_id": "char-42"})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	charID, err := c.ResolveSSHFingerprint(testFingerprintWithSlash)
+	if err != nil {
+		t.Fatalf("ResolveSSHFingerprint: unexpected error: %v", err)
+	}
+	if gotPath != "/api/v1/ssh-keys" {
+		t.Errorf("expected /api/v1/ssh-keys, got %s", gotPath)
+	}
+	// The real proof this went out as a query param, not a mangled path segment: the fingerprint
+	// (with its real "/") round-trips exactly through Go's own URL query decoding.
+	if gotQuery != testFingerprintWithSlash {
+		t.Errorf("fingerprint query param = %q, want %q", gotQuery, testFingerprintWithSlash)
+	}
+	if charID != "char-42" {
+		t.Errorf("expected char-42, got %q", charID)
+	}
+}
+
+func TestResolveSSHFingerprintNotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	if _, err := c.ResolveSSHFingerprint("SHA256:never-bound"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestBindSSHKeySuccess(t *testing.T) {
+	var gotPath, gotMethod, gotBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotMethod = r.Method
+		b, _ := io.ReadAll(r.Body)
+		gotBody = string(b)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	if err := c.BindSSHKey("char-1", testFingerprintWithSlash, "ssh-ed25519 AAAA..."); err != nil {
+		t.Fatalf("BindSSHKey: unexpected error: %v", err)
+	}
+	if gotMethod != http.MethodPost {
+		t.Errorf("expected POST, got %s", gotMethod)
+	}
+	if gotPath != "/api/v1/characters/char-1/ssh-keys" {
+		t.Errorf("expected /api/v1/characters/char-1/ssh-keys, got %s", gotPath)
+	}
+	if gotBody != `{"fingerprint":"`+testFingerprintWithSlash+`","public_key":"ssh-ed25519 AAAA..."}` {
+		t.Errorf("unexpected body: %s", gotBody)
+	}
+}
+
+func TestBindSSHKeyConflict(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusConflict)
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	if err := c.BindSSHKey("char-1", "SHA256:taken", "ssh-ed25519 AAAA..."); !errors.Is(err, ErrConflict) {
+		t.Fatalf("expected ErrConflict (fingerprint bound to a different character), got %v", err)
+	}
+}
+
+func TestListSSHKeysSuccess(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode([]map[string]string{
+			{"fingerprint": "SHA256:one", "public_key": "ssh-ed25519 one", "created_at": "2026-09-12T00:00:00Z"},
+			{"fingerprint": "SHA256:two", "public_key": "ssh-ed25519 two", "created_at": "2026-09-12T00:00:00Z"},
+		})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	keys, err := c.ListSSHKeys("char-1")
+	if err != nil {
+		t.Fatalf("ListSSHKeys: unexpected error: %v", err)
+	}
+	if len(keys) != 2 || keys[0].Fingerprint != "SHA256:one" || keys[1].Fingerprint != "SHA256:two" {
+		t.Errorf("unexpected keys: %+v", keys)
+	}
+}
+
+func TestRevokeSSHKeySuccess(t *testing.T) {
+	var gotPath, gotMethod, gotQuery string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotMethod = r.Method
+		gotQuery = r.URL.Query().Get("fingerprint")
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	if err := c.RevokeSSHKey("char-1", testFingerprintWithSlash); err != nil {
+		t.Fatalf("RevokeSSHKey: unexpected error: %v", err)
+	}
+	if gotMethod != http.MethodDelete {
+		t.Errorf("expected DELETE, got %s", gotMethod)
+	}
+	if gotPath != "/api/v1/characters/char-1/ssh-keys" {
+		t.Errorf("expected /api/v1/characters/char-1/ssh-keys, got %s", gotPath)
+	}
+	if gotQuery != testFingerprintWithSlash {
+		t.Errorf("fingerprint query param = %q, want %q", gotQuery, testFingerprintWithSlash)
+	}
+}

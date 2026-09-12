@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"sync"
 	"time"
@@ -589,6 +590,105 @@ func (c *Client) UpdateJobLevel(characterID, jobID string, level, currentXP int)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+	return nil
+}
+
+// SSHKey is one of a character's own bound (non-revoked) SSH keys (SSH_TRANSPORT_IDENTITY_SPEC.md
+// §3.2, Stage 5).
+type SSHKey struct {
+	Fingerprint string `json:"fingerprint"`
+	PublicKey   string `json:"public_key"`
+	CreatedAt   string `json:"created_at"`
+}
+
+// ResolveSSHFingerprint looks up which character (if any) a real SSH public key fingerprint is
+// permanently bound to (SSH_TRANSPORT_IDENTITY_SPEC.md §3.1). Returns ErrNotFound for an unbound
+// (or revoked) fingerprint -- callers treat that as "this connection needs the claim flow," not
+// as an error to surface to the player. The fingerprint is sent as a query parameter, never a
+// path segment: ssh.FingerprintSHA256's own real output is unpadded standard base64, which can
+// legitimately contain a literal "/" that a path segment would mangle.
+func (c *Client) ResolveSSHFingerprint(fingerprint string) (string, error) {
+	req, _ := http.NewRequest(http.MethodGet,
+		c.baseURL+"/api/v1/ssh-keys?fingerprint="+url.QueryEscape(fingerprint), nil)
+	resp, err := c.do(req)
+	if err != nil {
+		return "", fmt.Errorf("idunaclient: ResolveSSHFingerprint: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return "", ErrNotFound
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+	var out struct {
+		CharacterID string `json:"character_id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return "", fmt.Errorf("idunaclient: ResolveSSHFingerprint decode: %w", err)
+	}
+	return out.CharacterID, nil
+}
+
+// BindSSHKey permanently binds fingerprint to characterID (§3.1), or reactivates it if this exact
+// character previously revoked this exact key (IDUNA's own handleBindSSHKey doc comment has the
+// full reactivation-vs-conflict logic). Returns ErrConflict if the fingerprint already belongs to
+// a DIFFERENT character -- a real, permanent binding never silently moves.
+func (c *Client) BindSSHKey(characterID, fingerprint, publicKey string) error {
+	body, _ := json.Marshal(map[string]string{"fingerprint": fingerprint, "public_key": publicKey})
+	req, _ := http.NewRequest(http.MethodPost, c.baseURL+"/api/v1/characters/"+characterID+"/ssh-keys", bytes.NewReader(body))
+	resp, err := c.do(req)
+	if err != nil {
+		return fmt.Errorf("idunaclient: BindSSHKey: %w", err)
+	}
+	defer resp.Body.Close()
+	switch resp.StatusCode {
+	case http.StatusNoContent, http.StatusOK:
+		return nil
+	case http.StatusConflict:
+		return ErrConflict
+	case http.StatusNotFound:
+		return ErrNotFound
+	default:
+		return fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+}
+
+// ListSSHKeys returns every active (non-revoked) key bound to characterID (§3.2 "list bound
+// keys"). An empty, non-nil slice for a character with none, not an error.
+func (c *Client) ListSSHKeys(characterID string) ([]SSHKey, error) {
+	req, _ := http.NewRequest(http.MethodGet, c.baseURL+"/api/v1/characters/"+characterID+"/ssh-keys", nil)
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, fmt.Errorf("idunaclient: ListSSHKeys: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+	var keys []SSHKey
+	if err := json.NewDecoder(resp.Body).Decode(&keys); err != nil {
+		return nil, fmt.Errorf("idunaclient: ListSSHKeys decode: %w", err)
+	}
+	return keys, nil
+}
+
+// RevokeSSHKey revokes fingerprint for characterID (§3.2 "revoke a key other than the one in
+// use"). The "other than the one in use" half is the CALLER's job (the MUD server knows which
+// fingerprint authenticated the current session and must refuse to call this for it) -- this
+// method has no concept of "the session currently using this key." Idempotent: revoking an
+// already-revoked or never-bound fingerprint is not an error.
+func (c *Client) RevokeSSHKey(characterID, fingerprint string) error {
+	req, _ := http.NewRequest(http.MethodDelete,
+		c.baseURL+"/api/v1/characters/"+characterID+"/ssh-keys?fingerprint="+url.QueryEscape(fingerprint), nil)
+	resp, err := c.do(req)
+	if err != nil {
+		return fmt.Errorf("idunaclient: RevokeSSHKey: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
 	}
 	return nil
