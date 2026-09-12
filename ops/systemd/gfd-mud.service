@@ -34,6 +34,22 @@
 #   IDUNA_AGENT_SECRET=<IDUNA_SECRET_DRAGONSNSHIT_MUD from IDUNA/var/agent-secrets.env>
 #   ENV
 #   chmod 600 ~/.config/gfd-mud/env
+#
+# Sandboxing directives below added 2026-09-12 (SSH_TRANSPORT_IDENTITY_SPEC.md §5 / Stage 3,
+# docs2/SSH_TRANSPORT_IDENTITY_NORTHSTAR.md) -- real, honest, found-live limit: this is a
+# `systemctl --user` unit, so it runs inside the normal, unprivileged per-user systemd instance
+# (user@1000.service), which itself never holds CAP_SETPCAP -- confirmed live by testing each
+# directive individually on a throwaway instance before touching this file. Any directive whose
+# enforcement mechanism is "drop a specific capability from the bounding set"
+# (CapabilityBoundingSet=, AmbientCapabilities=, ProtectKernelModules=, ProtectKernelLogs=,
+# ProtectClock=) fails with `status=218/CAPABILITIES` here -- not because this box denies them,
+# but because only a root-held systemd instance can perform that operation at all, for any unit.
+# A real system-level unit (root-owned, running as a dedicated unprivileged system account) would
+# not have this limit and could add those directives plus the "no login shell" requirement §5
+# itself asks for -- scoped, not yet built, see the sudo-queue script this same commit adds.
+# Everything below IS achievable in a `--user` unit and was live-verified (throwaway instance,
+# real telnet connect + real var/ write, `systemd-analyze security` exposure score 9.8 UNSAFE ->
+# 5.8 MEDIUM) before being applied here.
 
 [Unit]
 Description=DragonsNShit MUD (GoblinFoxDragon apps2/mud)
@@ -49,6 +65,36 @@ RestartSec=10s
 StandardOutput=append:/home/fatbaby/GoblinFoxDragon/var/logs/mud.log
 StandardError=append:/home/fatbaby/GoblinFoxDragon/var/logs/mud.log
 MemoryMax=512M
+
+# Filesystem: read-only everywhere except the one real data path (spec §5's own core ask).
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/fatbaby/GoblinFoxDragon/var
+PrivateTmp=yes
+
+# No privilege escalation; no new capabilities can ever be gained mid-run.
+NoNewPrivileges=yes
+
+# Namespace/kernel-surface restriction achievable without CAP_SETPCAP.
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+RemoveIPC=yes
+
+# This process only ever needs plain TCP (telnet :2323, world-event API :7171, outbound calls to
+# IDUNA) -- no raw/packet/netlink sockets, no other address family.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+# Baseline syscall allowlist (mount/module/reboot/etc. denied) -- does not itself need
+# CAP_SETPCAP, seccomp filters apply regardless of the calling process's own capabilities.
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+UMask=0077
 
 [Install]
 WantedBy=default.target

@@ -20,3 +20,7 @@ __pycache__/
 
 # Runtime-generated (logs, MUD server state) -- not source
 var/
+
+# Local pre-rollout backup tarballs of var/ (SSH_TRANSPORT_IDENTITY spec Stage 3) -- contains
+# var/moltbook-credentials.json verbatim (real credentials), never committed.
+var-backups/
