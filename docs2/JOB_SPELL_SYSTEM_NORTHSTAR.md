@@ -1,9 +1,11 @@
 # Job & Spell System Overhaul — NORTHSTAR
 
 **Status:** Phase 0 (advanced jobs disabled), the universal 1s lockout, the shared
-`server/rng` marble-bag+pity utility, Phase 4.5 (real combat damage formula), and real effects
-for Berserk/Boost/Sneak Attack all shipped 2026-09-12. Phase 1's remaining scope (universal
-`Ability` model) + Phases 2-3-4-5 scoped, not started. Founder real-time direction, routed
+`server/rng` marble-bag+pity utility, Phase 4.5 (real combat damage formula), real effects
+for Berserk/Boost/Sneak Attack, and Phase 1's real-cast-time slice (WHM/RDM/BLM spells now
+actually take time to resolve) all shipped 2026-09-12. Phase 1's one remaining, deliberately
+deferred piece (the literal `cmdJA`/`cmdCast` merge into one `cmdAbility` dispatcher — see §6)
+plus Phases 2-3-4-5 scoped, not started. Founder real-time direction, routed
 through `emily observe` (Apple #19178) per
 Principle 1a: "we make everything a spell... we need to disable all of the advanced jobs for
 now including ASN... design the first tier of spells... start tracking skill levels for each of
@@ -256,10 +258,30 @@ real KO flow all correct even stacked with an existing Poison DoT). GoblinFoxDra
   at every one of `cmdCast`'s own dozens of MP-deduction sites across its six delegate
   functions), and Trick Attack (needs a real "which ally" targeting design) all remain flavor
   text only, each for its own real, named, larger reason -- see the `case` for each in `cmdJA`.
-- [ ] **Phase 1 (remainder) — universal `Ability` model.** Still real, separate scope: MP cost/
-  cast time/recast as one shared struct unifying `/ja` and `cast` into one `cmdAbility`. The
-  universal lockout and the three real pending-effect fixes above both shipped as their own
-  bounded slices rather than waiting on this larger refactor.
+- [x] **Phase 1 (remainder), real cast time — SHIPPED 2026-09-12** (`continue lifo`, most-
+  recently-flagged pending item after the SSH-login bug/backup-gap work). New `apps2/mud/
+  ability.go`: `spellCastTimes` gives every already-shipped WHM/RDM/BLM spell a real, non-zero
+  cast time for the first time (previously every spell was instant, gated only by the 1s
+  universal lockout) -- a 2.0-3.5s real v0 tuning band, named as deliberately tunable, not lifted
+  from FFXI's own table. `beginCast` runs a cheap MP/target preflight (fails fast, zero wait, on
+  a cast that was never going to work) then defers the EXACT existing, unchanged effect switch
+  (`castNow`, `cmdCast`'s old body relocated only) via `time.AfterFunc`; the completion callback
+  re-locks `gw.mu` itself (matching `runHeadlessCommand`'s own established background-goroutine
+  pattern) and re-checks the player is still present before doing anything, so a disconnect
+  mid-cast simply no-ops. `checkNotCasting` is a real, new shared gate both `cmdCast` and `cmdJA`
+  call -- casting a spell blocks a JA attempt and vice versa, one real action economy.
+  Real, honest, deliberately NOT the literal `cmdAbility(id, target)` merge §1's own prose shows:
+  every current JA still has `CastTime=0`, so that larger, riskier dispatcher-merge would have
+  bought zero behavioral change this pass -- named as real, remaining follow-up if byte-for-byte
+  doc compliance is wanted later, not silently substituted for. Interruption-on-damage and MP
+  refund on a failed/interrupted cast remain open questions (#4 below), not resolved.
+  11 new tests (`apps2/mud/ability_test.go`), `go test ./...` clean. Live-verified in production
+  (not just a throwaway instance): `cast cure` → "You begin casting Cure... (2s)" → an immediate
+  `ja provoke` correctly refused ("You are already casting Cure...") → ~2s later, unprompted,
+  "Cure: +100 HP. (MP: 35)" lands. Separately: `cast fire` with no target fails instantly (no
+  cast bar at all); with a real target, shows the bar then resolves for real damage/MP. Isolated
+  from a concurrent in-flight `main.go` change (S252 inventory sync) via this session's own
+  established hunk-isolation technique. GoblinFoxDragon commit `8b4f561`.
 - [ ] **Phase 2 — weapon skill per-type leveling.** `p.weaponSkills`, skill-gain-on-hit,
   `MinSkillLevel` gate on `setws`.
 - [ ] **Phase 3 — new first-tier content.** RAISE, Polymorph (pending the real design questions
@@ -288,9 +310,11 @@ real KO flow all correct even stacked with an existing Poison DoT). GoblinFoxDra
    2026-09-12: the simpler flat accuracy/evasion/armor trio, shipped** (`combatMobBaseHitChance`/
    `CritChance` in `apps2/mud/combat_formula.go`). A real, full per-mob stat block remains a
    real, separate, named future refinement if ever wanted.
-6. Which phase to actually build next — **Phase 4.5 done; Phase 1's remaining scope (the
-   universal `Ability` model + pending-effect mechanism) is the next real candidate**, or Phase 2
-   (weapon skills) if that's a higher near-term priority.
+6. Which phase to actually build next — **Phase 4.5 done; Phase 1's real-cast-time slice done
+   (2026-09-12). Phase 2 (weapon skills) is the next real candidate**, or Phase 3 (new content:
+   RAISE/Polymorph/SAP/Chakra redefinition) if that's a higher near-term priority. The literal
+   `cmdJA`/`cmdCast` merge into one `cmdAbility` dispatcher remains real, named, deferred scope
+   within Phase 1 (see §6) -- not blocking either Phase 2 or 3 from starting.
 7. Chakra redefinition (§4, founder direction 2026-09-12: "chakra is a MNK ranged attack") — real
    design needed: base damage, what stat scales it (STR like melee, or a new ranged-attack
    stat?), real range vs. `p.combat.MeleeRange`, and whether the CURRENT self-heal behavior is
