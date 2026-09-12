@@ -1,7 +1,9 @@
 # Job & Spell System Overhaul — NORTHSTAR
 
-**Status:** Planning + Phase 0 (advanced jobs disabled) shipped 2026-09-12. Phases 1-5 scoped,
-not started. Founder real-time direction, routed through `emily observe` (Apple #19178) per
+**Status:** Phase 0 (advanced jobs disabled), the universal 1s lockout, the shared
+`server/rng` marble-bag+pity utility, and Phase 4.5 (real combat damage formula) all shipped
+2026-09-12. Phase 1's remaining scope (universal `Ability` model) + Phases 2-3-4-5 scoped, not
+started. Founder real-time direction, routed through `emily observe` (Apple #19178) per
 Principle 1a: "we make everything a spell... we need to disable all of the advanced jobs for
 now including ASN... design the first tier of spells... start tracking skill levels for each of
 the weapon types... /ja /ma both map to the same spell casting affordance... plan this next
@@ -195,31 +197,39 @@ real executable algorithm, not the comment, and the mismatch is named rather tha
 carried forward or silently "corrected" in a way that would diverge from the C original's real
 behavior.
 
-**How this plugs into the formulas above** (not yet wired into `apps2/mud`'s real combat code —
-`server/rng` itself is real and tested; this is the design for Phase 4.5's own implementation):
-- **Accuracy**: a 2-outcome bag `[Hit, Miss]` with base weights from the `hitChance` formula
-  above (e.g. `[hitChance, 100-hitChance]`), pity tracked **per player, per opponent-class**
-  (`p.combatPity.accuracy [2]int` is enough for a single ongoing fight — reset when combat ends/
-  target changes, matching the existing `p.combat.TargetMobID` lifecycle) on **Hit** specifically:
-  a miss streak makes the next swing progressively more likely to land, the real anti-frustration
-  property this mechanism exists for. Symmetric for a mob attacking a player.
-- **Critical hit**: a 2-outcome bag `[Normal, Critical]`, base weights from `critChance` above,
-  pity tracked on **Critical** — a real crit drought becomes progressively more likely to break,
-  matching the founder's own "legendary pull" framing exactly.
-- **Damage magnitude** (the ±20% variance band) stays a plain uniform roll, not a marble-bag
-  pick — marble-bag+pity is for a small, fixed set of discrete outcomes (which of N tiers/
-  results), not a continuous quantity; forcing damage magnitude itself through discrete "buckets"
-  just to reuse the same primitive would be a real, honest mismatch of the mechanism, not asked
-  for by the founder's own wording either (RNG-with-pity was tied to *whether* a hit/crit
-  happens, not the exact number rolled once it does).
+**SHIPPED 2026-09-12 — Phase 4.5 fully wired into real combat**, not just designed: new
+`apps2/mud/combat_formula.go` (`resolvePlayerAutoAttackDamage`/`resolveMobAutoAttackDamage`),
+`server/mob.Registry.ReadyToSwing` (split out of `TickPlayer`, which is otherwise unchanged, so
+apps2/mud can compute the real roll itself instead of `TickPlayer`'s own flat
+`combat.BaseDamage`), and the `EvtMobAttack` handler in `apps2/mud/main.go`'s event loop.
 
-This touches `server/mob.Registry.Hit`/`TickPlayer` (player→mob) and the `EvtMobAttack` handling
-in `apps2/mud/main.go`'s event loop (mob→player) — real, core, shared combat code, not
-job-specific, so this is honestly a bigger, more foundational change than the spell-timing work
-in §1-5 above, even though the founder raised it second. Real open question: do mobs get full
-STR/DEX/VIT/AGI stat blocks (most FFXI-parity, most work — every mob spawn site in
-`apps2/mud/main.go` would need real numbers) or a simpler flat per-mob "accuracy"/"evasion"/
-"armor" trio that approximates the same feel without a stat block on every mob? Not decided here.
+- **Accuracy**: a 2-outcome bag `[Hit, Miss]` (player attacking) or the complementary framing
+  `[Miss, Hit]` from the player's own defensive perspective (a mob attacking), pity **always
+  tracked in the player's own favor** — landing their own hits, or avoiding an incoming one —
+  via four independent counters (`p.pityOwnHit`/`pityOwnCrit`/`pityAvoidHit`/`pityAvoidCrit`).
+  Real, deliberate simplification from the original design sketch: pity persists for the whole
+  session, not reset per-encounter/per-target — a real, named future refinement, not silently
+  dropped.
+- **Critical hit**: the same shared mechanism, pity on the player's own preferred outcome
+  (landing a crit, or not eating one) — a real crit drought becomes progressively more likely to
+  break, matching the founder's own "legendary pull" framing exactly.
+- **Damage magnitude** (the ±20% variance band) stays a plain uniform roll, not a marble-bag
+  pick, exactly as designed — verified live: real swings landed for 24-28 damage in one fight
+  (vs. the old flat 30), never identical twice.
+- **Mobs**: answered the stat-block open question with the simpler option (`combatMobBaseHitChance`/
+  `CritChance`, flat baselines) — a real, deliberate v0 choice, not left unresolved. Named as a
+  real, separate future refinement if full per-mob STR/DEX/VIT/AGI blocks are ever wanted.
+- **PvP duels** (a separate, mob-registry-based mechanic that reuses `TickPlayer` in an unrelated
+  way) were deliberately left untouched, still flat-damage — a real, named scope boundary, not
+  an oversight.
+
+10 new tests (`apps2/mud/combat_formula_test.go`) + 6 new tests for `ReadyToSwing`
+(`server/mob/ready_to_swing_test.go`), plus a regression test proving `TickPlayer`'s own external
+behavior is byte-for-byte unchanged by the split. Live-verified twice: a throwaway instance (real
+variance, crits landing on both sides, a real evade, the full kill/XP/loot/level-up flow
+unaffected) and then the real production service after deploy (real variance, a real evade, a
+real KO flow all correct even stacked with an existing Poison DoT). GoblinFoxDragon commits
+`aaf5133`/`86fb69d`/`15b0339`.
 
 ## 6. Phased plan
 
@@ -228,38 +238,46 @@ STR/DEX/VIT/AGI stat blocks (most FFXI-parity, most work — every mob spawn sit
   temporary. `jobs` command marks disabled jobs. Existing characters already on a disabled job
   are left alone (not force-switched) — a real, deliberate choice to avoid destructive
   mid-session side effects; see the commit's own doc comment for the honest reasoning.
-- [ ] **Phase 1 — universal `Ability` model + cast-time/lockout engine.** The real core: MP/cast
-  time/recast/lockout as one shared mechanism, `/ja` and `cast` unified into `cmdAbility`. No new
-  spell content yet — this phase proves the timing engine against the EXISTING roster (Provoke,
-  Boost, Chakra, Cure, the BLM elementals) before adding anything new.
+- [x] **Universal 1s spell/ability lockout (shipped 2026-09-12, part of Phase 1's own real
+  scope).** `p.lastActionAt` + `checkUniversalLockout`, gating both `cmdCast` and `cmdJA` (and
+  `cmdCast`'s six further delegate spell functions, all reached only through it). The founder's
+  own resolution of open question 1 below.
+- [ ] **Phase 1 (remainder) — universal `Ability` model.** Still real, separate scope: MP cost/
+  cast time/recast as one shared struct unifying `/ja` and `cast` into one `cmdAbility`, plus the
+  real "pending effect, consumed by the next matching action" mechanism named in §0.5 (fixing
+  Berserk/Boost/Elemental Seal/Chainspell/Sneak Attack/Trick Attack for real). The universal
+  lockout above shipped as its own bounded slice rather than waiting on this larger refactor.
 - [ ] **Phase 2 — weapon skill per-type leveling.** `p.weaponSkills`, skill-gain-on-hit,
   `MinSkillLevel` gate on `setws`.
 - [ ] **Phase 3 — new first-tier content.** RAISE, Polymorph (pending the real design questions
-  named in §4), SAP (pending the naming/effect confirmation named in §4).
+  named in §4), SAP (pending the naming/effect confirmation named in §4), the Chakra
+  redefinition (pending open question 7 below).
 - [ ] **Phase 4 — targeting rules.** Offensive-auto-target/defensive-explicit-target,
   provoke-redirects-without-retargeting, all live-verified against real combat.
-- [ ] **Phase 4.5 — combat damage formula overhaul (§5).** STR-scaled+random player damage,
-  DEX-based crit, the shared accuracy/evasion roll, VIT-based reduction — real, foundational,
-  and arguably higher-impact than the spell-timing phases above since it touches every single
-  attack in the game, not just casters. Sequenced here (not first) only because it's independent
-  of the `Ability` model work and can land whenever ready without blocking or being blocked by
-  it — real candidate to actually do FIRST if the founder wants the most broadly-felt improvement
-  soonest.
+- [x] **Phase 4.5 — combat damage formula overhaul (§5) — SHIPPED 2026-09-12.** STR-scaled+
+  random player damage, DEX-based crit, the shared marble-bag+pity accuracy/evasion roll,
+  VIT-based reduction — real, foundational, arguably higher-impact than the spell-timing phases
+  since it touches every single attack in the game, not just casters. Built and deployed live
+  ahead of Phase 1's own remaining scope, per the founder's own "start working on the stack
+  LIFO" direction (most-recently-added phase first).
 - [ ] **Phase 5 — playtest, re-enable advanced jobs one at a time** once each has been ported
   onto the new `Ability` model — not a one-shot re-enable, matching the founder's own "so we can
   get feedback on actual gameplay" framing (the point is to ship the SIX-job core solid first).
 
 ## Real, open questions for the founder (named, not guessed at)
 
-1. Universal lockout duration: ~20ms bot-throttle vs. a human-felt ~1s (see §1's own caveat).
+1. ~~Universal lockout duration~~ — **resolved 2026-09-12: 1s**, shipped.
 2. THF "SAP (CC)" — exact effect/duration intended (real FFXI term, or a house-invented one)?
 3. RDM Polymorph — what does it actually do?
 4. Cast-time interruption on taking damage: FFXI-accurate (yes) or simplified (no interrupts for
    now, revisit later)?
-5. Combat formula (§5): do mobs get full STR/DEX/VIT/AGI stat blocks (most accurate, most
-   per-mob-spawn-site work) or a simpler flat accuracy/evasion/armor trio per mob?
-6. Which phase to actually build next — Phase 1 (spell timing) or Phase 4.5 (combat formula)?
-   Both are real, independent, and shippable in either order.
+5. ~~Combat formula (§5): do mobs get full STR/DEX/VIT/AGI stat blocks...~~ — **resolved
+   2026-09-12: the simpler flat accuracy/evasion/armor trio, shipped** (`combatMobBaseHitChance`/
+   `CritChance` in `apps2/mud/combat_formula.go`). A real, full per-mob stat block remains a
+   real, separate, named future refinement if ever wanted.
+6. Which phase to actually build next — **Phase 4.5 done; Phase 1's remaining scope (the
+   universal `Ability` model + pending-effect mechanism) is the next real candidate**, or Phase 2
+   (weapon skills) if that's a higher near-term priority.
 7. Chakra redefinition (§4, founder direction 2026-09-12: "chakra is a MNK ranged attack") — real
    design needed: base damage, what stat scales it (STR like melee, or a new ranged-attack
    stat?), real range vs. `p.combat.MeleeRange`, and whether the CURRENT self-heal behavior is
