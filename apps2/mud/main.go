@@ -872,8 +872,14 @@ func (p *player) prompt() {
 }
 
 func zoneName(id int) string {
-	if z, ok := gw.zoneMgr.Get(id); ok {
-		return z.Name
+	// Same real nil-safety shape prompt() already uses for gw.weatherEngine just above --
+	// found live while unit-testing cmdUseItem's new effects (use_item_test.go constructs a
+	// bare *player with no package-level gw at all, the same real gap every other command
+	// handler's own untested prompt() call already had).
+	if gw != nil && gw.zoneMgr != nil {
+		if z, ok := gw.zoneMgr.Get(id); ok {
+			return z.Name
+		}
 	}
 	return fmt.Sprintf("Zone%d", id)
 }
@@ -2499,14 +2505,20 @@ func handle(p *player, line string) {
 			p.send("Usage: eat <item-id>")
 			p.prompt()
 		} else {
-			cmdEat(p, args[0])
+			// Twin of the "use" bug fixed below: item-id args weren't lowercased here either,
+			// so "eat Milk" silently missed p.inventory's own always-lowercase keys.
+			cmdEat(p, strings.ToLower(args[0]))
 		}
 	case "use":
 		if len(args) < 1 {
 			p.send("Usage: use <item-id>")
 			p.prompt()
 		} else {
-			cmdUseItem(p, args[0])
+			// Real, found-live bug (2026-09-12): unlike cmdGo/cmdCast/cmdJA/cmdDeclare just
+			// above, this call site never lowercased its arg, so "use Hi-Potion" missed
+			// p.inventory's own always-lowercase keys entirely and fell through to "you don't
+			// have that."
+			cmdUseItem(p, strings.ToLower(args[0]))
 		}
 	case "food":
 		cmdFoodBuff(p)
@@ -4441,16 +4453,36 @@ func cmdFishPoints(p *player) {
 
 // cmdUseItem is Phase 0 of docs2/ITEM_BUILDER_NORTHSTAR.md: a real "use item" command didn't
 // exist at all before this -- every consumable in data/items.json (Potion, Hi-Potion, etc.) was
-// a real, inert data row with no way for a player to even attempt to use one. This is the
-// blocking prerequisite for Phase 1's mod-hook dispatch: it validates ownership and category,
-// then honestly reports that no effect is wired up yet, rather than pretending to do something.
+// a real, inert data row with no way for a player to even attempt to use one. It validates
+// ownership and category, then dispatches to a real effect where one exists.
 // Distinct from the existing "eat" command, which is food.Registry's own separate system.
+//
+// Real effects added 2026-09-12 (founder-reported live bug: "the mud items arent implemented
+// like echo drops and hi potion"). Phase 1's mod-hook mechanism (docs2/ITEM_BUILDER_NORTHSTAR.md)
+// still doesn't exist, so these are real, hardcoded, one-off effects -- the same shape
+// cmdRemoveDebuffs/cmdEat/food.Registry already use elsewhere in this file, not a new pattern --
+// rather than the data-driven "on_use_mod" dispatch that doc scopes as real future work once
+// more than a handful of items need behavior. Echo Drop and Antidote live in the flat string-ID
+// economy (p.inventory), not itemdefReg/items.json at all, so they're handled by ID before the
+// itemdefReg lookup below; Echo Drop specifically was already fully implemented (cmdRemoveDebuffs)
+// but only reachable via the separate `removedebuffs`/`erase` command, never via `use` -- the
+// real, literal reason it looked "not implemented" despite already working.
 func cmdUseItem(p *player, itemID string) {
 	if p.inventory[itemID] <= 0 {
 		p.sendf("You don't have %s.", itemDisplayNameOr(itemID))
 		p.prompt()
 		return
 	}
+
+	switch itemID {
+	case "echo-drop":
+		cmdRemoveDebuffs(p)
+		return
+	case "antidote":
+		cmdCurePoison(p)
+		return
+	}
+
 	def, ok := itemdefReg.ByName(itemID)
 	if !ok {
 		p.sendf("%s can't be used.", itemDisplayNameOr(itemID))
@@ -4462,7 +4494,72 @@ func cmdUseItem(p *player, itemID string) {
 		p.prompt()
 		return
 	}
+
+	// FFXI-canonical flat restore amounts -- the other named half of the same reported bug
+	// (Hi-Potion). Potion/Ether aren't sold anywhere today (checked: no vendor catalog entry
+	// exists for either), but items.json already carries them as real consumables, so they get
+	// the same real fix rather than being left in the same broken state for whenever they
+	// become obtainable.
+	switch def.Name {
+	case "Potion":
+		useRestoreHP(p, itemID, def.Name, 60)
+		return
+	case "Hi-Potion":
+		useRestoreHP(p, itemID, def.Name, 100)
+		return
+	case "Ether":
+		useRestoreMP(p, itemID, def.Name, 30)
+		return
+	}
+
 	p.sendf("You go to use %s, but nothing happens yet -- its effect isn't wired up.", def.Name)
+	p.prompt()
+}
+
+// cmdCurePoison is Antidote's real effect: FFXI's own Antidote cures Poison specifically --
+// narrower than Echo Drop's full debuff wipe (cmdRemoveDebuffs). Consumed on use regardless of
+// whether the player was actually poisoned, matching cmdRemoveDebuffs' own real convention (and
+// FFXI's own real item behavior) rather than refunding a "wasted" use.
+func cmdCurePoison(p *player) {
+	if p.inventory["antidote"] <= 0 {
+		p.send("You need an Antidote to cure Poison.")
+		p.prompt()
+		return
+	}
+	p.inventory["antidote"]--
+	if p.statFX.Has(status.Poison) {
+		p.statFX.Remove(status.Poison)
+		p.send("Antidote used. Poison cured.")
+	} else {
+		p.send("Antidote used. You weren't poisoned.")
+	}
+	p.prompt()
+}
+
+// useRestoreHP is the real, hardcoded effect for HP-restoring consumables (Potion, Hi-Potion).
+// Clamped to maxHP, same shape as the Chakra ability's own self-heal just above in this file.
+// Consumes one of itemID regardless of whether the player was already at full HP, matching real
+// FFXI item-use behavior (and cmdCurePoison/cmdRemoveDebuffs' own convention here).
+func useRestoreHP(p *player, itemID, displayName string, amount int) {
+	p.inventory[itemID]--
+	healed := amount
+	if p.hp+healed > p.maxHP {
+		healed = p.maxHP - p.hp
+	}
+	p.hp += healed
+	p.sendf("You use %s. +%d HP. (HP: %d/%d)", displayName, healed, p.hp, p.maxHP)
+	p.prompt()
+}
+
+// useRestoreMP mirrors useRestoreHP for MP-restoring consumables (Ether).
+func useRestoreMP(p *player, itemID, displayName string, amount int) {
+	p.inventory[itemID]--
+	restored := amount
+	if p.mp+restored > p.maxMP {
+		restored = p.maxMP - p.mp
+	}
+	p.mp += restored
+	p.sendf("You use %s. +%d MP. (MP: %d/%d)", displayName, restored, p.mp, p.maxMP)
 	p.prompt()
 }
 
