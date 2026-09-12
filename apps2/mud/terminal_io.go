@@ -92,9 +92,21 @@ func readTerminalLine(r *bufio.Reader, w io.Writer, echo bool) (string, error) {
 				io.WriteString(w, "\r\n")
 			}
 			// A cooked client's own "\r\n" pair must still consume as one line ending, not
-			// leave a stray '\n' for the next read to see as an immediate empty line.
-			if next, peekErr := r.Peek(1); peekErr == nil && next[0] == '\n' {
-				_, _ = r.ReadByte()
+			// leave a stray '\n' for the next read to see as an immediate empty line -- but
+			// ONLY when that '\n' is already sitting in the buffer. Real, serious bug found
+			// live (2026-09-12, immediately after this file's own original ship): r.Peek(1)
+			// blocks until it can actually satisfy the peek, which means calling it
+			// unconditionally here BLOCKS FOREVER the moment a real client sends a bare '\r'
+			// with nothing queued after it and then waits for a response (exactly what a real
+			// interactive keypress does -- the client doesn't send anything else until it sees
+			// this server's own reply) -- a real, total hang on every single line read, not a
+			// cosmetic issue. r.Buffered() > 0 only true's when a byte has ALREADY arrived and
+			// is sitting in bufio's own buffer (e.g. a client that really did send "\r\n" as one
+			// packet) -- checking that first means Peek can never block waiting on the network.
+			if r.Buffered() > 0 {
+				if next, peekErr := r.Peek(1); peekErr == nil && next[0] == '\n' {
+					_, _ = r.ReadByte()
+				}
 			}
 			return string(buf), nil
 		case '\n':

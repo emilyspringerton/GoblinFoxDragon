@@ -6,6 +6,7 @@ import (
 	"net"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestReadTerminalLine_BareCRTerminatesLine guards the real root cause of the founder-reported
@@ -21,6 +22,47 @@ func TestReadTerminalLine_BareCRTerminatesLine(t *testing.T) {
 	}
 	if line != "CoolName1" {
 		t.Errorf("readTerminalLine on bare CR = %q, want %q", line, "CoolName1")
+	}
+}
+
+// TestReadTerminalLine_BareCRWithNoFollowingDataDoesNotBlock guards a real, serious bug found
+// live (2026-09-12), immediately after this file's own first ship: r.Peek(1) called
+// unconditionally after a '\r' BLOCKS until it can satisfy the peek -- which means a real client
+// that sends a bare '\r' with nothing queued after it (exactly what a real keypress does: the
+// client waits for this server's own reply before sending anything else) hangs this function
+// forever. Uses a real net.Pipe() (not strings.Reader, which always has all its data immediately
+// available and would never have caught this) so the reader genuinely has nothing more to give
+// after the '\r' -- a regression back to the unconditional Peek would make this test hang and
+// fail on its own timeout rather than silently pass.
+func TestReadTerminalLine_BareCRWithNoFollowingDataDoesNotBlock(t *testing.T) {
+	clientSide, serverSide := net.Pipe()
+	defer clientSide.Close()
+	defer serverSide.Close()
+
+	go func() {
+		clientSide.Write([]byte("EMILY\r"))
+		// Deliberately writes NOTHING else -- a real interactive client now waits for this
+		// server's own response, exactly the real, live scenario that hung production.
+	}()
+
+	done := make(chan struct{})
+	var line string
+	var err error
+	go func() {
+		line, err = readTerminalLine(bufio.NewReader(serverSide), serverSide, false)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if line != "EMILY" {
+			t.Errorf("line = %q, want %q", line, "EMILY")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("readTerminalLine hung on a bare CR with no following data -- the real live production bug this test guards")
 	}
 }
 
