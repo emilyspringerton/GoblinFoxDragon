@@ -137,7 +137,8 @@ built on the `Ability` struct above. Targeting, matching the founder's own expli
 | Job | Ability/Spell | Kind | Real status |
 |---|---|---|---|
 | WAR | Provoke | Offensive (aggro) | **Already real** (30s recast, Lv5) |
-| MNK | Boost, Chakra | Buff / SelfOnly | **Already real** (both Lv1) |
+| MNK | Boost | Buff | **Already real** (Lv1) |
+| MNK | Chakra | **Offensive (ranged)** | **Redefine, not new content** — currently coded as a real-FFXI-accurate self-heal (no MP, restores missing HP); founder direction (2026-09-12): in GFD, Chakra is a MNK ranged attack instead. A deliberate house rule diverging from FFXI canon on purpose, same precedent as `blmSpells`' own distract/frazzle stubs — needs a real damage/range design (not specified yet: base damage? scales off STR like melee, or its own stat? real projectile range vs. the existing `p.combat.MeleeRange`?), not just a rename of the existing self-heal code |
 | THF | Sneak Attack | Offensive | **Already real** (1m recast, Lv1) |
 | THF | SAP (Sleep-inducing ranged attack, "CC") | Offensive/CC | **New** — real FFXI THF ranged JA is Aura Steal/Flee, not SAP; founder named "SAP" specifically (real FFXI term is a RDM/generalist CC noun, not a canonical THF ability) — flagging for a naming confirmation, not guessed at silently |
 | WHM | Cure, Haste, Dia | Defensive/Buff/Offensive-DoT | **Already real** as instant `cast` spells — need cast time added |
@@ -223,3 +224,9 @@ STR/DEX/VIT/AGI stat blocks (most FFXI-parity, most work — every mob spawn sit
    per-mob-spawn-site work) or a simpler flat accuracy/evasion/armor trio per mob?
 6. Which phase to actually build next — Phase 1 (spell timing) or Phase 4.5 (combat formula)?
    Both are real, independent, and shippable in either order.
+7. Chakra redefinition (§4, founder direction 2026-09-12: "chakra is a MNK ranged attack") — real
+   design needed: base damage, what stat scales it (STR like melee, or a new ranged-attack
+   stat?), real range vs. `p.combat.MeleeRange`, and whether the CURRENT self-heal behavior is
+   dropped entirely or kept as a different ability (MNK's real FFXI kit does have both a self-heal
+   AND ranged options at higher level — Boost/Chakra/Hundred Fists/etc. — so this may be "add a
+   new ranged JA" rather than "replace Chakra's own healing").
