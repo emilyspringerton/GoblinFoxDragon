@@ -165,15 +165,27 @@ const combatBoostBonus = 0.5 // +50%
 // Returns (hit, crit, damage) -- damage is 0 and crit is false whenever hit is false.
 func resolvePlayerAutoAttackDamage(p *player, baseDamage int) (hit bool, crit bool, damage int) {
 	stats := playerCombatStats(p)
-	hitChance := clampPercent(combatBaseHitChance+stats.DEX/2, combatMinHitChance, combatMaxHitChance)
+	// S412-06, founder real-time: "you start at lvl 1 sword and like that also impacts accuracy
+	// and damage" -- real weapon-type mastery (skill-gain-on-use, fishing/mining-shaped) adds a
+	// real bonus to both the hit roll and the damage mean, on top of DEX/STR. Modest by design
+	// (a fresh weapon type contributes nothing; a fully-capped level-10 weapon, 100 skill,
+	// contributes +10% hit chance and +20 flat damage) -- meaningful without swamping the
+	// existing STR/DEX-driven formula.
+	skillLvl := weaponSkillLevel(p, currentWeaponType(p))
+	hitChance := clampPercent(combatBaseHitChance+stats.DEX/2+skillLvl/10, combatMinHitChance, combatMaxHitChance)
 	if !pityRoll(hitChance, &p.pityOwnHit) {
 		return false, false, 0
 	}
+	// Real skill-gain-on-use, granted only on a landed hit (a miss teaches you nothing, matching
+	// the existing mining/fishing convention) -- must happen before any further use of skillLvl
+	// below would be stale for THIS swing (it isn't; skillLvl is deliberately captured pre-gain
+	// so this swing's own bonus reflects skill entering the swing, not leaving it).
+	gainWeaponSkill(p, charLevelOf(p))
 
 	// Real equipped-weapon "attack" stat (e.g. the starting Sword's own real 10) added to the
 	// caller's own flat baseline BEFORE STR scaling -- see equipAttackBonus's own doc comment for
 	// why this is a separate input from the STR multiplier just below, not folded into it.
-	baseDamage += equipAttackBonus(p)
+	baseDamage += equipAttackBonus(p) + skillLvl/5
 	mean := baseDamage
 	if stats.STR > 0 {
 		mean = baseDamage * stats.STR / 10
