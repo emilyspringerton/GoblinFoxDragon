@@ -2144,6 +2144,25 @@ typedef struct {
     int  submitting;
 } LoginScreenState;
 
+/* SSH_TRANSPORT_IDENTITY_SPEC.md Stage 2 (§7, "GUI login -- blocking item"): confirmed live
+ * (2026-09-12) that packages/common/http_client.h is a raw BSD-socket client with zero TLS
+ * capability on either platform this ships to (the Linux dev build, and the mingw-w64 Windows
+ * cross-build .github/workflows/build.yml produces as RedGarden.exe -- the client real players
+ * actually download and run) -- no OpenSSL/mbedTLS linked on either target, no dev headers
+ * installed in this sandbox, no TLS handshake code anywhere in this file. Real TLS here means
+ * vendoring and cross-compiling a full TLS library for both targets *and* real certificate/
+ * hostname verification -- a rushed implementation that skipped cert validation would be worse
+ * than plaintext (looks encrypted, is still trivially MITM-able), and wasn't going to be both
+ * built and verified in one sitting. The spec's own §7 acceptance names a second, valid path:
+ * "terminate TLS in front of the login and ticket endpoints, or disable the GUI login path
+ * entirely until TLS exists." Founder chose the second, live, 2026-09-12. See
+ * kGuiLoginDisabledPendingTLS below for where that's actually enforced -- the network call
+ * itself is gated, not just the UI, so this holds even if a future UI change reintroduces a way
+ * to reach the email/password fields. SIGN UP is unaffected: it opens the real WOTAN store page
+ * in the system browser (SDL_OpenURL below), which does a real TLS handshake via the browser's
+ * own stack -- this file's raw socket client is never involved in that path. */
+static const int kGuiLoginDisabledPendingTLS = 1;
+
 static void draw_login_screen(SDL_Window *win, int win_w, int win_h, const LoginScreenState *st) {
     glClearColor(0.03f, 0.05f, 0.04f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -2157,40 +2176,56 @@ static void draw_login_screen(SDL_Window *win, int win_w, int win_h, const Login
     glColor3f(0.6f, 1.0f, 0.7f);
     draw_string("DRAGONSNSHIT -- LOG IN", win_w / 2.0f - 150.0f, win_h - 120.0f, 16);
     glColor3f(0.6f, 0.7f, 0.65f);
-    draw_string("TAB TO SWITCH FIELD -- ENTER TO LOG IN -- ESC TO QUIT", win_w / 2.0f - 220.0f, win_h - 150.0f, 8);
+    if (kGuiLoginDisabledPendingTLS) {
+        draw_string("SIGN UP BELOW OR PLAY VIA TELNET -- ESC TO QUIT", win_w / 2.0f - 220.0f, win_h - 150.0f, 8);
+    } else {
+        draw_string("TAB TO SWITCH FIELD -- ENTER TO LOG IN -- ESC TO QUIT", win_w / 2.0f - 220.0f, win_h - 150.0f, 8);
+    }
 
     float box_w = 420.0f, box_h = 44.0f;
     float box_x = win_w / 2.0f - box_w / 2.0f;
     float email_y = win_h - 230.0f;
     float pass_y = win_h - 300.0f;
 
-    for (int field = 0; field < 2; field++) {
-        float top = (field == 0) ? email_y : pass_y;
-        float bottom = top - box_h;
-        int focused = (st->focus == field);
-        glColor4f(focused ? 0.2f : 0.1f, focused ? 0.45f : 0.18f, focused ? 0.25f : 0.16f, 0.9f);
-        glRectf(box_x, bottom, box_x + box_w, top);
-        glColor3f(focused ? 0.6f : 0.35f, focused ? 1.0f : 0.55f, focused ? 0.7f : 0.5f);
-        glBegin(GL_LINE_LOOP);
-        glVertex2f(box_x, bottom); glVertex2f(box_x + box_w, bottom);
-        glVertex2f(box_x + box_w, top); glVertex2f(box_x, top);
-        glEnd();
+    if (kGuiLoginDisabledPendingTLS) {
+        /* SSH_TRANSPORT_IDENTITY_SPEC.md Stage 2: no email/password fields are drawn at all --
+         * nothing for a player to type a real credential into on this screen while this file's
+         * HTTP client has no TLS. See kGuiLoginDisabledPendingTLS's own doc comment above. */
+        glColor3f(0.9f, 0.75f, 0.4f);
+        draw_string("GUI LOGIN IS TEMPORARILY DISABLED", win_w / 2.0f - 190.0f, email_y + 10.0f, 11);
+        glColor3f(0.6f, 0.7f, 0.65f);
+        draw_string("Encrypted login isn't wired up yet, so this client won't send a", win_w / 2.0f - 260.0f, email_y - 24.0f, 8);
+        draw_string("password over the network. Play right now via telnet, or sign up", win_w / 2.0f - 260.0f, email_y - 44.0f, 8);
+        draw_string("below -- SSH-based login is coming.", win_w / 2.0f - 260.0f, email_y - 64.0f, 8);
+    } else {
+        for (int field = 0; field < 2; field++) {
+            float top = (field == 0) ? email_y : pass_y;
+            float bottom = top - box_h;
+            int focused = (st->focus == field);
+            glColor4f(focused ? 0.2f : 0.1f, focused ? 0.45f : 0.18f, focused ? 0.25f : 0.16f, 0.9f);
+            glRectf(box_x, bottom, box_x + box_w, top);
+            glColor3f(focused ? 0.6f : 0.35f, focused ? 1.0f : 0.55f, focused ? 0.7f : 0.5f);
+            glBegin(GL_LINE_LOOP);
+            glVertex2f(box_x, bottom); glVertex2f(box_x + box_w, bottom);
+            glVertex2f(box_x + box_w, top); glVertex2f(box_x, top);
+            glEnd();
 
-        glColor3f(0.55f, 0.75f, 0.6f);
-        draw_string(field == 0 ? "EMAIL" : "PASSWORD", box_x, top + 10.0f, 8);
+            glColor3f(0.55f, 0.75f, 0.6f);
+            draw_string(field == 0 ? "EMAIL" : "PASSWORD", box_x, top + 10.0f, 8);
 
-        char shown[LOGIN_FIELD_MAX + 1];
-        const char *raw = (field == 0) ? st->email : st->password;
-        if (field == 1) {
-            size_t n = strlen(raw);
-            if (n > LOGIN_FIELD_MAX) n = LOGIN_FIELD_MAX;
-            for (size_t i = 0; i < n; i++) shown[i] = '*';
-            shown[n] = '\0';
-        } else {
-            snprintf(shown, sizeof(shown), "%s", raw);
+            char shown[LOGIN_FIELD_MAX + 1];
+            const char *raw = (field == 0) ? st->email : st->password;
+            if (field == 1) {
+                size_t n = strlen(raw);
+                if (n > LOGIN_FIELD_MAX) n = LOGIN_FIELD_MAX;
+                for (size_t i = 0; i < n; i++) shown[i] = '*';
+                shown[n] = '\0';
+            } else {
+                snprintf(shown, sizeof(shown), "%s", raw);
+            }
+            glColor3f(0.9f, 1.0f, 0.95f);
+            draw_string(shown, box_x + 10.0f, bottom + box_h / 2.0f - 4.0f, 10);
         }
-        glColor3f(0.9f, 1.0f, 0.95f);
-        draw_string(shown, box_x + 10.0f, bottom + box_h / 2.0f - 4.0f, 10);
     }
 
     /* Real LOG IN / SIGN UP buttons (GFD-FIX/GFD-UX-8325432, founder: "ctrl alt s to sign up
@@ -2209,15 +2244,17 @@ static void draw_login_screen(SDL_Window *win, int win_w, int win_h, const Login
     float btn_w = 200.0f, btn_h = 40.0f, btn_gap = 14.0f;
     float login_btn_y0 = pass_y - 70.0f;
     float login_btn_x0 = win_w / 2.0f - btn_w / 2.0f;
-    int login_disabled = !(st->email[0] && st->password[0]) || st->submitting;
-    glColor4f(login_disabled ? 0.2f : 0.25f, login_disabled ? 0.3f : 0.55f, login_disabled ? 0.25f : 0.3f, 0.9f);
-    glRectf(login_btn_x0, login_btn_y0, login_btn_x0 + btn_w, login_btn_y0 + btn_h);
-    glColor3f(login_disabled ? 0.4f : 0.7f, login_disabled ? 0.5f : 1.0f, login_disabled ? 0.45f : 0.75f);
-    glBegin(GL_LINE_LOOP);
-    glVertex2f(login_btn_x0, login_btn_y0); glVertex2f(login_btn_x0 + btn_w, login_btn_y0);
-    glVertex2f(login_btn_x0 + btn_w, login_btn_y0 + btn_h); glVertex2f(login_btn_x0, login_btn_y0 + btn_h);
-    glEnd();
-    draw_string("LOG IN", login_btn_x0 + btn_w / 2.0f - 34.0f, login_btn_y0 + btn_h / 2.0f - 5.0f, 10);
+    if (!kGuiLoginDisabledPendingTLS) {
+        int login_disabled = !(st->email[0] && st->password[0]) || st->submitting;
+        glColor4f(login_disabled ? 0.2f : 0.25f, login_disabled ? 0.3f : 0.55f, login_disabled ? 0.25f : 0.3f, 0.9f);
+        glRectf(login_btn_x0, login_btn_y0, login_btn_x0 + btn_w, login_btn_y0 + btn_h);
+        glColor3f(login_disabled ? 0.4f : 0.7f, login_disabled ? 0.5f : 1.0f, login_disabled ? 0.45f : 0.75f);
+        glBegin(GL_LINE_LOOP);
+        glVertex2f(login_btn_x0, login_btn_y0); glVertex2f(login_btn_x0 + btn_w, login_btn_y0);
+        glVertex2f(login_btn_x0 + btn_w, login_btn_y0 + btn_h); glVertex2f(login_btn_x0, login_btn_y0 + btn_h);
+        glEnd();
+        draw_string("LOG IN", login_btn_x0 + btn_w / 2.0f - 34.0f, login_btn_y0 + btn_h / 2.0f - 5.0f, 10);
+    }
 
     float signup_btn_y0 = login_btn_y0 - btn_h - btn_gap;
     float signup_btn_x0 = win_w / 2.0f - btn_w / 2.0f;
@@ -2268,7 +2305,7 @@ static int run_login_screen(SDL_Window *win, int win_w, int win_h,
                 break;
             } else if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_RESIZED) {
                 win_w = e.window.data1; win_h = e.window.data2;
-            } else if (e.type == SDL_TEXTINPUT && !st.submitting) {
+            } else if (e.type == SDL_TEXTINPUT && !st.submitting && !kGuiLoginDisabledPendingTLS) {
                 char *field = (st.focus == 0) ? st.email : st.password;
                 size_t len = strlen(field);
                 size_t add = strlen(e.text.text);
@@ -2276,6 +2313,12 @@ static int run_login_screen(SDL_Window *win, int win_w, int win_h,
             } else if (e.type == SDL_KEYDOWN && !st.submitting) {
                 if (e.key.keysym.sym == SDLK_ESCAPE) {
                     running = 0;
+                } else if (kGuiLoginDisabledPendingTLS) {
+                    /* SSH_TRANSPORT_IDENTITY_SPEC.md Stage 2: no other key does anything on this
+                     * screen while GUI login is disabled -- nothing to focus/edit/submit, and
+                     * Ctrl+Alt+S (sign up) is still reachable below via mouse click on the SIGN UP
+                     * button, so this isn't losing real functionality, just the disabled fields'
+                     * own keys. */
                 } else if (e.key.keysym.sym == SDLK_TAB) {
                     st.focus = 1 - st.focus;
                 } else if (e.key.keysym.sym == SDLK_BACKSPACE) {
@@ -2340,7 +2383,8 @@ static int run_login_screen(SDL_Window *win, int win_w, int win_h,
                 float login_btn_x0 = win_w / 2.0f - btn_w / 2.0f;
                 float signup_btn_y0 = login_btn_y0 - btn_h - btn_gap;
                 float signup_btn_x0 = win_w / 2.0f - btn_w / 2.0f;
-                if (st.email[0] && st.password[0] && login_screen_point_in_rect(mx, my, login_btn_x0, login_btn_y0, btn_w, btn_h)) {
+                if (!kGuiLoginDisabledPendingTLS && st.email[0] && st.password[0] &&
+                    login_screen_point_in_rect(mx, my, login_btn_x0, login_btn_y0, btn_w, btn_h)) {
                     st.submitting = 1;
                     st.error[0] = '\0';
                 } else if (login_screen_point_in_rect(mx, my, signup_btn_x0, signup_btn_y0, btn_w, btn_h)) {
@@ -2352,7 +2396,14 @@ static int run_login_screen(SDL_Window *win, int win_w, int win_h,
 
         draw_login_screen(win, win_w, win_h, &st);
 
-        if (st.submitting) {
+        if (st.submitting && kGuiLoginDisabledPendingTLS) {
+            /* Defense in depth for SSH_TRANSPORT_IDENTITY_SPEC.md Stage 2: st.submitting should
+             * be unreachable while GUI login is disabled (every path that sets it is gated
+             * above), but get_player_login_ticket is the actual plaintext network call this
+             * stage exists to stop, so it gets its own guard rather than trusting the UI gating
+             * alone to never regress. */
+            st.submitting = 0;
+        } else if (st.submitting) {
             char err[128] = "";
             if (get_player_login_ticket(st.email, st.password, out_ticket, err, sizeof(err))) {
                 ok = 1;
