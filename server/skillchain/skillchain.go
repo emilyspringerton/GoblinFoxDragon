@@ -242,36 +242,79 @@ func Burst(resonance Resonance, spellElem Element, elapsed, window time.Duration
 // --- Weapon skill definitions ---
 
 // WeaponSkill defines the resonance properties of a weapon skill.
+//
+// WeaponType and MinSkillLevel (S412-06, founder real-time weapon-skill-leveling design burst:
+// "you start at lvl 1 sword and like that also impacts accuracy and damage then when you hit you
+// can level up that skill... fast blade should be the sward lvl 10 weapon skill combo is the mnk
+// lvl 10 weapon skill") are real and new -- before this pass `setws` accepted any canonical name
+// with zero gate, and no field said which weapon TYPE a given skill even belonged to.
+// WeaponType is one of apps2/mud's own real weaponSkillLevel-package constants ("sword",
+// "greatsword", "axe", "dagger", "club", "staff", "polearm", "h2h", "katana"). MinSkillLevel is
+// the real per-weapon-type skill points (apps2/mud's own p.weaponSkills[WeaponType], gained on
+// every landed auto-attack, fishing/mining-shaped) a player needs before they can actually FIRE
+// this skill via `ws` -- `setws` itself stays ungated (pre-selecting a name you can't use yet,
+// e.g. while leveling toward it, is harmless), the real gate lives at execution time.
 type WeaponSkill struct {
-	Name   string
-	Attrs  []Resonance // SC attributes this WS carries (can carry multiple)
+	Name          string
+	Attrs         []Resonance // SC attributes this WS carries (can carry multiple)
+	WeaponType    string
+	MinSkillLevel int
 }
 
 // CanonicalWeaponSkills is a representative set of DragonsNShit weapon skills
 // modelled on FFXI archetypes.  The server registers additional skills at runtime.
 var CanonicalWeaponSkills = map[string]WeaponSkill{
 	// 1-handed sword
-	"Fast Blade":      {Name: "Fast Blade", Attrs: []Resonance{Scission}},
-	"Burning Blade":   {Name: "Burning Blade", Attrs: []Resonance{Liquefaction}},
-	"Red Lotus Blade": {Name: "Red Lotus Blade", Attrs: []Resonance{Liquefaction, Transfixion}},
-	"Flat Blade":      {Name: "Flat Blade", Attrs: []Resonance{Impaction}},
-	"Shining Blade":   {Name: "Shining Blade", Attrs: []Resonance{Transfixion}},
-	"Seraph Blade":    {Name: "Seraph Blade", Attrs: []Resonance{Transfixion, Reverberation}},
-	"Circle Blade":    {Name: "Circle Blade", Attrs: []Resonance{Reverberation}},
+	"Fast Blade":      {Name: "Fast Blade", Attrs: []Resonance{Scission}, WeaponType: "sword", MinSkillLevel: 10},
+	"Flat Blade":      {Name: "Flat Blade", Attrs: []Resonance{Impaction}, WeaponType: "sword", MinSkillLevel: 20},
+	"Burning Blade":   {Name: "Burning Blade", Attrs: []Resonance{Liquefaction}, WeaponType: "sword", MinSkillLevel: 30},
+	"Shining Blade":   {Name: "Shining Blade", Attrs: []Resonance{Transfixion}, WeaponType: "sword", MinSkillLevel: 40},
+	"Circle Blade":    {Name: "Circle Blade", Attrs: []Resonance{Reverberation}, WeaponType: "sword", MinSkillLevel: 55},
+	"Seraph Blade":    {Name: "Seraph Blade", Attrs: []Resonance{Transfixion, Reverberation}, WeaponType: "sword", MinSkillLevel: 70},
+	"Red Lotus Blade": {Name: "Red Lotus Blade", Attrs: []Resonance{Liquefaction, Transfixion}, WeaponType: "sword", MinSkillLevel: 85},
 	// Great sword
-	"Hard Slash":      {Name: "Hard Slash", Attrs: []Resonance{Scission}},
-	"Power Slash":     {Name: "Power Slash", Attrs: []Resonance{Transfixion}},
-	"Frostbite":       {Name: "Frostbite", Attrs: []Resonance{Induration, Reverberation}},
-	"Freezebite":      {Name: "Freezebite", Attrs: []Resonance{Distortion}},
-	// Staff
-	"Shell Crusher":   {Name: "Shell Crusher", Attrs: []Resonance{Scission}},
-	"Rock Crusher":    {Name: "Rock Crusher", Attrs: []Resonance{Reverberation}},
-	"Earth Crusher":   {Name: "Earth Crusher", Attrs: []Resonance{Reverberation, Compression}},
-	"Starburst":       {Name: "Starburst", Attrs: []Resonance{Fusion}},
-	"Sunburst":        {Name: "Sunburst", Attrs: []Resonance{Fragmentation}},
-	// Club
-	"Shining Strike":  {Name: "Shining Strike", Attrs: []Resonance{Transfixion}},
-	"Seraph Strike":   {Name: "Seraph Strike", Attrs: []Resonance{Transfixion, Reverberation}},
-	"Black Halo":      {Name: "Black Halo", Attrs: []Resonance{Gravitation}},
-	"Judgment":        {Name: "Judgment", Attrs: []Resonance{Fusion}},
+	"Hard Slash":  {Name: "Hard Slash", Attrs: []Resonance{Scission}, WeaponType: "greatsword", MinSkillLevel: 10},
+	"Power Slash": {Name: "Power Slash", Attrs: []Resonance{Transfixion}, WeaponType: "greatsword", MinSkillLevel: 25},
+	"Frostbite":   {Name: "Frostbite", Attrs: []Resonance{Induration, Reverberation}, WeaponType: "greatsword", MinSkillLevel: 45},
+	"Freezebite":  {Name: "Freezebite", Attrs: []Resonance{Distortion}, WeaponType: "greatsword", MinSkillLevel: 65},
+	// Staff (real data/items.json items: Willow Wand, Brass/Healing/Shepherd's Staff -- WHM/BLM's
+	// real casting-weapon affinity; founder's own wording said "whm club," mapped onto this
+	// repo's real, existing "Staff"/"Wand" item type since no separate Club-category item exists)
+	"Shell Crusher": {Name: "Shell Crusher", Attrs: []Resonance{Scission}, WeaponType: "staff", MinSkillLevel: 10},
+	"Rock Crusher":  {Name: "Rock Crusher", Attrs: []Resonance{Reverberation}, WeaponType: "staff", MinSkillLevel: 25},
+	"Earth Crusher": {Name: "Earth Crusher", Attrs: []Resonance{Reverberation, Compression}, WeaponType: "staff", MinSkillLevel: 45},
+	"Sunburst":      {Name: "Sunburst", Attrs: []Resonance{Fragmentation}, WeaponType: "staff", MinSkillLevel: 65},
+	"Starburst":     {Name: "Starburst", Attrs: []Resonance{Fusion}, WeaponType: "staff", MinSkillLevel: 85},
+	// Club -- a real, distinct weapon type from Staff above; no data/items.json item grants this
+	// type yet (an honest, named gap, same shape as polearm's own below), kept registered so the
+	// skills exist the moment a real Club item is authored.
+	"Shining Strike": {Name: "Shining Strike", Attrs: []Resonance{Transfixion}, WeaponType: "club", MinSkillLevel: 10},
+	"Seraph Strike":  {Name: "Seraph Strike", Attrs: []Resonance{Transfixion, Reverberation}, WeaponType: "club", MinSkillLevel: 30},
+	"Black Halo":     {Name: "Black Halo", Attrs: []Resonance{Gravitation}, WeaponType: "club", MinSkillLevel: 55},
+	"Judgment":       {Name: "Judgment", Attrs: []Resonance{Fusion}, WeaponType: "club", MinSkillLevel: 80},
+	// Dagger (THF's real affinity weapon; founder: "thf gets wasp sting for daggers etc")
+	"Wasp Sting":    {Name: "Wasp Sting", Attrs: []Resonance{Detonation}, WeaponType: "dagger", MinSkillLevel: 10},
+	"Gust Slash":    {Name: "Gust Slash", Attrs: []Resonance{Detonation}, WeaponType: "dagger", MinSkillLevel: 25},
+	"Cyclone":       {Name: "Cyclone", Attrs: []Resonance{Detonation, Scission}, WeaponType: "dagger", MinSkillLevel: 50},
+	"Mercy Stroke":  {Name: "Mercy Stroke", Attrs: []Resonance{Compression}, WeaponType: "dagger", MinSkillLevel: 75},
+	// Axe (WAR's real affinity weapon)
+	"Raging Axe":    {Name: "Raging Axe", Attrs: []Resonance{Liquefaction}, WeaponType: "axe", MinSkillLevel: 10},
+	"Smash Axe":     {Name: "Smash Axe", Attrs: []Resonance{Impaction}, WeaponType: "axe", MinSkillLevel: 25},
+	"Gale Axe":      {Name: "Gale Axe", Attrs: []Resonance{Detonation}, WeaponType: "axe", MinSkillLevel: 50},
+	"Primal Rend":   {Name: "Primal Rend", Attrs: []Resonance{Gravitation}, WeaponType: "axe", MinSkillLevel: 75},
+	// Polearm (DRG's real affinity weapon) -- honest gap: no real data/items.json item has
+	// weapon_type "polearm" yet (this repo has no polearm item at all today), so this type is
+	// currently unreachable in live gameplay; registered here so DRG's own affinity and these
+	// skills are real and ready the moment a real polearm item is authored, not silently omitted.
+	"Double Thrust": {Name: "Double Thrust", Attrs: []Resonance{Scission}, WeaponType: "polearm", MinSkillLevel: 10},
+	"Penta Thrust":  {Name: "Penta Thrust", Attrs: []Resonance{Scission, Impaction}, WeaponType: "polearm", MinSkillLevel: 30},
+	"Vorpal Thrust": {Name: "Vorpal Thrust", Attrs: []Resonance{Induration}, WeaponType: "polearm", MinSkillLevel: 55},
+	"Skewer":        {Name: "Skewer", Attrs: []Resonance{Gravitation}, WeaponType: "polearm", MinSkillLevel: 80},
+	// H2H (MNK's real affinity weapon; also unarmed's real weapon type -- "when we first start
+	// out we dont have a weapon so hand to hand should level up and the weapon skill should be
+	// combo instead of fast blade")
+	"Combo":        {Name: "Combo", Attrs: []Resonance{Impaction}, WeaponType: "h2h", MinSkillLevel: 10},
+	"Backhand Blow": {Name: "Backhand Blow", Attrs: []Resonance{Compression}, WeaponType: "h2h", MinSkillLevel: 25},
+	"Raging Fists":  {Name: "Raging Fists", Attrs: []Resonance{Liquefaction}, WeaponType: "h2h", MinSkillLevel: 50},
+	"Asuran Fists":  {Name: "Asuran Fists", Attrs: []Resonance{Fusion}, WeaponType: "h2h", MinSkillLevel: 90},
 }
