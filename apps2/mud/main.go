@@ -803,6 +803,16 @@ type player struct {
 	homePoint     *homepoint.State
 	wsSkill       string         // current weapon skill name (from CanonicalWeaponSkills)
 	jobID         string         // current job (job.JobID, default "WAR")
+	// isGuest (SSH_TRANSPORT_IDENTITY_SPEC.md Stage 1, founder-supplied spec + Amendment 1,
+	// 2026-09-12) marks an anonymous telnet connection -- true for every real handleConn
+	// session, always false (Go's own zero value) for a headless/Town-GUI session, which
+	// already carries a real WOTAN-authenticated characterID rather than a typed name. See
+	// guestGate's own doc comment for what this actually gates. Named "guest" rather than
+	// "telnet" deliberately, matching the spec's own framing: once SSH ships (a later stage,
+	// not built yet), a real SSH connection with no bound identity is still a guest -- the
+	// distinction this flag draws is "has a durable, accountable identity," not "which
+	// transport." Every real connection today is telnet, so this is always true for now.
+	isGuest       bool
 	inventory     map[string]int // itemID → quantity
 	craftSkill    *craft.CraftSkill
 	flow          int
@@ -2223,6 +2233,69 @@ func broadcastMobEvent(zoneID int, ev mob.Event) {
 
 // ── command handling ──────────────────────────────────────────────────────────
 
+// guestBlockedCommands is the real, server-side enforcement of SSH_TRANSPORT_IDENTITY_SPEC.md
+// §4 + Amendment 1 (founder-supplied spec, 2026-09-12): an anonymous ("guest") telnet connection
+// holds no durable identity, so it may never touch economy state (bank/bazaar/auction house) or
+// reach another player with free text (say/tell/yell/linkshell chat/party chat) -- an
+// unauthenticated, unbannable, zero-cost name is both a direct-theft vector (economy) and an
+// impersonation/social-engineering vector (chat), and the spec is explicit that both gates are
+// required, neither is sufficient alone. Checked here, in handle()'s own dispatch, rather than
+// hidden behind a menu -- the spec's own acceptance criteria require this survive direct socket
+// testing, not just client-side hiding.
+//
+// Deliberately does NOT block party/linkshell MEMBERSHIP commands (invite/accept/leave/ls-create/
+// ls-invite) -- Amendment 1 §B.4 keeps those permitted, only the CHAT sub-feature of each is
+// gated. Also deliberately does not touch headless (Town GUI) sessions -- those already carry a
+// real, non-guessable identity (a WOTAN-authenticated characterID handed in by the caller, not a
+// typed name), so p.isGuest is only ever true for a real telnet connection (see handleConn).
+var guestBlockedCommands = map[string]string{
+	"bank":   "economy",
+	"bazaar": "economy",
+	"ah":     "economy",
+	"say":    "chat", "'": "chat",
+	"tell": "chat", "t": "chat",
+	"yell": "chat", "y": "chat",
+	"guild": "chat", "g": "chat",
+}
+
+// guestBlockedMessage explains the real reason and the real upgrade path, per the spec's own
+// "Blocked-command responses explain the upgrade rather than only denying" requirement -- a bare
+// "command not found"/"permission denied" would just look broken, and wouldn't build toward the
+// spec's own real conversion-funnel goal (§D/E: guest->SSH conversion is the number that
+// eventually justifies deprecating telnet at all, per stage 8).
+func guestBlockedMessage(category string) string {
+	switch category {
+	case "economy":
+		return "[Guest] The bank, auction house, and bazaar are SSH-only -- a guest connection has no durable identity to trust with economy state. Combat, exploration, jobs, and progression are still fully open. SSH key binding is coming soon."
+	case "chat":
+		return "[Guest] Player-to-player chat (say/tell/yell/linkshell) is SSH-only -- an anonymous guest name is too easy to impersonate. Combat, exploration, jobs, and progression are still fully open. SSH key binding is coming soon."
+	default:
+		return "[Guest] That command requires an SSH-bound identity."
+	}
+}
+
+// guestGate checks cmd/line against guestBlockedCommands (and the "/p" party-chat shortcut,
+// which handle() special-cases before its own main switch and so isn't a plain command-name
+// lookup). Returns true if handle() should stop processing this line -- caller has already sent
+// the refusal and the next prompt.
+func guestGate(p *player, cmd, line string) bool {
+	if !p.isGuest {
+		return false
+	}
+	category, blocked := guestBlockedCommands[cmd]
+	isPartyChat := cmd == "/p" || strings.HasPrefix(line, "/p ")
+	if !blocked && !isPartyChat {
+		return false
+	}
+	if isPartyChat {
+		category = "chat"
+	}
+	log.Printf("[guest-blocked] slot=%s cmd=%q category=%s", p.slot, cmd, category)
+	p.send(guestBlockedMessage(category))
+	p.prompt()
+	return true
+}
+
 func handle(p *player, line string) {
 	line = strings.TrimSpace(line)
 	if line == "" {
@@ -2235,6 +2308,10 @@ func handle(p *player, line string) {
 
 	if full, ok := dirAliases[cmd]; ok {
 		cmd = full
+	}
+
+	if guestGate(p, cmd, line) {
+		return
 	}
 
 	// Party chat shortcut: /p <msg>
@@ -5663,6 +5740,13 @@ func cmdCraft(p *player, recipeID string) {
 	p.prompt()
 }
 
+// switchActiveJob is the real fix for GFD-124433 ("when you are a lvl 10 warrior in gfd and you
+// switch to RDM for the first time you go back to lvl 1... separate lvls/job"): returns the
+// *xp.CharXP for jobID, creating a fresh level-1 entry in jobXP (mutated in place) the first
+// time this particular job is ever made active for this character. Deliberately pure/small and
+// unit-testable in isolation, unlike cmdSetJob itself (needs the full gw/player machinery) --
+// same "extract the one real piece of new logic into something testable" shape
+// weaponDelayFor/use_item_test.go's own helpers already established in this file.
 func switchActiveJob(jobXP map[string]*xp.CharXP, jobID string) *xp.CharXP {
 	if existing, ok := jobXP[jobID]; ok {
 		return existing
@@ -7958,6 +8042,16 @@ func handleConn(conn net.Conn) {
 	}
 
 	send("Welcome to DragonsNShit MUD.")
+	// SSH_TRANSPORT_IDENTITY_SPEC.md Stage 1 (Amendment 1 §C.1/§D): ephemerality and guest-mode
+	// scope must be stated plainly BEFORE the name prompt, not discovered at the moment of first
+	// refusal. Real, confirmed-live behavior (founder, 2026-09-12, tested directly): reconnecting
+	// with the same name does not resume a character today -- treated here as this tier's real,
+	// deliberate, permanent model, not a bug to hide or silently fix.
+	send("This is a GUEST connection: no login, no persistence. Your character does not")
+	send("carry over between connections -- reconnecting starts a brand-new level 1.")
+	send("Guests can fight, explore, quest, and level up freely, but cannot use the bank,")
+	send("auction house, bazaar, or talk to other players (say/tell/yell/linkshell) --")
+	send("those require an SSH-bound identity, coming soon.")
 	send("Enter your character name: ")
 	w.Flush()
 
@@ -8014,6 +8108,7 @@ func handleConn(conn net.Conn) {
 		equip:         gear.NewEquipment(),
 		conn:          conn,
 		w:             w,
+		isGuest:       true, // SSH_TRANSPORT_IDENTITY_SPEC.md Stage 1: every real telnet connection is a guest
 	}
 
 	// IDUNA character fetch-or-create (best-effort; non-blocking).
