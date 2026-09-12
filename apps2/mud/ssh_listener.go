@@ -489,6 +489,7 @@ func serveSSH(ln net.Listener, config *ssh.ServerConfig) {
 			log.Printf("[ssh] accept: %v", err)
 			continue
 		}
+		disableNagle(rawConn)
 
 		ip := ipOnly(rawConn.RemoteAddr())
 		sshPerIPMu.Lock()

@@ -9381,6 +9381,7 @@ func main() {
 			fmt.Printf("accept: %v\n", err)
 			continue
 		}
+		disableNagle(conn)
 		go handleConn(conn, true, nil, false) // telnet: guest, no preset identity, client echoes locally
 	}
 }

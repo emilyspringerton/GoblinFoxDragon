@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"net"
 	"strings"
 	"testing"
 )
@@ -130,6 +131,52 @@ func TestReadTerminalLine_EOFPropagatesAsError(t *testing.T) {
 	if _, err := readTerminalLine(r, &out, false); err == nil {
 		t.Error("expected an error when the connection closes mid-line with no terminator")
 	}
+}
+
+// TestDisableNagle_RealTCPConnDoesNotError guards the real, founder-reported live bug
+// (2026-09-12): "i have to hit enter twice... it wont send until i hit enter or another key" --
+// Nagle's algorithm (Go's own net.TCPConn default) batching this file's own new per-keystroke
+// echo writes. A real loopback TCP pair (not a mock) confirms SetNoDelay actually succeeds
+// against a real *net.TCPConn.
+func TestDisableNagle_RealTCPConnDoesNotError(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	defer ln.Close()
+
+	acceptedCh := make(chan net.Conn, 1)
+	go func() {
+		conn, err := ln.Accept()
+		if err == nil {
+			acceptedCh <- conn
+		}
+	}()
+
+	client, err := net.Dial("tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer client.Close()
+
+	server := <-acceptedCh
+	defer server.Close()
+
+	// Must not panic and must actually be a *net.TCPConn this real dial/accept pair.
+	if _, ok := server.(*net.TCPConn); !ok {
+		t.Fatalf("expected a real *net.TCPConn from a real TCP accept, got %T", server)
+	}
+	disableNagle(server) // real assertion: this must not panic or otherwise misbehave
+}
+
+// TestDisableNagle_NonTCPConnNoOps guards the defensive fallback -- a net.Pipe() conn (used
+// elsewhere in this package's own tests) is not a *net.TCPConn, and must silently no-op rather
+// than panicking on a failed type assertion.
+func TestDisableNagle_NonTCPConnNoOps(t *testing.T) {
+	clientSide, serverSide := net.Pipe()
+	defer clientSide.Close()
+	defer serverSide.Close()
+	disableNagle(serverSide) // must not panic
 }
 
 func TestReadTerminalLine_CapsUnboundedLineAtMaxLen(t *testing.T) {

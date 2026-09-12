@@ -42,9 +42,37 @@ package main
 import (
 	"bufio"
 	"io"
+	"log"
+	"net"
 )
 
 const maxLineLen = 256
+
+// disableNagle sets TCP_NODELAY on a freshly accepted connection -- a real, live bug this
+// session's own echo fix (readTerminalLine, above) exposed: real-time per-keystroke echo writes
+// are exactly the small, frequent-write workload Nagle's algorithm (Go's own net.TCPConn default:
+// enabled) actively hurts, and combined with the peer's own delayed-ACK timer it produces the
+// textbook "Nagle/delayed-ACK death spiral" -- founder-reported live, 2026-09-12: "i have to hit
+// enter twice... it wont send until i hit enter or another key[.] as soon as another key is typed
+// the previous command sends." Before the echo fix, this server almost never did small, frequent
+// writes (one write per full command response, not one per keystroke), so the exact same
+// long-standing Nagle-enabled default never surfaced as a felt problem -- a real, latent bug the
+// echo fix's own real value (visible per-keystroke feedback) made newly visible, not something
+// the echo fix broke on its own. TCP_NODELAY is the standard, correct fix for any interactive
+// terminal protocol (a real ssh/telnet server never benefits from Nagle's batching and always
+// suffers from its added latency) -- applied to both the SSH listener's raw underlying TCP
+// connection (ssh.Channel writes multiplex over it) and the plain telnet listener's own
+// connection, matching the exact same real workload once guest telnet also gets per-keystroke
+// echo (it doesn't today -- telnet clients echo locally -- but this fix costs nothing to apply
+// uniformly and protects against the same class of bug if that ever changes). A non-TCP net.Conn
+// (not expected in real use here, but defensive) silently no-ops rather than panicking.
+func disableNagle(conn net.Conn) {
+	if tcpConn, ok := conn.(*net.TCPConn); ok {
+		if err := tcpConn.SetNoDelay(true); err != nil {
+			log.Printf("[net] SetNoDelay failed for %s: %v (interactive latency may suffer, not fatal)", conn.RemoteAddr(), err)
+		}
+	}
+}
 
 // readTerminalLine reads one line of raw user input from r, byte at a time, applying real
 // (if minimal) line editing regardless of echo, and writing each processed byte back to w when
