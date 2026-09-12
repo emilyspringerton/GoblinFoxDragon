@@ -5797,6 +5797,23 @@ func loadJobXP(persisted map[string]idunaclient.JobLevel, mainJob string, legacy
 	return out
 }
 
+// enabledJobs (JOB_SPELL_SYSTEM_NORTHSTAR.md Phase 0, founder real-time 2026-09-12: "we need to
+// disable all of the advanced jobs for now including ASN -- we need to design the first tier of
+// spells into the game so we can get feedback on actual gameplay") -- only the original FFXI six
+// can be freshly SET while the spell/ability timing overhaul (§1-5 of that doc) is designed and
+// built against a small, solid core. Real, deliberate scope: this blocks new switches TO a
+// disabled job, it does NOT touch any character already playing one (see cmdSetJob's own check
+// below) -- force-switching an existing player's job out from under them the moment this shipped
+// would be a real, unrequested, destructive side effect, not "disabling for now."
+var enabledJobs = map[string]bool{
+	job.WAR: true,
+	job.MNK: true,
+	job.WHM: true,
+	job.BLM: true,
+	job.RDM: true,
+	job.THF: true,
+}
+
 func cmdSetJob(p *player, jobID string) {
 	if p.homePoint.IsKO {
 		p.send("You cannot change jobs while KO'd.")
@@ -5806,6 +5823,11 @@ func cmdSetJob(p *player, jobID string) {
 	s, err := job.StatsFor(jobID)
 	if err != nil {
 		p.sendf("Unknown job %q. Use 'jobs' to list all 23 jobs.", jobID)
+		p.prompt()
+		return
+	}
+	if !enabledJobs[jobID] {
+		p.sendf("%s is temporarily disabled while the job/spell system is being redesigned. Available now: WAR, MNK, WHM, BLM, RDM, THF.", jobID)
 		p.prompt()
 		return
 	}
@@ -5879,6 +5901,13 @@ func cmdSetSubJob(p *player, subJobID string) {
 	}
 	if _, err := job.StatsFor(subJobID); err != nil {
 		p.sendf("Unknown job %q. Use 'jobs' to list all.", subJobID)
+		p.prompt()
+		return
+	}
+	// JOB_SPELL_SYSTEM_NORTHSTAR.md Phase 0: same gate as cmdSetJob -- a disabled job's spells/
+	// abilities must not become reachable through the sub-job side door either.
+	if !enabledJobs[subJobID] {
+		p.sendf("%s is temporarily disabled while the job/spell system is being redesigned. Available now: WAR, MNK, WHM, BLM, RDM, THF.", subJobID)
 		p.prompt()
 		return
 	}
@@ -7664,6 +7693,11 @@ func cmdJobs(p *player) {
 		if j == p.jobID {
 			cur = " <--"
 		}
+		// JOB_SPELL_SYSTEM_NORTHSTAR.md Phase 0: mark jobs cmdSetJob will currently refuse,
+		// rather than letting a player discover that only by trying and getting turned away.
+		if !enabledJobs[j] {
+			cur += " [disabled]"
+		}
 		// GFD-124433: each job levels independently -- show that job's own real, already-earned
 		// level (not p.charXP.Level, which is only the CURRENTLY active job). A job never played
 		// yet reads as Lv.1 without eagerly creating a jobXP entry for it (switchActiveJob does
@@ -7676,6 +7710,7 @@ func cmdJobs(p *player) {
 			j, lvl, hpStr, mpStr, s.STR, s.DEX, s.VIT, s.AGI, s.INT, s.MND, s.CHR, cur)
 	}
 	p.send("Use 'setjob <ABBR>' to change your job (restores HP/MP). Each job levels separately.")
+	p.send("[disabled] jobs are temporarily unavailable while the job/spell system is redesigned -- see JOB_SPELL_SYSTEM_NORTHSTAR.md.")
 	p.prompt()
 }
 

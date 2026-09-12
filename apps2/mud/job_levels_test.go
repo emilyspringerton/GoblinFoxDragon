@@ -104,3 +104,29 @@ func TestLoadJobXP_DoesNotEagerlyCreateUnplayedJobs(t *testing.T) {
 		t.Error("expected an unplayed job to be absent from the loaded map, not pre-created")
 	}
 }
+
+// TestEnabledJobs_OnlyOriginalSixEnabled is JOB_SPELL_SYSTEM_NORTHSTAR.md Phase 0 (founder
+// real-time, 2026-09-12: "we need to disable all of the advanced jobs for now including ASN").
+// cmdSetJob/cmdSetSubJob's own full behavior (gw-dependent) is live-verified against the real
+// server, matching this package's established pattern for anything touching `gw` -- this test
+// covers the one thing that's pure data and easy to get wrong: exactly six jobs enabled, no more,
+// no less, and ASN specifically named as disabled (the founder called it out explicitly).
+func TestEnabledJobs_OnlyOriginalSixEnabled(t *testing.T) {
+	wantEnabled := map[string]bool{
+		job.WAR: true, job.MNK: true, job.WHM: true,
+		job.BLM: true, job.RDM: true, job.THF: true,
+	}
+	for _, j := range job.AllJobs {
+		got := enabledJobs[j]
+		want := wantEnabled[j]
+		if got != want {
+			t.Errorf("enabledJobs[%s] = %v, want %v", j, got, want)
+		}
+	}
+	if enabledJobs[job.ASN] {
+		t.Error("ASN must be disabled -- named explicitly by the founder")
+	}
+	if len(enabledJobs) != 6 {
+		t.Errorf("expected exactly 6 enabled jobs, got %d: %+v", len(enabledJobs), enabledJobs)
+	}
+}
