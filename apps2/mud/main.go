@@ -800,9 +800,19 @@ type player struct {
 	combat       *mob.PlayerCombat
 	miningSkill  float64
 	fishingSkill float64
-	foodEffect   *food.FoodEffect
-	fameStore    *fame.Store
-	charXP       *xp.CharXP // ALWAYS an alias into jobXP[p.jobID] -- see switchActiveJob's own doc comment
+	// syncedMiningSkill/syncedFishingSkill (2026-09-12, founder real-time: "can we make sure
+	// fishing skill persists too?") mirror headlessSyncedLevel/XP/Flow's own real delta-sync
+	// shape, applied to gather skills -- see char_progress_sync.go's syncGatherSkills. Unlike
+	// level (xp.MinLevel is never 0), a genuinely untrained skill IS 0.0, so there is no "never
+	// baselined" sentinel value here; every real connect path instead explicitly sets both of
+	// these to match whatever was just loaded from IDUNA (or 0/0 for a brand-new character with
+	// nothing to load), so the first delta check is naturally zero rather than needing a
+	// separate baseline branch.
+	syncedMiningSkill  float64
+	syncedFishingSkill float64
+	foodEffect         *food.FoodEffect
+	fameStore          *fame.Store
+	charXP             *xp.CharXP // ALWAYS an alias into jobXP[p.jobID] -- see switchActiveJob's own doc comment
 	// jobXP (GFD-124433, founder: "when you are a lvl 10 warrior in gfd and you switch to RDM
 	// for the first time you go back to lvl 1... separate lvls/job") holds every job this
 	// character has ever played, each with its own real, independently-earned level/XP.
@@ -1667,6 +1677,7 @@ func tickAll() {
 		// synced every tick (1Hz) for every player, not just headless ones -- see
 		// char_progress_sync.go.
 		syncCharLevelAndFlow(p)
+		syncGatherSkills(p) // founder real-time: "can we make sure fishing skill persists too?"
 		// Expire Invisible/Sneak.
 		if p.isInvisible && now.After(p.invisExpires) {
 			p.isInvisible = false
@@ -8294,6 +8305,15 @@ func getOrCreateHeadlessPlayer(characterID string) (*player, error) {
 	if err != nil {
 		loadedInventory = make(map[string]int)
 	}
+	// Founder real-time, 2026-09-12: "can we make sure fishing skill persists too?" -- mining/
+	// fishing skill was never persisted anywhere at all (checked directly: zero idunaclient calls
+	// referenced either field before this fix), the same class of bug as level/XP/Flow just found
+	// and fixed in char_progress_sync.go. A GetSkills failure degrades to "start from 0," matching
+	// the same best-effort posture as loadedInventory just above.
+	loadedSkills, err := gw.iduna.GetSkills(characterID)
+	if err != nil {
+		loadedSkills = map[string]float64{}
+	}
 	// Real job seeding (2026-08-05, diagnosing "1/2/3 ability hotkeys don't match my real spells
 	// in Meadow"): this used to hardcode job.WAR unconditionally -- IDUNA's own job_main (now
 	// actually persisted by cmdSetJob, see that function's own doc comment) was never read back
@@ -8330,21 +8350,22 @@ func getOrCreateHeadlessPlayer(characterID string) (*player, error) {
 	buf := &bytes.Buffer{}
 	w := bufio.NewWriter(buf)
 	p := &player{
-		slot:        slot,
-		name:        ch.Name,
-		zoneID:      ch.SceneID,
-		pos:         mob.Pos{X: ch.PosX, Y: ch.PosY, Z: ch.PosZ},
-		hp:          startHP,
-		maxHP:       startHP,
-		mp:          startMP,
-		maxMP:       startMP,
-		tp:          &combatTp.TPState{},
-		statFX:      status.New(),
-		combat:      &mob.PlayerCombat{BaseDamage: playerDamage, MeleeRange: playerMeleeRng},
-		miningSkill: 0,
-		charXP:      activeXP,
-		jobXP:       jobXP,
-		homePoint:   homepoint.NewState(ch.SceneID),
+		slot:         slot,
+		name:         ch.Name,
+		zoneID:       ch.SceneID,
+		pos:          mob.Pos{X: ch.PosX, Y: ch.PosY, Z: ch.PosZ},
+		hp:           startHP,
+		maxHP:        startHP,
+		mp:           startMP,
+		maxMP:        startMP,
+		tp:           &combatTp.TPState{},
+		statFX:       status.New(),
+		combat:       &mob.PlayerCombat{BaseDamage: playerDamage, MeleeRange: playerMeleeRng},
+		miningSkill:  loadedSkills["mining"],
+		fishingSkill: loadedSkills["fishing"],
+		charXP:       activeXP,
+		jobXP:        jobXP,
+		homePoint:    homepoint.NewState(ch.SceneID),
 		// S412-06, founder real-time: "when we first start out we dont have a weapon so hand to
 		// hand should level up and the weapon skill should be combo instead of fast blade" -- a
 		// brand-new character has no weapon equipped yet (h2h, unarmed), so Combo (h2h's own real
@@ -8393,6 +8414,10 @@ func getOrCreateHeadlessPlayer(characterID string) (*player, error) {
 	p.headlessSyncedXP = p.charXP.CurrentXP
 	p.headlessSyncedFlow = p.flow
 	p.headlessSyncedInventory = cloneInventory(loadedInventory)
+	// Baseline for syncGatherSkills too -- matches what was just loaded from IDUNA, so the first
+	// tick's delta check is correctly zero rather than re-sending an already-current value.
+	p.syncedMiningSkill = p.miningSkill
+	p.syncedFishingSkill = p.fishingSkill
 	gw.charIDBySlot[slot] = ch.CharacterID
 	gw.players[slot] = p
 	p.atlas.Visit(p.zoneID)
@@ -8723,6 +8748,12 @@ func handleConn(conn net.Conn, isGuest bool, preset *presetIdentity, echoInput b
 			if inv, err := gw.iduna.GetInventory(ch.CharacterID); err == nil {
 				p.inventory = inv
 			}
+			// Founder real-time, 2026-09-12: "can we make sure fishing skill persists too?" --
+			// same real gap as level/XP/Flow, now fixed for every real connect path.
+			if skills, err := gw.iduna.GetSkills(ch.CharacterID); err == nil {
+				p.miningSkill = skills["mining"]
+				p.fishingSkill = skills["fishing"]
+			}
 			// S412-03: only a character runSSHClaimFlow just created gets the real starting
 			// weapon -- a returning character (existing fingerprint) never gets re-granted one
 			// on every reconnect.
@@ -8760,6 +8791,11 @@ func handleConn(conn net.Conn, isGuest bool, preset *presetIdentity, echoInput b
 			if inv, err := gw.iduna.GetInventory(ch.CharacterID); err == nil {
 				p.inventory = inv
 			}
+			// Founder real-time, 2026-09-12: "can we make sure fishing skill persists too?"
+			if skills, err := gw.iduna.GetSkills(ch.CharacterID); err == nil {
+				p.miningSkill = skills["mining"]
+				p.fishingSkill = skills["fishing"]
+			}
 		}
 	} else {
 		if newID, err := gw.iduna.CreateCharacter(mudPlayerIDFor(name), name, job.WAR); err == nil {
@@ -8770,6 +8806,11 @@ func handleConn(conn net.Conn, isGuest bool, preset *presetIdentity, echoInput b
 			grantStartingGear(p) // S412-03: a real, brand-new character either way
 		}
 	}
+	// Baseline for syncGatherSkills (char_progress_sync.go) -- matches whatever mining/fishing
+	// skill was just loaded above (or the real 0/0 default for a brand-new character), so the
+	// first tick's delta check is correctly zero instead of re-sending an already-current value.
+	p.syncedMiningSkill = p.miningSkill
+	p.syncedFishingSkill = p.fishingSkill
 	// Backend-unification follow-up (2026-07-31, EMILY/BACKLOG.md "unify the backends"): p.flow
 	// was read from IDUNA above but never written back on disconnect, unlike level/XP/position
 	// just below -- IDUNA had no way to credit gold at all until today's new

@@ -86,3 +86,33 @@ func syncCharLevelAndFlow(p *player) {
 		p.headlessSyncedFlow = p.flow
 	}
 }
+
+// miningSkillDelta/fishingSkillDelta return p's real gather-skill change since the last sync
+// (0 = nothing to sync). Unlike level (xp.MinLevel is never 0), a genuinely untrained skill IS
+// 0.0, so there is no "never baselined" sentinel here -- every real connect path instead
+// explicitly sets syncedMiningSkill/syncedFishingSkill to match whatever was just loaded from
+// IDUNA (see getOrCreateHeadlessPlayer/handleConn), so these deltas are naturally 0 until real,
+// new gathering happens this session.
+func miningSkillDelta(p *player) float64  { return p.miningSkill - p.syncedMiningSkill }
+func fishingSkillDelta(p *player) float64 { return p.fishingSkill - p.syncedFishingSkill }
+
+// syncGatherSkills persists p's mining/fishing skill gains to IDUNA (founder real-time,
+// 2026-09-12: "can we make sure fishing skill persists too?") -- the same real class of bug as
+// level/XP/Flow (see this file's own top-of-file doc comment), just for a field that had NO
+// persistence path at all, not even a disconnect-time save. IncrementSkill is delta-based
+// (IDUNA's own real upsert adds delta to whatever's already stored), matching exactly what these
+// deltas represent.
+func syncGatherSkills(p *player) {
+	charID := gw.charIDBySlot[p.slot]
+	if charID == "" {
+		return
+	}
+	if delta := miningSkillDelta(p); delta != 0 {
+		_ = gw.iduna.IncrementSkill(charID, "mining", delta)
+		p.syncedMiningSkill = p.miningSkill
+	}
+	if delta := fishingSkillDelta(p); delta != 0 {
+		_ = gw.iduna.IncrementSkill(charID, "fishing", delta)
+		p.syncedFishingSkill = p.fishingSkill
+	}
+}

@@ -93,3 +93,42 @@ func TestFlowSyncDelta_NegativeWhenFlowDecreased(t *testing.T) {
 		t.Errorf("flowSyncDelta = %d, want -60", got)
 	}
 }
+
+// TestMiningSkillDelta/TestFishingSkillDelta guard the real fix for the founder's own follow-up
+// ask: "can we make sure fishing skill persists too?" -- unlike level, 0.0 is a real, legitimate
+// "never trained" value here, so there's no baseline sentinel branch to test; every real connect
+// path is responsible for explicitly setting syncedMiningSkill/syncedFishingSkill to match
+// whatever was loaded from IDUNA (see getOrCreateHeadlessPlayer/handleConn).
+
+func TestMiningSkillDelta_ZeroForFreshUntrainedPlayer(t *testing.T) {
+	p := &player{}
+	if got := miningSkillDelta(p); got != 0 {
+		t.Errorf("miningSkillDelta(untrained) = %v, want 0", got)
+	}
+}
+
+func TestMiningSkillDelta_DetectsRealGain(t *testing.T) {
+	p := &player{miningSkill: 42.5, syncedMiningSkill: 42.0}
+	if got := miningSkillDelta(p); got != 0.5 {
+		t.Errorf("miningSkillDelta = %v, want 0.5", got)
+	}
+}
+
+func TestFishingSkillDelta_DetectsRealGain(t *testing.T) {
+	p := &player{fishingSkill: 17.5, syncedFishingSkill: 17.0}
+	if got := fishingSkillDelta(p); got != 0.5 {
+		t.Errorf("fishingSkillDelta = %v, want 0.5", got)
+	}
+}
+
+func TestFishingSkillDelta_ZeroAfterMatchingBaseline(t *testing.T) {
+	// Exactly what a real connect path does: load the persisted value into both the live field
+	// and its synced mirror together, so the very first tick sees no false delta.
+	p := &player{}
+	loaded := 23.5
+	p.fishingSkill = loaded
+	p.syncedFishingSkill = loaded
+	if got := fishingSkillDelta(p); got != 0 {
+		t.Errorf("fishingSkillDelta right after loading = %v, want 0", got)
+	}
+}
