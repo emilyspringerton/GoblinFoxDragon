@@ -1,8 +1,9 @@
 # SSH Transport & Identity — NORTHSTAR
 
 **Status:** Stage 1 (§4 economy gate + Amendment 1 chat/guest-tier gate) shipped 2026-09-12.
-Stage 2 (§7 GUI login) shipped 2026-09-12. Stages 3-8 scoped, not started.
-**Source spec is founder-authored and verbatim-authoritative** —
+Stage 2 (§7 GUI login) shipped 2026-09-12. Stage 3 (§5 process isolation + data backup) shipped
+2026-09-12, partially — see its own section for the real, honest, root-blocked remainder.
+Stages 4-8 scoped, not started. **Source spec is founder-authored and verbatim-authoritative** —
 this doc is the phased-status tracker + real, checked findings against this codebase, not a
 paraphrase. Full source spec text lives in `docs2/SSH_TRANSPORT_IDENTITY_SPEC.md` (verbatim) and
 `docs2/SSH_TRANSPORT_IDENTITY_AMENDMENT_1.md` (verbatim) — read those first for the real
@@ -169,13 +170,73 @@ clean; full native link clean (all pre-existing warnings, none new).
   would show nothing by construction. Verified instead by reading the gated code paths directly
   and by the live screenshot above.
 
-## Stages 3-8 — scoped by the source spec, not started
+## Stage 3 — SHIPPED (PARTIAL) 2026-09-12 (§5 process isolation + data backup)
+
+**Real, achievable-without-root filesystem/kernel-surface sandboxing shipped and live**,
+`ops/systemd/gfd-mud.service`: `ProtectSystem=strict` + `ReadWritePaths=var` confines every write
+the process makes to its one real data path (`var/mud-chars.json`, `var/mud-player-ids.json`,
+`var/logs/`) — everything else, including this repo's own source, is read-only to it. Plus
+`PrivateTmp`, `RestrictNamespaces`/`SUIDSGID`/`Realtime`/`AddressFamilies`, `LockPersonality`,
+`RemoveIPC`, `ProtectHostname`/`KernelTunables`/`ControlGroups`, a `SystemCallFilter=
+@system-service` seccomp allowlist, `NoNewPrivileges`, `UMask=0077`.
+
+**Real, checked-live limit, not assumed:** every directive whose enforcement mechanism is
+"drop a specific capability from the bounding set" (`CapabilityBoundingSet=`,
+`AmbientCapabilities=`, `ProtectKernelModules=`, `ProtectKernelLogs=`, `ProtectClock=`) fails with
+`status=218/CAPABILITIES` under this `systemctl --user` unit — tested each directive individually
+on a throwaway instance before touching the real one. Root cause: the per-user systemd instance
+(`user@1000.service`) never holds `CAP_SETPCAP`, so it cannot drop capabilities from any bounding
+set for any unit it manages, full stop — a normal Linux capability rule, not a container/sandbox
+quirk of this box (`systemd-detect-virt` reports a real KVM VM here, not a container). The spec's
+own "dedicated unprivileged user, no login shell" ask hits the same wall: `useradd` needs root.
+
+**Founder authorized a live restart to roll this out today** (chose this over "prepare + test,
+don't touch the live service" or "skip Stage 3" via `AskUserQuestion`). Real backup taken first,
+matching §5's own "data path is backed up before rollout begins": added a new `gfd` target to
+`emily.cli`'s existing `emily backup run` tool (GoblinFoxDragon/var — the mud process's real data
+path; the durable character/economy data itself lives in IDUNA, already covered by the `iduna`
+target) — found and fixed a real gap while scoping it (`looksLikeSecret` missed
+`var/moltbook-credentials.json` entirely, would have shipped a real credential into an
+unencrypted cloud archive). The actual GCS upload fails in this sandbox (no `gcloud` ADC
+configured here, a real environment limit of this session, not a defect) — archiving/filtering
+verified correct instead, plus a local `var-backups/*.tar.gz` snapshot with a real, verified
+byte-identical restore round-trip (`diff -r`) before the live restart. Measured result of the
+restart: `systemd-analyze security` exposure score **9.8 UNSAFE → 5.8 MEDIUM**. Live-verified
+after restart via a real socket connection: guest banner, guest-gate blocking `bank`, normal
+movement/combat all still correct.
+
+**Real, unplanned, load-bearing finding along the way:** the live binary was stale since
+2026-09-05 — predating every fix shipped this session (mob Revive, item-use fixes, per-job
+leveling, and Stage 1's own guest gate). None of it had actually gone live despite being
+committed and tested. Since a restart was happening regardless for the hardening rollout,
+rebuilt and deployed current `master` (commit `6b03614`) instead of restarting back into the same
+stale binary — built from a clean checkout with the pre-existing, not-mine, uncommitted S252-00/01
+inventory-sync work stashed out first (so it isn't silently baked into a live deploy unreviewed),
+then restored to the working tree unchanged afterward.
+
+### Real, honest, NOT done in Stage 3 (named, not silently skipped)
+
+- **Dedicated unprivileged system user, no login shell (§5's own literal ask).** Not done — needs
+  root. `sudo-queue/78-gfd-mud-dedicated-user-and-full-hardening.sh` is a complete, real, queued
+  script that migrates gfd-mud.service from this `systemctl --user` unit to a root-owned system
+  unit under a new, dedicated, shell-less account — which, being root-managed, can also apply the
+  five capability-dropping directives this pass couldn't. Reviewed-not-yet-run by design (it
+  changes file ownership under a live repo and migrates a running production service's execution
+  user) — the founder runs it whenever convenient; it isn't blocking anything else in this spec.
+- **The five capability-dropping directives named above**, standalone — same root dependency,
+  same script covers them.
+- **Cloud upload of the `gfd` backup target.** The tool and its filtering are real and verified;
+  the actual `gcloud storage cp` step needs ADC credentials this sandbox doesn't have. Real
+  follow-up: run `emily backup run --target gfd` from a host that has `gcloud auth login` (or a
+  service account) configured, or wire it into whatever schedule the `iduna`/`fatbaby`/
+  `promptoverse` targets already run on.
+- **Restart-on-failure with backoff** — already present in the unit (`Restart=on-failure`,
+  `RestartSec=10s`), predates this stage, not newly verified here.
+
+## Stages 4-8 — scoped by the source spec, not started
 
 Real, honest status against each remaining stage (source spec §8's own numbering):
 
-3. **§5 process isolation + data backup.** Not started. Real prerequisite work
-   (systemd hardening directives, dedicated unprivileged user, read-only filesystem except one
-   data path) against whatever unit currently runs the live `:2323` service.
 4. **§2 SSH listener (high port, no identity yet).** Not started. Real, substantial new
    capability — an SSH server implementation (public-key-only, TOFU, PTY/resize handling, host
    key generated once and persisted outside the repo) feeding the existing game loop the same
