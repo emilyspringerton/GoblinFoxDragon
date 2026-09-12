@@ -3,7 +3,8 @@
 **Status:** Stage 1 (§4 economy gate + Amendment 1 chat/guest-tier gate) shipped 2026-09-12.
 Stage 2 (§7 GUI login) shipped 2026-09-12. Stage 3 (§5 process isolation + data backup) shipped
 2026-09-12, partially — see its own section for the real, honest, root-blocked remainder.
-Stages 4-8 scoped, not started. **Source spec is founder-authored and verbatim-authoritative** —
+Stage 4 (§2 SSH listener) shipped 2026-09-12. Stages 5-8 scoped, not started.
+**Source spec is founder-authored and verbatim-authoritative** —
 this doc is the phased-status tracker + real, checked findings against this codebase, not a
 paraphrase. Full source spec text lives in `docs2/SSH_TRANSPORT_IDENTITY_SPEC.md` (verbatim) and
 `docs2/SSH_TRANSPORT_IDENTITY_AMENDMENT_1.md` (verbatim) — read those first for the real
@@ -233,18 +234,82 @@ then restored to the working tree unchanged afterward.
 - **Restart-on-failure with backoff** — already present in the unit (`Restart=on-failure`,
   `RestartSec=10s`), predates this stage, not newly verified here.
 
-## Stages 4-8 — scoped by the source spec, not started
+## Stage 4 — SHIPPED 2026-09-12 (§2 SSH listener, high port, no identity yet)
+
+**Real SSH server shipped and live**, `apps2/mud/ssh_listener.go`, wired into `main()` alongside
+(not replacing) telnet: `go startSSHListener(*sshPort)`, default port `2222`.
+
+- **§2.1 transport:** public-key auth only — `PasswordCallback`/`KeyboardInteractiveCallback`
+  left `nil` on the `ssh.ServerConfig`, so both methods are simply unsupported, not merely
+  discouraged. Trust-on-first-use: `PublicKeyCallback` accepts any syntactically valid offered
+  key unconditionally — binding a key to a character/account is §3/Stage 5, not built here. The
+  SSH username is never inspected — accepted and ignored, matching §2.1's own "must not error"
+  literally.
+- **§2.2 host key:** generated once (Ed25519) at `var/ssh_host_ed25519_key` — this process's one
+  real `ReadWritePaths` data path (Stage 3), already git-ignored, already covered by Stage 3's
+  `gfd` emily-backup target with zero extra wiring. Reused on every subsequent boot.
+- **§2.3 terminal:** `pty-req` and `window-change` are acknowledged without error. Real, honest
+  scope, named rather than overclaimed: this MUD's own output (telnet and SSH both) is a plain,
+  unwrapped text stream with no width-aware reflow anywhere in this codebase, so "honoring" a
+  resize means "never crashes or hangs on it," not "re-flows text to the new width" — there is no
+  reflow logic anywhere to plug a width into. A client with no PTY at all degrades identically:
+  `shell` is the one request that actually starts the session (matching real `sshd`'s own
+  pty-req-then-shell convention), so a no-PTY client that sends `shell` directly works exactly
+  the same way.
+- **§2.4 resource limits:** idle timeout (15m) and max session duration (6h), enforced by a
+  per-session watchdog goroutine that force-closes the channel (handleConn's existing disconnect/
+  IDUNA-sync path then runs exactly as it would for a real dropped connection); max 5 concurrent
+  sessions per source IP (checked before the SSH handshake even starts, to avoid wasting one on a
+  connection being refused anyway); `MaxAuthTries=3`.
+
+**Real, positive design finding, confirmed by actually building it (not just claimed in Stage
+3's own placeholder note):** `handle()`/`handleConn` call exactly four methods on `p.conn`
+anywhere in this file — `Read`/`Write`/`Close`/`RemoteAddr` (checked live via grep before writing
+a line of this). `sshConnAdapter` wraps an `ssh.Channel` with those four plus three deadline
+no-ops (telnet's own `handleConn` never calls any deadline method either — same behavior
+preserved across both transports) to satisfy `net.Conn`, and `handleConn(adapter)` then runs
+**completely unmodified** for SSH — same struct literal, same `isGuest: true`, same guest gate,
+same IDUNA fetch-or-create, same disconnect sync. An SSH connection with no bound identity is
+still a guest per the spec's own explicit framing (Amendment 1), and this reuse gives SSH
+sessions the exact same guest-tier treatment as telnet with zero new gating code.
+
+**7 new unit tests**: host key generate/reuse/persisted-file-permissions, per-IP address parsing,
+and the real §2.1 auth semantics (password refused, keyboard-interactive refused, TOFU accepts
+any/multiple never-registered keys) via a genuine `ssh.NewServerConn`/`ssh.NewClientConn`
+handshake over a real loopback TCP connection. `net.Pipe()` was tried first for this and found to
+deadlock live — the SSH version-exchange step has both sides write their version string before
+either reads, and `net.Pipe()` is fully synchronous/unbuffered, so both goroutines blocked on
+`Write` simultaneously. Switched to a real socket pair, which buffers at the OS level and doesn't
+have this problem.
+
+**Live-verified against a throwaway instance** (different ports, isolated `var/`), then again
+**against the real live production service** after founder-authorized deploy: password auth
+refused via the real `ssh` CLI on both; a fresh, never-registered key succeeds via TOFU with no
+PTY (`-T`) and the guest banner/gate work correctly over SSH on both; a Go test client confirmed
+`pty-req` + initial window size + mid-session `window-change` + `shell` all work together without
+error or hang on the throwaway instance, guest gate still blocks `bank`, `look` still works after
+resize; a second Go test client confirmed the per-IP cap on the throwaway instance (exactly 5
+concurrent sessions succeed, the 6th is refused); host key fingerprint confirmed identical across
+a real restart of the throwaway instance. GoblinFoxDragon commits `86c7b95` (code) / `bc6e4e1`
+(deploy).
+
+### Real, honest, NOT done in Stage 4 (named, not silently skipped)
+
+- **No actual text reflow on resize** — named above, not a real gap against this game's own
+  current rendering (there is no width-aware output anywhere to reflow), but worth remembering if
+  a future feature ever adds one.
+- **No character-name hint from the SSH username** — accepted and ignored per §2.1's own literal
+  wording; a real feature here would need Stage 5's identity model to mean anything.
+- **Per-IP session accounting is in-memory, per-process** — resets on restart, and (if this
+  process is ever scaled to more than one instance) doesn't share state across instances. Not a
+  real problem at gfd-mud's current single-process scale; named for whenever that changes.
+
+## Stages 5-8 — scoped by the source spec, not started
 
 Real, honest status against each remaining stage (source spec §8's own numbering):
 
-4. **§2 SSH listener (high port, no identity yet).** Not started. Real, substantial new
-   capability — an SSH server implementation (public-key-only, TOFU, PTY/resize handling, host
-   key generated once and persisted outside the repo) feeding the existing game loop the same
-   read/write stream telnet already does. `apps2/mud`'s own command dispatch (`handle()`) is
-   already transport-agnostic enough that an SSH-fed session should be able to reuse it directly
-   — a real, positive finding from this pass, not yet exercised.
 5. **§3 identity binding + key management.** Not started. Depends on stage 4 existing first
-   (there's no SSH public key to bind a fingerprint to yet).
+   (there's no SSH public key to bind a fingerprint to yet) — now unblocked.
 6. **§1 port swap to 22.** Not started. Depends on stages 3-5.
 7. **§6 device-flow hardening (number matching, OTP-to-session binding, TTL/attempt caps).** Not
    investigated this pass — real, separate work against whatever WOTAN/IDUNA device-flow
