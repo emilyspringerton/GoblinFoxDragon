@@ -627,3 +627,101 @@ func TestRevokeSSHKeySuccess(t *testing.T) {
 		t.Errorf("fingerprint query param = %q, want %q", gotQuery, testFingerprintWithSlash)
 	}
 }
+
+// GetSkills/IncrementSkill (2026-09-12, founder real-time: "can we make sure fishing skill
+// persists too?" -- part of the same real production data-loss incident as level/XP/Flow).
+// IncrementSkill itself already existed with zero test coverage (matching this file's own note
+// above about DeductGold/every pre-existing method); backfilling that gap here too since it's the
+// real write half of the same feature GetSkills is the read half of.
+
+func TestGetSkillsSuccess(t *testing.T) {
+	var gotPath, gotMethod string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotMethod = r.Method
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"skills": []map[string]any{
+				{"skill_name": "mining", "value": 42.5},
+				{"skill_name": "fishing", "value": 17.0},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	skills, err := c.GetSkills("char-1")
+	if err != nil {
+		t.Fatalf("GetSkills: unexpected error: %v", err)
+	}
+	if gotMethod != http.MethodGet {
+		t.Errorf("expected GET, got %s", gotMethod)
+	}
+	if gotPath != "/api/v1/characters/char-1/skills" {
+		t.Errorf("expected /api/v1/characters/char-1/skills, got %s", gotPath)
+	}
+	if skills["mining"] != 42.5 || skills["fishing"] != 17.0 || len(skills) != 2 {
+		t.Errorf("unexpected skills: %+v", skills)
+	}
+}
+
+// TestGetSkillsEmptyIsNonNilMap -- a character with no skills rows yet (brand new, or simply
+// never trained mining/fishing) must come back as an empty, non-nil map, not an error -- matches
+// GetInventory's own established convention for the identical "nothing stored yet" case.
+func TestGetSkillsEmptyIsNonNilMap(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"skills": []map[string]any{}})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	skills, err := c.GetSkills("char-1")
+	if err != nil {
+		t.Fatalf("GetSkills: unexpected error: %v", err)
+	}
+	if skills == nil {
+		t.Error("expected a non-nil empty map, got nil")
+	}
+	if len(skills) != 0 {
+		t.Errorf("expected zero skills, got %+v", skills)
+	}
+}
+
+func TestIncrementSkillSuccess(t *testing.T) {
+	var gotPath, gotMethod, gotBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotMethod = r.Method
+		b, _ := io.ReadAll(r.Body)
+		gotBody = string(b)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	if err := c.IncrementSkill("char-1", "fishing", 0.5); err != nil {
+		t.Fatalf("IncrementSkill: unexpected error: %v", err)
+	}
+	if gotMethod != http.MethodPatch {
+		t.Errorf("expected PATCH, got %s", gotMethod)
+	}
+	if gotPath != "/api/v1/characters/char-1/skills" {
+		t.Errorf("expected /api/v1/characters/char-1/skills, got %s", gotPath)
+	}
+	if gotBody != `{"delta":0.5,"skill_name":"fishing"}` {
+		t.Errorf(`unexpected body: %s`, gotBody)
+	}
+}
+
+func TestIncrementSkillNotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	if err := c.IncrementSkill("nonexistent", "mining", 1.0); !errors.Is(err, ErrNotFound) {
+		t.Errorf("expected ErrNotFound, got %v", err)
+	}
+}

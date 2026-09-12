@@ -469,6 +469,41 @@ func (c *Client) SetInventory(characterID string, inv map[string]int) error {
 	return nil
 }
 
+// GetSkills returns every persisted skill_name -> value for a character (e.g. "mining",
+// "fishing") -- the read half of IncrementSkill below. Founder real-time, 2026-09-12: "can we
+// make sure fishing skill persists too?" (part of the same real production data-loss incident as
+// level/XP/Flow -- IDUNA's own character_skills table and the GET/PATCH endpoints backing it
+// already existed, but apps2/mud never called either one for p.miningSkill/p.fishingSkill).
+// Returns an empty, non-nil map (never an error) for a character with no skills rows yet -- a
+// brand-new or pre-this-feature character has genuinely never trained anything, not a fetch
+// failure.
+func (c *Client) GetSkills(characterID string) (map[string]float64, error) {
+	req, _ := http.NewRequest(http.MethodGet,
+		c.baseURL+"/api/v1/characters/"+characterID+"/skills", nil)
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, fmt.Errorf("idunaclient: GetSkills: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+	var body struct {
+		Skills []struct {
+			SkillName string  `json:"skill_name"`
+			Value     float64 `json:"value"`
+		} `json:"skills"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		return nil, fmt.Errorf("idunaclient: GetSkills decode: %w", err)
+	}
+	out := make(map[string]float64, len(body.Skills))
+	for _, s := range body.Skills {
+		out[s.SkillName] = s.Value
+	}
+	return out, nil
+}
+
 // IncrementSkill adds delta to character's skill_name, capped at 110.0.
 func (c *Client) IncrementSkill(characterID, skillName string, delta float64) error {
 	body, _ := json.Marshal(map[string]interface{}{
