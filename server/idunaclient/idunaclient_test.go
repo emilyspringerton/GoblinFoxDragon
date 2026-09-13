@@ -725,3 +725,117 @@ func TestIncrementSkillNotFound(t *testing.T) {
 		t.Errorf("expected ErrNotFound, got %v", err)
 	}
 }
+
+// GetEquipment/UpdateEquipmentSlot (2026-09-12, founder real-time: "gear needs to persist what
+// the fuck why was that deferred" -- real production data loss, equipment had NO persistence
+// path at all before this fix).
+
+func TestGetEquipmentSuccess(t *testing.T) {
+	var gotPath, gotMethod string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotMethod = r.Method
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"equipment": []map[string]any{
+				{"slot": "main", "item_id": "sword"},
+				{"slot": "head", "item_id": nil},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	eq, err := c.GetEquipment("char-1")
+	if err != nil {
+		t.Fatalf("GetEquipment: unexpected error: %v", err)
+	}
+	if gotMethod != http.MethodGet {
+		t.Errorf("expected GET, got %s", gotMethod)
+	}
+	if gotPath != "/api/v1/characters/char-1/equipment" {
+		t.Errorf("expected /api/v1/characters/char-1/equipment, got %s", gotPath)
+	}
+	if eq["main"] != "sword" {
+		t.Errorf("expected main=sword, got %+v", eq)
+	}
+	if _, ok := eq["head"]; ok {
+		t.Errorf("expected an empty/null item_id slot to be omitted, got %+v", eq)
+	}
+	if len(eq) != 1 {
+		t.Errorf("expected exactly 1 real equipped slot, got %+v", eq)
+	}
+}
+
+func TestGetEquipmentEmptyIsNonNilMap(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"equipment": []map[string]any{}})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	eq, err := c.GetEquipment("char-1")
+	if err != nil {
+		t.Fatalf("GetEquipment: unexpected error: %v", err)
+	}
+	if eq == nil {
+		t.Error("expected a non-nil empty map, got nil")
+	}
+}
+
+func TestUpdateEquipmentSlotSuccess(t *testing.T) {
+	var gotPath, gotMethod, gotBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotMethod = r.Method
+		b, _ := io.ReadAll(r.Body)
+		gotBody = string(b)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	if err := c.UpdateEquipmentSlot("char-1", "main", "sword"); err != nil {
+		t.Fatalf("UpdateEquipmentSlot: unexpected error: %v", err)
+	}
+	if gotMethod != http.MethodPatch {
+		t.Errorf("expected PATCH, got %s", gotMethod)
+	}
+	if gotPath != "/api/v1/characters/char-1/equipment" {
+		t.Errorf("expected /api/v1/characters/char-1/equipment, got %s", gotPath)
+	}
+	if gotBody != `{"item_id":"sword","slot":"main"}` {
+		t.Errorf("unexpected body: %s", gotBody)
+	}
+}
+
+func TestUpdateEquipmentSlotEmptyItemIDClears(t *testing.T) {
+	var gotBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		gotBody = string(b)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	if err := c.UpdateEquipmentSlot("char-1", "main", ""); err != nil {
+		t.Fatalf("UpdateEquipmentSlot: unexpected error: %v", err)
+	}
+	if gotBody != `{"item_id":"","slot":"main"}` {
+		t.Errorf("unexpected body: %s", gotBody)
+	}
+}
+
+func TestUpdateEquipmentSlotServerError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	if err := c.UpdateEquipmentSlot("char-1", "main", "sword"); !errors.Is(err, ErrServer) {
+		t.Errorf("expected ErrServer, got %v", err)
+	}
+}

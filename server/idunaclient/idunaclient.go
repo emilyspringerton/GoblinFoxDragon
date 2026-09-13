@@ -504,6 +504,65 @@ func (c *Client) GetSkills(characterID string) (map[string]float64, error) {
 	return out, nil
 }
 
+// GetEquipment returns every persisted equipment slot -> item_id for a character (an empty
+// item_id means the slot exists but is empty). Real production data-loss fix (2026-09-12,
+// founder real-time: "gear needs to persist what the fuck why was that deferred") -- the read
+// half of UpdateEquipmentSlot below. Returns an empty, non-nil map (never an error) for a
+// character with nothing equipped yet.
+func (c *Client) GetEquipment(characterID string) (map[string]string, error) {
+	req, _ := http.NewRequest(http.MethodGet,
+		c.baseURL+"/api/v1/characters/"+characterID+"/equipment", nil)
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, fmt.Errorf("idunaclient: GetEquipment: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+	var body struct {
+		Equipment []struct {
+			Slot   string  `json:"slot"`
+			ItemID *string `json:"item_id"`
+		} `json:"equipment"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		return nil, fmt.Errorf("idunaclient: GetEquipment decode: %w", err)
+	}
+	out := make(map[string]string, len(body.Equipment))
+	for _, s := range body.Equipment {
+		if s.ItemID != nil && *s.ItemID != "" {
+			out[s.Slot] = *s.ItemID
+		}
+	}
+	return out, nil
+}
+
+// UpdateEquipmentSlot persists (or clears, if itemID is "") one equipped slot -- the real, direct
+// write path p.equip never had before this fix (checked directly: GET was the only real
+// equipment endpoint, ComputeStats was computed purely for a cosmetic display line, and nothing
+// ever wrote back to IDUNA). itemID is apps2/mud's own itemdef.Registry lookup key (e.g.
+// "sword"), the same string gear.ItemEntry.ItemID already holds -- not necessarily a real
+// item-instance UUID (character_equipment's schema has no foreign key on item_id).
+func (c *Client) UpdateEquipmentSlot(characterID, slot, itemID string) error {
+	body, _ := json.Marshal(map[string]string{
+		"slot":    slot,
+		"item_id": itemID,
+	})
+	req, _ := http.NewRequest(http.MethodPatch,
+		c.baseURL+"/api/v1/characters/"+characterID+"/equipment",
+		bytes.NewReader(body))
+	resp, err := c.do(req)
+	if err != nil {
+		return fmt.Errorf("idunaclient: UpdateEquipmentSlot: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+	return nil
+}
+
 // IncrementSkill adds delta to character's skill_name, capped at 110.0.
 func (c *Client) IncrementSkill(characterID, skillName string, delta float64) error {
 	body, _ := json.Marshal(map[string]interface{}{
