@@ -1,3 +1,7 @@
+## 2026-09-13
+
+- CRITICAL fix: level/XP/Flow, mining/fishing skill, and equipment now all persist continuously (1Hz tick sync + a real equipment write path) instead of relying on a disconnect-time save that a systemctl restart always skipped. Live-verified: real level-up + gear survive independently of any disconnect. (sess-20260905-0720-ec33e7c5)
+
 ## 2026-09-12
 - S412-09: mob-drop tables now roll each item's real drop_chance independently (RollDropsFor) instead of always dropping the whole table; dropsForMob wired to it. Live-verified 6/6 vs 0/6 against a forced 0% test item. (sess-20260905-0720-ec33e7c5)
 - Guest names can no longer squat a real character's name (case-insensitive) -- founder live report: guest 'EMILY' online alongside the real SSH-bound 'EMILY'. Guest names now validated via validateSSHClaimName (charset+reserved-list, shared with SSH claims, and URL-safe by construction) plus a new case-insensitive collision check against both IDUNA's permanent characters (new GetCharacterByName, backed by IDUNA's new case-insensitive by-name lookup endpoint) and every other currently-online player. New player_name.go (normalizePlayerName, nameCollidesWithOnlinePlayer), 5 new tests. Isolated from a concurrent in-flight main.go change, go build/vet/test ./... clean. Live-verified against real production IDUNA data. Commit 6835c0b (source pushed; deploy held alongside the other two pending fixes -- two live demo SSH sessions currently running for the founder's own stream). (sess-20260905-0720-ec33e7c5)
