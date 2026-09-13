@@ -6,17 +6,11 @@ package main
 // only for a cosmetic "Stat changes:" display, never applied to real combat math, so a starting
 // weapon would have been purely cosmetic before today.
 //
-// Real, honest, NOT solved here (found while scoping this): equipment does not persist across a
-// reconnect AT ALL today -- checked directly, there is no write path anywhere (client or server)
-// from p.equip back to IDUNA's own real `character_equipment` table (a real GET exists,
-// `/api/v1/characters/:id/equipment`; no PATCH/PUT ever existed to populate it). This is a real,
-// pre-existing, universal limitation affecting every piece of equipment for every character, not
-// something this feature introduces or makes worse -- a starting sword granted here behaves
-// exactly as consistently (present for the session, gone on reconnect) as any other equipped
-// item already does. Real, separate, larger follow-up, not rushed here: `character_equipment`'s
-// own real schema has a foreign key to a real item INSTANCE row in `items` (not the bare
-// itemdef.Registry catalog ID), so a correct fix needs a real item-instance-creation path wired
-// through a new IDUNA write endpoint, not a quick patch to this file alone.
+// Real, honest gap found while scoping this, FIXED later the same day (see equip_persist.go):
+// equipment did not persist across a reconnect at all -- no write path existed anywhere from
+// p.equip back to IDUNA's real `character_equipment` table. That fix's own doc comment corrects
+// this file's original, overcautious assumption that a real item-instance UUID was required --
+// the schema has no foreign key on item_id, a bare itemdef.Registry key was always safe to store.
 
 import (
 	"log"
@@ -46,5 +40,6 @@ func grantStartingGear(p *player) {
 		log.Printf("[startup] grantStartingGear: failed to equip %q for %s: %v", startingWeaponName, p.name, err)
 		return
 	}
+	persistEquipSlot(p, gear.SlotMainHand, startingWeaponName) // see equip_persist.go
 	p.send("A blacksmith presses a Sword into your hands. \"Every adventurer needs a real weapon,\" she says.")
 }

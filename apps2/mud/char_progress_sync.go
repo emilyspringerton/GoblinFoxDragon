@@ -60,6 +60,9 @@ func flowSyncDelta(p *player) int {
 // overwhelmingly common case, matching the exact real, already-proven headless convention this
 // generalizes to every player regardless of transport.
 func syncCharLevelAndFlow(p *player) {
+	if gw == nil {
+		return
+	}
 	charID := gw.charIDBySlot[p.slot]
 	if charID == "" {
 		return
@@ -103,6 +106,9 @@ func fishingSkillDelta(p *player) float64 { return p.fishingSkill - p.syncedFish
 // (IDUNA's own real upsert adds delta to whatever's already stored), matching exactly what these
 // deltas represent.
 func syncGatherSkills(p *player) {
+	if gw == nil {
+		return
+	}
 	charID := gw.charIDBySlot[p.slot]
 	if charID == "" {
 		return

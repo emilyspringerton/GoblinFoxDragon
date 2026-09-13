@@ -4437,6 +4437,7 @@ func cmdEquip(p *player, slotName, itemID string) {
 		p.inventory[old.ItemID]++
 	}
 	_ = p.equip.Equip(slotName, gear.ItemEntry{ItemID: itemID, IL: il, DefID: defID})
+	persistEquipSlot(p, slotName, itemID) // real production data-loss fix: "gear needs to persist"
 	p.inventory[itemID]--
 	if p.inventory[itemID] == 0 {
 		delete(p.inventory, itemID)
@@ -4497,6 +4498,7 @@ func cmdUnequip(p *player, slotName string) {
 		p.prompt()
 		return
 	}
+	persistEquipSlot(p, slotName, "") // real production data-loss fix: "gear needs to persist"
 	p.inventory[item.ItemID]++
 	dispName := item.ItemID
 	if dn, ok := itemDisplayName[item.ItemID]; ok {
@@ -8418,6 +8420,7 @@ func getOrCreateHeadlessPlayer(characterID string) (*player, error) {
 	// tick's delta check is correctly zero rather than re-sending an already-current value.
 	p.syncedMiningSkill = p.miningSkill
 	p.syncedFishingSkill = p.fishingSkill
+	loadEquipmentFromIDUNA(p, characterID) // real production data-loss fix: "gear needs to persist"
 	gw.charIDBySlot[slot] = ch.CharacterID
 	gw.players[slot] = p
 	p.atlas.Visit(p.zoneID)
@@ -8754,6 +8757,10 @@ func handleConn(conn net.Conn, isGuest bool, preset *presetIdentity, echoInput b
 				p.miningSkill = skills["mining"]
 				p.fishingSkill = skills["fishing"]
 			}
+			// Real production data-loss fix: "gear needs to persist what the fuck why was that
+			// deferred" -- restore whatever was actually equipped last session. A no-op for a
+			// brand-new character (nothing persisted yet; grantStartingGear below handles that).
+			loadEquipmentFromIDUNA(p, ch.CharacterID)
 			// S412-03: only a character runSSHClaimFlow just created gets the real starting
 			// weapon -- a returning character (existing fingerprint) never gets re-granted one
 			// on every reconnect.
@@ -8796,6 +8803,9 @@ func handleConn(conn net.Conn, isGuest bool, preset *presetIdentity, echoInput b
 				p.miningSkill = skills["mining"]
 				p.fishingSkill = skills["fishing"]
 			}
+			// Real production data-loss fix: "gear needs to persist what the fuck why was that
+			// deferred" -- restore whatever was actually equipped last session.
+			loadEquipmentFromIDUNA(p, ch.CharacterID)
 		}
 	} else {
 		if newID, err := gw.iduna.CreateCharacter(mudPlayerIDFor(name), name, job.WAR); err == nil {
