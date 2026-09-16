@@ -160,11 +160,21 @@ func (m *Map) AddPoints(regionID int, nation Nation, delta int) error {
 }
 
 // TickAll runs weekly conquest evaluation across all regions.
-// Returns a map of regionID → new Controller.
+// Returns a map of regionID → new Controller, but ONLY for regions whose controller actually
+// changed this tick -- the caller (apps2/mud's own per-minute conquest tick) broadcasts one
+// "[Conquest] X is now controlled by Y" line per entry to every connected player, and Tick()
+// runs (and resets points) for every region every single call regardless of whether anyone
+// scored, so returning every region unconditionally here meant a "conquest spam" of one message
+// per region, per minute, to every player, forever, even with zero real ownership changes
+// (founder real-time: "can you disable the conquest spam").
 func (m *Map) TickAll() map[int]Nation {
 	result := make(map[int]Nation, len(m.regions))
 	for id, r := range m.regions {
-		result[id] = r.Tick()
+		before := r.Controller
+		after := r.Tick()
+		if after != before {
+			result[id] = after
+		}
 	}
 	return result
 }

@@ -149,6 +149,38 @@ func TestMap_TickAll(t *testing.T) {
 	}
 }
 
+// TestMap_TickAll_OmitsUnchangedRegions is the real "conquest spam" regression test (founder
+// real-time: "can you disable the conquest spam"): a region whose controller doesn't change
+// this tick -- either because it's already held and no one outscored the incumbent, or because
+// no one scored at all -- must not appear in TickAll's result, since every entry becomes one
+// broadcast line to every connected player.
+func TestMap_TickAll_OmitsUnchangedRegions(t *testing.T) {
+	m := NewMap()
+	m.AddRegion(NewRegion(0, "A"))
+	m.AddRegion(NewRegion(1, "B"))
+
+	// First tick: region 0 gets claimed by Sandoria, region 1 gets no points at all.
+	_ = m.AddPoints(0, NationSandoria, 100)
+	first := m.TickAll()
+	if first[0] != NationSandoria {
+		t.Fatalf("region 0 first tick: got %v, want Sandoria", first[0])
+	}
+	if _, ok := first[1]; ok {
+		t.Errorf("region 1 first tick: no one scored, should not appear, got %v", first[1])
+	}
+
+	// Second tick: Sandoria scores again in region 0 (already the incumbent) and region 1 still
+	// gets nothing -- neither should appear now that region 0 has a real incumbent too.
+	_ = m.AddPoints(0, NationSandoria, 50)
+	second := m.TickAll()
+	if _, ok := second[0]; ok {
+		t.Errorf("region 0 second tick: incumbent retained, should not appear, got %v", second[0])
+	}
+	if _, ok := second[1]; ok {
+		t.Errorf("region 1 second tick: no one scored, should not appear, got %v", second[1])
+	}
+}
+
 func TestMap_RegionCount(t *testing.T) {
 	m := NewMap()
 	r0 := NewRegion(0, "A")
