@@ -1,3 +1,7 @@
+## 2026-09-16
+
+- Stop broadcasting [Conquest] lines for regions whose controller didn't change (was spamming every player every minute) -- S459-79 (sess-20260905-0720-ec33e7c5)
+
 ## 2026-09-13
 
 - CRITICAL fix: level/XP/Flow, mining/fishing skill, and equipment now all persist continuously (1Hz tick sync + a real equipment write path) instead of relying on a disconnect-time save that a systemctl restart always skipped. Live-verified: real level-up + gear survive independently of any disconnect. (sess-20260905-0720-ec33e7c5)
