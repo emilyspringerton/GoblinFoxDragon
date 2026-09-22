@@ -4800,6 +4800,42 @@ static int warrior_cast_r(ArenaHero *warrior, ArenaHero *foe) {
     return 1;
 }
 
+/* monk_cast_q: Combo -- real DragonsNShit H2H weapon skill (Impaction), plain melee-range
+ * damage, same shape as warrior_cast_q. Routes through apply_weapon_skill_damage so it can
+ * open/close a real skillchain window on its target. Returns 1 if it landed. */
+static int monk_cast_q(ArenaHero *monk, ArenaHero *foe) {
+    if (!hero_is_hittable(foe)) return 0;
+    float dx = foe->x - monk->x, dz = foe->z - monk->z;
+    if (sqrtf(dx * dx + dz * dz) > ARENA_MONK_Q_RANGE) return 0;
+    static const ArenaResonance attrs[] = { ARENA_RESONANCE_IMPACTION };
+    apply_weapon_skill_damage(monk, foe, ARENA_MONK_Q_DAMAGE, attrs, 1);
+    return 1;
+}
+
+/* monk_cast_w: Backhand Blow -- real DragonsNShit H2H weapon skill (Compression), a harder
+ * melee-range hit than Combo on a longer cooldown, same real FFXI mid-tier WS progression as
+ * warrior_cast_w. Returns 1 if it landed. */
+static int monk_cast_w(ArenaHero *monk, ArenaHero *foe) {
+    if (!hero_is_hittable(foe)) return 0;
+    float dx = foe->x - monk->x, dz = foe->z - monk->z;
+    if (sqrtf(dx * dx + dz * dz) > ARENA_MONK_W_RANGE) return 0;
+    static const ArenaResonance attrs[] = { ARENA_RESONANCE_COMPRESSION };
+    apply_weapon_skill_damage(monk, foe, ARENA_MONK_W_DAMAGE, attrs, 1);
+    return 1;
+}
+
+/* monk_cast_r: Asuran Fists -- real DragonsNShit H2H weapon skill (Fusion), MNK's own real
+ * iconic finisher, the hardest of Monk's three real weapon skills on the longest cooldown.
+ * Returns 1 if it landed. */
+static int monk_cast_r(ArenaHero *monk, ArenaHero *foe) {
+    if (!hero_is_hittable(foe)) return 0;
+    float dx = foe->x - monk->x, dz = foe->z - monk->z;
+    if (sqrtf(dx * dx + dz * dz) > ARENA_MONK_R_RANGE) return 0;
+    static const ArenaResonance attrs[] = { ARENA_RESONANCE_FUSION };
+    apply_weapon_skill_damage(monk, foe, ARENA_MONK_R_DAMAGE, attrs, 1);
+    return 1;
+}
+
 /* cart_cast_q: minimal self-maintenance heal -- the Cart's own lore (TYLER multiverse_heroes.md
  * #10) isn't a combatant, so Q stays deliberately small rather than padded out with an invented
  * attack. Always succeeds (no target/range gate -- there's nothing to miss). */
@@ -5280,6 +5316,12 @@ void arena_cast_q(int owner) {
             h->mp -= ARENA_MP_COST_Q;
         }
         break;
+    case ARENA_HERO_MONK:
+        if (monk_cast_q(h, foe)) {
+            h->q_cooldown_ms = cast_cooldown(h, ARENA_MONK_Q_COOLDOWN_MS);
+            h->mp -= ARENA_MP_COST_Q;
+        }
+        break;
     }
 }
 
@@ -5606,6 +5648,15 @@ void arena_toggle_w(int owner) {
         h->shield_ms_remaining = ARENA_MICHAEL_W_SHIELD_DURATION_MS;
         h->w_cooldown_ms = cast_cooldown(h, ARENA_MICHAEL_W_COOLDOWN_MS);
         h->mp -= ARENA_MP_COST_W;
+        break;
+    case ARENA_HERO_MONK:
+        /* Backhand Blow: instant targeted cast, same shape as warrior_cast_w -- see
+           monk_cast_w's own doc comment. */
+        if (h->w_cooldown_ms > 0 || h->mp < ARENA_MP_COST_W) return;
+        if (monk_cast_w(h, arena_nearest_enemy(owner))) {
+            h->w_cooldown_ms = cast_cooldown(h, ARENA_MONK_W_COOLDOWN_MS);
+            h->mp -= ARENA_MP_COST_W;
+        }
         break;
     default:
         /* No-op for any hero without a real W in this arena, not a crash
@@ -5956,6 +6007,15 @@ void arena_cast_r(int owner) {
         }
         break;
     }
+    case ARENA_HERO_MONK:
+        /* Asuran Fists: instant targeted cast, same shape as warrior_cast_r -- see
+           monk_cast_r's own doc comment. */
+        if (h->r_cooldown_ms > 0 || h->mp < ARENA_MP_COST_R) return;
+        if (monk_cast_r(h, foe)) {
+            h->r_cooldown_ms = cast_cooldown(h, ARENA_MONK_R_COOLDOWN_MS);
+            h->mp -= ARENA_MP_COST_R;
+        }
+        break;
     }
 }
 
@@ -7068,6 +7128,18 @@ void bot_cast_kit_if_ready(ArenaHero *bot, ArenaHero *foe) {
         if (bot->hp < bot->max_hp / 3 && bot->w_cooldown_ms <= 0) {
             arena_toggle_w(bot->owner);
         } else if (bot->q_cooldown_ms <= 0 && dist <= ARENA_MICHAEL_Q_RANGE) {
+            arena_cast_q(bot->owner);
+        }
+        break;
+    case ARENA_HERO_MONK:
+        /* Same "plain melee hits, biggest/longest-cooldown first" heuristic as Warrior's own
+           case above -- both jobs' kits are shaped identically (three unconditional melee
+           weapon skills, no CC/execute/self-buff condition to gate on). */
+        if (bot->r_cooldown_ms <= 0 && dist <= ARENA_MONK_R_RANGE) {
+            arena_cast_r(bot->owner);
+        } else if (bot->w_cooldown_ms <= 0 && dist <= ARENA_MONK_W_RANGE) {
+            arena_toggle_w(bot->owner);
+        } else if (bot->q_cooldown_ms <= 0 && dist <= ARENA_MONK_Q_RANGE) {
             arena_cast_q(bot->owner);
         }
         break;

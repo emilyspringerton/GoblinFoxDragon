@@ -339,8 +339,11 @@ typedef enum {
                                  cooldown, matching the founder's own "like Doc Wheel" ask while
                                  fitting the R slot's own established "big, cooldown-gated payoff"
                                  convention every other hero's R already holds to. */
+    ARENA_HERO_MONK = 31, /* GFD-BG-12444 follow-up, 2026-09-22: DragonsNShit's second job ported
+                              into Battlegrounds -- fork-local content, see
+                              ARENA_MONK_Q_RANGE's own doc comment for the full reasoning. */
 } ArenaHeroID;
-#define ARENA_HERO_COUNT 31
+#define ARENA_HERO_COUNT 32
 
 /* The Unicorn — first real hero kit wired in (S170-18). */
 #define ARENA_UNICORN_ARMOR         4    /* passive: Chassis Claim, flat dmg reduction */
@@ -1036,6 +1039,29 @@ typedef enum {
 #define ARENA_WARRIOR_R_RANGE                2.2f
 #define ARENA_WARRIOR_R_DAMAGE               30    /* Frostbite -- Induration+Reverberation (dual resonance); real FFXI GSword finisher WS */
 #define ARENA_WARRIOR_R_COOLDOWN_MS       20000
+
+/* Monk (GFD-BG-12444 follow-up, 2026-09-22): DragonsNShit's second job ported into
+ * Battlegrounds as playable content, same shape Warrior's own doc comment above establishes --
+ * real weapon skills from `server/skillchain.CanonicalWeaponSkills`, matching MNK's real
+ * FFXI-archetype H2H affinity per `server/job.jobStats[MNK]`'s STR8/DEX8/VIT8/AGI7 stat block
+ * (this roster's most balanced physical job, no MP at all in the real job table -- MP
+ * substitutes for TP here too, same honest amendment Warrior's own doc comment already covers).
+ * Real FFXI H2H weapon skill progression, in order: Combo (Q, starter) -> Backhand Blow (W,
+ * mid-tier) -> Asuran Fists (R, the real iconic MNK finisher, picked over the lower-tier Raging
+ * Fists for the R slot to match this roster's own "R is the biggest payoff" convention). This is
+ * GFD's own fork-local content, deliberately NOT ported back into REDGARDEN's own repo -- per
+ * founder direction, REDGARDEN's arena engine itself stays untouched; new hero/job content from
+ * here forward lives only in this fork (`docs2/BATTLEGROUNDS_MIGRATION_NORTHSTAR.md`'s own
+ * "sync the fork forward" resolution). */
+#define ARENA_MONK_Q_RANGE                   2.2f  /* melee range, same as every other weapon-skill job's Q */
+#define ARENA_MONK_Q_DAMAGE                  12    /* Combo -- Impaction; real FFXI starter H2H WS */
+#define ARENA_MONK_Q_COOLDOWN_MS           3000
+#define ARENA_MONK_W_RANGE                   2.2f
+#define ARENA_MONK_W_DAMAGE                  18    /* Backhand Blow -- Compression; real FFXI mid-tier H2H WS */
+#define ARENA_MONK_W_COOLDOWN_MS           8000
+#define ARENA_MONK_R_RANGE                   2.2f
+#define ARENA_MONK_R_DAMAGE                  30    /* Asuran Fists -- Fusion; real FFXI H2H finisher WS, MNK's own iconic ultimate */
+#define ARENA_MONK_R_COOLDOWN_MS          20000
 
 /* The Cart (TYLER multiverse_heroes.md #10, NORTHSTAR §24 Milestone 2, 2026-07-31): Q is a
  * minimal, thematically-consistent self-heal ("the cart provides for its own maintenance") --
