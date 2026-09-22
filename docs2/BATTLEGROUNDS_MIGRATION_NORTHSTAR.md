@@ -63,13 +63,27 @@ that nothing currently catches (no CI cross-check between the two repos' `protoc
 
 ## 3. Real, honest status
 
-**Diagnosed, not fixed.** Root cause is real and decisive (§1); no code changed. Per this
-session's own established precedent for a genuinely large, ambiguous architectural fork
-(`INVENTORY_PERSISTENCE_NORTHSTAR.md`'s "scope it, don't build now"), this needs a real founder
-decision among §2's three options before any of them gets built — guessing wrong here risks
-real, wasted work (syncing 1200 lines only to have the founder actually want option 2 or 3) or a
-real regression (a rushed partial sync that half-matches REDGARDEN and breaks something that
-currently works). Card stays open in the priority queue, not marked done.
+**RESOLVED, 2026-09-22 — founder chose Option 1 (sync the fork forward).** `protocol.h`,
+`arena_game.c`, and `arena_game.h` all synced to REDGARDEN's current state, plus 7 new PARENA
+mod host `.h`/`.c` pairs (bloodflower, tree_passive, build_template, item_curriculum,
+duck_smoke_bomb, abraham_fireball, bacon_puck_intangible_speed) arena_game.c now depends on that
+GFD's copy didn't have. Checked directly via a real 3-way merge (`git merge-file` against the
+actual fork-point commit `61baafb` as base) before touching anything: despite the drift, GFD's
+own copies of these three files had accumulated **zero independent content of their own** —
+every conflict resolved to a pure REDGARDEN addition GFD was simply missing, so this was a safe
+straight sync, not a risky hand-merge. `build.yml`'s MUD GUI client link line updated to include
+the 7 new mod `.c` files (previously would have failed to link with undefined references).
+Verified for real: `gcc -c` clean on every touched/added file, and a full native link (SDL2+GL,
+matching CI's own recipe) succeeds end to end — real binary produced, zero errors, only
+pre-existing harmless warnings identical to REDGARDEN's own build. mingw cross-compile itself
+not run in this environment (not installed here) — CI is the first real confirmation of that
+specific toolchain. GoblinFoxDragon `9f5d867`.
+
+**Recurring-sync burden named, not solved here:** per §2 Option 1's own real cost, this becomes
+an ongoing burden every time REDGARDEN ships new arena features, with no CI cross-check between
+the two repos' `protocol.h` files yet — a real, separate follow-up (a CI job diffing
+`GoblinFoxDragon/apps2/battlegrounds_gui/packages/common/protocol.h` against REDGARDEN's own on
+a schedule, failing loud instead of silently drifting again) not built this pass.
 
 ## Related
 

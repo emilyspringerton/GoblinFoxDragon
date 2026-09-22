@@ -1,3 +1,10 @@
+## 2026-09-22
+
+- fix(battlegrounds_gui): synced forked arena engine (protocol.h, arena_game.c/.h + 7 new PARENA
+  mod host pairs) forward to REDGARDEN's current state, closing GFD-BG-12444's real desync --
+  founder decision on `docs2/BATTLEGROUNDS_MIGRATION_NORTHSTAR.md`'s 3 options: "sync the fork
+  forward." Verified via a real full native link (SDL2+GL), zero errors. `9f5d867`.
+
 ## 2026-09-16
 
 - Stop broadcasting [Conquest] lines for regions whose controller didn't change (was spamming every player every minute) -- S459-79 (sess-20260905-0720-ec33e7c5)
