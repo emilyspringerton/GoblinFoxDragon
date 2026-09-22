@@ -8,6 +8,9 @@
   (Combo/Backhand Blow/Asuran Fists, real H2H weapon skills) -- fork-local content, first new
   hero/job work landing only in this repo per the sync-forward resolution above. Also fixed a
   pre-existing gap: Michael was missing from the hero name/ability/tags tables. `d9b4ace`.
+- feat(battlegrounds_gui): ported Thief as the third job (Wasp Sting/Gust Slash/Mercy Stroke,
+  real dagger weapon skills); R is a genuine execute (`execute_scale_damage`) composed with the
+  real skillchain system, not a flat-damage reskin of Warrior's/Monk's own finishers. `cb0d9ca`.
 
 ## 2026-09-16
 
