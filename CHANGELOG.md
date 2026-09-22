@@ -4,6 +4,10 @@
   mod host pairs) forward to REDGARDEN's current state, closing GFD-BG-12444's real desync --
   founder decision on `docs2/BATTLEGROUNDS_MIGRATION_NORTHSTAR.md`'s 3 options: "sync the fork
   forward." Verified via a real full native link (SDL2+GL), zero errors. `9f5d867`.
+- feat(battlegrounds_gui): ported Monk as the second DragonsNShit job into Battlegrounds
+  (Combo/Backhand Blow/Asuran Fists, real H2H weapon skills) -- fork-local content, first new
+  hero/job work landing only in this repo per the sync-forward resolution above. Also fixed a
+  pre-existing gap: Michael was missing from the hero name/ability/tags tables. `d9b4ace`.
 
 ## 2026-09-16
 
