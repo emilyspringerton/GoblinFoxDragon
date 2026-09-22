@@ -342,8 +342,11 @@ typedef enum {
     ARENA_HERO_MONK = 31, /* GFD-BG-12444 follow-up, 2026-09-22: DragonsNShit's second job ported
                               into Battlegrounds -- fork-local content, see
                               ARENA_MONK_Q_RANGE's own doc comment for the full reasoning. */
+    ARENA_HERO_THIEF = 32, /* GFD-BG-12444 follow-up, 2026-09-22: DragonsNShit's third job ported
+                               into Battlegrounds -- fork-local content, see
+                               ARENA_THIEF_Q_RANGE's own doc comment for the full reasoning. */
 } ArenaHeroID;
-#define ARENA_HERO_COUNT 32
+#define ARENA_HERO_COUNT 33
 
 /* The Unicorn — first real hero kit wired in (S170-18). */
 #define ARENA_UNICORN_ARMOR         4    /* passive: Chassis Claim, flat dmg reduction */
@@ -1062,6 +1065,31 @@ typedef enum {
 #define ARENA_MONK_R_RANGE                   2.2f
 #define ARENA_MONK_R_DAMAGE                  30    /* Asuran Fists -- Fusion; real FFXI H2H finisher WS, MNK's own iconic ultimate */
 #define ARENA_MONK_R_COOLDOWN_MS          20000
+
+/* Thief (GFD-BG-12444 follow-up, 2026-09-22): DragonsNShit's third job ported into
+ * Battlegrounds, same fork-local shape Monk's own doc comment above establishes. Real dagger
+ * weapon skills from `server/skillchain.CanonicalWeaponSkills`, matching THF's real
+ * FFXI-archetype dagger affinity per `server/job.jobStats[THF]`'s DEX9/AGI9 stat block (this
+ * roster's fastest/most evasive physical job, MP 0 like WAR/MNK -- same MP-for-TP amendment).
+ * Real FFXI dagger WS progression: Wasp Sting (Q, starter) -> Gust Slash (W, mid-tier) ->
+ * Mercy Stroke (R, the real iconic THF finisher -- a genuine FFXI execute move, "delivers the
+ * killing blow," not just a bigger flat number). Unlike Warrior/Monk's three flat-damage
+ * weapon skills, Mercy Stroke's own real identity is worth keeping distinct: R routes its
+ * damage through execute_scale_damage (same scaling Morrigan's/Cain's own Q already use) BEFORE
+ * handing it to apply_weapon_skill_damage, so it's simultaneously a real execute (hits much
+ * harder against a low-HP target) AND a real weapon skill that opens/closes skillchains --
+ * a genuinely new composition this roster's execute and skillchain systems hadn't been
+ * combined in before. */
+#define ARENA_THIEF_Q_RANGE                  2.2f
+#define ARENA_THIEF_Q_DAMAGE                 12    /* Wasp Sting -- Detonation; real FFXI starter dagger WS */
+#define ARENA_THIEF_Q_COOLDOWN_MS          3000
+#define ARENA_THIEF_W_RANGE                  2.2f
+#define ARENA_THIEF_W_DAMAGE                 18    /* Gust Slash -- Detonation; real FFXI mid-tier dagger WS */
+#define ARENA_THIEF_W_COOLDOWN_MS          8000
+#define ARENA_THIEF_R_RANGE                  2.2f
+#define ARENA_THIEF_R_DAMAGE_BASE            22    /* Mercy Stroke -- Compression; execute-scaled base (100% target HP), same shape as ARENA_MORRIGAN_Q_DAMAGE_BASE */
+#define ARENA_THIEF_R_DAMAGE_LOW_HP          40    /* Mercy Stroke's damage as target HP -> 0%, same shape as ARENA_MORRIGAN_Q_DAMAGE_LOW_HP -- "delivers the killing blow" made literal */
+#define ARENA_THIEF_R_COOLDOWN_MS         20000
 
 /* The Cart (TYLER multiverse_heroes.md #10, NORTHSTAR §24 Milestone 2, 2026-07-31): Q is a
  * minimal, thematically-consistent self-heal ("the cart provides for its own maintenance") --

@@ -4836,6 +4836,46 @@ static int monk_cast_r(ArenaHero *monk, ArenaHero *foe) {
     return 1;
 }
 
+/* thief_cast_q: Wasp Sting -- real DragonsNShit dagger weapon skill (Detonation), plain
+ * melee-range damage, same shape as monk_cast_q/warrior_cast_q. Returns 1 if it landed. */
+static int thief_cast_q(ArenaHero *thief, ArenaHero *foe) {
+    if (!hero_is_hittable(foe)) return 0;
+    float dx = foe->x - thief->x, dz = foe->z - thief->z;
+    if (sqrtf(dx * dx + dz * dz) > ARENA_THIEF_Q_RANGE) return 0;
+    static const ArenaResonance attrs[] = { ARENA_RESONANCE_DETONATION };
+    apply_weapon_skill_damage(thief, foe, ARENA_THIEF_Q_DAMAGE, attrs, 1);
+    return 1;
+}
+
+/* thief_cast_w: Gust Slash -- real DragonsNShit dagger weapon skill (Detonation), a harder
+ * melee-range hit than Wasp Sting on a longer cooldown, same real FFXI mid-tier WS progression
+ * as monk_cast_w/warrior_cast_w. Returns 1 if it landed. */
+static int thief_cast_w(ArenaHero *thief, ArenaHero *foe) {
+    if (!hero_is_hittable(foe)) return 0;
+    float dx = foe->x - thief->x, dz = foe->z - thief->z;
+    if (sqrtf(dx * dx + dz * dz) > ARENA_THIEF_W_RANGE) return 0;
+    static const ArenaResonance attrs[] = { ARENA_RESONANCE_DETONATION };
+    apply_weapon_skill_damage(thief, foe, ARENA_THIEF_W_DAMAGE, attrs, 1);
+    return 1;
+}
+
+/* thief_cast_r: Mercy Stroke -- real DragonsNShit dagger weapon skill (Compression), THF's own
+ * real iconic finisher -- a genuine FFXI execute move. Unlike monk_cast_r/warrior_cast_r's own
+ * flat damage, this routes through execute_scale_damage FIRST (same scaling Morrigan's/Cain's
+ * own Q already use, ARENA_THIEF_R_DAMAGE_BASE at 100% target HP up to ARENA_THIEF_R_DAMAGE_
+ * LOW_HP near 0%) and hands the RESULT to apply_weapon_skill_damage as its base_damage -- a
+ * real execute that's simultaneously a real weapon skill, opening/closing skillchains exactly
+ * like Warrior's/Monk's own flat-damage finishers do. Returns 1 if it landed. */
+static int thief_cast_r(ArenaHero *thief, ArenaHero *foe) {
+    if (!hero_is_hittable(foe)) return 0;
+    float dx = foe->x - thief->x, dz = foe->z - thief->z;
+    if (sqrtf(dx * dx + dz * dz) > ARENA_THIEF_R_RANGE) return 0;
+    static const ArenaResonance attrs[] = { ARENA_RESONANCE_COMPRESSION };
+    int scaled = execute_scale_damage(foe, ARENA_THIEF_R_DAMAGE_BASE, ARENA_THIEF_R_DAMAGE_LOW_HP);
+    apply_weapon_skill_damage(thief, foe, scaled, attrs, 1);
+    return 1;
+}
+
 /* cart_cast_q: minimal self-maintenance heal -- the Cart's own lore (TYLER multiverse_heroes.md
  * #10) isn't a combatant, so Q stays deliberately small rather than padded out with an invented
  * attack. Always succeeds (no target/range gate -- there's nothing to miss). */
@@ -5322,6 +5362,12 @@ void arena_cast_q(int owner) {
             h->mp -= ARENA_MP_COST_Q;
         }
         break;
+    case ARENA_HERO_THIEF:
+        if (thief_cast_q(h, foe)) {
+            h->q_cooldown_ms = cast_cooldown(h, ARENA_THIEF_Q_COOLDOWN_MS);
+            h->mp -= ARENA_MP_COST_Q;
+        }
+        break;
     }
 }
 
@@ -5655,6 +5701,15 @@ void arena_toggle_w(int owner) {
         if (h->w_cooldown_ms > 0 || h->mp < ARENA_MP_COST_W) return;
         if (monk_cast_w(h, arena_nearest_enemy(owner))) {
             h->w_cooldown_ms = cast_cooldown(h, ARENA_MONK_W_COOLDOWN_MS);
+            h->mp -= ARENA_MP_COST_W;
+        }
+        break;
+    case ARENA_HERO_THIEF:
+        /* Gust Slash: instant targeted cast, same shape as monk_cast_w/warrior_cast_w -- see
+           thief_cast_w's own doc comment. */
+        if (h->w_cooldown_ms > 0 || h->mp < ARENA_MP_COST_W) return;
+        if (thief_cast_w(h, arena_nearest_enemy(owner))) {
+            h->w_cooldown_ms = cast_cooldown(h, ARENA_THIEF_W_COOLDOWN_MS);
             h->mp -= ARENA_MP_COST_W;
         }
         break;
@@ -6013,6 +6068,15 @@ void arena_cast_r(int owner) {
         if (h->r_cooldown_ms > 0 || h->mp < ARENA_MP_COST_R) return;
         if (monk_cast_r(h, foe)) {
             h->r_cooldown_ms = cast_cooldown(h, ARENA_MONK_R_COOLDOWN_MS);
+            h->mp -= ARENA_MP_COST_R;
+        }
+        break;
+    case ARENA_HERO_THIEF:
+        /* Mercy Stroke: instant targeted cast, same shape as monk_cast_r/warrior_cast_r -- see
+           thief_cast_r's own doc comment for the real execute+skillchain composition. */
+        if (h->r_cooldown_ms > 0 || h->mp < ARENA_MP_COST_R) return;
+        if (thief_cast_r(h, foe)) {
+            h->r_cooldown_ms = cast_cooldown(h, ARENA_THIEF_R_COOLDOWN_MS);
             h->mp -= ARENA_MP_COST_R;
         }
         break;
@@ -7140,6 +7204,20 @@ void bot_cast_kit_if_ready(ArenaHero *bot, ArenaHero *foe) {
         } else if (bot->w_cooldown_ms <= 0 && dist <= ARENA_MONK_W_RANGE) {
             arena_toggle_w(bot->owner);
         } else if (bot->q_cooldown_ms <= 0 && dist <= ARENA_MONK_Q_RANGE) {
+            arena_cast_q(bot->owner);
+        }
+        break;
+    case ARENA_HERO_THIEF:
+        /* Same "plain melee hits, biggest/longest-cooldown first" heuristic as Warrior's/Monk's
+           own case above -- the bot heuristic doesn't try to reason about Mercy Stroke's own
+           real execute scaling (same "simple heuristic, not real strategy" scope Morrigan's own
+           execute-Q case above also accepts), it just fires R whenever off cooldown and in
+           range. */
+        if (bot->r_cooldown_ms <= 0 && dist <= ARENA_THIEF_R_RANGE) {
+            arena_cast_r(bot->owner);
+        } else if (bot->w_cooldown_ms <= 0 && dist <= ARENA_THIEF_W_RANGE) {
+            arena_toggle_w(bot->owner);
+        } else if (bot->q_cooldown_ms <= 0 && dist <= ARENA_THIEF_Q_RANGE) {
             arena_cast_q(bot->owner);
         }
         break;

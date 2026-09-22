@@ -38,6 +38,7 @@ const char *arena_hero_name(ArenaHeroID hero_id) {
     case ARENA_HERO_CART:    return "cart";
     case ARENA_HERO_MICHAEL: return "michael"; /* real, pre-existing gap found while adding Monk below -- same "found missing, fixed alongside" precedent as Weatherman's own entry above */
     case ARENA_HERO_MONK:    return "monk";
+    case ARENA_HERO_THIEF:   return "thief";
     default:                 return "unknown";
     }
 }
@@ -111,6 +112,7 @@ const char *arena_ability_name(ArenaHeroID hero_id, int slot) {
         [ARENA_HERO_CART]       = {"MAINTENANCE", "NO REQUESTER IN THE LEDGER", "ALREADY WAITING"}, /* NORTHSTAR §24 Milestone 2 -- W/R names drawn from the character's own real seed phrase/lore framing, TYLER multiverse_heroes.md #10 */
         [ARENA_HERO_MICHAEL]    = {"FLAMING SWORD", "HEAVEN'S SHIELD", "RECAST VICTORY"}, /* real, pre-existing gap found while adding Monk below */
         [ARENA_HERO_MONK]       = {"COMBO", "BACKHAND BLOW", "ASURAN FISTS"}, /* real DragonsNShit H2H weapon skills, not invented lore names -- GFD-BG-12444 follow-up, fork-local content */
+        [ARENA_HERO_THIEF]      = {"WASP STING", "GUST SLASH", "MERCY STROKE"}, /* real DragonsNShit dagger weapon skills, not invented lore names -- GFD-BG-12444 follow-up, fork-local content */
     };
     if (hero_id < 0 || hero_id >= ARENA_HERO_COUNT || slot < 0 || slot > 2) return "?";
     const char *name = NAMES[hero_id][slot];
@@ -156,6 +158,7 @@ const char *arena_ability_description(ArenaHeroID hero_id, int slot) {
         [ARENA_HERO_CART]       = {"SMALL SELF-HEAL", "ZONE: RANDOM DELIVERY, ANYONE CAN TRIGGER IT", "BIGGER ZONE, SAME RANDOM DELIVERY"},
         [ARENA_HERO_MICHAEL]    = {"STRONG MELEE-RANGE STRIKE", "SELF SHIELD, ABSORBS DAMAGE", "HEALS HOVERED OR NEAREST ALLY, MORE AT LOW HP"}, /* real, pre-existing gap found while adding Monk below */
         [ARENA_HERO_MONK]       = {"MELEE-RANGE DIRECT STRIKE", "HARDER MELEE-RANGE STRIKE", "HARDEST MELEE-RANGE STRIKE"}, /* real DragonsNShit H2H weapon skills, same kit shape as Warrior -- three unconditional melee hits */
+        [ARENA_HERO_THIEF]      = {"MELEE-RANGE DIRECT STRIKE", "HARDER MELEE-RANGE STRIKE", "EXECUTE -- MORE DAMAGE AT LOW TARGET HP"}, /* real DragonsNShit dagger weapon skills; R is a genuine execute, not a flat finisher like Warrior's/Monk's own */
     };
     if (hero_id < 0 || hero_id >= ARENA_HERO_COUNT || slot < 0 || slot > 2) return "?";
     const char *desc = DESC[hero_id][slot];
@@ -217,6 +220,7 @@ static const ArenaHeroTags ARENA_HERO_TAGS[ARENA_HERO_COUNT] = {
     [ARENA_HERO_CART]       = { 1, 0, 0, 1, 0, 0 }, /* W/R are zone-shaped (reads ranged); Q and a possible delivery roll both heal -- has_heal true; no knockback/dash/stealth anywhere in the kit */
     [ARENA_HERO_MICHAEL]    = { 0, 0, 0, 1, 0, 0 }, /* Q/W melee-range+self-shield, R heals an ally -- real, pre-existing gap found while adding Monk below */
     [ARENA_HERO_MONK]       = { 0, 0, 0, 0, 0, 0 }, /* same kit shape as Warrior -- all three real weapon skills are melee-range hits, no ranged/knockback/heal/dash/stealth tool anywhere in the kit */
+    [ARENA_HERO_THIEF]      = { 0, 0, 0, 0, 0, 0 }, /* all three real weapon skills are melee-range hits (R's own execute scaling doesn't change its range/targeting shape); no ranged/knockback/heal/dash/stealth tool anywhere in the kit */
 };
 
 /* arena_hero_tags_string writes a space-separated list of hero_id's TRUE tags into out (empty
