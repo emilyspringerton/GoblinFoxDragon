@@ -1,11 +1,106 @@
 #include "arena_game.h"
 #include <math.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include "../common/rl_policy_weights.h"
+#include "bloodflower_mod_host.h"
+#include "tree_passive_mod_host.h"
+#include "build_template_mod_host.h"
+#include "item_curriculum_mod_host.h"
+#include "duck_smoke_bomb_mod_host.h"
+#include "abraham_fireball_mod_host.h"
+#include "bacon_puck_intangible_speed_mod_host.h"
 
 ArenaState arena_state;
 int arena_bot_enabled = 1;
+
+/* arena_tick_daynight / arena_hero_claim_bloodflower / redgarden_host_spawn_bloodflower
+ * (2026-08-25): see arena_game.h's own doc comments (near ARENA_DAYNIGHT_ORBIT_SPEED and each
+ * function's declaration) for the full design. Placed here, right after arena_state's own
+ * definition, so redgarden_host_spawn_bloodflower -- called back into from the PARENA-compiled
+ * on_moon_zenith -- is defined before any other translation unit could need its address; it's
+ * only referenced via the extern in bloodflower_mod_host.h, but keeping the real host
+ * implementation textually close to that extern (matching this file's existing convention of
+ * defining tick functions near their own state) rather than scattered at the bottom. */
+
+void redgarden_host_spawn_bloodflower(int x, int z) {
+    arena_state.bloodflower_active = 1;
+    arena_state.bloodflower_x = (float)x;
+    arena_state.bloodflower_z = (float)z;
+    arena_state.bloodflower_ms_remaining = ARENA_BLOODFLOWER_LIFETIME_MS;
+}
+
+void arena_hero_claim_bloodflower(void) {
+    if (!arena_state.bloodflower_active) return;
+    for (int i = 0; i < ARENA_HEROES_ARRAY_SIZE; i++) {
+        ArenaHero *h = &arena_state.heroes[i];
+        if (!h->active || !h->alive) continue;
+        float dx = h->x - arena_state.bloodflower_x;
+        float dz = h->z - arena_state.bloodflower_z;
+        float dist_sq = dx * dx + dz * dz;
+        if (dist_sq <= ARENA_BLOODFLOWER_CLAIM_RADIUS * ARENA_BLOODFLOWER_CLAIM_RADIUS) {
+            h->flow += ARENA_BLOODFLOWER_CLAIM_FLOW;
+            arena_state.bloodflower_active = 0;
+            return; /* first claim wins, same "stop scanning once resolved" idiom this file's other claim-style loops use */
+        }
+    }
+}
+
+void arena_tick_daynight(unsigned int dt_ms) {
+    float dt_sec = (float)dt_ms / 1000.0f;
+    arena_state.time_of_day_sec += dt_sec;
+
+    /* Ported from SHANKPIT retro_sky.c's retro_sky_eval_sun_dir -- same orbit_t/tilt math, same
+     * sun_y formula. moon_dir_y = -sun_dir_y (retro_lighting.c's own s.moon_dir_x/y/z = -sun_dir
+     * relation) -- moon height is highest exactly when sun height is lowest. */
+    float orbit_t = arena_state.time_of_day_sec * ARENA_DAYNIGHT_ORBIT_SPEED;
+    float sun_height = sinf(orbit_t) * cosf(ARENA_DAYNIGHT_TILT);
+    float moon_height = -sun_height;
+
+    int rising_now = (moon_height > arena_state.prev_moon_height);
+    if (!rising_now && arena_state.moon_was_rising && !arena_state.daynight_zenith_fired) {
+        /* moon_height was climbing last tick, isn't climbing this tick -- we just passed its
+         * local maximum (zenith). Real event, through the PARENA mod surface -- see this
+         * function's own header comment. */
+        arena_state.daynight_zenith_fired = 1;
+        on_moon_zenith(0, 0); /* map center -- see ArenaState.bloodflower_x/z's own doc comment */
+    }
+    if (moon_height < ARENA_DAYNIGHT_ZENITH_REARM_THRESHOLD) {
+        arena_state.daynight_zenith_fired = 0;
+    }
+    arena_state.moon_was_rising = rising_now;
+    arena_state.prev_moon_height = moon_height;
+
+    if (arena_state.bloodflower_active) {
+        arena_state.bloodflower_ms_remaining -= (int)dt_ms;
+        if (arena_state.bloodflower_ms_remaining <= 0) {
+            arena_state.bloodflower_active = 0; /* unclaimed, timed out -- real time pressure, see ARENA_BLOODFLOWER_LIFETIME_MS's own doc comment */
+        }
+    }
+}
+
+static float arena_daynight_smoothstep(float edge0, float edge1, float x) {
+    float t = (x - edge0) / (edge1 - edge0);
+    if (t < 0.0f) t = 0.0f;
+    if (t > 1.0f) t = 1.0f;
+    return t * t * (3.0f - 2.0f * t);
+}
+
+void arena_daynight_ambient_rgb(float *out_r, float *out_g, float *out_b) {
+    float orbit_t = arena_state.time_of_day_sec * ARENA_DAYNIGHT_ORBIT_SPEED;
+    float sun_height = sinf(orbit_t) * cosf(ARENA_DAYNIGHT_TILT);
+    /* Ported from SHANKPIT retro_lighting.c's RETRO_LIGHTING_DYNAMIC ambient formula
+     * (sun_visibility = smoothstep(0, 0.22, sun_dir_y); ambient_r/g/b blend by sun_visibility) --
+     * same edge values, same blend shape, this game's own dark-green base tone (0.03, 0.05,
+     * 0.04, the existing hardcoded glClearColor this replaces) used as the night-side floor
+     * instead of SHANKPIT's own night-ambient numbers, so night in this game still reads as
+     * "this game's palette at night," not a copy-pasted different game's color grade. */
+    float sun_visibility = arena_daynight_smoothstep(0.0f, 0.22f, sun_height);
+    if (out_r) *out_r = 0.03f + sun_visibility * 0.10f;
+    if (out_g) *out_g = 0.05f + sun_visibility * 0.10f;
+    if (out_b) *out_b = 0.04f + sun_visibility * 0.08f;
+}
 
 /* ARENA_ITEMS (S170-175): the actual 24-item shop catalog. See
  * arena_game.h's own doc comment on ArenaItemDef/ArenaItemTier for the
@@ -85,6 +180,279 @@ const ArenaItemDef ARENA_ITEMS[ARENA_ITEM_COUNT] = {
        early-buy utility item (well under Blink Dagger's 1400) matching that "modest" framing,
        not confirmed final tuning. -- */
     { "Haste Trinket",      ARENA_ITEM_SLOT_TRINKET, ARENA_ITEM_TIER_GENERIC,  900,  0,   0,   0,  0, 0.0f, 6 },
+    /* -- "expand the play space" first pass (2026-08-11), founder real-time: "do a first pass
+       generating weird items that expand the play space" -> "using ffxi items and your own best
+       judgement on how the new items with unique qualities" -> "and how they push the meta
+       forward" -> "if you cant be creative and want to block on founder direction thats fine but
+       honestly i think you can handle it." 6 items, real FFXI names (docs/FFXI_ITEM_PARITY_SEED.md
+       §3/§4), pushing this catalog into the shop UI's real page 4 (founder: "add page 4 to the
+       shop" -- see ARENA_ITEM_COUNT's own doc comment, no separate paging code needed). Two
+       genuinely NEW mechanic categories (true damage, lifesteal -- see ArenaItemDef's own doc
+       comment), one dynamic live-computed comeback stat (Balance Ring, see arena_hero_armor's
+       own doc comment), three stat-shape-only items following the existing Kraken Club/Ridill
+       convention. Index order is catalog-append order (27-32), same "fixed literal, stays stable
+       as more items get added" reasoning ARENA_BLINK_DAGGER_ITEM_ID's own doc comment gives. */
+    /* Gae Bolg (S170-parity §3 Polearm) -- real mythological spear (Cu Chulainn's, various
+       fiction's "never misses/always finds the heart"). This engine has no miss/crit RNG and
+       deliberately doesn't introduce any for this pass (same boundary Kraken Club/Ridill's own
+       doc comment already flags), so "always finds the heart" is expressed as ARMOR-PIERCING
+       true damage instead -- a real, different lever: flat bonus_true_dmg applied AFTER
+       apply_armor, the first stat in this catalog that isn't reduced by the target's armor at
+       all. Opens a real counter-build against armor-stacking compositions -- "push the meta
+       forward" in the most literal sense, a genuine answer to a strategy that previously had no
+       direct counter-item. */
+    /* Cost tripled 2026-08-13, founder real-time: "the page 4 items need tripple costs" --
+       1000 -> 3000, page-4-only pass (other items flagged for a future iteration, not touched
+       here). */
+    { "Gae Bolg",           ARENA_ITEM_SLOT_WEAPON, ARENA_ITEM_TIER_WEIRD,   3000,  0,   0,   0,  0, 0.0f, 0, 18, 0 },
+    /* Masamune (S170-parity §3 Great Katana) -- real legendary blade, fiction's own recurring
+       "benevolent/protective" half of the Masamune-vs-Muramasa pairing (paired below with
+       Muramasa's own "cursed/bloodthirsty" half -- a real thematic build-around CHOICE between
+       two katana, not two flavors of the same stat). This catalog's first-ever lifesteal: heals
+       the wielder for bonus_lifesteal_pct of the FINAL (post-armor) damage on a landed
+       auto-attack -- a genuinely new sustain mechanic, opens a real "outlast, don't burst"
+       playstyle previously unavailable at all. */
+    /* Cost tripled 2026-08-13 (see Gae Bolg's comment above): 1100 -> 3300. */
+    { "Masamune",           ARENA_ITEM_SLOT_WEAPON, ARENA_ITEM_TIER_WEIRD,   3300, 15,   0,   0,  0, 0.0f, 0,  0, 15 },
+    /* Muramasa (S170-parity §3 Great Katana) -- Masamune's own real cursed counterpart, fiction's
+       "the blade that thirsts for blood, even its wielder's own." Stat-SHAPE only (same
+       discipline Kraken Club/Ridill already established -- not every weird item needs a new
+       mechanic), pushed further than Kraken Club's own glass-cannon shape: huge AD, genuinely
+       ZERO of everything else, the single most extreme risk/reward weapon in the catalog. */
+    /* Cost tripled 2026-08-13 (see Gae Bolg's comment above): 1150 -> 3450. */
+    { "Muramasa",            ARENA_ITEM_SLOT_WEAPON, ARENA_ITEM_TIER_WEIRD,   3450, 70,   0,   0,  0, 0.0f, 0,  0, 0 },
+    /* Balance Ring (S170-parity §4 Ring) -- real FFXI accessory name, reframed here around its
+       own name's literal meaning: a COMEBACK item, armor bonus that scales with the wearer's own
+       MISSING hp fraction, computed live in arena_hero_armor() (see that function's own doc
+       comment) rather than baked in once at purchase time -- can't be, since it depends on
+       state that changes every tick, the same reason Zagan's mirror/King Wealth's aura are also
+       computed live there instead of cached. The catalog's first dynamic, state-dependent item
+       stat -- rewards fighting on while low rather than always being strictly better at full HP,
+       real rubber-band design in the same spirit as §25.3's own synergy decay (a different
+       system, same "give the losing side real openings" philosophy). ARENA_BALANCE_RING_ITEM_ID
+       (arena_game.h) is the named index arena_hero_armor checks. */
+    /* Cost tripled 2026-08-13 (see Gae Bolg's comment above): 900 -> 2700. */
+    { "Balance Ring",       ARENA_ITEM_SLOT_RING,    ARENA_ITEM_TIER_WEIRD,   2700,  0,   0,   0,  0, 0.0f, 0,  0, 0 },
+    /* Empress Hairpin (S170-parity §4 Head) -- real FFXI item, real-game reputation as a
+       caster/MP-support accessory. Mana-focused stat blend: a real bonus_max_mp plus a touch of
+       the existing bonus_cdr_pct stat (Haste Trinket's own mechanic, reused not duplicated) --
+       supports an ability-spam playstyle the existing Head-slot item (Optical Hat, flat HP) does
+       nothing for. */
+    /* Cost tripled 2026-08-13 (see Gae Bolg's comment above): 450 -> 1350. */
+    { "Empress Hairpin",    ARENA_ITEM_SLOT_HEAD,    ARENA_ITEM_TIER_GENERIC, 1350,  0,   0, 100,  0, 0.0f, 4,  0, 0 },
+    /* Ninja Tekko (S170-parity §4 Hands) -- real FFXI ninja gauntlets. AD+move-speed hybrid
+       (an "assassin" stat shape -- hit hard AND get there fast), distinct from the existing
+       Hands-slot item (Battle Gloves, pure flat AD) rather than a straight upgrade to it --
+       a real alternative build path, not strictly better/worse. */
+    /* Cost tripled 2026-08-13 (see Gae Bolg's comment above): 500 -> 1500. */
+    { "Ninja Tekko",        ARENA_ITEM_SLOT_HANDS,   ARENA_ITEM_TIER_GENERIC, 1500, 20,   0,   0,  0, 1.0f, 0,  0, 0 },
+    /* Kite String (S202-34, founder: "add an item that increases auto attack range by 4% 3333
+       flow 'Kite String' trinket") -- no flat stats at all, same "this IS the item, not a bonus
+       on top of one" shape Haste Trinket's own cdr_pct-only entry already established. Shares
+       the Trinket slot with Haste Trinket/Empress Hairpin/Balance Ring -- a real build choice
+       between them, not a strict upgrade. */
+    { "Kite String",        ARENA_ITEM_SLOT_TRINKET, ARENA_ITEM_TIER_GENERIC, 3333,  0,   0,   0,  0, 0.0f, 0,  0, 0, 4 },
+    /* Luck of the Draw (S205-87, founder, cruise-queue: "we should have a weapon that is on
+       like page 5 for 2.2k flow a trinket called 'luck of the draw' that gives some mana regen
+       during combat") -- no flat stats at all, same "this IS the item, not a bonus on top of
+       one" shape Kite String's own entry just above already established. Shares the Trinket
+       slot with Haste Trinket/Empress Hairpin/Balance Ring/Kite String -- a real build choice,
+       not a strict upgrade over any of them. +1 flat mp/sec while in combat, doubling the base
+       ARENA_MP_REGEN_IN_COMBAT_PER_SEC trickle (1) to 2 while equipped -- a real, modest
+       improvement, same restraint Haste Trinket's own "make it a modest improvement" precedent
+       set, not a build-defining spike. */
+    { "Luck of the Draw",   ARENA_ITEM_SLOT_TRINKET, ARENA_ITEM_TIER_GENERIC, 2200,  0,   0,   0,  0, 0.0f, 0,  0, 0, 0, 1 },
+    /* -- GFD item database pass (2026-09-11), founder real-time: "iterate on REDGARDEN add some
+       more items look into the GFD item database for inspiration bring in AD not just AP." Real
+       source, not invented from scratch: GoblinFoxDragon/data/items.json, a genuine FFXI-styled
+       155-item catalog with a real dual stat system -- Attack/STR/DEX (physical) alongside Magic
+       Attack Bonus/INT/MND (magic) -- the actual "AD vs AP" split the founder's own phrasing
+       names. Confirmed with the founder before writing any code: this catalog has NO ability-
+       power-scaling mechanic at all (every hero's Q/W/R deals its own flat, hardcoded damage,
+       unaffected by items -- see this file's own header comment on ArenaItemDef), so "AP" items
+       from GFD are translated onto this catalog's EXISTING mana/cooldown stats (bonus_max_mp,
+       bonus_cdr_pct, bonus_mp_regen_combat) as the closest real "caster" analog, not a new
+       damage-scaling stat -- scope confirmed, not assumed, since retrofitting real ability-power
+       scaling onto all 26 existing hero kits is flagged as real, separate, much larger follow-on
+       work this pass deliberately does not attempt.
+       Five of the eight close a real, concrete gap found by directly counting this catalog:
+       Body (Haubergeon), Legs (Iron Ram Trousers), Feet (Creek F. Boots), Neck (Justice Badge),
+       and Waist (Warwolf Belt) each had exactly ONE item before this pass -- zero real build
+       choice in 5 of 11 slots. Each below is a genuine alternative with a different stat SHAPE,
+       same "not strictly better/worse" discipline Ninja Tekko's own doc comment already
+       established, not a straight upgrade to the slot's existing item. */
+    /* Wizard's Coat (GFD: defense 35, fast_cast 5, int 12, magic_attack_bonus 18) -- a real
+       caster alternative to Haubergeon's flat-armor-only Body item: less raw armor, but a real
+       mana pool plus the same bonus_cdr_pct mechanic Haste Trinket already established
+       (fast_cast's closest real analog), supporting an ability-spam playstyle Haubergeon does
+       nothing for -- same reasoning Empress Hairpin's own doc comment already gives for the Head
+       slot, applied here to Body. */
+    { "Wizard's Coat",      ARENA_ITEM_SLOT_BODY,    ARENA_ITEM_TIER_GENERIC, 1400,  0,   0,  80, 10, 0.0f, 3 },
+    /* Chain Leggings (GFD: defense 22, str 3, vit 2) -- a tankier alternative to Iron Ram
+       Trousers' pure-armor shape: less armor, but a real HP pool on top -- a genuine "which do I
+       need more, mitigation or raw HP" choice, not a strict upgrade either direction. */
+    { "Chain Leggings",     ARENA_ITEM_SLOT_LEGS,    ARENA_ITEM_TIER_GENERIC, 1100,  0,  70,   0, 14, 0.0f },
+    /* Boots of Winter (GFD: evasion 5, int 3, magic_defense_bonus 5, mnd 3, mp 10, vit 2) -- a
+       caster alternative to Creek F. Boots' pure-move-speed shape: less speed, but a real mana
+       pool -- same "different build path, not a straight upgrade" discipline as Ninja Tekko vs.
+       Battle Gloves in the Hands slot. */
+    { "Boots of Winter",    ARENA_ITEM_SLOT_FEET,    ARENA_ITEM_TIER_GENERIC, 1200,  0,   0,  60,  0, 0.5f },
+    /* Mage's Earring (GFD: int 3, mnd 3) -- a plain mana stat stick, Neck's first non-armor
+       option next to Justice Badge. Deliberately does NOT also carry bonus_mp_regen_combat --
+       Luck of the Draw already prices a flat +1 mp_regen_combat at 2200 flow entirely on its own;
+       stacking that same stat cheaply onto a Neck item would undercut Luck of the Draw's own
+       value outright, not offer a genuine alternative. */
+    { "Mage's Earring",     ARENA_ITEM_SLOT_NECK,    ARENA_ITEM_TIER_GENERIC,  900,  0,   0,  70,  0, 0.0f },
+    /* Venerer's Belt (GFD: dex 5, ranged_accuracy 10, store_tp 3) -- an AD/range hybrid, Waist's
+       first alternative to Warwolf Belt's pure-HP shape. Deliberately a SMALLER attack_range_pct
+       than Kite String's own 4% (Kite String prices that entire 4% at 3333 flow standalone) --
+       this is a different equipment slot, so the two stack rather than compete, and pricing this
+       one's range bonus small keeps Kite String's own Trinket-slot value intact rather than
+       undercutting it from a different slot. */
+    { "Venerer's Belt",     ARENA_ITEM_SLOT_WAIST,   ARENA_ITEM_TIER_GENERIC, 1300, 12,   0,   0,  0, 0.0f, 0,  0, 0, 2 },
+    /* Mikazuki (GFD: accuracy 20, attack 55, dex 6, haste 20, str 6) -- real named Japanese
+       katana (Mikazuki Munechika, a real National Treasure, reputed the most beautiful sword in
+       Japan), picked for GFD's own notably high "haste" stat among its named weapons --
+       translated as bonus_cdr_pct (this catalog's own established haste analog, per Haste
+       Trinket's doc comment) alongside a real bonus_ad, a genuine "fast, skirmishing" alternative
+       to this catalog's existing flat-AD-only weapons. WEIRD tier: a real named legendary weapon
+       with a real unusual reputation, same convention Kraken Club/Ridill/Muramasa already
+       established -- stat shape reflects that reputation rather than new RNG this engine still
+       deliberately doesn't have. */
+    { "Mikazuki",           ARENA_ITEM_SLOT_WEAPON,  ARENA_ITEM_TIER_WEIRD,   2400, 34,   0,   0,  0, 0.0f, 5 },
+    /* Dojigiri (GFD: attack 88 -- the single highest raw attack stat among GFD's named weapons).
+       Real named katana (Dojigiri Yasutsuna, one of Japan's "Five Swords Under Heaven," reputed
+       to have slain the demon Shuten-doji) -- translated as this catalog's highest-AD weapon
+       PLUS real mobility, a distinct "mobile duelist" glass cannon rather than a reskin of
+       Muramasa's own existing "huge AD, zero everything else, immobile" shape. WEIRD tier, same
+       real-reputation-into-stat-shape convention as Mikazuki above. Named in plain ASCII
+       ("Dojigiri," not "Dōjigiri") deliberately -- no existing string literal in this file uses a
+       non-ASCII character, and this pass doesn't take on unverified font-rendering risk in
+       apps/arena's own SDL2 text rendering just for a diacritic. */
+    { "Dojigiri",           ARENA_ITEM_SLOT_WEAPON,  ARENA_ITEM_TIER_WEIRD,   2800, 58,   0,   0,  0, 1.0f },
+    /* Excalibur (GFD: accuracy 20, attack 249, defense 25, str 25 -- by a wide margin the
+       single strongest item, of any kind, in GFD's entire 155-item database). The single most
+       famous legendary sword in the source material, translated as this catalog's new flagship:
+       a well-rounded, expensive, powerful AD/armor/HP blend (not a glass cannon like Muramasa/
+       Dojigiri -- Excalibur's real reputation is "the best sword, full stop," not a risky
+       one-note weapon) at this catalog's new highest price, becoming the genuine top of the
+       power curve this pass's real Body/Legs/Feet/Neck/Waist gap-filling and Mikazuki/Dojigiri
+       flavor additions build up toward. WEIRD tier, same real-reputation-into-stat-shape
+       convention as every other named legendary weapon in this catalog. */
+    { "Excalibur",          ARENA_ITEM_SLOT_WEAPON,  ARENA_ITEM_TIER_WEIRD,   4200, 50, 120,   0, 20, 0.0f },
+};
+
+/* Item curriculum: see arena_game.h's own "Item curriculum" section doc comment for the full
+ * founder-quote chain and honest scope note. Runtime-mutable, separate from the fixed, const
+ * ARENA_ITEMS[] catalog above -- deliberately not appended into it, see that doc comment for
+ * why. Zero-initialized to a safe, clearly-labeled "not yet generated" placeholder rather than
+ * left name=NULL, so any accidental early read (before the training loop ever calls the
+ * generator) doesn't crash on a null string. */
+static char arena_item_curriculum_names[ARENA_ITEM_CURRICULUM_SLOT_COUNT][80] = {
+    { "(curriculum slot: not yet generated)" },
+    { "(curriculum slot: not yet generated)" },
+    { "(curriculum slot: not yet generated)" },
+    { "(curriculum slot: not yet generated)" },
+};
+ArenaItemDef ARENA_ITEM_CURRICULUM_SLOTS[ARENA_ITEM_CURRICULUM_SLOT_COUNT] = {
+    { arena_item_curriculum_names[0], ARENA_ITEM_SLOT_WEAPON, ARENA_ITEM_TIER_WEIRD, 0, 0, 0, 0, 0, 0.0f, 0, 0, 0 },
+    { arena_item_curriculum_names[1], ARENA_ITEM_SLOT_WEAPON, ARENA_ITEM_TIER_WEIRD, 0, 0, 0, 0, 0, 0.0f, 0, 0, 0 },
+    { arena_item_curriculum_names[2], ARENA_ITEM_SLOT_WEAPON, ARENA_ITEM_TIER_WEIRD, 0, 0, 0, 0, 0, 0.0f, 0, 0, 0 },
+    { arena_item_curriculum_names[3], ARENA_ITEM_SLOT_WEAPON, ARENA_ITEM_TIER_WEIRD, 0, 0, 0, 0, 0, 0.0f, 0, 0, 0 },
+};
+
+/* arena_item_curriculum_blend_int: average two base stats, then apply a small, DETERMINISTIC
+ * jitter (a plain integer hash of the two item ids + slot, not rand()/srand()) so the same pair
+ * of base items always generates the same result -- reproducibility matters for a training
+ * pipeline that will re-run this deterministically across restarts, and avoids the global
+ * rand() state every other real-RNG use in this codebase (item drops, etc.) doesn't need to
+ * share with a curriculum-generation call. Jitter is bounded to +/-12% of the averaged value
+ * (never negative) so a blend of two real items stays a plausible item, not an outlier. */
+static int arena_item_curriculum_blend_int(int a, int b, unsigned int hash) {
+    int base = (a + b) / 2;
+    if (base == 0) return 0;
+    int jitter_range = base * 12 / 100;
+    if (jitter_range < 1) return base;
+    int jitter = (int)(hash % (unsigned int)(2 * jitter_range + 1)) - jitter_range;
+    int result = base + jitter;
+    return result < 0 ? 0 : result;
+}
+
+/* redgarden_host_item_curriculum_generate_counter_item: the real work behind
+ * on-generate-counter-item (stdlib/redgarden/item_curriculum_mod.prn) -- same "mod is the
+ * trigger, host C does the mutation" split every prior REDGARDEN mod (Bloodflower, Tree
+ * passive, Build templates) already established. Blends base_item_a and base_item_b's own
+ * stat fields into ARENA_ITEM_CURRICULUM_SLOTS[slot_index]. Returns the synthetic item id
+ * (ARENA_ITEM_COUNT + slot_index) on success, -1 on an out-of-range base item or slot index. */
+int redgarden_host_item_curriculum_generate_counter_item(int base_item_a, int base_item_b, int slot_index) {
+    if (base_item_a < 0 || base_item_a >= ARENA_ITEM_COUNT) return -1;
+    if (base_item_b < 0 || base_item_b >= ARENA_ITEM_COUNT) return -1;
+    if (slot_index < 0 || slot_index >= ARENA_ITEM_CURRICULUM_SLOT_COUNT) return -1;
+
+    const ArenaItemDef *a = &ARENA_ITEMS[base_item_a];
+    const ArenaItemDef *b = &ARENA_ITEMS[base_item_b];
+    /* One deterministic hash seed per stat field so two blends of the same pair don't jitter
+     * every field in lockstep (which would just scale the whole item up or down uniformly,
+     * defeating the point of a per-stat jitter). */
+    unsigned int seed = (unsigned int)(base_item_a * 733 + base_item_b * 41 + slot_index * 17 + 2026);
+
+    ArenaItemDef *out = &ARENA_ITEM_CURRICULUM_SLOTS[slot_index];
+    snprintf(arena_item_curriculum_names[slot_index], sizeof(arena_item_curriculum_names[slot_index]),
+             "Curriculum: %.28s x %.28s", a->name, b->name);
+    out->name = arena_item_curriculum_names[slot_index];
+    out->slot = a->slot; /* the resulting item equips into base_item_a's own slot */
+    out->tier = ARENA_ITEM_TIER_WEIRD; /* an unusual, generated stat shape, not a hand-authored one */
+    out->cost = arena_item_curriculum_blend_int(a->cost, b->cost, seed * 2654435761u);
+    out->bonus_ad = arena_item_curriculum_blend_int(a->bonus_ad, b->bonus_ad, seed * 2654435761u + 1);
+    out->bonus_max_hp = arena_item_curriculum_blend_int(a->bonus_max_hp, b->bonus_max_hp, seed * 2654435761u + 2);
+    out->bonus_max_mp = arena_item_curriculum_blend_int(a->bonus_max_mp, b->bonus_max_mp, seed * 2654435761u + 3);
+    out->bonus_armor = arena_item_curriculum_blend_int(a->bonus_armor, b->bonus_armor, seed * 2654435761u + 4);
+    out->bonus_move_speed = (a->bonus_move_speed + b->bonus_move_speed) / 2.0f;
+    out->bonus_cdr_pct = arena_item_curriculum_blend_int(a->bonus_cdr_pct, b->bonus_cdr_pct, seed * 2654435761u + 5);
+    out->bonus_true_dmg = arena_item_curriculum_blend_int(a->bonus_true_dmg, b->bonus_true_dmg, seed * 2654435761u + 6);
+    out->bonus_lifesteal_pct = arena_item_curriculum_blend_int(a->bonus_lifesteal_pct, b->bonus_lifesteal_pct, seed * 2654435761u + 7);
+
+    return ARENA_ITEM_COUNT + slot_index;
+}
+
+const ArenaItemDef *redgarden_host_item_curriculum_get(int slot_index) {
+    if (slot_index < 0 || slot_index >= ARENA_ITEM_CURRICULUM_SLOT_COUNT) return NULL;
+    return &ARENA_ITEM_CURRICULUM_SLOTS[slot_index];
+}
+
+/* ARENA_BUILD_TEMPLATES: see arena_game.h's own "Build templates" section doc comment for the
+   full founder-quote chain and design reasoning. A first, generic (any-hero) pass -- item
+   picks/ordering are a real judgment call, not founder-specified numbers, same "reasonable
+   defaults, document the choice" precedent ARENA_BLOODFLOWER_CLAIM_FLOW's own doc comment set.
+   Each template's item_ids are ordered CHEAPEST-FIRST within its theme (the "complex ordering
+   rules" the founder asked for, expressed as literal purchase priority) so a partial Flow
+   balance still lands real, useful progress instead of stalling on one expensive first pick.
+   One item per slot, verified by hand against ARENA_ITEMS' own indices above -- no two entries
+   in the same template share a slot. */
+const ArenaBuildTemplate ARENA_BUILD_TEMPLATES[ARENA_BUILD_TEMPLATE_COUNT] = {
+    {
+        "Bruiser", "Tanky, front-line -- armor and HP first, a heavy weapon last.",
+        { 22 /* Warwolf Belt: waist, 400, +80hp */,
+          20 /* Justice Badge: neck, 400, +14armor */,
+          15 /* Haubergeon: body, 450, +18armor */,
+          5  /* Ironbark Plate: weapon, 900, +10ad +150hp +20armor */ },
+        4
+    },
+    {
+        "Assassin", "AD and mobility -- hit hard, get there fast.",
+        { 21 /* Forager's Mantle: back, 350, +8ad +0.4spd */,
+          18 /* Creek F. Boots: feet, 400, +0.6spd */,
+          16 /* Battle Gloves: hands, 400, +12ad */,
+          8  /* Splinterfang: weapon, 900, +30ad */ },
+        4
+    },
+    {
+        "Caster", "MP and cooldown reduction -- an ability-spam playstyle.",
+        { 19 /* Astral Ring: ring, 350, +50mp */,
+          26 /* Haste Trinket: trinket, 900, +6% cdr */,
+          4  /* Wanecall Grimoire: weapon, 950, +25ad +60mp */ },
+        3
+    },
 };
 
 /* arena_creeps_reset (S170-51): shared init helper for both arena_init_*
@@ -464,8 +832,33 @@ void arena_obstacles_reset_layout(void) {
         arena_state.obstacles[i].z = layout[i].z;
         arena_state.obstacles[i].radius = layout[i].radius;
         arena_state.obstacles[i].kind = layout[i].kind;
+        /* Tree passive (2026-08-25): only ARENA_OBSTACLE_TREE gets real hp -- rocks stay at
+           0/0, same "field exists but only one kind reads it" convention this struct's own doc
+           comment describes. */
+        if (layout[i].kind == ARENA_OBSTACLE_TREE) {
+            arena_state.obstacles[i].hp = ARENA_TREE_HP;
+            arena_state.obstacles[i].max_hp = ARENA_TREE_HP;
+        } else {
+            arena_state.obstacles[i].hp = 0;
+            arena_state.obstacles[i].max_hp = 0;
+        }
     }
 }
+
+/* arena_tick_obstacles: see header declaration's own doc comment. */
+void arena_tick_obstacles(unsigned int dt_ms) {
+    for (int i = 0; i < ARENA_OBSTACLE_COUNT; i++) {
+        ArenaObstacle *o = &arena_state.obstacles[i];
+        if (o->max_hp <= 0 || o->hp >= o->max_hp) continue;
+        o->hp += (ARENA_TREE_REGEN_PER_SEC * (int)dt_ms) / 1000;
+        if (o->hp > o->max_hp) o->hp = o->max_hp;
+    }
+}
+
+/* redgarden_host_tree_passive_strike and arena_hero_tree_passive themselves are defined further
+   down (right after arena_hero_attack_camp_minions), not here -- both need hero_is_hittable/
+   apply_cdr, static helpers whose real definitions (not just forward declarations) don't exist
+   yet at this point in the file; camp_minions' own attack function already sits past both. */
 
 void arena_init_with_heroes(ArenaHeroID player_hero, ArenaHeroID bot_hero) {
     memset(&arena_state, 0, sizeof(arena_state));
@@ -514,6 +907,23 @@ void arena_init(void) {
     arena_init_with_heroes(ARENA_HERO_UNICORN, ARENA_HERO_DUCK);
 }
 
+/* arena_hero_attack_range (S202-34): which basic-auto-attack range applies to `hero_id` --
+ * ranged/homing heroes (Gary, and now Abraham) get their own real ranged constant, every other
+ * hero falls through to the flat melee ARENA_ATTACK_RANGE. Pulled out into a real function
+ * instead of the same three-way ternary getting hand-copied a sixth time (it was already
+ * duplicated identically at 5 call sites before Abraham's own basic attack needed the same
+ * check) -- any hero added to this list only has to be added here, not at every call site. */
+/* Takes the whole hero (not just hero_id) as of S202-34's own Kite String trinket
+ * (item_bonus_attack_range_pct) -- same "%-bonus stat read off the whole hero struct" shape
+ * apply_cdr's own item_bonus_cdr_pct handling already established, applied on top of whichever
+ * base range the hero's own kit gives them. */
+static float arena_hero_attack_range(const ArenaHero *h) {
+    float base = ARENA_ATTACK_RANGE;
+    if (h->hero_id == ARENA_HERO_GARY) base = ARENA_GARY_ATTACK_RANGE;
+    else if (h->hero_id == ARENA_HERO_ABRAHAM) base = ARENA_ABRAHAM_ATTACK_RANGE;
+    return base * (1.0f + (float)h->item_bonus_attack_range_pct / 100.0f);
+}
+
 void arena_set_move_target(int owner, float x, float z) {
     /* 2026-07-30, Tyler clone-control rework: widened from ARENA_MAX_HEROES to
        ARENA_HEROES_ARRAY_SIZE so a puppet clone slot can receive its own independent move
@@ -540,7 +950,7 @@ void arena_set_move_target(int owner, float x, float z) {
        both still exceed this radius and correctly cancel. */
     if (mh->attack_windup_ms_remaining > 0) {
         float wdx = x - mh->x, wdz = z - mh->z;
-        float range = (mh->hero_id == ARENA_HERO_GARY) ? ARENA_GARY_ATTACK_RANGE : ARENA_ATTACK_RANGE;
+        float range = arena_hero_attack_range(mh);
         if (wdx * wdx + wdz * wdz > range * range) {
             mh->attack_windup_ms_remaining = 0;
         }
@@ -605,7 +1015,7 @@ void arena_set_attack_move_target(int owner, float x, float z) {
     ArenaHero *mh = &arena_state.heroes[owner];
     if (mh->attack_windup_ms_remaining > 0) {
         float wdx = x - mh->x, wdz = z - mh->z;
-        float range = (mh->hero_id == ARENA_HERO_GARY) ? ARENA_GARY_ATTACK_RANGE : ARENA_ATTACK_RANGE;
+        float range = arena_hero_attack_range(mh);
         if (wdx * wdx + wdz * wdz > range * range) {
             mh->attack_windup_ms_remaining = 0;
         }
@@ -652,7 +1062,7 @@ void arena_set_patrol_target(int owner, float x, float z) {
     ArenaHero *mh = &arena_state.heroes[owner];
     if (mh->attack_windup_ms_remaining > 0) {
         float wdx = x - mh->x, wdz = z - mh->z;
-        float range = (mh->hero_id == ARENA_HERO_GARY) ? ARENA_GARY_ATTACK_RANGE : ARENA_ATTACK_RANGE;
+        float range = arena_hero_attack_range(mh);
         if (wdx * wdx + wdz * wdz > range * range) {
             mh->attack_windup_ms_remaining = 0;
         }
@@ -683,7 +1093,7 @@ static int hero_is_hittable(const ArenaHero *h);
  * rather than a third copy of the loop. */
 static int arena_find_opportunistic_target(int i) {
     ArenaHero *h = &arena_state.heroes[i];
-    float range = (h->hero_id == ARENA_HERO_GARY) ? ARENA_GARY_ATTACK_RANGE : ARENA_ATTACK_RANGE;
+    float range = arena_hero_attack_range(h);
     int nearest = -1;
     float nearest_dist_sq = range * range;
     for (int j = 0; j < ARENA_MAX_HEROES; j++) {
@@ -891,6 +1301,41 @@ static void resolve_hero_obstacle_collision(ArenaHero *h) {
     }
 }
 
+/* resolve_hero_hero_collision (S202-27, "body blocking"): founder real-time, "we need to add
+ * body blocking" -> "currently players can ghost through eachother". Same real, honest analog
+ * resolve_hero_obstacle_collision just above already uses -- an obstacle is a static circle a
+ * hero pushes itself back out of; a hero is now ALSO one, to every other hero. Applies
+ * regardless of team (real MOBAs body-block allies too, not just enemies) and across the full
+ * ARENA_HEROES_ARRAY_SIZE range (Tyler's puppet clones included -- S170-141's own precedent for
+ * widening hero-vs-hero interactions to cover them). Deliberately only called from
+ * update_hero_motion's own organic walking-toward-target step, never from forced displacement
+ * (Duck's Q/R pulls, Morrigan's W gap-close, knockbacks) -- those set position directly and
+ * don't route through this function, so a pull can still land a target inside another hero's
+ * radius for that one instant; the NEXT tick's own normal movement resolution pushes it back
+ * out again, same "don't fight the ability, let movement self-correct" reasoning
+ * donkey_airborne_ms's own skip-collision-while-flying carve-out above already established for
+ * a different case. Each hero resolves against every other hero independently (no shared
+ * "who moves first" bookkeeping) -- a real, simple v0, not perfectly stable under a 3+-hero
+ * pileup (a later hero's own resolution can nudge an earlier one back into slight overlap), but
+ * correct and non-jittery for the common 1v1/small-cluster case this engine's own real matches
+ * actually produce. */
+static void resolve_hero_hero_collision(ArenaHero *h, int self_index) {
+    for (int i = 0; i < ARENA_HEROES_ARRAY_SIZE; i++) {
+        if (i == self_index) continue;
+        const ArenaHero *other = &arena_state.heroes[i];
+        if (!other->active || !other->alive) continue;
+        float dx = h->x - other->x;
+        float dz = h->z - other->z;
+        float min_dist = ARENA_HERO_COLLISION_RADIUS * 2.0f;
+        float dist = sqrtf(dx * dx + dz * dz);
+        if (dist >= min_dist) continue;
+        if (dist < 0.0001f) { dx = 1.0f; dz = 0.0f; dist = 0.0001f; }
+        float push = min_dist - dist;
+        h->x += dx / dist * push;
+        h->z += dz / dist * push;
+    }
+}
+
 /* §25.3 synergy-decay helpers -- defined much further down this file (near arena_tick_synergy,
  * their natural home), forward-declared here same as hero_is_hittable/apply_damage's own
  * pattern elsewhere in this file, since both update_hero_motion and apply_cdr below need them
@@ -898,7 +1343,7 @@ static void resolve_hero_obstacle_collision(ArenaHero *h) {
 static int arena_synergy_cdr_pct(const ArenaHero *h);
 static float arena_synergy_move_speed_pct(const ArenaHero *h);
 
-static void update_hero_motion(ArenaHero *h, float dt_sec) {
+static void update_hero_motion(ArenaHero *h, int self_index, float dt_sec) {
     /* rooted_ms (S170-46)/stunned_ms (S170-184): a queued move command is preserved (not
        cancelled) but doesn't advance while either is active -- matches how silence blocks
        casting without clearing the ability off cooldown. Stun is the stronger of the two
@@ -906,8 +1351,16 @@ static void update_hero_motion(ArenaHero *h, float dt_sec) {
        but there's no meaningful difference in what THIS function does for either -- both just
        mean "don't advance position this tick."
        attack_windup_ms_remaining (S170-204, NORTHSTAR §17.1): same "don't advance position"
-       treatment -- a champion mid-windup stands still, full stop, same as real League. */
-    if (!h->alive || !h->moving || h->rooted_ms > 0 || h->stunned_ms > 0 || h->attack_windup_ms_remaining > 0) return;
+       treatment -- a champion mid-windup stands still, full stop, same as real League.
+       Abraham's own casting_slot (2026-08-26, founder: "when you hit w on abraham and you are
+       moving dont have it blow the cooldown and do nothing have it freeze the player for the
+       length of the cast for that ability"): scoped to Abraham specifically, not every
+       casting_slot-using hero (Gary's own Aimed Shot deliberately keeps its established
+       "movement interrupts the cast" feel, per the founder's own earlier S170-203 spec --
+       not touched here) -- see tick_hero_kit's own cast-interrupt block for the matching
+       Abraham-only immunity to that same interrupt. */
+    if (!h->alive || !h->moving || h->rooted_ms > 0 || h->stunned_ms > 0 || h->attack_windup_ms_remaining > 0 ||
+        (h->hero_id == ARENA_HERO_ABRAHAM && h->casting_slot != 0)) return;
     float dx = h->target_x - h->x;
     float dz = h->target_z - h->z;
     float dist = sqrtf(dx * dx + dz * dz);
@@ -915,6 +1368,9 @@ static void update_hero_motion(ArenaHero *h, float dt_sec) {
         h->moving = 0;
         return;
     }
+    /* S202-40: real facing, updated whenever there's a genuine direction to face -- see
+       facing_rad's own header doc comment. */
+    h->facing_rad = atan2f(dx, dz);
     /* slowed_ms/slow_pct (S170-184, GFD's Slow): a proportional multiplier on top of the base
        speed + item bonus, so it scales correctly regardless of how much flat item speed a hero
        already has (a slow that just subtracted a flat amount could go negative against a
@@ -932,6 +1388,17 @@ static void update_hero_motion(ArenaHero *h, float dt_sec) {
     /* East/Music's Catchy Song (Jungle Camps Milestone 2): move-speed half of the buff,
        multiplicative same as the slow above so it scales correctly against item speed too. */
     if (h->king_music_carrier) speed_mult *= (1.0f + ARENA_KING_MUSIC_MOVE_SPEED_PCT / 100.0f);
+    /* Bacon+Puck's Shadow Step (Q) intangibility (2026-08-27, founder real-time: "when baconpuck
+       goes intangible can we get a movement speed increase?" -> "parena mod powered
+       development"). Real PARENA mod call (on_bacon_puck_intangible_speed_pct, stdlib/redgarden/
+       bacon_puck_intangible_speed_mod.prn), same multiplicative shape Music's own buff just above
+       already uses -- composes correctly with slows/item speed/other buffs rather than fighting
+       them. h->intangible_ms is the same real countdown bacon_puck_cast_q already sets (no new
+       state added) -- the boost is active for exactly as long as the hero actually is
+       intangible, never desyncs from it. */
+    if (h->hero_id == ARENA_HERO_BACON_PUCK && h->intangible_ms > 0) {
+        speed_mult *= (1.0f + on_bacon_puck_intangible_speed_pct() / 100.0f);
+    }
     /* §25.3 synergy decay: ambient team-cohesion move-speed bonus, same multiplicative shape as
        Music's own buff -- decays toward 0 as this hero's team's synergy_tier rises. */
     speed_mult *= (1.0f + arena_synergy_move_speed_pct(h) / 100.0f);
@@ -947,7 +1414,10 @@ static void update_hero_motion(ArenaHero *h, float dt_sec) {
     /* Skipped while airborne (S170-206) -- "flies over trees etc," the founder's own original
        2026-07-24 direction on Paper Glide, predating this whole item pivot. Every other hero's
        movement still collides normally. */
-    if (h->donkey_airborne_ms <= 0) resolve_hero_obstacle_collision(h);
+    if (h->donkey_airborne_ms <= 0) {
+        resolve_hero_obstacle_collision(h);
+        resolve_hero_hero_collision(h, self_index);
+    }
 }
 
 /* arena_hero_base_armor: every hero-specific armor rule (S170-175:
@@ -989,6 +1459,13 @@ static float arena_hero_base_armor(const ArenaHero *h) {
     /* Ada's frame plating (W, S170-103): flat armor while toggled on. */
     if (h->hero_id == ARENA_HERO_ADA && h->w_active) {
         return (float)ARENA_ADA_W_ARMOR_BONUS;
+    }
+    /* He Xiangu's Dark stance (W toggle, 2026-08-26): flat armor while in the OFF/Dark half of
+       the Light/Dark toggle -- see ARENA_HE_XIANGU_DARK_ARMOR_BONUS's own header comment. Same
+       shape as Ada's plating just above, just gated on !w_active instead of w_active since
+       Dark is the "toggled off" state of this particular toggle. */
+    if (h->hero_id == ARENA_HERO_HE_XIANGU && !h->w_active) {
+        return (float)ARENA_HE_XIANGU_DARK_ARMOR_BONUS;
     }
     /* Tyler's Divided We Stand (R, S170-111): armor goes NEGATIVE for the window --
        apply_armor does raw_damage - armor, so a negative value increases damage taken.
@@ -1060,6 +1537,21 @@ float arena_hero_armor(const ArenaHero *h) {
         float wdx = holder->x - h->x, wdz = holder->z - h->z;
         if (sqrtf(wdx * wdx + wdz * wdz) <= ARENA_KING_WEALTH_AURA_RADIUS) { total += (float)ARENA_KING_WEALTH_ARMOR_BONUS; break; }
     }
+    /* Balance Ring (2026-08-11, "expand the play space" pass): comeback armor, scales with the
+       wearer's OWN missing-hp fraction -- 0 bonus at full HP, approaching ARENA_BALANCE_RING_
+       MAX_ARMOR_BONUS as hp -> 0. Computed live here, not cached in item_bonus_armor at purchase
+       time, same reasoning the Zagan mirror/King Wealth aura above are also computed live --
+       this needs to change every tick as hp changes, a plain cached sum can't do that. */
+    if (h->max_hp > 0) {
+        for (int s = 0; s < ARENA_ITEM_SLOT_COUNT; s++) {
+            if (h->equipped_item[s] == ARENA_BALANCE_RING_ITEM_ID) {
+                float missing_frac = 1.0f - (float)h->hp / (float)h->max_hp;
+                if (missing_frac < 0.0f) missing_frac = 0.0f;
+                total += (float)ARENA_BALANCE_RING_MAX_ARMOR_BONUS * missing_frac;
+                break;
+            }
+        }
+    }
     return total;
 }
 
@@ -1112,8 +1604,7 @@ static void apply_damage(ArenaHero *target, int amount);
 /* arena_log_damage (S189-01): pushes one entry into the rolling damage-log ring buffer --
  * see ArenaDamageLogEntry's own doc comment in arena_game.h for the full design/scope
  * reasoning. Always succeeds (no failure mode -- oldest entry is simply overwritten once the
- * buffer wraps, the intended rolling-feed behavior, not a bug). Ported verbatim from REDGARDEN
- * (commit 6292c9e). */
+ * buffer wraps, the intended rolling-feed behavior, not a bug). */
 static void arena_log_damage(ArenaHeroID target_hero_id, ArenaHeroID source_hero_id, int amount) {
     ArenaDamageLogEntry *e = &arena_state.damage_log[arena_state.damage_log_head];
     e->target_hero_id = target_hero_id;
@@ -1318,6 +1809,16 @@ static int arena_multikill_fib(int n) {
 static void apply_damage_ex(ArenaHero *target, int amount, ArenaHeroID source_hero_id) {
     target->damaged_this_tick = 1;
     target->combat_timer_ms = ARENA_COMBAT_TIMEOUT_MS; /* S170-148: any damage taken re-arms the "in combat" window, gating mana regen */
+    if (target->shield_hp > 0) {
+        /* Michael's Heaven's Shield (2026-09-11): this roster's first real damage-absorption
+           shield -- see ArenaHero.shield_hp's own doc comment. Drains before real hp is touched;
+           logged/reported damage below is the REAL amount that actually reduced hp, not the raw
+           pre-shield amount, matching "this is what actually happened to the target" for both
+           the damage log and any future HUD/replay reading of it. */
+        int absorbed = (amount < target->shield_hp) ? amount : target->shield_hp;
+        target->shield_hp -= absorbed;
+        amount -= absorbed;
+    }
     target->hp -= amount;
     arena_log_damage(target->hero_id, source_hero_id, amount); /* S189-01 */
     if (target->hp <= 0) {
@@ -1421,6 +1922,29 @@ static void apply_damage(ArenaHero *target, int amount) {
  * is the one shared lookup every kit cast and the team-mode melee loop
  * already goes through, so widening it here is what makes clones "just
  * fight like a real hero" rather than needing a parallel combat system. */
+/* hero_obscured_from (S202-10, Duck's Smoke Bomb): true if `target` is
+ * standing inside an active smoke cloud that `viewer` is NOT also standing
+ * inside -- the one concrete, honest "vision-blocking" mechanic this engine
+ * can actually support with no real vision/LOS system anywhere (see
+ * ARENA_DUCK_W_RADIUS's own doc comment). Symmetric per-cloud, not
+ * per-caster: two heroes both inside the same cloud can still see/target
+ * each other (real smoke works the same way -- it blocks the outside
+ * looking in, not everyone inside from each other). Iterates every active
+ * hero's own duck_smoke_ms rather than assuming a single Duck, so it stays
+ * correct if team mode ever puts two Ducks on the field. */
+static int hero_obscured_from(const ArenaHero *viewer, const ArenaHero *target) {
+    if (!viewer || !target) return 0;
+    for (int i = 0; i < ARENA_HEROES_ARRAY_SIZE; i++) {
+        const ArenaHero *caster = &arena_state.heroes[i];
+        if (!caster->active || caster->duck_smoke_ms <= 0) continue;
+        float tdx = target->x - caster->duck_smoke_x, tdz = target->z - caster->duck_smoke_z;
+        if (tdx * tdx + tdz * tdz > ARENA_DUCK_W_RADIUS * ARENA_DUCK_W_RADIUS) continue; /* target not in this cloud */
+        float vdx = viewer->x - caster->duck_smoke_x, vdz = viewer->z - caster->duck_smoke_z;
+        if (vdx * vdx + vdz * vdz > ARENA_DUCK_W_RADIUS * ARENA_DUCK_W_RADIUS) return 1; /* viewer outside, target inside */
+    }
+    return 0;
+}
+
 ArenaHero *arena_nearest_enemy(int owner) {
     if (owner < 0 || owner >= ARENA_HEROES_ARRAY_SIZE) return NULL;
     ArenaHero *self = &arena_state.heroes[owner];
@@ -1431,6 +1955,7 @@ ArenaHero *arena_nearest_enemy(int owner) {
         ArenaHero *cand = &arena_state.heroes[i];
         if (!cand->active || !cand->alive) continue;
         if (cand->team == self->team) continue;
+        if (hero_obscured_from(self, cand)) continue; /* Smoke Bomb: can't target into a cloud from outside it */
         float dx = cand->x - self->x, dz = cand->z - self->z;
         float dist = sqrtf(dx * dx + dz * dz);
         if (!best || dist < best_dist) { best = cand; best_dist = dist; }
@@ -1464,6 +1989,14 @@ ArenaHero *arena_nearest_ally(int owner) {
 void arena_set_hover_target(int owner, int target) {
     if (owner < 0 || owner >= ARENA_MAX_HEROES) return;
     arena_state.hover_target[owner] = target;
+}
+
+/* arena_set_ground_target (S202-34): see header doc comment. */
+void arena_set_ground_target(int owner, int has_target, float x, float z) {
+    if (owner < 0 || owner >= ARENA_MAX_HEROES) return;
+    arena_state.has_ground_target[owner] = has_target;
+    arena_state.ground_target_x[owner] = x;
+    arena_state.ground_target_z[owner] = z;
 }
 
 /* arena_hover_ally_or_nearest (S170-143): see header doc comment. */
@@ -1719,6 +2252,7 @@ void arena_shop_position(int team, float *x, float *z) {
  * comment. */
 void arena_recompute_item_stats(ArenaHero *h) {
     int bonus_hp = 0, bonus_mp = 0, bonus_armor = 0, bonus_ad = 0, bonus_cdr = 0;
+    int bonus_true_dmg = 0, bonus_lifesteal = 0, bonus_range_pct = 0, bonus_mp_regen_combat = 0;
     float bonus_speed = 0.0f;
     for (int s = 0; s < ARENA_ITEM_SLOT_COUNT; s++) {
         int item_id = h->equipped_item[s];
@@ -1730,6 +2264,10 @@ void arena_recompute_item_stats(ArenaHero *h) {
         bonus_ad += def->bonus_ad;
         bonus_speed += def->bonus_move_speed;
         bonus_cdr += def->bonus_cdr_pct; /* S170-207 */
+        bonus_true_dmg += def->bonus_true_dmg; /* 2026-08-11 */
+        bonus_lifesteal += def->bonus_lifesteal_pct; /* 2026-08-11 */
+        bonus_range_pct += def->bonus_attack_range_pct; /* S202-34, Kite String */
+        bonus_mp_regen_combat += def->bonus_mp_regen_combat; /* S205-87, Luck of the Draw */
     }
 
     int old_max_hp = h->max_hp;
@@ -1748,6 +2286,10 @@ void arena_recompute_item_stats(ArenaHero *h) {
     h->item_bonus_ad = bonus_ad;
     h->item_bonus_move_speed = bonus_speed;
     h->item_bonus_cdr_pct = bonus_cdr; /* S170-207 */
+    h->item_bonus_true_dmg = bonus_true_dmg; /* 2026-08-11 */
+    h->item_bonus_lifesteal_pct = bonus_lifesteal; /* 2026-08-11 */
+    h->item_bonus_attack_range_pct = bonus_range_pct; /* S202-34, Kite String */
+    h->item_bonus_mp_regen_combat = bonus_mp_regen_combat; /* S205-87, Luck of the Draw */
 }
 
 /* arena_shop_buy (S170-175): see header declaration's doc comment. */
@@ -1800,6 +2342,35 @@ int arena_shop_sell(int owner, ArenaItemSlot slot) {
     h->equipped_item[slot] = -1;
     arena_recompute_item_stats(h);
     return 1;
+}
+
+/* redgarden_host_buy_build_item: see header declaration's own doc comment. Thin wrapper --
+   arena_shop_buy already does everything (proximity, affordability, auto-sell-on-occupied-slot,
+   stat recompute), this exists purely so the PARENA mod boundary has a stable name to call. */
+int redgarden_host_buy_build_item(int hero_index, int item_id) {
+    return arena_shop_buy(hero_index, item_id);
+}
+
+/* arena_hero_apply_build_template: see header declaration's own doc comment. */
+int arena_hero_apply_build_template(int owner, int template_id) {
+    if (owner < 0 || owner >= ARENA_MAX_HEROES) return 0;
+    if (template_id < 0 || template_id >= ARENA_BUILD_TEMPLATE_COUNT) return 0;
+    ArenaHero *h = &arena_state.heroes[owner];
+    if (!h->active || !h->alive) return 0;
+
+    const ArenaBuildTemplate *tmpl = &ARENA_BUILD_TEMPLATES[template_id];
+    int bought = 0;
+    for (int i = 0; i < tmpl->item_count; i++) {
+        int item_id = tmpl->item_ids[i];
+        if (item_id < 0 || item_id >= ARENA_ITEM_COUNT) continue;
+        /* Idempotent re-click: skip an item this hero already has equipped in that slot rather
+           than re-buying it (which arena_shop_buy would otherwise happily do, auto-selling and
+           re-buying the identical item for a net loss via the sell-refund gap). */
+        if (h->equipped_item[ARENA_ITEMS[item_id].slot] == item_id) continue;
+        if (!on_apply_build_template_item(owner, item_id)) break; /* first unaffordable item stops the sequence -- partial progress, not all-or-nothing */
+        bought++;
+    }
+    return bought;
 }
 
 /* arena_use_blink (S170-205): see header declaration's doc comment. Direction-derivation
@@ -2014,7 +2585,7 @@ void arena_tick_attack_targets(unsigned int dt_ms) {
             continue;
         }
 
-        float range = (h->hero_id == ARENA_HERO_GARY) ? ARENA_GARY_ATTACK_RANGE : ARENA_ATTACK_RANGE;
+        float range = arena_hero_attack_range(h);
         float dx = foe->x - h->x, dz = foe->z - h->z;
         float dist = sqrtf(dx * dx + dz * dz);
 
@@ -2049,9 +2620,17 @@ void arena_tick_attack_targets(unsigned int dt_ms) {
            arena_tick_attack_windups (called after this function) fires the
            actual homing shot once it completes, same S170-204 shape the
            flat melee loop now uses. */
-        if (h->hero_id == ARENA_HERO_GARY) {
+        /* Real, live bug found and fixed 2026-08-26 (founder: "also his auto attack is broken"
+           -> "abraham"): S202-34 excluded Abraham from the old flat melee loop everywhere
+           (arena_hero_attack_creeps/lane_creeps/towers/kings/camp_minions, the team-mode melee
+           loop -- every one of those already has its own "same as Gary" comment), but this,
+           the actual windup-START trigger for the NEW ranged path, stayed hardcoded to
+           `ARENA_HERO_GARY` alone -- Abraham fell into neither loop and simply never began an
+           auto-attack windup at all, ever. */
+        if (h->hero_id == ARENA_HERO_GARY || h->hero_id == ARENA_HERO_ABRAHAM) {
             if (h->attack_cooldown_ms <= 0 && h->stunned_ms <= 0 && h->attack_windup_ms_remaining <= 0) { /* S170-184/S170-204 */
-                h->attack_windup_ms_remaining = ARENA_GARY_ATTACK_WINDUP_MS;
+                h->attack_windup_ms_remaining = (h->hero_id == ARENA_HERO_GARY)
+                    ? ARENA_GARY_ATTACK_WINDUP_MS : ARENA_ABRAHAM_ATTACK_WINDUP_MS;
             }
         }
     }
@@ -2084,21 +2663,32 @@ static void arena_tick_attack_windups(unsigned int dt_ms) {
         if (h->attack_windup_ms_remaining > 0) continue;
         h->attack_windup_ms_remaining = 0;
 
-        if (h->hero_id == ARENA_HERO_GARY) {
+        if (h->hero_id == ARENA_HERO_GARY || h->hero_id == ARENA_HERO_ABRAHAM) {
+            /* S202-34: Abraham's basic auto-attack is now ranged/homing too, same mechanic
+               Gary's own established (ArenaProjectile.homing_target) -- own named constants
+               (currently aliased to Gary's own values, see arena_game.h) rather than hardcoding
+               Gary's macros for both, so either hero's numbers can diverge later without
+               touching this shared branch again. hero_id passed through as h->hero_id (not a
+               hardcoded ARENA_HERO_GARY) so the client's existing per-hero_id color convention
+               picks the right shot color for whichever of the two actually fired. */
             int target = h->attack_target;
+            float atk_range = (h->hero_id == ARENA_HERO_GARY) ? ARENA_GARY_ATTACK_RANGE : ARENA_ABRAHAM_ATTACK_RANGE;
+            float atk_speed = (h->hero_id == ARENA_HERO_GARY) ? ARENA_GARY_ATTACK_SPEED : ARENA_ABRAHAM_ATTACK_SPEED;
+            int atk_damage = (h->hero_id == ARENA_HERO_GARY) ? ARENA_GARY_ATTACK_DAMAGE : ARENA_ABRAHAM_ATTACK_DAMAGE;
+            int atk_cooldown_ms = (h->hero_id == ARENA_HERO_GARY) ? ARENA_GARY_ATTACK_COOLDOWN_MS : ARENA_ABRAHAM_ATTACK_COOLDOWN_MS;
             if (target >= 0 && target < ARENA_MAX_HEROES) {
                 ArenaHero *foe = &arena_state.heroes[target];
                 if (hero_is_hittable(foe)) {
                     float dx = foe->x - h->x, dz = foe->z - h->z;
-                    if (sqrtf(dx * dx + dz * dz) <= ARENA_GARY_ATTACK_RANGE) {
-                        ArenaProjectile *shot = arena_spawn_projectile(i, h->team, ARENA_HERO_GARY,
-                            h->x, h->z, foe->x, foe->z, ARENA_GARY_ATTACK_SPEED, 0.6f,
-                            ARENA_GARY_ATTACK_DAMAGE + arena_hero_bonus_ad(h), ARENA_GARY_ATTACK_RANGE * 3.0f); /* S170-190 */
+                    if (sqrtf(dx * dx + dz * dz) <= atk_range) {
+                        ArenaProjectile *shot = arena_spawn_projectile(i, h->team, h->hero_id,
+                            h->x, h->z, foe->x, foe->z, atk_speed, 0.6f,
+                            atk_damage + arena_hero_bonus_ad(h), atk_range * 3.0f); /* S170-190 */
                         if (shot) shot->homing_target = target;
                     }
                 }
             }
-            h->attack_cooldown_ms = apply_cdr(h, ARENA_GARY_ATTACK_COOLDOWN_MS); /* S170-207 */
+            h->attack_cooldown_ms = apply_cdr(h, atk_cooldown_ms); /* S170-207 */
         } else {
             ArenaHero *foe = arena_nearest_enemy(i);
             if (foe && hero_is_hittable(foe)) {
@@ -2109,7 +2699,20 @@ static void arena_tick_attack_windups(unsigned int dt_ms) {
                     int reward_owner = arena_reward_owner(i);
                     foe->last_attacked_by_owner = reward_owner;
                     record_assist_damage(foe, reward_owner); /* S170-187 */
-                    apply_damage(foe, apply_armor(ARENA_ATTACK_DAMAGE + arena_hero_bonus_ad(h), arena_hero_armor(foe))); /* S170-190 */
+                    /* Gae Bolg's true damage (2026-08-11): applied AFTER apply_armor, not
+                       before -- armor-piercing, the first stat in this catalog the target's
+                       armor does nothing to reduce. Masamune's lifesteal (2026-08-11): a percent
+                       of this FINAL (post-armor, post-true-damage) number, matching real-MOBA
+                       "lifesteal scales off damage actually dealt" convention, not raw attack
+                       power -- same inline heal-and-clamp shape every other heal site in this
+                       file already uses (no shared helper exists to reuse). */
+                    int final_dmg = apply_armor(ARENA_ATTACK_DAMAGE + arena_hero_bonus_ad(h), arena_hero_armor(foe))
+                                     + h->item_bonus_true_dmg;
+                    apply_damage(foe, final_dmg); /* S170-190 */
+                    if (h->item_bonus_lifesteal_pct > 0 && h->alive) {
+                        h->hp += (final_dmg * h->item_bonus_lifesteal_pct) / 100;
+                        if (h->hp > h->max_hp) h->hp = h->max_hp;
+                    }
                 }
             }
             h->attack_cooldown_ms = apply_cdr(h, ARENA_ATTACK_COOLDOWN_MS); /* S170-207 */
@@ -2152,6 +2755,8 @@ ArenaProjectile *arena_spawn_projectile(int owner, int team, ArenaHeroID hero_id
     p->on_hit_burn_ms = 0;
     p->on_hit_burn_dps = 0;
     p->homing_target = -1; /* S170-163: a stale homing lock from a previous shot recycled into this slot must never leak onto a fresh skill-shot */
+    p->pierce = 0; /* S202-34: a stale pierce flag from a previous shot (Abraham's Fireball) must never leak onto a fresh single-hit shot recycled into this slot */
+    p->pierced_mask = 0;
     return p;
 }
 
@@ -2215,6 +2820,11 @@ void arena_tick_projectiles(unsigned int dt_ms) {
             ArenaHero *foe = &arena_state.heroes[h];
             if (!foe->active || foe->team == p->team) continue;
             if (!hero_is_hittable(foe)) continue;
+            /* S202-34: a piercing shot (Abraham's Fireball) skips anyone it's
+               already damaged, so a slow shot that's still geometrically
+               overlapping a foe it just hit doesn't re-tick them every
+               subsequent frame while they're both still in range. */
+            if (p->pierce && (p->pierced_mask & (1u << h))) continue;
 
             float t = 0.0f;
             if (seg_len_sq > 0.0001f) {
@@ -2240,6 +2850,15 @@ void arena_tick_projectiles(unsigned int dt_ms) {
             if (p->on_hit_burn_ms > 0) {
                 foe->burning_ms = p->on_hit_burn_ms;
                 foe->burn_dps = p->on_hit_burn_dps;
+            }
+            if (p->pierce) {
+                /* Keeps travelling -- mark this foe hit and check the
+                   remaining heroes this same tick instead of stopping at
+                   the first one, so a shot passing through a cluster of
+                   enemies in one tick damages all of them, not just
+                   whichever happened to be checked first. */
+                p->pierced_mask |= (1u << h);
+                continue;
             }
             p->active = 0;
             break;
@@ -2434,7 +3053,7 @@ void arena_hero_attack_creeps(unsigned int dt_ms) {
            scoped gap: Gary can't auto-attack node-guardian creeps at all until a
            future pass extends the homing system to creep targets too --
            flagged, not faked. */
-        if (h->hero_id == ARENA_HERO_GARY) continue;
+        if (h->hero_id == ARENA_HERO_GARY || h->hero_id == ARENA_HERO_ABRAHAM) continue; /* S202-34: Abraham's basic attack is homing now too */
 
         ArenaHero *foe = arena_nearest_enemy(i);
         if (foe && hero_is_hittable(foe)) {
@@ -2513,7 +3132,7 @@ void arena_hero_attack_towers(unsigned int dt_ms) {
         ArenaHero *h = &arena_state.heroes[i];
         if (!h->active || !h->alive || h->attack_cooldown_ms > 0 || h->stunned_ms > 0) continue;
         if (h->mnm_burrow_ms > 0) continue;
-        if (h->hero_id == ARENA_HERO_GARY) continue; /* same homing-only-basic-attack exclusion as arena_hero_attack_creeps */
+        if (h->hero_id == ARENA_HERO_GARY || h->hero_id == ARENA_HERO_ABRAHAM) continue; /* same homing-only-basic-attack exclusion as arena_hero_attack_creeps (S202-34: Abraham joined Gary here) */
 
         ArenaHero *foe = arena_nearest_enemy(i);
         if (foe && hero_is_hittable(foe)) {
@@ -2722,7 +3341,7 @@ void arena_hero_attack_lane_creeps(unsigned int dt_ms) {
         if (h->mnm_burrow_ms > 0) continue; /* S170-208: burrowed, not present to swing at anything */
         /* S170-163: same exclusion as arena_hero_attack_creeps above -- see
            that function's own comment. */
-        if (h->hero_id == ARENA_HERO_GARY) continue;
+        if (h->hero_id == ARENA_HERO_GARY || h->hero_id == ARENA_HERO_ABRAHAM) continue; /* S202-34: Abraham's basic attack is homing now too */
 
         ArenaHero *foe = arena_nearest_enemy(i);
         if (foe && hero_is_hittable(foe)) {
@@ -2911,7 +3530,7 @@ void arena_hero_attack_camp_minions(unsigned int dt_ms) {
         ArenaHero *h = &arena_state.heroes[i];
         if (!h->active || !h->alive || h->attack_cooldown_ms > 0 || h->stunned_ms > 0) continue;
         if (h->mnm_burrow_ms > 0) continue;
-        if (h->hero_id == ARENA_HERO_GARY) continue; /* same homing-only-basic-attack exclusion as arena_hero_attack_creeps/lane_creeps */
+        if (h->hero_id == ARENA_HERO_GARY || h->hero_id == ARENA_HERO_ABRAHAM) continue; /* same homing-only-basic-attack exclusion as arena_hero_attack_creeps/lane_creeps (S202-34: Abraham joined Gary here) */
 
         ArenaHero *foe = arena_nearest_enemy(i);
         if (foe && hero_is_hittable(foe)) {
@@ -2943,6 +3562,120 @@ void arena_hero_attack_camp_minions(unsigned int dt_ms) {
             }
             break; /* one minion target per hero per attack, same as every other creep type here */
         }
+    }
+}
+
+/* redgarden_host_tree_passive_strike: see header declaration's own doc comment. Placed here,
+   not next to arena_obstacles_reset_layout/arena_tick_obstacles, because it (like
+   arena_hero_tree_passive below) needs apply_cdr -- only forward-declared, not yet defined, that
+   early in the file; arena_hero_attack_camp_minions just above already established this is where
+   real definitions of these helpers first become available. */
+void redgarden_host_tree_passive_strike(int hero_index, int obstacle_index) {
+    if (hero_index < 0 || hero_index >= ARENA_MAX_HEROES) return;
+    if (obstacle_index < 0 || obstacle_index >= ARENA_OBSTACLE_COUNT) return;
+    ArenaHero *h = &arena_state.heroes[hero_index];
+    ArenaObstacle *o = &arena_state.obstacles[obstacle_index];
+    if (o->kind != ARENA_OBSTACLE_TREE) return; /* defensive -- arena_hero_tree_passive only ever targets TREE-kind obstacles, this just refuses to misfire if that ever changes */
+
+    o->hp -= ARENA_TREE_PASSIVE_DAMAGE;
+    if (o->hp < 0) o->hp = 0; /* never destroyed/despawned -- see this feature's own doc comment on why trees are a permanent resource */
+
+    h->hp += ARENA_TREE_PASSIVE_HEAL_PER_HIT;
+    if (h->hp > h->max_hp) h->hp = h->max_hp;
+}
+
+/* redgarden_host_duck_smoke_bomb_cast: see header declaration's own doc comment.
+ *
+ * S205-87: each enemy standing inside the cloud radius at the moment it's thrown gets an
+ * independent 50% chance (ARENA_DUCK_W_SLOW_CHANCE_PCT) to be slowed (ARENA_DUCK_W_SLOW_MS/
+ * _PCT) -- "each enemy hit by it" means each enemy this cast-time radius check finds, the only
+ * real "hit" this vision-only ability has. Rolled once per enemy here at cast time, not
+ * re-rolled on every tick the cloud lingers -- matches "hit by it" (the throw), not "standing in
+ * it" (continuous), and avoids an enemy who steps out and back in re-rolling for free. */
+void redgarden_host_duck_smoke_bomb_cast(int hero_index) {
+    if (hero_index < 0 || hero_index >= ARENA_HEROES_ARRAY_SIZE) return;
+    ArenaHero *h = &arena_state.heroes[hero_index];
+    if (!h->active) return;
+    h->duck_smoke_ms = ARENA_DUCK_W_DURATION_MS;
+    h->duck_smoke_x = h->x;
+    h->duck_smoke_z = h->z;
+
+    for (int i = 0; i < ARENA_MAX_HEROES; i++) {
+        ArenaHero *enemy = &arena_state.heroes[i];
+        if (!enemy->active || !enemy->alive || enemy->team == h->team) continue;
+        float dx = enemy->x - h->x, dz = enemy->z - h->z;
+        if (dx * dx + dz * dz > ARENA_DUCK_W_RADIUS * ARENA_DUCK_W_RADIUS) continue; /* not caught in the cloud */
+        if ((rand() % 100) < ARENA_DUCK_W_SLOW_CHANCE_PCT) {
+            arena_apply_slow(enemy->owner, ARENA_DUCK_W_SLOW_MS, ARENA_DUCK_W_SLOW_PCT);
+        }
+    }
+}
+
+/* redgarden_host_abraham_fireball_cast: see header declaration's own doc comment. Called from
+ * tick_hero_kit's ARENA_HERO_ABRAHAM completion branch (the windup already finished, cooldown/
+ * mana already spent at cast start) -- the real work here is exactly one thing, spawn the real
+ * piercing shot in the direction of the click point, "no real range limit" (founder), so
+ * ARENA_ABRAHAM_FIREBALL_MAX_RANGE is a generous map-spanning distance, not the actual clicked
+ * point's own distance -- the shot travels the FULL max_range along that direction regardless of
+ * where the player actually clicked, matching "just have it go whatever direction is the click"
+ * literally (direction only, not a bounded point-to-point shot the way Gary's homing attack is). */
+void redgarden_host_abraham_fireball_cast(int hero_index, int target_x, int target_z) {
+    if (hero_index < 0 || hero_index >= ARENA_MAX_HEROES) return;
+    ArenaHero *h = &arena_state.heroes[hero_index];
+    if (!h->active || !h->alive) return;
+
+    float dx = (float)target_x - h->x, dz = (float)target_z - h->z;
+    float dist = sqrtf(dx * dx + dz * dz);
+    if (dist < 0.0001f) { dx = 1.0f; dz = 0.0f; dist = 1.0f; } /* degenerate same-position click: pick an arbitrary direction rather than a NaN velocity */
+    /* arena_spawn_projectile takes a target POINT, not a direction -- extend the click
+       direction out to the real max range so the shot travels the full distance regardless of
+       how far the player actually clicked (see doc comment above). */
+    float far_x = h->x + (dx / dist) * ARENA_ABRAHAM_FIREBALL_MAX_RANGE;
+    float far_z = h->z + (dz / dist) * ARENA_ABRAHAM_FIREBALL_MAX_RANGE;
+
+    ArenaProjectile *shot = arena_spawn_projectile(hero_index, h->team, ARENA_HERO_ABRAHAM,
+        h->x, h->z, far_x, far_z,
+        ARENA_ABRAHAM_FIREBALL_SPEED, ARENA_ABRAHAM_FIREBALL_RADIUS, ARENA_ABRAHAM_FIREBALL_DAMAGE,
+        ARENA_ABRAHAM_FIREBALL_MAX_RANGE);
+    if (shot) {
+        shot->pierce = 1;
+        /* Ignite (2026-08-26, founder: "make it so that the fireball ignites the enemies it
+           touches making them have burning too"): the generic per-hit resolution code (see its
+           own comment on p->on_hit_burn_ms, this exact function's own header comment above)
+           already runs once per enemy a piercing shot passes through -- setting these two
+           fields is the whole change, every enemy the shot touches gets ignited automatically. */
+        shot->on_hit_burn_ms = ARENA_ABRAHAM_FIREBALL_BURN_MS;
+        shot->on_hit_burn_dps = ARENA_ABRAHAM_FIREBALL_BURN_DPS;
+    }
+}
+
+/* arena_hero_tree_passive: see header declaration's own doc comment. */
+void arena_hero_tree_passive(unsigned int dt_ms) {
+    (void)dt_ms; /* same "only spends the cooldown, doesn't tick it" idiom as arena_hero_attack_camp_minions */
+    for (int i = 0; i < ARENA_MAX_HEROES; i++) {
+        ArenaHero *h = &arena_state.heroes[i];
+        if (!h->active || !h->alive || h->hero_id != ARENA_HERO_TREE) continue;
+        if (h->attack_cooldown_ms > 0 || h->stunned_ms > 0) continue;
+
+        ArenaHero *foe = arena_nearest_enemy(i);
+        if (foe && hero_is_hittable(foe)) {
+            float dx = foe->x - h->x, dz = foe->z - h->z;
+            if (sqrtf(dx * dx + dz * dz) <= ARENA_ATTACK_RANGE) continue; /* already busy with an enemy hero this tick */
+        }
+
+        int best = -1;
+        float best_dist = 0.0f;
+        for (int o = 0; o < ARENA_OBSTACLE_COUNT; o++) {
+            if (arena_state.obstacles[o].kind != ARENA_OBSTACLE_TREE) continue;
+            float dx = arena_state.obstacles[o].x - h->x, dz = arena_state.obstacles[o].z - h->z;
+            float dist = sqrtf(dx * dx + dz * dz);
+            if (dist > ARENA_ATTACK_RANGE) continue;
+            if (best < 0 || dist < best_dist) { best = o; best_dist = dist; }
+        }
+        if (best < 0) continue;
+
+        on_tree_passive_strike(i, best); /* PARENA-compiled -- the mod call IS the trigger, see this feature's own doc comment */
+        h->attack_cooldown_ms = apply_cdr(h, ARENA_TREE_PASSIVE_COOLDOWN_MS);
     }
 }
 
@@ -3076,7 +3809,7 @@ void arena_hero_attack_kings(unsigned int dt_ms) {
         ArenaHero *h = &arena_state.heroes[i];
         if (!h->active || !h->alive || h->attack_cooldown_ms > 0 || h->stunned_ms > 0) continue;
         if (h->mnm_burrow_ms > 0) continue;
-        if (h->hero_id == ARENA_HERO_GARY) continue;
+        if (h->hero_id == ARENA_HERO_GARY || h->hero_id == ARENA_HERO_ABRAHAM) continue; /* S202-34: Abraham's basic attack is homing now too */
 
         ArenaHero *foe = arena_nearest_enemy(i);
         if (foe && hero_is_hittable(foe)) {
@@ -3253,8 +3986,7 @@ static void resolve_combat(unsigned int dt_ms) {
     if (a->attack_cooldown_ms <= 0 && a->mnm_burrow_ms <= 0) {
         /* S189-01: real attacker attribution -- both hero pointers already in scope here,
            zero risk, the one call site upgraded to apply_damage_ex (see its own doc comment
-           in arena_game.h for why the other ~50 apply_damage sites aren't). Ported verbatim
-           from REDGARDEN (commit 6292c9e). */
+           in arena_game.h for why the other ~50 apply_damage sites aren't). */
         if (hero_is_hittable(b)) apply_damage_ex(b, apply_armor(ARENA_ATTACK_DAMAGE, arena_hero_armor(b)), a->hero_id);
         a->attack_cooldown_ms = ARENA_ATTACK_COOLDOWN_MS;
     }
@@ -3388,6 +4120,30 @@ static void doc_wheel_heal_and_cleanse(ArenaHero *target, int amount) {
     target->hp += amount;
     if (target->hp > target->max_hp) target->hp = target->max_hp;
     target->silenced_ms = 0; /* Bedside Manner: "cleanses one debuff" -- the only debuff arena has today */
+}
+
+/* michael_heal_amount: Recast Victory -- reuses doc_wheel_heal_amount's own exact SHAPE (linear
+ * scale from BASE at 100% target HP up to LOW_HP at 0%), at Michael's own bigger numbers (see
+ * ARENA_MICHAEL_R_HEAL_BASE/LOW_HP's own doc comment). Not parameterized/shared with Doc Wheel's
+ * own function -- kept as its own small function, same "one function per hero's own named
+ * constants" convention this file already uses throughout, rather than a generic helper neither
+ * call site needs yet. */
+static int michael_heal_amount(const ArenaHero *target) {
+    if (target->max_hp <= 0) return ARENA_MICHAEL_R_HEAL_BASE;
+    float hp_pct = (float)target->hp / (float)target->max_hp;
+    if (hp_pct < 0.0f) hp_pct = 0.0f;
+    if (hp_pct > 1.0f) hp_pct = 1.0f;
+    float heal = ARENA_MICHAEL_R_HEAL_BASE +
+                 (ARENA_MICHAEL_R_HEAL_LOW_HP - ARENA_MICHAEL_R_HEAL_BASE) * (1.0f - hp_pct);
+    return (int)heal;
+}
+
+/* michael_heal: plain heal, no cleanse -- unlike Doc Wheel's own Bedside Manner (whose cleanse is
+ * that specific character's own "extremely good at medicine" flavor), Recast Victory is just the
+ * heal-shape borrowed, not the cleanse side effect that comes with it. */
+static void michael_heal(ArenaHero *target, int amount) {
+    target->hp += amount;
+    if (target->hp > target->max_hp) target->hp = target->max_hp;
 }
 
 /* tree_cast_q: Vine Lash, simplified from "AoE root in a cone in front" to
@@ -3703,11 +4459,53 @@ static void flute_debt_cast_r(ArenaHero *fd, ArenaHero *foe) {
 }
 
 /* bacon_puck_cast_q: Ask Again Later -- self intangible_ms, the shared can't-be-hit status
- * (S170-32), for longer while W is toggled on. Always "lands" (there's no foe/range check --
- * it's purely self-targeted), same as Ghost's W/Frog's R. */
+ * (S170-32). Always "lands" (there's no foe/range check -- it's purely self-targeted), same as
+ * Ghost's W/Frog's R.
+ *
+ * Real, honest simplification (2026-08-26, W redesign to Shadow Step, see bacon_puck_cast_w's
+ * own doc comment): this used to grant a LONGER intangible duration while W was toggled on
+ * (ARENA_BACON_PUCK_Q_INTANGIBLE_MS_WATCHING) -- W is no longer a toggle at all (an instant
+ * blink now, doesn't touch w_active), so that longer duration is dead: w_active permanently
+ * reads 0 for this hero now. Always uses the base duration -- not compensated with a buff
+ * elsewhere, a real, accepted power change from losing the old toggle's own utility, not
+ * silently patched over. ARENA_BACON_PUCK_Q_INTANGIBLE_MS_WATCHING itself is left defined,
+ * unused, matching this session's own "leave dead constants in place, don't rip out" convention
+ * for redesigned abilities. */
 static void bacon_puck_cast_q(ArenaHero *bp) {
-    bp->intangible_ms = bp->w_active ? ARENA_BACON_PUCK_Q_INTANGIBLE_MS_WATCHING
-                                      : ARENA_BACON_PUCK_Q_INTANGIBLE_MS;
+    bp->intangible_ms = ARENA_BACON_PUCK_Q_INTANGIBLE_MS;
+}
+
+/* bacon_puck_cast_w: Shadow Step (2026-08-26 redesign) -- see ARENA_BACON_PUCK_W_RANGE's own
+ * header comment for the full founder-quote chain. Reads the real target hero from
+ * arena_state.hover_target[owner] (set by arena_set_hover_target right before dispatch, same
+ * generic "record right before dispatch" convention every hover-consulted ability already
+ * uses) -- an untargeted W (no hero hovered when the click confirmed) is a real no-op, same
+ * "real commitment" shape every other kit piece in this file holds itself to. Lands the caster
+ * a short, real distance PAST the target's own position, along the target's own real
+ * facing_rad (S202-40) -- "roughly behind them" from the target's own perspective, not the
+ * caster's approach angle. Instant, no windup -- a blink, not a cast-time ability, same shape
+ * Blink Dagger's own arena_use_blink already established (clamp to map bounds, no interrupt
+ * concept needed since there's no time window to interrupt). */
+static void bacon_puck_cast_w(int owner) {
+    ArenaHero *bp = &arena_state.heroes[owner];
+    if (bp->w_cooldown_ms > 0 || bp->mp < ARENA_MP_COST_W) return;
+    int target_idx = arena_state.hover_target[owner];
+    if (target_idx < 0 || target_idx >= ARENA_MAX_HEROES) return;
+    ArenaHero *target = &arena_state.heroes[target_idx];
+    if (!target->active || target->team == bp->team || !hero_is_hittable(target)) return;
+    float dx = target->x - bp->x, dz = target->z - bp->z;
+    if (sqrtf(dx * dx + dz * dz) > ARENA_BACON_PUCK_W_RANGE) return;
+
+    float bx = target->x + sinf(target->facing_rad) * ARENA_BACON_PUCK_W_BEHIND_OFFSET;
+    float bz = target->z + cosf(target->facing_rad) * ARENA_BACON_PUCK_W_BEHIND_OFFSET;
+    if (bx < -ARENA_HALF_EXTENT) bx = -ARENA_HALF_EXTENT;
+    if (bx > ARENA_HALF_EXTENT) bx = ARENA_HALF_EXTENT;
+    if (bz < -ARENA_HALF_EXTENT) bz = -ARENA_HALF_EXTENT;
+    if (bz > ARENA_HALF_EXTENT) bz = ARENA_HALF_EXTENT;
+    bp->x = bx;
+    bp->z = bz;
+    bp->w_cooldown_ms = cast_cooldown(bp, ARENA_BACON_PUCK_W_COOLDOWN_MS);
+    bp->mp -= ARENA_MP_COST_W;
 }
 
 /* bacon_puck_cast_r: The Trick Was Always the Same -- real damage plus a self-heal off a
@@ -3723,14 +4521,18 @@ static int bacon_puck_cast_r(ArenaHero *bp, ArenaHero *foe) {
     return 1;
 }
 
-/* abraham_cast_q: The Sacred Magic -- a real ranged magic bolt, stronger while W (channeling
- * the book) is toggled on. Returns 1 if it landed. */
+/* abraham_cast_q: The Sacred Magic -- a real ranged magic bolt. Used to be
+ * stronger while W (channeling the book) was toggled on; W's own toggle is
+ * gone as of S202-34 (replaced by A Line of Fire, see that ability's own
+ * doc comment on ARENA_ABRAHAM_FIREBALL_DAMAGE), so Q now always deals the
+ * old "channeling" damage value -- a deliberate net-buff rather than
+ * silently leaving Q worse off with no way to ever reach its old ceiling.
+ * Returns 1 if it landed. */
 static int abraham_cast_q(ArenaHero *abraham, ArenaHero *foe) {
     if (!hero_is_hittable(foe)) return 0;
     float dx = foe->x - abraham->x, dz = foe->z - abraham->z;
     if (sqrtf(dx * dx + dz * dz) > ARENA_ABRAHAM_Q_RANGE) return 0;
-    int dmg = abraham->w_active ? ARENA_ABRAHAM_Q_DAMAGE_CHANNELING : ARENA_ABRAHAM_Q_DAMAGE;
-    apply_damage(foe, apply_armor(dmg, arena_hero_armor(foe)));
+    apply_damage(foe, apply_armor(ARENA_ABRAHAM_Q_DAMAGE, arena_hero_armor(foe)));
     return 1;
 }
 
@@ -3950,6 +4752,17 @@ static int gunnr_cast_q(ArenaHero *gunnr, ArenaHero *foe) {
     return 1;
 }
 
+/* michael_cast_q: Flaming Sword -- plain single-target damage, same shape as Gunnr's Q, at a
+ * deliberately higher damage number (see ARENA_MICHAEL_Q_DAMAGE's own doc comment). Returns 1 if
+ * it landed. */
+static int michael_cast_q(ArenaHero *michael, ArenaHero *foe) {
+    if (!hero_is_hittable(foe)) return 0;
+    float dx = foe->x - michael->x, dz = foe->z - michael->z;
+    if (sqrtf(dx * dx + dz * dz) > ARENA_MICHAEL_Q_RANGE) return 0;
+    apply_damage(foe, apply_armor(ARENA_MICHAEL_Q_DAMAGE, arena_hero_armor(foe)));
+    return 1;
+}
+
 /* warrior_cast_q: Hard Slash -- real DragonsNShit Great Sword weapon skill (Scission), plain
  * melee-range damage, same shape as Gunnr's Q. Routes through apply_weapon_skill_damage (not a
  * bare apply_damage/apply_armor pair) so it can open/close a real skillchain window on its
@@ -3995,36 +4808,109 @@ static void cart_cast_q(ArenaHero *cart) {
     if (cart->hp > cart->max_hp) cart->hp = cart->max_hp;
 }
 
-/* cart_trigger_delivery (NORTHSTAR §24 Milestone 2): the Cart's real signature mechanic --
- * "a requested document turns out to already be waiting on the cart, with no requester logged,"
- * and "nobody, including its own controller, gets to request what." Rolls one of 4 equally-
- * weighted, real outcomes onto `target` (which may be an ally, the Cart's own controller, or an
- * enemy -- whoever steps into the zone first, no team check, matching the lore's own
- * unpredictability). Not always good: two heals/buffs, one debuff, one Flow grant that could
- * just as easily land on the wrong team. Called once per zone, from tick_hero_kit -- the caller
- * is responsible for deactivating the zone afterward so it only fires once. */
-static void cart_trigger_delivery(ArenaHero *target) {
-    switch (rand() % 4) {
-    case 0: {
+/* arena_fibonacci / arena_marble_bag_pick: see header doc comments. First real implementation
+ * of NORTHSTAR's own long-documented weighted-marble-bag-plus-Fibonacci-pity pull algorithm
+ * anywhere in this repo (S202-09/S202-42) -- generic, not Cart-specific, per that doc's own
+ * "worth building once as a shared utility" note. */
+int arena_fibonacci(int n) {
+    if (n <= 1) return 1; /* fib(0)=fib(1)=1, not the textbook fib(0)=0 -- a fresh/reset pity
+                              counter still carries its real base weight, never zeroed out */
+    int a = 1, b = 1;
+    for (int i = 2; i <= n; i++) {
+        int c = a + b;
+        a = b;
+        b = c;
+    }
+    return b;
+}
+
+int arena_marble_bag_pick(const int *weights, int *pity, int n) {
+    if (n <= 0) return -1;
+    long total = 0;
+    for (int i = 0; i < n; i++) {
+        int tier = pity[i] > ARENA_MARBLE_BAG_MAX_PITY_TIER ? ARENA_MARBLE_BAG_MAX_PITY_TIER : pity[i];
+        total += (long)weights[i] * arena_fibonacci(tier);
+    }
+    if (total <= 0) return -1; /* every effective weight is 0 -- caller error, not a real pick */
+    long roll = (long)(rand() % total);
+    long cum = 0;
+    int picked = n - 1; /* fallback for the very top of the range */
+    for (int i = 0; i < n; i++) {
+        int tier = pity[i] > ARENA_MARBLE_BAG_MAX_PITY_TIER ? ARENA_MARBLE_BAG_MAX_PITY_TIER : pity[i];
+        cum += (long)weights[i] * arena_fibonacci(tier);
+        if (roll < cum) {
+            picked = i;
+            break;
+        }
+    }
+    for (int i = 0; i < n; i++) pity[i] = (i == picked) ? 0 : pity[i] + 1;
+    return picked;
+}
+
+/* cart_apply_delivery_outcome: applies exactly one real delivery outcome
+ * (ARENA_CART_DELIVERY_OUTCOME_*) to `target` -- split out from cart_trigger_delivery so each
+ * outcome is directly, deterministically testable (forcing an index) rather than only reachable
+ * through many rand()-driven rolls, same "test the real mechanic, not just hope RNG cooperates"
+ * discipline this file already holds itself to elsewhere. */
+static void cart_apply_delivery_outcome(ArenaHero *target, int outcome) {
+    switch (outcome) {
+    case ARENA_CART_DELIVERY_OUTCOME_HEAL: {
         int heal = (int)(target->max_hp * ARENA_CART_DELIVERY_HEAL_PCT);
         target->hp += heal;
         if (target->hp > target->max_hp) target->hp = target->max_hp;
         break;
     }
-    case 1: {
+    case ARENA_CART_DELIVERY_OUTCOME_MANA: {
         int mana = (int)(target->max_mp * ARENA_CART_DELIVERY_MANA_PCT);
         target->mp += mana;
         if (target->mp > target->max_mp) target->mp = target->max_mp;
         break;
     }
-    case 2:
+    case ARENA_CART_DELIVERY_OUTCOME_SLOW:
         arena_apply_slow(target->owner, ARENA_CART_DELIVERY_SLOW_MS, ARENA_CART_DELIVERY_SLOW_PCT);
         break;
-    case 3:
+    case ARENA_CART_DELIVERY_OUTCOME_FLOW:
         target->flow += ARENA_CART_DELIVERY_FLOW;
         target->flow_earned += ARENA_CART_DELIVERY_FLOW;
         break;
+    case ARENA_CART_DELIVERY_OUTCOME_KING_BUFF:
+        /* Growth (flat AD stack, ARENA_KING_GROWTH_AD_PER_STACK) -- the simplest, most
+           self-contained King buff to grant outside its own real kill-a-King flow (no aura/
+           team-wide complexity like Wealth/All-Seeing) -- founder's own literal example for
+           the "general random-buff system... a random hero occasionally gets a King buff" ask.
+           Stacks with a real king-earned Growth if the target already has one (same "just
+           extend the duration" idiom the real King-kill path already uses), rather than a
+           separate parallel buff slot. */
+        if (target->king_growth_stacks < 1) target->king_growth_stacks = 1;
+        target->king_growth_ms = ARENA_KING_GROWTH_DURATION_MS;
+        break;
     }
+}
+
+/* W: the frequent, mundane roll. R: "bigger... BETTER-WEIGHTED" per ARENA_CART_Q_HEAL's own
+ * doc comment block, a real intent stated but never actually built until now -- slow halved,
+ * the King-buff outcome tripled relative to W. */
+static const int ARENA_CART_DELIVERY_W_WEIGHTS[ARENA_CART_DELIVERY_OUTCOME_COUNT] = { 3, 3, 2, 3, 1 };
+static const int ARENA_CART_DELIVERY_R_WEIGHTS[ARENA_CART_DELIVERY_OUTCOME_COUNT] = { 3, 3, 1, 3, 3 };
+
+/* cart_trigger_delivery (NORTHSTAR §24 Milestone 2): the Cart's real signature mechanic --
+ * "a requested document turns out to already be waiting on the cart, with no requester logged,"
+ * and "nobody, including its own controller, gets to request what." Picks one real outcome via
+ * arena_marble_bag_pick (S202-42) onto `target` (which may be an ally, the Cart's own
+ * controller, or an enemy -- whoever steps into the zone first, no team check, matching the
+ * lore's own unpredictability) -- W and R now genuinely weight differently (see the tables
+ * above), and pity is tracked per-caster (`caster->cart_delivery_pity`) so a Cart player's own
+ * bad-outcome streak gets rarer for THEM specifically. Which weight table applies is read off
+ * `caster->zone_radius` (ARENA_CART_R_RADIUS vs. the W default) rather than adding a new
+ * separate "which slot" field -- the two constants are already distinct and this is the same
+ * value tick_hero_kit's own CART case already uses to size the zone. Called once per zone, from
+ * tick_hero_kit -- the caller is responsible for deactivating the zone afterward so it only
+ * fires once. */
+static void cart_trigger_delivery(ArenaHero *caster, ArenaHero *target) {
+    const int *weights = (caster->zone_radius == ARENA_CART_R_RADIUS) ? ARENA_CART_DELIVERY_R_WEIGHTS : ARENA_CART_DELIVERY_W_WEIGHTS;
+    int outcome = arena_marble_bag_pick(weights, caster->cart_delivery_pity, ARENA_CART_DELIVERY_OUTCOME_COUNT);
+    if (outcome < 0) return; /* defensive -- every real weight above is positive, should never happen */
+    cart_apply_delivery_outcome(target, outcome);
 }
 
 /* vassago_cast_q: Reveal the Gentle Maybe -- a ranged bolt, damage + silence, same shape as
@@ -4038,16 +4924,26 @@ static int vassago_cast_q(ArenaHero *vassago, ArenaHero *foe) {
     return 1;
 }
 
-/* he_xiangu_cast_q: Subsisting on Mother-of-Pearl and Moonlight -- a ranged bolt that heals her
- * for a fraction of the damage it deals, same heal-off-a-fraction mechanic as Bacon+Puck's R,
- * repeatable on Q instead of a one-off burst. Returns 1 if it landed. */
+/* he_xiangu_cast_q: Moira Orb redesign (2026-08-26) -- see arena_game.h's own doc comment on
+ * ARENA_HE_XIANGU_Q_ORB_SPEED for the full founder-quote chain. No longer an instant hitscan
+ * bolt against the passed-in `foe` -- auto-targets the nearest enemy anywhere on the map
+ * (arena_nearest_enemy has no range cap), same auto-target reuse Abraham's own W redesign
+ * established, and spawns a real, slower, HOMING projectile (arena_spawn_projectile +
+ * homing_target, same mechanic Gary/Abraham's own ranged auto-attacks already use) instead of
+ * resolving damage instantly. Self-heal fires at cast time, a real, deliberate simplification
+ * (see the header comment) rather than new on-hit-heal plumbing. Returns 1 if a real orb was
+ * fired. */
 static int he_xiangu_cast_q(ArenaHero *he_xiangu, ArenaHero *foe) {
-    if (!hero_is_hittable(foe)) return 0;
-    float dx = foe->x - he_xiangu->x, dz = foe->z - he_xiangu->z;
-    if (sqrtf(dx * dx + dz * dz) > ARENA_HE_XIANGU_Q_RANGE) return 0;
-    int dmg = apply_armor(ARENA_HE_XIANGU_Q_DAMAGE, arena_hero_armor(foe));
-    apply_damage(foe, dmg);
-    he_xiangu->hp += (int)(dmg * ARENA_HE_XIANGU_Q_HEAL_PCT);
+    (void)foe; /* the old single-target hitscan parameter -- unused now, auto-targets instead */
+    ArenaHero *target = arena_nearest_enemy(he_xiangu->owner);
+    if (!target) return 0;
+    ArenaProjectile *shot = arena_spawn_projectile(he_xiangu->owner, he_xiangu->team, ARENA_HERO_HE_XIANGU,
+        he_xiangu->x, he_xiangu->z, target->x, target->z,
+        ARENA_HE_XIANGU_Q_ORB_SPEED, ARENA_HE_XIANGU_Q_ORB_RADIUS,
+        ARENA_HE_XIANGU_Q_ORB_DAMAGE, ARENA_HE_XIANGU_Q_ORB_MAX_RANGE);
+    if (!shot) return 0;
+    shot->homing_target = target->owner;
+    he_xiangu->hp += ARENA_HE_XIANGU_Q_ORB_SELF_HEAL;
     if (he_xiangu->hp > he_xiangu->max_hp) he_xiangu->hp = he_xiangu->max_hp;
     return 1;
 }
@@ -4378,6 +5274,12 @@ void arena_cast_q(int owner) {
         h->q_cooldown_ms = cast_cooldown(h, ARENA_CART_Q_COOLDOWN_MS);
         h->mp -= ARENA_MP_COST_Q;
         break;
+    case ARENA_HERO_MICHAEL:
+        if (michael_cast_q(h, foe)) {
+            h->q_cooldown_ms = cast_cooldown(h, ARENA_MICHAEL_Q_COOLDOWN_MS);
+            h->mp -= ARENA_MP_COST_Q;
+        }
+        break;
     }
 }
 
@@ -4467,6 +5369,19 @@ void arena_toggle_w(int owner) {
         h->w_cooldown_ms = cast_cooldown(h, ARENA_DAGDA_W_COOLDOWN_MS);
         h->mp -= ARENA_MP_COST_W;
         break;
+    case ARENA_HERO_DUCK:
+        /* Smoke Bomb (S202-10): self-centered, always lands -- no
+           click-to-place targeting exists in this input model, same
+           reasoning Flamel/Dagda's own W already use. Routes through the
+           PARENA-compiled on_duck_smoke_bomb_cast (not
+           redgarden_host_duck_smoke_bomb_cast directly) -- the mod call IS
+           the trigger, per the founder's explicit "as a parena mod" /
+           "mod first dev." */
+        if (h->w_cooldown_ms > 0 || h->mp < ARENA_MP_COST_W) return;
+        on_duck_smoke_bomb_cast(owner);
+        h->w_cooldown_ms = cast_cooldown(h, ARENA_DUCK_W_COOLDOWN_MS);
+        h->mp -= ARENA_MP_COST_W;
+        break;
     case ARENA_HERO_COURIER:
         /* Between Eagle and Serpent: always lands, jumps to whichever
            of the ARENA_NODE_COUNT nodes is farthest right now. */
@@ -4511,18 +5426,37 @@ void arena_toggle_w(int owner) {
         h->w_active = !h->w_active;
         break;
     case ARENA_HERO_BACON_PUCK:
-        /* Which One Is The Real One: free toggle, no cooldown --
-           bacon_puck_cast_q() reads w_active directly for Q's extended
-           intangibility duration, not a stat bonus. */
-        if (!h->w_active && h->mp <= 0) return; /* S170-181: activating no longer charges a flat cost, just requires some mana to sustain -- see ARENA_MP_DRAIN_W_PER_SEC; toggling off is always free */
-        h->w_active = !h->w_active;
+        bacon_puck_cast_w(owner);
         break;
-    case ARENA_HERO_ABRAHAM:
-        /* The Book, Unattested: free toggle, no cooldown -- abraham_cast_q()
-           reads w_active directly for Q's boosted damage while channeling. */
-        if (!h->w_active && h->mp <= 0) return; /* S170-181: activating no longer charges a flat cost, just requires some mana to sustain -- see ARENA_MP_DRAIN_W_PER_SEC; toggling off is always free */
-        h->w_active = !h->w_active;
+    case ARENA_HERO_ABRAHAM: {
+        /* A Line of Fire, auto-target redesign (2026-08-26, founder real-time, after the
+           manual ground-click flow proved genuinely hard to get firing reliably in a live
+           20-hero match: "why does gary work but abraham doesnt" -> "fuck it have the
+           fireball go infinitely across the map" -> "have it fire at the nearest enemy no
+           matter how far away"). No longer requires arena_state.has_ground_target at all --
+           auto-targets the nearest living enemy anywhere on the map (arena_nearest_enemy has
+           no range cap of its own), same "no real range limit" spirit the ability's own
+           original design already had, just auto-aimed instead of click-aimed. A no-op if
+           there's no living enemy anywhere (nothing to fire at), same "real commitment, no
+           wasted cast" convention every other kit piece in this switch already holds itself
+           to. The client's own green-reticle ground-targeting UI (screen_to_ground et al.)
+           is now dead code for this ability -- left in place rather than ripped out
+           mid-investigation, real cleanup is separate follow-up work. */
+        if (h->w_cooldown_ms > 0 || h->mp < ARENA_MP_COST_W) return;
+        ArenaHero *fireball_target = arena_nearest_enemy(owner);
+        if (!fireball_target) return;
+        h->casting_slot = 2;
+        h->cast_time_remaining_ms = ARENA_ABRAHAM_FIREBALL_WINDUP_MS;
+        h->cast_total_ms = ARENA_ABRAHAM_FIREBALL_WINDUP_MS;
+        h->cast_anchor_x = h->x;
+        h->cast_anchor_z = h->z;
+        h->cast_target = -1;
+        h->cast_target_x = fireball_target->x;
+        h->cast_target_z = fireball_target->z;
+        h->w_cooldown_ms = cast_cooldown(h, ARENA_ABRAHAM_FIREBALL_COOLDOWN_MS);
+        h->mp -= ARENA_MP_COST_W;
         break;
+    }
     case ARENA_HERO_ADA:
         /* The frame's own plating: free toggle, no cooldown --
            arena_hero_armor() reads w_active directly for the bonus. */
@@ -4591,9 +5525,11 @@ void arena_toggle_w(int owner) {
         break;
     }
     case ARENA_HERO_HE_XIANGU:
-        /* Self-Denial Taken Past the Point: free toggle, no cooldown -- tick_hero_kit
-           reads w_active directly for the regen, same shape as Flute Debt's Recouping
-           Interest. */
+        /* Light/Dark stance (2026-08-26 redesign, see ARENA_HE_XIANGU_DARK_ARMOR_BONUS's own
+           header comment): still a free toggle, no cooldown -- Light (w_active=1) keeps the
+           original regen tick_hero_kit already reads w_active for; Dark (w_active=0) is now a
+           real second stance too, granting flat armor via arena_hero_armor's own w_active==0
+           check, not just "the buff turned off." */
         if (!h->w_active && h->mp <= 0) return; /* S170-181: activating no longer charges a flat cost, just requires some mana to sustain -- see ARENA_MP_DRAIN_W_PER_SEC; toggling off is always free */
         h->w_active = !h->w_active;
         break;
@@ -4659,6 +5595,16 @@ void arena_toggle_w(int owner) {
         h->r_active_ms = ARENA_CART_W_DURATION_MS;
         h->zone_radius = ARENA_CART_W_RADIUS;
         h->w_cooldown_ms = cast_cooldown(h, ARENA_CART_W_COOLDOWN_MS);
+        h->mp -= ARENA_MP_COST_W;
+        break;
+    case ARENA_HERO_MICHAEL:
+        /* Heaven's Shield: self-targeted, no foe/ally needed -- same "instant self-buff on a
+           real cooldown" shape as Ghost's own Not a Ghost (W). See ArenaHero.shield_hp's own doc
+           comment for the real absorption mechanic this activates. */
+        if (h->w_cooldown_ms > 0 || h->mp < ARENA_MP_COST_W) return;
+        h->shield_hp = ARENA_MICHAEL_W_SHIELD_AMOUNT;
+        h->shield_ms_remaining = ARENA_MICHAEL_W_SHIELD_DURATION_MS;
+        h->w_cooldown_ms = cast_cooldown(h, ARENA_MICHAEL_W_COOLDOWN_MS);
         h->mp -= ARENA_MP_COST_W;
         break;
     default:
@@ -4995,6 +5941,21 @@ void arena_cast_r(int owner) {
         h->r_cooldown_ms = cast_cooldown(h, ARENA_CART_R_COOLDOWN_MS);
         h->mp -= ARENA_MP_COST_R;
         break;
+    case ARENA_HERO_MICHAEL: {
+        /* Recast Victory: single-target ally heal, same real targeting (hovered ally, falling
+           back to nearest) and "whiff doesn't cost you the cooldown" convention as Doc Wheel's
+           own Bedside Manner (Q) -- see michael_heal_amount's own doc comment for the shared
+           heal-shape math. No ally (1v1, or ally already dead) -- no-op, same as Doc Wheel/
+           Vassago/He Xiangu's own ally-only slots. */
+        if (h->r_cooldown_ms > 0 || h->mp < ARENA_MP_COST_R) return;
+        ArenaHero *ally = arena_hover_ally_or_nearest(owner);
+        if (ally && ally->alive) {
+            michael_heal(ally, michael_heal_amount(ally));
+            h->r_cooldown_ms = cast_cooldown(h, ARENA_MICHAEL_R_COOLDOWN_MS);
+            h->mp -= ARENA_MP_COST_R;
+        }
+        break;
+    }
     }
 }
 
@@ -5085,7 +6046,15 @@ static void tick_hero_kit(ArenaHero *h, ArenaHero *foe, ArenaHero *ally, unsigne
        WoW-style out-of-combat regen, just no longer a dead stop at 0 while
        fighting. */
     if (h->alive && h->mp < h->max_mp) {
-        float rate = (h->combat_timer_ms > 0) ? ARENA_MP_REGEN_IN_COMBAT_PER_SEC : ARENA_MP_REGEN_PER_SEC;
+        /* S205-87, Luck of the Draw: item_bonus_mp_regen_combat only applies to the IN-COMBAT
+           rate specifically -- the founder's own ask names "mana regen during combat," not a
+           general regen buff, same narrow-scope discipline every other trinket bonus on this
+           hero already holds itself to (bonus_attack_range_pct is auto-attack range only, not
+           ability range; bonus_cdr_pct is the one deliberate exception, scoped explicitly to
+           both cooldown types by its own founder quote). */
+        float rate = (h->combat_timer_ms > 0)
+            ? ARENA_MP_REGEN_IN_COMBAT_PER_SEC + (float)h->item_bonus_mp_regen_combat
+            : ARENA_MP_REGEN_PER_SEC;
         h->mp_regen_accum += rate * ((float)dt_ms / 1000.0f);
         int whole = (int)h->mp_regen_accum;
         if (whole > 0) {
@@ -5160,7 +6129,18 @@ static void tick_hero_kit(ArenaHero *h, ArenaHero *foe, ArenaHero *ally, unsigne
             h->cast_target = -1;
         } else {
             float cast_dx = h->x - h->cast_anchor_x, cast_dz = h->z - h->cast_anchor_z;
-            if (cast_dx * cast_dx + cast_dz * cast_dz > 0.0001f) {
+            /* Abraham exemption (2026-08-26, founder: "freeze the player for the length of the
+               cast for that ability" instead of wasting the cooldown on a movement-interrupted
+               cast): update_hero_motion's own matching Abraham-only freeze (see that function's
+               doc comment) means h->x/z genuinely can't drift from cast_anchor_x/z while he's
+               casting anyway -- this check would always read 0 drift for him now, so the
+               `!= ARENA_HERO_ABRAHAM` guard is here mainly for clarity/defense-in-depth (a
+               knockback/pull forcing his position mid-cast, which the freeze above doesn't
+               block, still shouldn't interrupt this specific ability either -- the founder's
+               own ask was "freeze the player," not "still cancel on any forced displacement"
+               the way Gary's own cast deliberately still does). Gary's own established
+               "movement interrupts" feel (S170-203) is untouched. */
+            if (h->hero_id != ARENA_HERO_ABRAHAM && cast_dx * cast_dx + cast_dz * cast_dz > 0.0001f) {
                 /* Movement interrupts -- any real drift from where the cast began, whether a
                    fresh move command or a forced displacement (a pull, a knockback), not just a
                    deliberate click; comparing live position against the cast-start anchor every
@@ -5176,6 +6156,7 @@ static void tick_hero_kit(ArenaHero *h, ArenaHero *foe, ArenaHero *ally, unsigne
                 if (h->cast_time_remaining_ms <= 0) {
                     int finished_slot = h->casting_slot;
                     int target_idx = h->cast_target;
+                    float finished_target_x = h->cast_target_x, finished_target_z = h->cast_target_z;
                     h->casting_slot = 0;
                     h->cast_time_remaining_ms = 0;
                     h->cast_total_ms = 0;
@@ -5194,6 +6175,19 @@ static void tick_hero_kit(ArenaHero *h, ArenaHero *foe, ArenaHero *ally, unsigne
                                 h->cast_flash_slot = 2; /* the shot actually fires now, not at cast start */
                             }
                         }
+                    } else if (h->hero_id == ARENA_HERO_ABRAHAM && finished_slot == 2) {
+                        /* A Line of Fire (S202-34): the windup itself never re-validates
+                           anything (a ground point can't "dodge" the way a unit target can,
+                           so there's nothing to re-check here the way Gary's branch above
+                           re-checks range/hittability) -- it always fires on completion.
+                           Routes through the PARENA-compiled on_abraham_fireball_cast (not
+                           redgarden_host_abraham_fireball_cast directly), same "the mod call
+                           IS the trigger" convention duck_smoke_bomb_mod's own W case already
+                           established. Target coords rounded to int -- see
+                           abraham_fireball_mod.prn's own doc comment on why (VS0 has no F32
+                           mod-parameter support yet). */
+                        on_abraham_fireball_cast(h->owner, (int)finished_target_x, (int)finished_target_z);
+                        h->cast_flash_slot = 2; /* the fireball actually fires now, not at cast start */
                     }
                 }
             }
@@ -5202,6 +6196,16 @@ static void tick_hero_kit(ArenaHero *h, ArenaHero *foe, ArenaHero *ally, unsigne
     if (h->intangible_ms > 0) {
         h->intangible_ms -= (int)dt_ms;
         if (h->intangible_ms < 0) h->intangible_ms = 0;
+    }
+    /* Duck's Smoke Bomb (S202-10): decremented here, in the one shared
+     * per-hero tick both arena_update (1v1) and arena_update_teams (team
+     * mode) already call -- not duplicated into each top-level tick
+     * function separately, the exact mistake S202-23 found and fixed for
+     * Tree's passive (wired into team-mode's own tick only, silently never
+     * fired in 1v1 matches for a full session before being caught). */
+    if (h->duck_smoke_ms > 0) {
+        h->duck_smoke_ms -= (int)dt_ms;
+        if (h->duck_smoke_ms < 0) h->duck_smoke_ms = 0;
     }
     /* rooted_ms/survive_floor_ms (S170-46): generic status effects, any
        kit's ability can apply them, same reasoning as silence/intangible
@@ -5213,6 +6217,16 @@ static void tick_hero_kit(ArenaHero *h, ArenaHero *foe, ArenaHero *ally, unsigne
     if (h->survive_floor_ms > 0) {
         h->survive_floor_ms -= (int)dt_ms;
         if (h->survive_floor_ms < 0) h->survive_floor_ms = 0;
+    }
+    /* shield_ms_remaining (Michael's W): same generic tick-down idiom as every other status
+       effect here -- the shield disappears once its duration runs out, whether or not it was
+       ever fully broken, a real MOBA-standard shield shape (not a permanent buff). */
+    if (h->shield_ms_remaining > 0) {
+        h->shield_ms_remaining -= (int)dt_ms;
+        if (h->shield_ms_remaining <= 0) {
+            h->shield_ms_remaining = 0;
+            h->shield_hp = 0;
+        }
     }
     /* stunned_ms/slowed_ms (S170-184): same generic tick-down idiom as every other status
        effect above. slow_pct isn't reset when slowed_ms hits 0 -- update_hero_motion only ever
@@ -5675,7 +6689,7 @@ static void tick_hero_kit(ArenaHero *h, ArenaHero *foe, ArenaHero *ally, unsigne
                 if (!cand->active || !hero_is_hittable(cand)) continue;
                 float dx = cand->x - h->r_zone_x, dz = cand->z - h->r_zone_z;
                 if (dx * dx + dz * dz > h->zone_radius * h->zone_radius) continue;
-                cart_trigger_delivery(cand);
+                cart_trigger_delivery(h, cand);
                 h->r_active_ms = 0;
                 break;
             }
@@ -5843,10 +6857,22 @@ void bot_cast_kit_if_ready(ArenaHero *bot, ArenaHero *foe) {
         }
         break;
     case ARENA_HERO_ABRAHAM:
-        /* Toggle W on early for the channeled Q damage, poke with Q
-           whenever in range and off cooldown, cleanse+heal with R when hurt
-           or carrying a debuff. */
-        if (!bot->w_active) {
+        /* Real bug found and fixed 2026-08-26 (founder, live: "theres some issue with fireball
+           its not casting" -> "also his auto attack is broken" -> "abraham"): this comment
+           and the branch below both described Abraham's OLD kit ("channeled Q damage... toggle
+           W") -- stale leftovers from before the S202-34 W rework (961d500) landed. A Line of
+           Fire is a one-shot GROUND-TARGETED cast now, not a toggle: calling arena_toggle_w
+           unconditionally here (like the old code did) never sets arena_state.has_ground_target
+           first, so the new W code's own real guard (`if
+           (!arena_state.has_ground_target[owner]) return;`) silently no-ops it every time --
+           bot-controlled Abrahams have never actually cast a fireball since the rework landed.
+           Fixed to set a real ground target (the current foe's position) before casting, same
+           "aim at the current foe" heuristic every other ground-targeted bot cast in this
+           switch already uses. Poke with Q whenever in range and off cooldown, cleanse+heal
+           with R when hurt or carrying a debuff, unchanged from before. */
+        if (bot->w_cooldown_ms <= 0 && bot->mp >= ARENA_MP_COST_W && foe && hero_is_hittable(foe) &&
+            dist <= ARENA_ABRAHAM_FIREBALL_MAX_RANGE) {
+            arena_set_ground_target(bot->owner, 1, foe->x, foe->z);
             arena_toggle_w(bot->owner);
         } else if (bot->q_cooldown_ms <= 0 && dist <= ARENA_ABRAHAM_Q_RANGE) {
             arena_cast_q(bot->owner);
@@ -6034,6 +7060,17 @@ void bot_cast_kit_if_ready(ArenaHero *bot, ArenaHero *foe) {
             arena_cast_q(bot->owner);
         }
         break;
+    case ARENA_HERO_MICHAEL:
+        /* R (heal) is ally-only -- no useful action in the 1v1 local demo's bot heuristic (no
+           ally present), same reasoning as Doc Wheel/Vassago/He Xiangu's own ally-only slots
+           above. W (shield) is defensive, gated on low HP like Cain's own dash-away, not
+           proximity to a foe. Q whenever in range and off cooldown. */
+        if (bot->hp < bot->max_hp / 3 && bot->w_cooldown_ms <= 0) {
+            arena_toggle_w(bot->owner);
+        } else if (bot->q_cooldown_ms <= 0 && dist <= ARENA_MICHAEL_Q_RANGE) {
+            arena_cast_q(bot->owner);
+        }
+        break;
     }
 }
 
@@ -6059,8 +7096,8 @@ void arena_update(unsigned int dt_ms) {
         }
     }
 
-    update_hero_motion(&arena_state.heroes[0], dt_sec);
-    update_hero_motion(&arena_state.heroes[1], dt_sec);
+    update_hero_motion(&arena_state.heroes[0], 0, dt_sec);
+    update_hero_motion(&arena_state.heroes[1], 1, dt_sec);
     arena_tick_creeps(dt_ms);
     arena_hero_attack_creeps(dt_ms);
     /* Node towers (2026-07-30) are team-mode only, same scope as lane creep waves just below --
@@ -6107,6 +7144,22 @@ void arena_update(unsigned int dt_ms) {
        projectile hits, and the bot's own casts -- before deciding whether
        anyone's channel survives this tick. */
     arena_tick_nodes(dt_ms);
+
+    /* Real, live bug found and fixed 2026-08-25 (founder, real-time: "im playing redgarden on
+       latest and the tree is not generating health from auto attacking the other trees ensure
+       the server knows about that and its all wired up to work"): arena_tick_daynight/
+       arena_tick_obstacles/arena_hero_tree_passive were wired into arena_update_teams (below)
+       when Bloodflower/Tree passive landed, but never into THIS function -- the 1v1 tick
+       (lobby_size == 2, apps/arena_server/src/main.c's own `if (lobby_size == 2) arena_update
+       else arena_update_teams` branch). The founder's own 1v1 matchmaker (:7779, lobby-size 2,
+       per REDGARDEN/CLAUDE.md's own deployment table) runs exclusively through this function,
+       so Tree's passive (and the day/night cycle + Bloodflower event) silently never fired
+       there at all -- team-mode/bot-pool matches (:7778) were unaffected. Same class of gap
+       §25.4's own "arena_update hardcodes heroes[0]/heroes[1]" bug already flagged: two
+       parallel simulation-tick functions, one gets a new mechanic wired in, the other doesn't. */
+    arena_tick_daynight(dt_ms);
+    arena_tick_obstacles(dt_ms);
+    arena_hero_tree_passive(dt_ms);
 
     if (!arena_state.heroes[0].alive) arena_state.winner = 2;
     else if (!arena_state.heroes[1].alive) arena_state.winner = 1;
@@ -6386,7 +7439,7 @@ void arena_update_teams(unsigned int dt_ms) {
     for (int i = 0; i < ARENA_HEROES_ARRAY_SIZE; i++) {
         ArenaHero *h = &arena_state.heroes[i];
         if (!h->active) continue;
-        update_hero_motion(h, dt_sec);
+        update_hero_motion(h, i, dt_sec);
     }
     arena_tick_creeps(dt_ms);
     arena_hero_attack_creeps(dt_ms);
@@ -6398,6 +7451,10 @@ void arena_update_teams(unsigned int dt_ms) {
     arena_hero_attack_camp_minions(dt_ms);
     arena_tick_kings(dt_ms); /* Jungle Camps Milestone 2 */
     arena_hero_attack_kings(dt_ms);
+    arena_tick_daynight(dt_ms); /* 2026-08-25: day/night cycle + moon-zenith Bloodflower event */
+    arena_hero_claim_bloodflower();
+    arena_tick_obstacles(dt_ms); /* 2026-08-25: Tree passive -- tree obstacle hp regen */
+    arena_hero_tree_passive(dt_ms);
 
     /* Melee combat: each active, alive hero independently attacks its own
        nearest enemy if one is in range and its cooldown is ready -- this is
@@ -6421,7 +7478,7 @@ void arena_update_teams(unsigned int dt_ms) {
            decrement above still applies to him uniformly (same field,
            same idiom), just the damage-dealing half of this loop skips
            him. */
-        if (h->hero_id == ARENA_HERO_GARY) continue;
+        if (h->hero_id == ARENA_HERO_GARY || h->hero_id == ARENA_HERO_ABRAHAM) continue; /* S202-34: Abraham's basic attack is homing now too */
         if (h->stunned_ms > 0) continue; /* S170-184 */
         if (h->attack_windup_ms_remaining > 0) continue; /* already mid-windup -- arena_tick_attack_windups below owns it from here */
         if (h->mnm_burrow_ms > 0) continue; /* S170-208: literally not on the battlefield surface while burrowed */

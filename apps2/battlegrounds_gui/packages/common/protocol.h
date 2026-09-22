@@ -27,6 +27,7 @@
 #define PACKET_ARENA_ATTACK_MOVE 16 /* client -> arena_server: real LoL/WC3 "A + click", NORTHSTAR.md §17.4 + §24 Milestone 2 (2026-07-31) -- see ArenaAttackMoveCmd's own doc comment */
 #define PACKET_ARENA_HOLD 17 /* client -> arena_server: real WC3 "Hold Position", NORTHSTAR.md §24 Milestone 2 (2026-07-31) -- see ArenaHoldCmd's own doc comment */
 #define PACKET_ARENA_PATROL 18 /* client -> arena_server: real WC3 "Patrol", NORTHSTAR.md §24 Milestone 2 (2026-07-31) -- see ArenaPatrolCmd's own doc comment */
+#define PACKET_ARENA_APPLY_BUILD_TEMPLATE 19 /* client -> arena_server: auto-buy a named build template's items in order, 2026-08-25 -- see ArenaApplyBuildTemplateCmd's own doc comment */
 
 #define ARENA_PHASE_WAITING 0 /* fewer than 2 real players connected yet */
 #define ARENA_PHASE_DRAFT   1 /* both connected, waiting on hero picks */
@@ -84,9 +85,20 @@ typedef struct {
 
 // Sent by the matchmaker after PACKET_MATCH_FOUND's NetHeader: the UDP port
 // of the freshly-spawned red_garden_server instance the client should now
-// connect to (see apps/matchmaker/src/main.c).
+// connect to (see apps/matchmaker/src/main.c). seed/mode added for
+// GoblinFoxDragon/docs2/DUNGEON_NORTHSTAR.md's Milestone 1 ("a way to pass a
+// seed... into the spawned process" / "PACKET_MATCH_FOUND telling the client
+// which mode it's joining") -- real, minimal first slice: seed is generated
+// fresh per match and passed both to the spawned server (--seed) and the
+// client here, so a future dungeon server's generator and the client that
+// joins it can agree on the same instance without a separate round-trip.
+// mode is 0 for every existing arena/card-RTS match (unchanged real
+// behavior) -- a real dungeon server variant is not built yet, so nothing
+// non-zero is ever sent today.
 typedef struct {
     uint16_t port;
+    uint32_t seed;
+    uint8_t mode;
 } MatchFoundMsg;
 
 // ---- apps/arena_server wire structs (2026-07-24 pivot: the MOBA is the
@@ -118,9 +130,24 @@ typedef struct {
 // existing nearest-ally targeting when nothing's hovered -- the "macro"
 // itself is client-side (only WHICH target rides the packet), matching the
 // real WoW mouseover-macro pattern of "cast on unit=mouseover, or default."
+//
+// has_ground_target/target_x/target_z (Abraham's Fireball, S202-34):
+// generic support for a ground-targeted (skillshot) ability, not
+// Abraham-specific -- has_ground_target is 0 for every existing
+// unit-targeted/self-targeted cast (hover_target alone still covers those,
+// unchanged), 1 when the client is in ground-targeting mode (green
+// reticle, founder: "the targeter is green when you are ready to cast")
+// and the player has clicked a world point. The server is the sole judge
+// of whether a given hero/slot combination is actually a ground-targeted
+// ability -- a client setting this for a non-ground-targeted slot is
+// simply ignored server-side, same trust boundary every other command
+// payload already holds itself to.
 typedef struct {
     uint8_t slot;
     int8_t hover_target;
+    uint8_t has_ground_target;
+    float target_x;
+    float target_z;
 } ArenaCastCmd;
 
 // PACKET_ARENA_PICK payload: which hero (ArenaHeroID) the sending client
@@ -204,6 +231,15 @@ typedef struct {
 typedef struct {
     uint8_t slot;
 } ArenaShopSellCmd;
+
+// PACKET_ARENA_APPLY_BUILD_TEMPLATE payload (2026-08-25, build templates): which preset
+// (index into packages/simulation/arena_game.c's ARENA_BUILD_TEMPLATES catalog) to auto-buy
+// from. Server validates shop-proximity + Flow per item, same trust model as
+// PACKET_ARENA_SHOP_BUY -- this is just that same real purchase path called in a loop
+// (arena_hero_apply_build_template), not a separate mechanism.
+typedef struct {
+    uint8_t template_id;
+} ArenaApplyBuildTemplateCmd;
 
 // ARENA_SNAPSHOT_ITEM_SLOT_COUNT must match packages/simulation/arena_game.h's
 // ARENA_ITEM_SLOT_COUNT (S170-175), same duplication reasoning as every
@@ -325,6 +361,16 @@ typedef struct {
     // convention as attack_target/w_active above.
     float r_zone_x, r_zone_z;
     uint16_t r_active_ms;
+    // zone_radius_x10 (S202-42, Cart's own zone-circle gap): arena_hero_r_zone_radius(hero_id)
+    // supplies the radius for every OTHER zone hero (a fixed per-hero-id constant, so it never
+    // needed a wire field of its own) -- but Cart's W (delivery, ARENA_CART_W_RADIUS) and R
+    // (ARENA_CART_R_RADIUS) share these same r_active_ms/r_zone_x/z fields with two DIFFERENT
+    // real radii (see ArenaHero.zone_radius's own doc comment), so a fixed constant can't be
+    // right for him and a networked client had no way to know which one applied. Quantized
+    // radius*10 in a uint8_t, same "lossy is fine" precedent slow_pct_x100 already uses --
+    // comfortably covers both of Cart's real values (3.0/5.0) with room to spare. 0 for every
+    // other hero (arena_hero_r_zone_radius's own constant still supplies their radius).
+    uint8_t zone_radius_x10;
     // casting_slot/cast_time_remaining_ms/cast_total_ms (S170-203, founder: "switch gary w to
     // aimed shot just like wow hunter cast time big damage" -> "ensure cast bar affordance
     // shown to user"): generic cast-time-ability state (ArenaHero's own doc comment in
@@ -361,6 +407,26 @@ typedef struct {
     // (Bloodroar visibly stacking), not just an on/off state.
     uint8_t king_buff_flags;
     uint8_t king_growth_stacks;
+    // duck_smoke_x/duck_smoke_z/duck_smoke_ms (S202-10, Duck's Smoke Bomb): same
+    // "every zone-ability hero's ground effect needs to be on the wire or a
+    // networked client can't render it" reasoning r_zone_x/r_zone_z/r_active_ms's
+    // own doc comment above already established -- this is a W-slot zone, not an
+    // R-slot one (Duck's own R, Total Telekinesis, is an instant pull with no
+    // zone), so it gets its own fields rather than overloading r_zone_*. Synced
+    // for every hero, not just the local player's own, same "the whole
+    // battlefield should read clearly" convention as every other field here.
+    float duck_smoke_x, duck_smoke_z;
+    uint16_t duck_smoke_ms;
+    // shield_hp (2026-09-11, Michael's Heaven's Shield): this roster's first real
+    // damage-absorption shield -- real simulation state (ArenaHero.shield_hp) that would
+    // otherwise have zero wire representation, same "the whole battlefield should read clearly"
+    // convention as every other per-hero field on this struct. shield_ms_remaining isn't synced
+    // separately: a networked client only needs to know HOW MUCH shield is left to render it,
+    // not exactly when it expires (same "lossy is fine, the number that matters is the amount"
+    // precedent zone_radius_x10/slow_pct_x100 already establish for their own fields) -- shield_hp
+    // itself already reads as 0 the instant the shield is gone, whether from expiry or being
+    // fully absorbed.
+    uint16_t shield_hp;
 } ArenaHeroSnapshot;
 
 // ARENA_SNAPSHOT_MAX_HEROES must match packages/simulation/arena_game.h's
@@ -498,6 +564,14 @@ typedef struct {
 // ARENA_SNAPSHOT_CAMP_COUNT must match arena_game.h's ARENA_CAMP_COUNT.
 #define ARENA_SNAPSHOT_CAMP_COUNT 4
 
+// ARENA_SNAPSHOT_OBSTACLE_COUNT must match arena_game.h's ARENA_OBSTACLE_COUNT. Tree passive
+// (2026-08-25): obstacles are otherwise a static, never-wire-synced layout (both sides compute
+// the same deterministic positions independently, see ArenaObstacle's own doc comment) -- hp is
+// the one genuinely dynamic field, "always fully populated" same as kings/creeps/towers below
+// rather than a sparse pool, since the layout itself never changes size or order mid-match. Only
+// ARENA_OBSTACLE_TREE entries carry a real value; rocks stay 0.
+#define ARENA_SNAPSHOT_OBSTACLE_COUNT 32
+
 // Per-King state (Jungle Camps Milestones 2/4). Always exactly ARENA_SNAPSHOT_CAMP_COUNT
 // entries, index-matched to camps (0=N/Wealth, 1=S/Growth, 2=E/Music, 3=W/All-Seeing), same
 // "always fully populated" convention as powerups above -- a not-yet-spawned or dead King just
@@ -540,6 +614,7 @@ typedef struct {
     uint8_t camp_minion_count; /* jungle camps client-visibility fix, 2026-08-20 */
     ArenaCampMinionSnapshot camp_minions[ARENA_SNAPSHOT_MAX_CAMP_MINIONS];
     ArenaKingSnapshot kings[ARENA_SNAPSHOT_CAMP_COUNT]; /* always fully populated, see that struct's doc comment */
+    uint16_t obstacle_hp[ARENA_SNAPSHOT_OBSTACLE_COUNT]; /* Tree passive (2026-08-25) -- see ARENA_SNAPSHOT_OBSTACLE_COUNT's own doc comment. Index-matched to the deterministic obstacle layout both sides already compute identically. */
 } ArenaSnapshotMsg;
 
 // PACKET_ARENA_SNAPSHOT_HEROES payload (S170-193, founder: split the

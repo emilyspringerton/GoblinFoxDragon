@@ -321,8 +321,26 @@ typedef enum {
                               lore, same shape §16.1 already built for Donkey -- not a WC3-style
                               directly-commanded unit. §24's own Milestone 2 goal (a real
                               directly-controlled-unit hero) stays open after this. */
+    ARENA_HERO_MICHAEL = 30, /* TYLER multiverse_heroes.md #124, "Michael, the Recast Victory"
+                                 (2026-09-11). Founder real-time: "add Michael (arch angel
+                                 michael) to REDGARDEN he should have a very strong shield
+                                 activated on W and a general strong Q (damage) and then E should
+                                 be a heal like DOC WHEEL." This engine has no E slot (Q/W/R
+                                 only) -- "E" mapped onto R, the roster's own ultimate slot, same
+                                 as every other hero's third ability. Q (Flaming Sword) is a real
+                                 strong single-target hit, notably above this roster's own typical
+                                 8-15 Q damage range. W (Heaven's Shield) is this roster's first
+                                 REAL damage-absorption shield (not simplified away like Doc
+                                 Wheel's own R was, see ArenaHero.shield_hp's own doc comment) --
+                                 self-targeted, a genuinely new engine mechanic, not a reskin of
+                                 an existing stat. R (Recast Victory) reuses Doc Wheel's own
+                                 Bedside Manner SHAPE exactly (ally-targeted, heals more the more
+                                 hurt the target is) at bigger numbers and an ultimate-tier
+                                 cooldown, matching the founder's own "like Doc Wheel" ask while
+                                 fitting the R slot's own established "big, cooldown-gated payoff"
+                                 convention every other hero's R already holds to. */
 } ArenaHeroID;
-#define ARENA_HERO_COUNT 30
+#define ARENA_HERO_COUNT 31
 
 /* The Unicorn — first real hero kit wired in (S170-18). */
 #define ARENA_UNICORN_ARMOR         4    /* passive: Chassis Claim, flat dmg reduction */
@@ -334,11 +352,13 @@ typedef enum {
 #define ARENA_UNICORN_R_COOLDOWN_MS 15000
 #define ARENA_UNICORN_R_DURATION_MS 3000 /* Full Disclosure: armor doubled */
 
-/* The Duck — second hero kit (S170-31). Q/R only: W (Government Clearance)
- * needs towers/objective structures that don't exist in this 1v1 arena, and
- * E (Chosen One) triggers on a killing blow, but arena's win condition ends
- * the match on that same kill -- the buff window and match-end coincide, so
- * it would have zero observable effect here. Both skipped, not faked. */
+/* The Duck — second hero kit (S170-31). Originally Q/R only: W (Government
+ * Clearance, needs towers/objective structures that don't exist in this 1v1
+ * arena) and E (Chosen One, triggers on a killing blow that also ends the
+ * match, so the buff window would have zero observable effect) were both
+ * skipped, not faked. W's own empty slot is filled for real by S202-10
+ * below -- a different, new ability, not a late implementation of
+ * Government Clearance (that gap is still real and still unaddressed). */
 #define ARENA_DUCK_Q_PULL_DIST      5.0f /* Telekinetic Yank: how far the foe gets pulled */
 #define ARENA_DUCK_Q_DAMAGE         10
 #define ARENA_DUCK_Q_RANGE          6.0f /* max distance the yank can reach */
@@ -347,6 +367,34 @@ typedef enum {
 #define ARENA_DUCK_R_DAMAGE         20
 #define ARENA_DUCK_R_RANGE          9.0f
 #define ARENA_DUCK_R_COOLDOWN_MS    18000
+
+/* Duck W -- Smoke Bomb (S202-10). Founder real-time: "ok do fog of war as an
+ * ability" -> "add to the duck" -> "there is no natural fog of war just duck
+ * smoke bomb" -> "server authorittive" -> "as a parena mod" -> "mod first
+ * dev." This engine has no vision/fog-of-war/line-of-sight system anywhere
+ * (the King All-Seeing buff's own doc comment already names that as a real,
+ * out-of-scope gap) -- Smoke Bomb doesn't invent one. It implements the one
+ * concrete, honest analog that's actually buildable on top of this engine's
+ * real targeting primitive (arena_nearest_enemy): a hero standing inside an
+ * active cloud can't be selected as a target by anyone casting from OUTSIDE
+ * that same cloud (hero_obscured_from, arena_game.c). Always-lands AoE,
+ * self-centered at cast time (no click-to-place targeting exists in this
+ * input model, same "here is the only honest landing spot" reasoning
+ * arena's other zone abilities already use), same instant-cast-on-cooldown
+ * shape as Flamel/Dagda's own W. */
+#define ARENA_DUCK_W_RADIUS         4.5f  /* Smoke Bomb: cloud radius */
+#define ARENA_DUCK_W_DURATION_MS    6000  /* Smoke Bomb: how long the cloud lingers */
+#define ARENA_DUCK_W_COOLDOWN_MS    16000
+
+/* Smoke Bomb slow (S205-87, kanban priority-queue card: "duck smoke bomb should have a 50%
+ * chance to slow each enemy hit by it"). Rolled independently per enemy caught in the cast-time
+ * radius check below (redgarden_host_duck_smoke_bomb_cast) -- "each enemy hit by it" means each
+ * enemy standing inside the cloud at the moment it's thrown, the only real "hit" this ability
+ * has (it has no damage/tick component, purely vision-blocking otherwise). Duration/pct values
+ * follow the exact same real precedent ARENA_CART_DELIVERY_SLOW_MS/_PCT already established. */
+#define ARENA_DUCK_W_SLOW_CHANCE_PCT 50     /* integer 0-100: 50% independent roll per enemy hit */
+#define ARENA_DUCK_W_SLOW_MS         2000
+#define ARENA_DUCK_W_SLOW_PCT        0.30f
 
 /* The Ghost — third hero kit (S170-32). First kit needing real status-effect
  * state (silence, intangibility) rather than just cooldowns/toggles. R's
@@ -734,8 +782,20 @@ typedef enum {
  * intangibility duration, rather than granting a stat like most toggles. R pays off the
  * mischief: real damage plus a self-heal off it, "the trick was always the same" either way. */
 #define ARENA_BACON_PUCK_Q_INTANGIBLE_MS          1500
-#define ARENA_BACON_PUCK_Q_INTANGIBLE_MS_WATCHING 3000 /* Q's intangible duration while W is toggled on */
+#define ARENA_BACON_PUCK_Q_INTANGIBLE_MS_WATCHING 3000 /* dead since the 2026-08-26 W redesign (Shadow Step) -- see bacon_puck_cast_q's own doc comment */
 #define ARENA_BACON_PUCK_Q_COOLDOWN_MS             6000
+/* Shadow Step (2026-08-26, founder: "make bacon buck w instead of a toggle have it turn into
+   sghadow step use the targeting system you had for abraham fireball before we changed it" ->
+   "but have it click on a hero to teleport roughly behind them" -> "add a sense of hero
+   direction i guess so we can actually teleport behind them" -> "hive it a generous range but
+   not crazy like give it the same range as the ranged auto attacks"): replaces the old
+   toggle. Reuses the client's own ground-targeting reticle/aiming-mode machinery (left in
+   place, not ripped out, when Abraham's W moved off it) -- but the confirm click now detects a
+   HOVERED HERO (g_hover_target, the same mechanism the plain click-to-attack flow already
+   uses), not a ground point. */
+#define ARENA_BACON_PUCK_W_RANGE ARENA_GARY_ATTACK_RANGE /* "the same range as the ranged auto attacks," literally */
+#define ARENA_BACON_PUCK_W_BEHIND_OFFSET 2.0f /* how far past the target's own position, along their real facing_rad, the blink lands */
+#define ARENA_BACON_PUCK_W_COOLDOWN_MS 8000
 #define ARENA_BACON_PUCK_R_RANGE                   2.2f
 #define ARENA_BACON_PUCK_R_DAMAGE                  16
 #define ARENA_BACON_PUCK_R_HEAL_PCT                0.5f /* fraction of R's damage returned as self-heal */
@@ -743,17 +803,63 @@ typedef enum {
 
 /* Abraham of Worms, the Mage (S170-103, TYLER multiverse_heroes.md #113) -- a caster whose
  * whole real-world hook is a book whose ritual made a real man (Crowley) organize a life
- * around it. Q is a real ranged magic bolt, stronger while W (channeling the book) is
- * toggled on -- the first toggle in this roster that boosts a Q's damage rather than its
- * range/duration or granting armor/regen. R is "the Guardian Angel, contacted": a full
+ * around it. Q is a real ranged magic bolt. R is "the Guardian Angel, contacted": a full
  * self-cleanse (every debuff field this roster tracks) plus a real heal, the ritual's
- * actual real-world promised payoff. */
-#define ARENA_ABRAHAM_Q_DAMAGE            9
-#define ARENA_ABRAHAM_Q_DAMAGE_CHANNELING 15 /* Q's damage while W is toggled on */
+ * actual real-world promised payoff.
+ *
+ * W rework (S202-34/S202-30, founder real-time: "xehingu [He Xiangu, unrelated] ... give
+ * abraham a real targetable slow moving projectile fireball that moves a long distance and
+ * damages enemies it passes through, replace his dumbest ability" -> "usually w"): the old
+ * W was a free toggle whose only job was boosting Q's damage (ARENA_ABRAHAM_Q_DAMAGE_CHANNELING)
+ * -- judged the weaker/more redundant half of the kit vs. Q's own always-useful poke, so W is
+ * what got replaced, not Q. Q now always deals the old "channeling" damage value (there's no
+ * more toggle to gate it on) -- a deliberate, stated choice to net-buff Q rather than silently
+ * leave it worse off after W's removal. New W ("A Line of Fire," a ground-targeted skill-shot):
+ * click-to-aim (client shows a green reticle after pressing W, per founder: "the targeter is
+ * green when you are ready to cast"), no real range limit ("just have it go whatever direction
+ * is the click"), pierces every enemy it touches rather than stopping on the first hit ("damages
+ * enemies it passes through"), and is intentionally slow (ARENA_HERO_SPEED-relative) so landing
+ * it is a real read on the target's movement, not a guaranteed poke. A 400ms pre-cast windup
+ * plays a GOLDENBAND-driven ease-in/out hero-facing rotation (assets/anim/rotation_ease.gband,
+ * PARENA's abraham_fireball_mod -- see arena_toggle_w's ARENA_HERO_ABRAHAM case and
+ * tick_hero_kit's completion branch) plus a client-side squish/flick animation (founder:
+ * "squish way down... to about 20 percent... windup animation go medium fast and then snap up
+ * quite quick as a flick... take .4 seconds") -- see apps/arena/src/main.c's own
+ * ABRAHAM_FIREBALL_SQUISH_DOWN_MS/UP_MS split using the same golden-ratio constant
+ * (1.618034f) ARENA_HALF_EXTENT above already establishes as this repo's own convention for
+ * "explicit, visible golden-ratio scaling" rather than an ad-hoc split. */
+#define ARENA_ABRAHAM_Q_DAMAGE            15 /* was 9 base / 15 "channeling" -- always the higher value now, see doc comment above */
 #define ARENA_ABRAHAM_Q_RANGE             5.5f
 #define ARENA_ABRAHAM_Q_COOLDOWN_MS       3200
 #define ARENA_ABRAHAM_R_HEAL              20
 #define ARENA_ABRAHAM_R_COOLDOWN_MS       17000
+#define ARENA_ABRAHAM_FIREBALL_DAMAGE      14
+#define ARENA_ABRAHAM_FIREBALL_SPEED       4.0f    /* units/sec -- bumped from 3.0 (2026-08-26, founder: "make the fireball move just a bit faster") to match ARENA_HERO_SPEED exactly -- still a real dodgeable read against a stationary target, just no longer slower than a hero can walk */
+#define ARENA_ABRAHAM_FIREBALL_RADIUS      0.9f
+#define ARENA_ABRAHAM_FIREBALL_COOLDOWN_MS 9000
+#define ARENA_ABRAHAM_FIREBALL_WINDUP_MS   400     /* matches assets/anim/rotation_ease.gband's real baked duration (16 ticks @ 40Hz) exactly */
+#define ARENA_ABRAHAM_FIREBALL_MAX_RANGE   (ARENA_HALF_EXTENT * 4.0f) /* "no real range limit" -- comfortably longer than any real line of sight across the whole map (ARENA_HALF_EXTENT corners to corner) rather than a literal infinite/unbounded travel distance, which arena_spawn_projectile's own max_range field isn't designed to represent */
+/* Ignite (2026-08-26, founder: "make it so that the fireball ignites the enemies it touches
+   making them have burning too"): a real burn DoT on every hit, using the existing generic
+   on_hit_burn_ms/on_hit_burn_dps ArenaProjectile mechanic (Pizza's Q, Flute Debt's Q, Tyler's Q
+   all already apply burn the same way) -- the hit-resolution code that applies it already runs
+   once per enemy a piercing shot passes through, so this needed no new plumbing, only setting
+   the two fields on the fireball's own projectile at spawn. Same duration/DPS as Pizza's own Q
+   burn (a real, established "how strong is a burn tick" baseline in this catalog), not a new
+   number invented from nothing. */
+#define ARENA_ABRAHAM_FIREBALL_BURN_MS     3000
+#define ARENA_ABRAHAM_FIREBALL_BURN_DPS    5
+/* Abraham's ranged basic auto-attack (S202-34, founder: "make his auto attack ranged like
+ * garys with a different color projectile"): reuses Gary's exact homing-auto-attack mechanic
+ * (ArenaProjectile.homing_target, see that field's own doc comment) rather than inventing a
+ * second one -- only the range/speed/damage/color differ. Client picks the projectile's visual
+ * color from hero_id already carried on ArenaProjectile, so "different color" needs no new
+ * wire field, just a new client-side color branch. */
+#define ARENA_ABRAHAM_ATTACK_RANGE ARENA_GARY_ATTACK_RANGE
+#define ARENA_ABRAHAM_ATTACK_SPEED ARENA_GARY_ATTACK_SPEED
+#define ARENA_ABRAHAM_ATTACK_DAMAGE ARENA_ATTACK_DAMAGE
+#define ARENA_ABRAHAM_ATTACK_COOLDOWN_MS ARENA_ATTACK_COOLDOWN_MS
+#define ARENA_ABRAHAM_ATTACK_WINDUP_MS (ARENA_ABRAHAM_ATTACK_COOLDOWN_MS / 4)
 
 /* Ada Lovelace, Pilot (S170-103, TYLER multiverse_heroes.md #112) -- "wrote the operating
  * logic for a frame before the frame existed." A heavy, deliberate tank/controller: Q
@@ -949,11 +1055,63 @@ typedef enum {
 #define ARENA_CART_R_RADIUS                  5.0f
 #define ARENA_CART_R_DURATION_MS         15000
 #define ARENA_CART_R_COOLDOWN_MS         45000
-#define ARENA_CART_DELIVERY_HEAL_PCT         0.25f /* one of 4 equally-weighted random outcomes -- see cart_trigger_delivery */
-#define ARENA_CART_DELIVERY_MANA_PCT         0.25f
+/* Delivery outcomes (S202-42, "more impactful/powered-up abilities" + this doc's own
+ * long-stated-but-never-built "R has bigger radius/BETTER-WEIGHTED outcomes" intent just above
+ * -- W and R used to call the exact same rand()%4 with no distinction at all). Magnitudes
+ * bumped up from the original flat pass (heal/mana 25%->35%, Flow 50->90), and a real 5th
+ * outcome added: a King's Growth buff grant, the founder's own literal example for the
+ * "general random-buff system... a random hero occasionally gets a King buff" ask -- Cart's
+ * existing delivery mechanic ("whoever steps into the zone first" is already the "occasionally,
+ * to a random hero" trigger this ask wanted, not a new separate global timer system). Picked via
+ * arena_marble_bag_pick (real weighted marble-bag + Fibonacci pity, NORTHSTAR's own
+ * long-documented-but-never-implemented pull algorithm, first real build anywhere in this repo)
+ * instead of a flat rand()%N -- see ARENA_CART_DELIVERY_W_WEIGHTS/R_WEIGHTS below for the actual
+ * per-slot weighting that finally realizes "R is better-weighted." */
+#define ARENA_CART_DELIVERY_HEAL_PCT         0.35f
+#define ARENA_CART_DELIVERY_MANA_PCT         0.35f
 #define ARENA_CART_DELIVERY_SLOW_MS       3000
 #define ARENA_CART_DELIVERY_SLOW_PCT         0.30f
-#define ARENA_CART_DELIVERY_FLOW            50
+#define ARENA_CART_DELIVERY_FLOW            90
+#define ARENA_CART_DELIVERY_OUTCOME_COUNT       5   /* heal, mana, slow, flow, king-growth-buff */
+#define ARENA_CART_DELIVERY_OUTCOME_HEAL        0
+#define ARENA_CART_DELIVERY_OUTCOME_MANA        1
+#define ARENA_CART_DELIVERY_OUTCOME_SLOW        2
+#define ARENA_CART_DELIVERY_OUTCOME_FLOW        3
+#define ARENA_CART_DELIVERY_OUTCOME_KING_BUFF   4
+/* Per-slot outcome weights (ARENA_CART_DELIVERY_W_WEIGHTS/R_WEIGHTS) live in arena_game.c, next
+ * to cart_trigger_delivery -- the one real consumer, not header-wide state. */
+
+/* Michael (2026-09-11): see ARENA_HERO_MICHAEL's own doc comment above for the full founder-quote
+ * and design trail. Q (Flaming Sword): single-target direct damage, deliberately above this
+ * roster's typical Q range (most land 8-15, see e.g. ARENA_GUNNR_Q_DAMAGE/ARENA_ABRAHAM_Q_DAMAGE)
+ * -- "a general strong Q" was explicit in the ask. Cooldown/range sit mid-pack so the bigger
+ * number trades against cast frequency rather than just being strictly better. */
+#define ARENA_MICHAEL_Q_DAMAGE       22
+#define ARENA_MICHAEL_Q_RANGE        5.5f
+#define ARENA_MICHAEL_Q_COOLDOWN_MS  4500
+/* W (Heaven's Shield): self-targeted, sets shield_hp/shield_ms_remaining (see ArenaHero's own
+ * doc comment for the real absorption mechanic this drives). 60 shield HP against a 100 base HP
+ * pool is a genuinely "very strong" chunk for its 4-second window, matching the founder's own
+ * framing; the long cooldown (mid-pack for this roster's own biggest W-slot tools, e.g.
+ * ARENA_DOC_WHEEL_W_COOLDOWN_MS/ARENA_DUCK_W_COOLDOWN_MS) keeps it a real cooldown-gated decision,
+ * not a permanently-on damage reduction. */
+#define ARENA_MICHAEL_W_SHIELD_AMOUNT     60
+#define ARENA_MICHAEL_W_SHIELD_DURATION_MS 4000
+#define ARENA_MICHAEL_W_COOLDOWN_MS       15000
+/* R (Recast Victory): reuses Doc Wheel's own Bedside Manner SHAPE exactly -- ally-targeted
+ * (arena_hover_ally_or_nearest, same real mouseover-or-nearest targeting), heals more the more
+ * hurt the target is (BASE at 100% target hp, scaling up to LOW_HP at ~0%). Bigger numbers than
+ * Doc Wheel's own Q (ARENA_DOC_WHEEL_Q_HEAL_BASE/LOW_HP = 14/28) and an ultimate-tier cooldown
+ * (this roster's R slot is consistently its biggest, slowest payoff -- 15-30s across the board,
+ * see e.g. ARENA_DOC_WHEEL_R_COOLDOWN_MS) rather than Doc Wheel's own much shorter Q cooldown --
+ * Michael isn't a dedicated healer spamming this every few seconds, it's his one big defining
+ * rescue tool, matching how every other hero's R already behaves on this roster. Named after the
+ * character's own TYLER lore epithet (multiverse_heroes.md #124) on purpose: an ally handed back
+ * their own healthy state reads as its own small "recast," the one payoff Michael's own lore
+ * entry says he never gets to have himself. */
+#define ARENA_MICHAEL_R_HEAL_BASE    30
+#define ARENA_MICHAEL_R_HEAL_LOW_HP  55
+#define ARENA_MICHAEL_R_COOLDOWN_MS  18000
 
 /* Vassago (S170-93): passive small HP regen, always on, same shape as Dagda's Undry -- ambient
  * restorative foresight, sensing and softening harm before it fully lands. Q a ranged bolt,
@@ -983,11 +1141,38 @@ typedef enum {
  * heal-only, no enemy damage at all -- the roster's first purely-supportive ultimate, the mirror
  * of Vassago's purely-controlling one: she shares her sustenance, doesn't hurt anyone. */
 #define ARENA_HE_XIANGU_PASSIVE_REGEN_PER_SEC   2
+/* Moira Orb redesign (2026-08-26, founder real-time: "switch the targeted ability to another
+   hero who has a trash w and give them moira orb from overwatch" -> "give them moira orb on
+   their q" -> "give it to xehinhshu" -> "keep the code paths for the original fireball
+   ability... move it to that hero and it doesnt have to fully work for now"): He Xiangu's own
+   old Q (instant hitscan, ARENA_HE_XIANGU_Q_RANGE=6, heal-on-hit) is replaced by a real,
+   auto-targeting (arena_nearest_enemy, no range cap -- same "keep the code path" reuse as
+   Abraham's own W redesign) homing projectile, matching Overwatch's Biotic Orb in shape if not
+   in exact mechanics. Real, deliberate simplification per the founder's own "doesn't have to
+   fully work" allowance: the self-heal fires at CAST time (a flat amount, not tied to whether
+   the orb actually lands) rather than adding new on-hit-effect plumbing to ArenaProjectile for
+   a heal-the-caster case nothing else in this catalog needs yet -- an honest, smaller scope,
+   not a silently-dropped feature. ARENA_HE_XIANGU_Q_RANGE/Q_DAMAGE/Q_HEAL_PCT above are now
+   dead (left in place, not deleted, matching the founder's own "keep the code paths" framing)
+   -- the new ability uses its own constants below. */
+#define ARENA_HE_XIANGU_Q_ORB_SPEED              6.0f  /* faster than Abraham's slow fireball (3.0) -- Moira Orb reads as a moderate-paced projectile in its own source material, not a glacial skillshot */
+#define ARENA_HE_XIANGU_Q_ORB_RADIUS             0.5f
+#define ARENA_HE_XIANGU_Q_ORB_DAMAGE             9
+#define ARENA_HE_XIANGU_Q_ORB_MAX_RANGE   (ARENA_HALF_EXTENT * 4.0f) /* map-spanning, same "no matter how far away" reuse as Abraham's own fireball range */
+#define ARENA_HE_XIANGU_Q_ORB_SELF_HEAL          5     /* flat self-heal on cast -- see the redesign comment above for why this isn't heal-on-hit */
 #define ARENA_HE_XIANGU_Q_RANGE                 6.0f
 #define ARENA_HE_XIANGU_Q_DAMAGE                 7
 #define ARENA_HE_XIANGU_Q_HEAL_PCT               0.6f  /* fraction of Q's damage returned as self-heal */
 #define ARENA_HE_XIANGU_Q_COOLDOWN_MS         4200
 #define ARENA_HE_XIANGU_W_REGEN_PER_SEC          4
+/* Light/Dark stance (2026-08-26, founder: "someone that has a toggle have their toggle switch
+   between light and dark"): her existing free W toggle now genuinely switches between two
+   real stances instead of "buff when on, nothing when off" -- Light (w_active=1) keeps the
+   original regen-while-active mechanic unchanged; Dark (w_active=0, now the OTHER real stance
+   rather than just "off") grants a flat armor bonus, same "flat stat while toggled" shape
+   Ada's own W plating (ARENA_ADA_W_ARMOR_BONUS) already established -- reusing that pattern,
+   not inventing a new one. */
+#define ARENA_HE_XIANGU_DARK_ARMOR_BONUS          8
 #define ARENA_HE_XIANGU_R_RADIUS                 4.5f
 #define ARENA_HE_XIANGU_R_DURATION_MS         4000
 #define ARENA_HE_XIANGU_R_HEAL_PER_TICK          7
@@ -1351,10 +1536,56 @@ typedef struct {
      * own doc comment already established -- no existing item's initializer row needs touching. */
     int bonus_true_dmg;
     int bonus_lifesteal_pct;
+    /* bonus_attack_range_pct (S202-34, Kite String trinket, founder: "add an item that
+     * increases auto attack range by 4% 3333 flow 'Kite String' trinket"): a %-increase to
+     * basic-auto-attack range specifically (arena_hero_attack_range()), not ability ranges --
+     * the founder's own ask names "auto attack range" specifically, same narrow scope
+     * bonus_cdr_pct's own Haste Trinket precedent holds itself to (ability cooldowns AND
+     * auto-attack cooldown, but nothing wider than what was actually asked for). Zero-fills for
+     * every existing item via the same positional-initializer convention every other trailing
+     * stat on this struct already relies on. */
+    int bonus_attack_range_pct;
+    /* bonus_mp_regen_combat (S205-87, "Luck of the Draw" trinket, founder, cruise-queue: "we
+     * should have a weapon that is on like page 5 for 2.2k flow a trinket called 'luck of the
+     * draw' that gives some mana regen during combat") -- a flat bonus added directly to
+     * ARENA_MP_REGEN_IN_COMBAT_PER_SEC (arena_game.c's own real mana-regen tick), not a
+     * percentage: that base in-combat rate is itself a flat int (1), so a flat bonus is the
+     * consistent unit, not the %-shape bonus_cdr_pct/bonus_attack_range_pct use for their own
+     * different base mechanics. Zero-fills for every existing item via the same trailing-field
+     * positional-initializer convention every prior append (bonus_cdr_pct, bonus_true_dmg/
+     * bonus_lifesteal_pct, bonus_attack_range_pct) already established. */
+    int bonus_mp_regen_combat;
 } ArenaItemDef;
 
 extern const ArenaItemDef ARENA_ITEMS[];
-#define ARENA_ITEM_COUNT 33 /* 2026-08-11: was 27 -- +6 for the "expand the play space" first pass (Gae Bolg, Masamune, Muramasa, Balance Ring, Empress Hairpin, Ninja Tekko), pushing the shop UI's own SHOP_PAGE_COUNT (apps/arena/src/main.c, ceil(ARENA_ITEM_COUNT/SHOP_ITEMS_PER_PAGE)) from 3 to a real 4th page -- founder: "add page 4 to the shop." No client-side paging code needed for this: SHOP_PAGE_COUNT is entirely derived from this one constant already. */
+#define ARENA_ITEM_COUNT 43 /* 2026-09-11: was 35 -- +8, a real GFD-item-database-inspired pass
+    (founder: "iterate on REDGARDEN add some more items look into the GFD item database for
+    inspiration bring in AD not just AP") -- see ARENA_ITEMS' own doc comment above these 8
+    entries for the full design. All 8 use this catalog's EXISTING stat fields only (no new
+    ArenaItemDef member added this pass -- confirmed in scope with the founder before writing
+    code, since REDGARDEN's abilities have no stat-scaling mechanic at all to hook a real new
+    "ability power" stat into, per this header's own long-standing note a few lines below). Five
+    close a real, concrete gap this pass found by directly counting the existing catalog: Body,
+    Legs, Feet, Neck, and Waist each had exactly ONE item -- zero real build choice in 5 of this
+    catalog's 11 slots -- now each has a genuine second option with a different stat shape, not a
+    strict upgrade. Three are new flagship Weapon-slot items (Excalibur becomes this catalog's
+    single most powerful/expensive item, matching its real mythic reputation).
+    2026-09-03: was 34 -- +1 for Luck of the Draw (S205-87, founder,
+    cruise-queue: "we should have a weapon that is on like page 5 for 2.2k flow a trinket called
+    'luck of the draw' that gives some mana regen during combat"), appended at the end of the
+    catalog, same "indices stay stable" convention every prior append already used. Real, honest
+    note: at this catalog size SHOP_PAGE_COUNT (apps/arena/src/main.c, ceil(ARENA_ITEM_COUNT/
+    SHOP_ITEMS_PER_PAGE), 9 items/page) computes to page 4, not page 5 -- the founder's own "page
+    5" was descriptive ("somewhere further down the shop"), not a literal page-count requirement
+    to hit exactly; not padded with filler items just to force a 5th page that doesn't reflect a
+    real 37th+ item existing yet. 2026-08-26: was 33 -- +1 for Kite String (S202-34, founder:
+    "add an item that increases auto attack range by 4% 3333 flow 'Kite String' trinket"),
+    appended at the end of the catalog, same "indices stay stable" convention every prior append
+    already used. 2026-08-11: was 27 -- +6 for the "expand the play space" first pass (Gae Bolg,
+    Masamune, Muramasa, Balance Ring, Empress Hairpin, Ninja Tekko), pushing the shop UI's own
+    SHOP_PAGE_COUNT from 3 to a real 4th page -- founder: "add page 4 to the shop." No
+    client-side paging code needed for this: SHOP_PAGE_COUNT is entirely derived from this one
+    constant already. */
 /* ARENA_BALANCE_RING_ITEM_ID (2026-08-11, "expand the play space" pass): a named index, same
  * reasoning ARENA_BLINK_DAGGER_ITEM_ID's own doc comment gives -- Balance Ring's comeback armor
  * bonus scales LIVE with the wearer's own missing-HP fraction (computed inside
@@ -1380,6 +1611,40 @@ extern const ArenaItemDef ARENA_ITEMS[];
  * should make the hero do the paper airplane glide thing"): see ARENA_BLINK_DAGGER_ITEM_ID's own
  * doc comment just above -- same reasoning, second (and currently last) fixed-index active item. */
 #define ARENA_DONKEY_ITEM_ID 25
+
+/* ---- Item curriculum (NORTHSTAR.md §26.3.2, 2026-08-25) ----
+ * Founder real-time: "continue the exotic auto curriculum redgarden work" -> "training" ->
+ * "parena mod driven first" -- §25.4's existing autocurriculum picks WHICH OPPONENT to train
+ * against from a pool of past checkpoints; §26.3.2 is a real, explicit scope expansion asked
+ * for directly by the founder: also curriculum-generate NEW ITEMS meant to "meta break the top
+ * teams" (counter whichever team composition the current policy is losing to), a POET/PAIRED-
+ * style environment-parameter curriculum layered on top of the opponent one, not a replacement
+ * for it.
+ *
+ * This section is the GENERATION PRIMITIVE only, PARENA-mod-driven per the founder's own
+ * sequencing ("parena mod driven first"): redgarden_host_item_curriculum_generate_counter_item
+ * blends two existing ARENA_ITEMS catalog entries' own stat fields (average + a small
+ * deterministic jitter, reproducible from the same two base items rather than truly random)
+ * into one of a small number of runtime-mutable "curriculum slots". Deciding WHICH two items
+ * to blend from (reading which items the currently-dominant team composition is using -- not
+ * even observable to the Python training loop yet, `sim_get_obs_team_any`'s observation vector
+ * carries no item-purchase state today) and evaluating whether a generated item actually
+ * counters that composition are real, unresolved training-loop questions, same honesty
+ * convention NORTHSTAR.md §26.3.2 itself already uses -- NOT built in this pass.
+ *
+ * Curriculum items live in a SEPARATE, runtime-mutable array (ARENA_ITEM_CURRICULUM_SLOTS
+ * below), not appended into the fixed, `const`, compile-time-sized ARENA_ITEMS[] catalog --
+ * every existing call site that indexes ARENA_ITEMS by a raw int id (shop UI, inventory
+ * application, network snapshot item ids, ARENA_BLINK_DAGGER_ITEM_ID-style fixed indices) would
+ * need auditing to become curriculum-slot-aware before a generated item could safely enter live
+ * gameplay -- deliberately not attempted here. This is training-side machinery a future
+ * consumer reads via redgarden_host_item_curriculum_get, same "plumbing first, consumption
+ * later" shape §25.4's own C-level prerequisite (sim_step_team_vs_actions) was built in. */
+#define ARENA_ITEM_CURRICULUM_SLOT_COUNT 4
+extern ArenaItemDef ARENA_ITEM_CURRICULUM_SLOTS[ARENA_ITEM_CURRICULUM_SLOT_COUNT];
+
+int redgarden_host_item_curriculum_generate_counter_item(int base_item_a, int base_item_b, int slot_index);
+const ArenaItemDef *redgarden_host_item_curriculum_get(int slot_index);
 
 #define ARENA_ITEM_SELL_REFUND_PCT 50 /* founder: "sell it back for less" */
 #define ARENA_SHOP_RADIUS 3.0f /* same "stand near it" convention as ARENA_FOUNTAIN_RADIUS */
@@ -1626,6 +1891,42 @@ typedef struct {
 #define ARENA_KING_WEALTH_DURATION_MS   30000
 #define ARENA_KING_WEALTH_ARMOR_BONUS     12 /* flat armor, this engine's damage model is flat-subtraction (apply_armor), not percentage -- comparable in scale to real armor items (e.g. Iron Ram Trousers' 18) */
 #define ARENA_KING_WEALTH_AURA_RADIUS    6.0f /* wider than a normal ability radius on purpose -- "shelter a group" */
+
+/* Day/night cycle + Bloodflower world event (2026-08-25). Founder real-time: "bring in the day
+ * night cycle from SHANKPIT main" -> "including the lighting" -> "but have the moon trigger an
+ * event called the bloodflower" -> "the bloodflower triggers when the moon is at its highest
+ * point in the sky" -> "but bring it into GFD totally as parena" -> "fuck it do it into
+ * redgarden first" (upstream-first, same precedent as Jungle Camps/Four Heavenly Kings, see
+ * that section's own doc comment above) -> "but it should all be events with parena mods ya
+ * know?" (event-driven: the host fires a named event, a PARENA-compiled mod handles it -- same
+ * shape PITVIPER's S192-01 wheel-scroll mod already proved, see stdlib/redgarden/
+ * bloodflower_mod.prn's own header comment for the exact ABI).
+ *
+ * Time-of-day math (sun/moon direction, ambient tint) is ported from SHANKPIT's
+ * packages/render/retro_sky.c/retro_lighting.c reference implementation (the founder's own
+ * named source), adapted for this game's top-down/isometric camera: no 3D sky dome, just an
+ * ambient RGB tint driven by the same time_sec -> phase math, consumed by apps/arena's
+ * glClearColor background. Core cycle state lives in arena_game.c (server-authoritative, real
+ * simulation state, synced to clients the same way King/camp state already is) -- only the
+ * Bloodflower's *trigger*, at moon zenith, goes through the PARENA mod surface, matching how
+ * PITVIPER's own underlying scrollback mechanism already existed and only the wheel-event
+ * trigger went through the mod. */
+#define ARENA_DAYNIGHT_ORBIT_SPEED 0.025f /* radians/sec, ported verbatim from SHANKPIT retro_sky.c's retro_sky_eval_sun_dir -- same real orbit rate, not re-tuned for this game. Natural period = 2*PI/0.025 = ~251s (~4:11), giving roughly two full day/night cycles in a typical under-15-min match */
+#define ARENA_DAYNIGHT_TILT        0.40f /* radians, same ported constant as SHANKPIT's own `tilt` local in retro_sky_eval_sun_dir */
+#define ARENA_DAYNIGHT_ZENITH_REARM_THRESHOLD 0.30f /* moon_height must drop back below this before daynight_zenith_fired re-arms -- clearly past the peak, not a near-zenith wobble; same smoothstep-scale magnitude retro_lighting.c's own sun_visibility/moon_visibility thresholds use (0.22-0.28) */
+
+/* Bloodflower (2026-08-25): a real, server-authoritative world object that spawns at map
+ * center (0,0 -- same "deterministic, real coordinate" convention as arena_fountain_position/
+ * arena_camp_position, see those functions' own doc comments) the instant the moon crosses
+ * zenith, grants a real Flow bonus to whichever team's hero claims it first (walks within
+ * ARENA_BLOODFLOWER_CLAIM_RADIUS), then despawns -- deliberately simple and demonstrable rather
+ * than a guessed-at deeper gameplay system, since the founder specified only the trigger
+ * condition ("triggers when the moon is at its highest point"), not the effect. Reuses the same
+ * "econ reward, computed live, not copied onto a hero field" shape King/All-Seeing's own Flow
+ * bonus already established, rather than inventing a new buff-application idiom. */
+#define ARENA_BLOODFLOWER_LIFETIME_MS      20000 /* despawns unclaimed after 20s -- real time pressure, shorter than a King's own multi-minute presence since this is a single-tick econ pickup, not a boss fight */
+#define ARENA_BLOODFLOWER_CLAIM_RADIUS      2.0f /* tight -- a hero has to actually walk onto it, not proximity-aura like King/Wealth */
+#define ARENA_BLOODFLOWER_CLAIM_FLOW         150 /* between a camp minion (60) and a King (300) -- a real but not dominant reward, matching this file's existing tiering */
 #define ARENA_KING_WEALTH_GOLD_PER_SEC      4 /* small trickle to nearby allies -- deliberately smaller than All-Seeing's own bonus, "a smaller bonus-gold trickle" per the holder's real domain */
 
 /* §25.3 Synergy decay -- a REAL LIVE-MATCH COMEBACK MECHANIC, not a training technique
@@ -1794,6 +2095,11 @@ typedef struct {
     int r_zone_tick_ms; /* Ghost's Recital: counts up to 1000ms, then ticks one DPS-worth of damage --
                           * a fixed-interval tick rather than fractional-per-tick accumulation, so it
                           * behaves correctly at any real frame rate, not just in a single big test step. */
+    int duck_smoke_ms;   /* Duck W, Smoke Bomb (S202-10): remaining cloud duration, >0 while active.
+                           * Hero-specific rather than reusing r_zone_x/r_active_ms above -- this is a
+                           * W ability, and Duck's own R (Total Telekinesis) is an instant pull with no
+                           * zone of its own, so there's no real R-zone slot to share here. */
+    float duck_smoke_x, duck_smoke_z; /* Duck W: fixed cloud position at cast time */
     /* zone_radius (NORTHSTAR §24 Milestone 2, 2026-07-31): every zone-ability hero before the
      * Cart has exactly ONE zone-shaped ability, so its radius was always just a fixed constant
      * read directly in tick_hero_kit -- no need to store it on the hero. The Cart's W and R are
@@ -1802,6 +2108,14 @@ typedef struct {
      * radius applies is genuinely ambiguous without this -- set by whichever of W/R most recently
      * activated the zone, read by tick_hero_kit's own CART case. Unused (0) by every other hero. */
     float zone_radius;
+    /* cart_delivery_pity (S202-42): per-outcome Fibonacci-pity counters for
+     * arena_marble_bag_pick, one entry per ARENA_CART_DELIVERY_OUTCOME_* index. Hero-specific
+     * storage (not match-wide) since pity is a per-Cart-player streak, matching the founder's
+     * own "occasionally" framing -- a Cart player who keeps rolling Slow should see it get
+     * genuinely rarer for THEM specifically, not have their luck shared with the enemy team's
+     * own Cart. Zero-initializes correctly with the rest of ArenaHero (fib(0)=1, a real nonzero
+     * base weight, not a locked-out one -- see arena_fibonacci's own doc comment). */
+    int cart_delivery_pity[ARENA_CART_DELIVERY_OUTCOME_COUNT];
     /* Cast-time ability state (S170-203, founder: "switch gary w to aimed shot just like wow
      * hunter cast time big damage for now movement interrupts cast damage does not interrupt
      * cast silence does"). Generic across any slot/hero, same "shared field names across kits"
@@ -1824,6 +2138,12 @@ typedef struct {
     int cast_total_ms;
     float cast_anchor_x, cast_anchor_z;
     int cast_target;
+    /* cast_target_x/z (S202-34, Abraham's Fireball): the ground point
+     * locked in at cast start, for a ground-targeted (skillshot) ability --
+     * generic, same reasoning as cast_target just above, just for a point
+     * instead of a hittable-enemy index. Unused (0) by every cast that has
+     * no ground-target component. */
+    float cast_target_x, cast_target_z;
     /* Status effects -- generic, any hero's kit can apply these to any
      * other hero, not just Ghost's own state (S170-32 is the first kit to
      * apply them, but the fields aren't Ghost-specific). */
@@ -1850,6 +2170,19 @@ typedef struct {
      * it's the entire point of the ability, using the same centralized
      * apply_damage() every damage call site already routes through. */
     int survive_floor_ms;
+    /* shield_hp/shield_ms_remaining (Michael's W, "Heaven's Shield," 2026-09-11): this roster's
+     * first REAL damage-absorption shield -- apply_damage_ex drains shield_hp before touching
+     * real hp, at the exact same central choke point survive_floor_ms's own doc comment already
+     * names. Not a simplified-away stand-in like Doc Wheel's own R ("teamwide heal, simplified
+     * from a shield -- shields would be a new generic damage-absorption mechanic," see
+     * ARENA_DOC_WHEEL_R_HEAL's own doc comment): that exact deferred mechanic is what this is.
+     * Generic, any hero's kit could apply it, same "status effect any kit could use" reasoning as
+     * every other field on this struct -- Michael is simply the first to. shield_ms_remaining
+     * decays like every other timed status effect above; the shield disappears when it expires,
+     * whether or not it was ever fully broken (a real MOBA-standard shield shape, not a
+     * permanent buff). */
+    int shield_hp;
+    int shield_ms_remaining;
     /* stunned_ms (S170-184, founder: "add more status effects use GFD [as a reference]" --
      * GoblinFoxDragon's server/status package, Paralyze). > 0: cannot move, cannot cast
      * Q/W/R, cannot auto-attack -- the generic "hard CC" hero_status_label's own doc comment
@@ -2158,6 +2491,23 @@ typedef struct {
      * bonus_true_dmg/bonus_lifesteal_pct for the full design. */
     int item_bonus_true_dmg;
     int item_bonus_lifesteal_pct;
+    /* item_bonus_attack_range_pct (S202-34, Kite String trinket, founder: "add an item that
+     * increases auto attack range by 4% 3333 flow"): same recomputed-cache shape as the fields
+     * above, consumed by arena_hero_attack_range(). */
+    int item_bonus_attack_range_pct;
+    /* item_bonus_mp_regen_combat (S205-87, Luck of the Draw trinket): same recomputed-cache
+     * shape as the fields above, consumed directly by the mana-regen tick's own in-combat rate
+     * (arena_game.c, "Mana regen" comment). */
+    int item_bonus_mp_regen_combat;
+    /* facing_rad (S202-40, Bacon+Puck's Shadow Step, founder: "add a sense of hero direction i
+     * guess so we can actually teleport behind them"): a real, server-authoritative facing
+     * angle, updated in update_hero_motion from the live movement direction (atan2f(dx, dz),
+     * same x/z-ordering convention apps/arena's own CLIENT-side hero_facing_rad already used
+     * purely for rendering) -- this is the first time a facing concept exists server-side, not
+     * just interpolated client-visual. Preserved (not reset) while stationary, matching every
+     * real MOBA's own "you keep facing whichever way you last moved" convention. Radians,
+     * standard atan2f range (-pi, pi]. */
+    float facing_rad;
 } ArenaHero;
 
 typedef struct {
@@ -2251,38 +2601,61 @@ typedef struct {
      * doesn't exist yet; homing only ever changes whether a shot connects
      * via POSITIONING, never whether it connects via chance. */
     int homing_target;
+    /* pierce/pierced_mask (S202-34, Abraham's Fireball): 0 = the existing
+     * behavior above (deactivates on first hit, one target only). 1 = a
+     * real piercing skill-shot -- keeps travelling and can hit MULTIPLE
+     * enemies, one bit per hero slot in pierced_mask tracking who this
+     * exact shot has already damaged so a slow-moving pierce can't double-
+     * or triple-tick the same target while it's still overlapping them.
+     * Still despawns at max_range like any other shot; still real armor/
+     * on-hit-status application per hit, just without the early return.
+     * ARENA_MAX_HEROES <= 32 (checked at the one real call site) so a
+     * plain uint32_t bitmask is enough, no array needed. */
+    int pierce;
+    unsigned int pierced_mask;
 } ArenaProjectile;
 
 /* ArenaObstacle: static jungle terrain, see the ARENA_OBSTACLE_COUNT
  * comment above for placement rationale. `radius` is the collision/visual
  * footprint (a circle -- the client draws it as one or two boxes, see
  * draw_obstacle in apps/arena, but collision itself stays circle-vs-circle
- * for the same cheap-and-good-enough reason hero-vs-hero would be). */
+ * for the same cheap-and-good-enough reason hero-vs-hero would be).
+ *
+ * hp/max_hp (2026-08-25, ARENA_HERO_TREE passive, see this file's own
+ * "Tree passive" section below): only meaningful for ARENA_OBSTACLE_TREE --
+ * rocks leave both at 0/unused, same "field exists but only one kind reads
+ * it" convention ArenaHero's own kit-specific fields (e.g. king_growth_ms)
+ * already use rather than a separate per-kind struct. Position/radius/kind
+ * stay static and never wire-synced (this struct's own doc comment above);
+ * hp is the one genuinely dynamic field and IS wire-synced (protocol.h's
+ * ArenaSnapshotMsg.obstacle_hp), same "static layout, dynamic state
+ * synced separately" split powerups already use for kind/active vs
+ * position. */
 typedef struct {
     float x, z;
     float radius;
     ArenaObstacleKind kind;
+    int hp, max_hp;
 } ArenaObstacle;
 
-/* ArenaDamageLogEntry (S189-01, "go ahead and add the damage log to REDGARDEN" -- "so you can
- * have the ui match for both GFD and REDGARDEN"): ported verbatim from REDGARDEN (commit
- * 6292c9e). One real damage event, rolling last-N feed (standard real-MOBA combat-log UX --
- * League of Legends and Dota 2 both do this, not a scrollable persistent history). v0 scope,
- * deliberately: damage events only, not kills/buffs/objectives (those are real, separate
- * features).
+/* ArenaDamageLogEntry (S189-01, "go ahead and add the damage log to REDGARDEN"): one real
+ * damage event, rolling last-N feed (standard real-MOBA combat-log UX -- League of Legends and
+ * Dota 2 both do this, not a scrollable persistent history). v0 scope, deliberately: damage
+ * events only, not kills/buffs/objectives (those are real, separate features).
  *
  * source_hero_id honest limitation: apply_damage() (this file's own single choke point for all
  * hero damage, ~50 call sites) is NOT changed to thread an attacker through every site -- that
- * would mean touching all ~50 call sites' argument lists, a bigger, riskier change than this
- * feature needs. ArenaHero's own last_attacked_by_owner field looked like a shortcut but isn't
- * reliably fresh for this purpose (only set at melee/homing-shot damage sites, left stale by
- * ability-damage calls that don't touch it) -- using it here would misattribute ability damage
- * to a stale prior melee attacker. So: apply_damage()'s own default path logs with
- * source_hero_id = ARENA_HERO_COUNT (a real, out-of-range sentinel -- every real ArenaHeroID is
- * < ARENA_HERO_COUNT) meaning "unattributed." The one path upgraded to real attribution is
- * resolve_combat's direct hero-vs-hero duel (both hero pointers already in scope there, zero
- * risk) via apply_damage_ex(). Ability/creep/tower damage stays unattributed in this pass --
- * flagged as a real, deliberate scope narrowing, not silently dropped. */
+ * would mean touching all ~50 call sites' argument lists under real time pressure, a bigger,
+ * riskier change than this feature needs. ArenaHero's own last_attacked_by_owner field looked
+ * like a shortcut but isn't reliably fresh for this purpose (S170-175's own doc comment: "only
+ * ever set at the melee/homing-shot damage sites," left stale by ability-damage calls that don't
+ * touch it) -- using it here would misattribute ability damage to a stale prior melee attacker.
+ * So: apply_damage()'s own default path logs with source_hero_id = ARENA_HERO_COUNT (a real,
+ * out-of-range sentinel -- every real ArenaHeroID is < ARENA_HERO_COUNT) meaning "unattributed."
+ * The one path upgraded to real attribution is resolve_combat's direct hero-vs-hero duel (both
+ * hero pointers already in scope there, zero risk) via apply_damage_ex(). Ability/creep/tower
+ * damage stays unattributed in this pass -- flagged as a real, deliberate scope narrowing, not
+ * silently dropped. */
 #define ARENA_DAMAGE_LOG_CAPACITY 12
 typedef struct {
     ArenaHeroID target_hero_id;
@@ -2333,6 +2706,26 @@ typedef struct {
      * same sentinel-after-memset idiom as ArenaCreep's
      * last_attacked_by_owner). */
     int hover_target[ARENA_MAX_HEROES];
+    /* ground_target (S202-34, Abraham's Fireball): same per-owner,
+     * set-right-before-dispatch shape as hover_target above, for
+     * ground-targeted (skillshot) abilities instead of unit-targeted ones.
+     * has_ground_target[i] is 0 unless the owner's most recent cast packet
+     * carried a real click point (ArenaCastCmd.has_ground_target); the
+     * individual cast function decides whether it actually cares (only
+     * Abraham's W does today), same "generic, not hero-specific" idiom as
+     * hover_target. Set by arena_set_ground_target(), called from both the
+     * networked path (apps/arena_server's PACKET_ARENA_CAST handler) and
+     * the local 1v1 demo's own direct keybind handler. */
+    int has_ground_target[ARENA_MAX_HEROES];
+    float ground_target_x[ARENA_MAX_HEROES];
+    float ground_target_z[ARENA_MAX_HEROES];
+    float time_of_day_sec; /* day/night cycle accumulator (seconds, not ms -- matches SHANKPIT retro_sky.c's own time_sec convention directly, no unit conversion at the call site), ticked from the same arena_update_teams path arena_tick_kings already uses */
+    float prev_moon_height; /* moon_dir_y from the previous tick -- local-maximum (zenith) detection compares consecutive samples instead of computing an exact analytical crossing, robust to the accumulator running indefinitely with no explicit wrap logic needed */
+    int moon_was_rising; /* 1 if moon_height was still increasing as of the previous tick -- "was rising, now falling" is the zenith-just-passed condition */
+    int daynight_zenith_fired; /* edge-trigger guard: 1 once this cycle's moon-zenith event has fired, reset to 0 once moon_height drops back below ARENA_DAYNIGHT_ZENITH_REARM_THRESHOLD (clearly-descended, not near zenith) -- without this the mod would fire on every tiny wobble near the peak instead of exactly once per real cycle */
+    int bloodflower_active; /* 1 while an unclaimed Bloodflower exists in the world */
+    float bloodflower_x, bloodflower_z; /* always (0,0), map center -- kept as real fields (not a hardcoded literal at every read site) so a future non-center spawn point is a one-line change, same pattern ArenaCampMinion.x/z use even though camp positions are currently deterministic too */
+    int bloodflower_ms_remaining; /* counts down from ARENA_BLOODFLOWER_LIFETIME_MS; despawns at 0 */
     ArenaDamageLogEntry damage_log[ARENA_DAMAGE_LOG_CAPACITY]; /* S189-01: real combat damage log, ring buffer -- see ArenaDamageLogEntry's own doc comment */
     int damage_log_head; /* next write index, wraps -- 0 (memset default) is correct at match start */
     int damage_log_count; /* how many entries are actually valid so far, caps at ARENA_DAMAGE_LOG_CAPACITY -- distinct from head so the UI doesn't render stale zeroed slots before the buffer's first lap */
@@ -2398,6 +2791,35 @@ ArenaHero *arena_nearest_ally(int owner);
  * the status-effect fields on ArenaHero. No-op if owner is out of the real
  * per-player range. */
 void arena_set_hover_target(int owner, int target);
+
+/* arena_set_ground_target (S202-34): records the ground point `owner`'s
+ * most recent cast packet carried, for ground-targeted (skillshot)
+ * abilities -- see arena_state.has_ground_target's own doc comment.
+ * has_target 0 means "no ground point on this cast" (ordinary unit-
+ * targeted/self-targeted cast), in which case x/z are ignored. No-op if
+ * owner is out of the real per-player range. */
+void arena_set_ground_target(int owner, int has_target, float x, float z);
+
+/* arena_fibonacci (S202-09/S202-42): fib(0)=fib(1)=1 (a real "never fully locked out" floor for
+ * a fresh/reset pity counter -- the textbook fib(0)=0 would zero out an outcome's weight
+ * entirely), grows the standard way after that. Real, generic, not Cart-specific -- exposed for
+ * arena_marble_bag_pick's own use and any future caller. */
+int arena_fibonacci(int n);
+
+/* arena_marble_bag_pick (S202-09, NORTHSTAR's own long-documented "weighted marble-bag +
+ * Fibonacci-pity pull algorithm," first real implementation anywhere in this repo -- flagged in
+ * that doc as "worth building once as a shared utility rather than twice as unrelated bespoke
+ * code" for exactly this reason, so this is a real, generic, non-Cart-specific primitive, not
+ * buried as a static helper): weighted-random pick among `n` outcomes. `pity[i]` is how many
+ * consecutive picks outcome i has been passed over; effective weight = weights[i] *
+ * arena_fibonacci(min(pity[i], ARENA_MARBLE_BAG_MAX_PITY_TIER)) -- an outcome that keeps losing
+ * gets progressively more likely, uncapped in principle but tier-capped in practice so the
+ * multiplier doesn't run away. Updates `pity` in place: the winner resets to 0, every other
+ * outcome's pity increments by 1. Caller owns `pity`'s storage (per-hero, per-match, wherever a
+ * given use case wants pity scoped to) and passes it in fresh each call -- no hidden global
+ * state. Returns -1 if n<=0 or every effective weight is 0 (caller error, not a real pick). */
+#define ARENA_MARBLE_BAG_MAX_PITY_TIER 10 /* fib(10)=55 -- a real but bounded ceiling, not runaway growth */
+int arena_marble_bag_pick(const int *weights, int *pity, int n);
 
 /* arena_set_attack_target (S170-162): PACKET_ARENA_ATTACK's server-side
  * entry point -- locks `owner` onto `target` (a real, in-range-of-the-real-
@@ -2569,6 +2991,67 @@ int arena_shop_buy(int owner, int item_id);
  * into bag for now" -- there's no bag to move it into, selling is the
  * only way to clear a slot. */
 int arena_shop_sell(int owner, ArenaItemSlot slot);
+
+/* ---------------- Build templates (2026-08-25) ----------------
+ * Founder real-time, fragmented: "ok in redgarden lets experiment with the idea that tech trees
+ * are just item templates" -> "choosing a build can let you auto buy at the shop" -> "or you can
+ * make your own build obviously" -> "or do a custom build to buy your items" -> "or some
+ * combination a build doesn't have to define all items" -> "and there can be complex ordering
+ * rules" -> "all powered by parena scripting and parena mods" -> "not sure on the affordances
+ * command based via the chat for now is fine."
+ *
+ * Reading: a build is a NAMED, ORDERED, POSSIBLY-PARTIAL list of items (it doesn't have to fill
+ * all ARENA_ITEM_SLOT_COUNT slots) that the shop auto-buys from, in order, as Flow allows -- the
+ * "complex ordering rules" this pass implements as the literal purchase-priority order baked
+ * into each template (cheapest-affordable-first within a theme, so partial Flow still buys
+ * something useful rather than stalling on one expensive first pick). "Or you can make your own
+ * build obviously" reads as: item-by-item manual purchase (arena_shop_buy, already real, already
+ * shipped) stays exactly as available as it always was -- a template is a shortcut on top of
+ * that, not a replacement requiring a new build-EDITOR UI, which isn't attempted this pass.
+ *
+ * Affordance: apps/arena has no chat/command box at all (that's specific to GFD's own
+ * apps2/battlegrounds_gui fork) -- the founder's own "not sure... chat... is fine for now" left
+ * this genuinely open, so this instead extends the shop's EXISTING click-based page UI with one
+ * more page listing build presets, matching the affordance the shop already trains players on
+ * rather than inventing a second, unrelated input surface. Chat-based selection can still be
+ * added later if GFD's own chat pattern gets ported upstream into apps/arena; not a dead end. */
+#define ARENA_BUILD_TEMPLATE_MAX_ITEMS 6 /* headroom above every preset below (4 items each); a template need not use them all -- item_count says how many are real */
+
+typedef struct {
+    const char *name;
+    const char *desc;
+    int item_ids[ARENA_BUILD_TEMPLATE_MAX_ITEMS]; /* PURCHASE ORDER -- the "complex ordering rules" -- cheapest-first within the theme */
+    int item_count;
+} ArenaBuildTemplate;
+
+extern const ArenaBuildTemplate ARENA_BUILD_TEMPLATES[];
+#define ARENA_BUILD_TEMPLATE_COUNT 3 /* Bruiser, Assassin, Caster -- a first, generic (any-hero) pass; per-hero curated builds are real, separate future scope, not attempted here */
+
+/* arena_hero_apply_build_template: buys as many of template_id's items as `owner` can currently
+ * afford, IN ORDER, skipping any item already equipped in its own slot (idempotent re-click --
+ * clicking the same build twice never re-buys what you already have) and STOPPING (not failing)
+ * at the first item that's unaffordable right now -- so a partial Flow balance still buys real
+ * progress toward the build instead of an all-or-nothing purchase, matching "a build doesn't
+ * have to define all items" applying just as much to what a *player* can afford as to what the
+ * template author chose to list. Same shop-proximity/alive/active gating as arena_shop_buy
+ * (delegated to it directly -- every individual purchase in the sequence IS a real
+ * arena_shop_buy call, not a parallel reimplementation). Each successful purchase routes through
+ * the PARENA-compiled on_apply_build_template_item (the trigger, per "all powered by parena
+ * scripting and parena mods"), which calls back into redgarden_host_buy_build_item -- same
+ * "mod is the trigger, host C does the mutation" split bloodflower_mod.prn/tree_passive_mod.prn
+ * both already established. Returns the number of items actually purchased this call (0 if the
+ * template is fully owned already, out of range, or the hero can't afford/reach the shop at
+ * all). */
+int arena_hero_apply_build_template(int owner, int template_id);
+
+/* redgarden_host_buy_build_item: the real host-side implementation the PARENA-compiled
+ * on_apply_build_template_item calls back into (see build_template_mod_host.h). Thin wrapper
+ * around arena_shop_buy -- exists as its own function (rather than calling arena_shop_buy
+ * directly from the mod) only because the mod boundary needs a stable, minimal C ABI to cross,
+ * same reasoning redgarden_host_spawn_bloodflower/redgarden_host_tree_passive_strike both already
+ * establish. Returns 1 on a real purchase, 0 otherwise -- arena_hero_apply_build_template uses
+ * this to know whether to keep advancing through the template or stop. */
+int redgarden_host_buy_build_item(int hero_index, int item_id);
 
 /* arena_use_blink (S170-205): activates Blink Dagger -- no-op (no cooldown spent) unless the
  * hero has ARENA_BLINK_DAGGER_ITEM_ID actually equipped, is alive, not stunned, and
@@ -2765,6 +3248,106 @@ void arena_hero_attack_camp_minions(unsigned int dt_ms);
  * the 3 timer-based King buffs (Music's king_music_carrier is not a timer, see its own field doc
  * comment). Called from arena_update_teams() only. */
 void arena_tick_kings(unsigned int dt_ms);
+
+/* arena_tick_daynight (2026-08-25): advances time_of_day_sec, computes the current moon height
+ * (ported from SHANKPIT retro_sky.c's sun/moon orbit math -- moon_dir_y = -sun_dir_y), and
+ * detects the instant the moon passes its zenith (local maximum of moon height) via consecutive-
+ * sample comparison (see ArenaState.prev_moon_height/moon_was_rising's own doc comments) rather
+ * than an exact analytical crossing -- simpler, and exact enough for a gameplay trigger. On a
+ * real zenith crossing, calls into the PARENA-compiled on_moon_zenith (stdlib/redgarden/
+ * bloodflower_mod.prn) at map center, which calls back into redgarden_host_spawn_bloodflower
+ * below -- a real round-trip through compiled PARENA code, not a direct call to the spawn logic.
+ * Also advances bloodflower_ms_remaining and despawns/claims it. Called from arena_update_teams()
+ * only, same as arena_tick_kings -- see that function's own doc comment. */
+void arena_tick_daynight(unsigned int dt_ms);
+
+/* arena_hero_claim_bloodflower: each active, alive hero within ARENA_BLOODFLOWER_CLAIM_RADIUS of
+ * an active Bloodflower claims it (first hero checked each tick wins -- heroes array order is
+ * the same implicit priority arena_hero_attack_creeps' own nearest-target scan already relies
+ * on elsewhere in this file), granting ARENA_BLOODFLOWER_CLAIM_FLOW and despawning it
+ * immediately. Called from arena_update_teams() right after arena_tick_daynight. */
+void arena_hero_claim_bloodflower(void);
+
+/* arena_daynight_ambient_rgb: pure query, no side effects -- recomputes sun_height from
+ * arena_state.time_of_day_sec fresh each call (same formula arena_tick_daynight already uses)
+ * and maps it to an ambient tint, same smoothstep-driven day/night blend shape SHANKPIT
+ * retro_lighting.c's own ambient_r/g/b formula uses (ported constants, adapted: this game's
+ * top-down camera has no sky dome to light, so this feeds a background/ambient clear-color tint
+ * directly rather than per-surface Lambertian shading). Callers: apps/arena/src/main.c's
+ * in-match render loop (not the pre-match queuing/draft screens -- day/night doesn't apply
+ * before a match's own clock is running). */
+void arena_daynight_ambient_rgb(float *out_r, float *out_g, float *out_b);
+
+/* redgarden_host_spawn_bloodflower: the real host-side implementation the PARENA-compiled
+ * on_moon_zenith calls back into (see bloodflower_mod_host.h). Sets bloodflower_active/x/z/
+ * ms_remaining on arena_state -- the actual, real world-state mutation; on_moon_zenith itself
+ * has no logic beyond this one call, matching vterm_mod.prn's own "one function, no dispatch
+ * table" minimalism. */
+void redgarden_host_spawn_bloodflower(int x, int z);
+
+/* ---------------- Tree passive (2026-08-25) ----------------
+ * Founder real-time: "can you add a passive to tree that when he is close enough to a tree to
+ * auto attack it he auto attacks it and slowly regenerates health?" -> "the tree he attacks
+ * never does or anything have it jiggle animate extra squishy" -> "as a parena first mod led dev
+ * cycle." "tree" = ARENA_HERO_TREE; "a tree" = the existing decorative ARENA_OBSTACLE_TREE
+ * jungle-obstacle pieces (arena_obstacles_reset_layout) -- those had zero interaction before this,
+ * pure static collision geometry. Same "PARENA mod is the trigger, host C does the real work"
+ * split as bloodflower_mod.prn/on_moon_zenith (S194-01), see tree_passive_mod.prn's own header
+ * comment and tree_passive_mod_host.h.
+ *
+ * Trees are a permanent, regenerating resource, not a kill target -- they never fully deplete or
+ * despawn (ARENA_TREE_REGEN_PER_SEC always ticks them back toward max_hp), matching "slowly
+ * regenerates health" being about a repeatable sustain tool, not a one-time farm-and-destroy
+ * mechanic. Numbers picked using this file's own existing tiering (camp minion HP=45, King
+ * HP=huge) rather than asked for -- same "founder specifies the trigger, reasonable numbers fill
+ * the rest" precedent Bloodflower's own ARENA_BLOODFLOWER_CLAIM_FLOW documented. */
+#define ARENA_TREE_HP                   120  /* above a camp minion (45) -- meant to be leaned on repeatedly, not felled */
+#define ARENA_TREE_REGEN_PER_SEC          6  /* keeps a tree from staying empty forever if left alone between visits */
+#define ARENA_TREE_PASSIVE_DAMAGE        10  /* light -- a sustain tool, not a kill-target's worth of damage */
+#define ARENA_TREE_PASSIVE_HEAL_PER_HIT   4  /* Tree hero's own self-heal per successful strike */
+#define ARENA_TREE_PASSIVE_COOLDOWN_MS 1200  /* slower than ARENA_ATTACK_COOLDOWN_MS's hero-vs-hero pace -- passive sustain, not meant to out-tempo real combat */
+
+/* arena_hero_tree_passive: gated to ARENA_HERO_TREE only (this is a kit-specific passive, not a
+ * general mechanic every hero gets). Mirrors arena_hero_attack_camp_minions' own precedence
+ * check (skips a hero already busy with an enemy hero in range) and shares the hero's normal
+ * attack_cooldown_ms rather than a separate timer, so the Tree hero can't also attack a camp
+ * minion/enemy hero the same tick this fires -- one basic-attack-shaped action per cooldown,
+ * same as every other auto-attack type in this file. On finding the nearest ARENA_OBSTACLE_TREE
+ * within ARENA_ATTACK_RANGE, calls the PARENA-compiled on_tree_passive_strike (not
+ * redgarden_host_tree_passive_strike directly) -- the mod call IS the trigger, per the founder's
+ * explicit "as a parena first mod led dev cycle." */
+void arena_hero_tree_passive(unsigned int dt_ms);
+
+/* arena_tick_obstacles: regenerates tree obstacles' hp toward max_hp at ARENA_TREE_REGEN_PER_SEC.
+ * Rocks (hp/max_hp always 0) are a no-op pass-through, cheap enough not to bother skipping. */
+void arena_tick_obstacles(unsigned int dt_ms);
+
+/* redgarden_host_tree_passive_strike: the real host-side implementation the PARENA-compiled
+ * on_tree_passive_strike calls back into (see tree_passive_mod_host.h). Applies
+ * ARENA_TREE_PASSIVE_DAMAGE to the obstacle (clamped at 0, never destroyed/despawned -- see this
+ * section's own doc comment on why trees are permanent), heals the hero
+ * ARENA_TREE_PASSIVE_HEAL_PER_HIT (clamped to max_hp), and arms the tree's hit-reaction by
+ * resetting its hp to a value the client can observe decrease -- the actual squish/jiggle
+ * animation itself is purely client-side (apps/arena/src/main.c's own squish_age_ms idiom,
+ * array-indexed by obstacle instead of hero, triggered on any wire-synced hp decrease), same
+ * "server is authoritative for state, client owns purely cosmetic reaction" split fountains'
+ * heal-flash already uses. */
+void redgarden_host_tree_passive_strike(int hero_index, int obstacle_index);
+
+/* ---------------- Duck W: Smoke Bomb (S202-10, 2026-08-25) ----------------
+ * Same "PARENA mod is the trigger, host C does the real work" split as
+ * Bloodflower/Tree-passive/build-templates/item-curriculum above -- see
+ * ARENA_DUCK_W_RADIUS's own doc comment (arena_game.h) for the full
+ * founder-quote chain and design reasoning, and hero_obscured_from
+ * (arena_game.c, static) for the actual targeting-denial mechanic. */
+
+/* redgarden_host_duck_smoke_bomb_cast: the real host-side implementation the
+ * PARENA-compiled on_duck_smoke_bomb_cast calls back into (see
+ * duck_smoke_bomb_mod_host.h). Sets duck_smoke_ms/x/z on the casting hero --
+ * the actual world-state mutation; on_duck_smoke_bomb_cast itself has no
+ * logic beyond this one call, matching vterm_mod.prn's own "one function, no
+ * dispatch table" minimalism every other real mod in this repo already uses. */
+void redgarden_host_duck_smoke_bomb_cast(int hero_index);
 
 /* arena_hero_attack_kings: mirrors arena_hero_attack_camp_minions -- each active, alive hero
  * without a closer enemy hero or camp minion already occupying its attack this tick instead

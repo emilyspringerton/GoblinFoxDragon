@@ -114,6 +114,13 @@ jobs:
             apps2/battlegrounds_gui/packages/simulation/arena_replay.c \
             apps2/battlegrounds_gui/packages/simulation/arena_ai_bridge.c \
             apps2/battlegrounds_gui/packages/simulation/action_bar_mod.c \
+            apps2/battlegrounds_gui/packages/simulation/bloodflower_mod.c \
+            apps2/battlegrounds_gui/packages/simulation/tree_passive_mod.c \
+            apps2/battlegrounds_gui/packages/simulation/build_template_mod.c \
+            apps2/battlegrounds_gui/packages/simulation/item_curriculum_mod.c \
+            apps2/battlegrounds_gui/packages/simulation/duck_smoke_bomb_mod.c \
+            apps2/battlegrounds_gui/packages/simulation/abraham_fireball_mod.c \
+            apps2/battlegrounds_gui/packages/simulation/bacon_puck_intangible_speed_mod.c \
             apps2/battlegrounds_gui/packages/common/mlp_infer.c \
             apps2/battlegrounds_gui/packages/goldenband/gband.c \
             apps2/battlegrounds_gui/packages/goldenband/gband_rig.c \
