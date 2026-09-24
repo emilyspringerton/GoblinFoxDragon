@@ -239,6 +239,23 @@ var itemDisplayName = map[string]string{
 	"faction-gear+1":  "Faction Gear +1",
 	"atlas-page":      "Atlas Page",
 	"atlas-page+1":    "Atlas Page +1",
+	// itemIL's own legacy armor/weapons (2026-09-24 gear-persistence fix, "The Missing Pants")
+	// never had display names either -- fell back to their raw hyphenated IDs in every player-
+	// facing message. Filling them in while touching this bug's real blast radius.
+	"bronze-sword":  "Bronze Sword",
+	"iron-sword":    "Iron Sword",
+	"bronze-shield": "Bronze Shield",
+	"iron-shield":   "Iron Shield",
+	"leather-helm":  "Leather Helm",
+	"leather-body":  "Leather Body",
+	"leather-legs":  "Leather Legs",
+	"leather-feet":  "Leather Feet",
+	"leather-hands": "Leather Hands",
+	"bone-earring":  "Bone Earring",
+	"iron-earring":  "Iron Earring",
+	"cotton-cape":   "Cotton Cape",
+	"leather-belt":  "Leather Belt",
+	"bronze-ring":   "Bronze Ring",
 }
 
 func itemName(id string) string {

@@ -63,6 +63,49 @@ func TestResolveEquipEntry_UsesRealAuthoredItemLevel(t *testing.T) {
 	}
 }
 
+// TestResolveEquipEntry_LegacyItemFallsBackToItemIL is the real regression guard for the
+// 2026-09-24 gear-persistence bug (see resolveEquipEntry's own doc comment): every armor piece
+// itemIL names as "legacy" (never registered in itemdefReg -- leather-legs among them) must
+// still resolve on reload, not silently vanish, mirroring cmdEquip's own real fallback.
+func TestResolveEquipEntry_LegacyItemFallsBackToItemIL(t *testing.T) {
+	oldReg := itemdefReg
+	itemdefReg = itemdef.NewRegistry() // empty -- leather-legs was never a real registry entry
+	t.Cleanup(func() { itemdefReg = oldReg })
+
+	for itemID, wantIL := range itemIL {
+		entry, ok := resolveEquipEntry(itemID)
+		if !ok {
+			t.Errorf("expected legacy item %q to resolve via the itemIL fallback, got ok=false", itemID)
+			continue
+		}
+		if entry.ItemID != itemID || entry.IL != wantIL || entry.DefID != 0 {
+			t.Errorf("resolveEquipEntry(%q) = %+v, want ItemID=%q IL=%d DefID=0", itemID, entry, itemID, wantIL)
+		}
+	}
+}
+
+// TestResolveEquipEntry_RegistryTakesPriorityOverItemIL guards the real precedence order
+// cmdEquip's own resolution already establishes: a real itemdefReg entry wins even if the same
+// item_id also happens to appear in the itemIL legacy map.
+func TestResolveEquipEntry_RegistryTakesPriorityOverItemIL(t *testing.T) {
+	oldReg := itemdefReg
+	reg := itemdef.NewRegistry()
+	if err := reg.LoadJSON([]byte(`[{"id":9001,"name":"Leather Legs","category":"armor",
+		"equip_slots":["legs"],"stack_size":1,"stats":{"item_level":42}}]`)); err != nil {
+		t.Fatalf("load test item: %v", err)
+	}
+	itemdefReg = reg
+	t.Cleanup(func() { itemdefReg = oldReg })
+
+	entry, ok := resolveEquipEntry("leather-legs")
+	if !ok {
+		t.Fatal("expected leather-legs to resolve")
+	}
+	if entry.DefID != 9001 || entry.IL != 42 {
+		t.Errorf("expected the real registry entry (DefID 9001, IL 42) to win over itemIL's DefID-less fallback, got %+v", entry)
+	}
+}
+
 // TestPersistEquipSlot_NoBoundCharacterIsANoOp guards a real, defensive case: a player whose
 // slot isn't (yet) bound to a real character ID (e.g. mid-guest-name-entry) must not panic.
 func TestPersistEquipSlot_NoBoundCharacterIsANoOp(t *testing.T) {

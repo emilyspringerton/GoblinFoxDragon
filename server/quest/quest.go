@@ -102,6 +102,22 @@ var StarterQuests = []*Quest{
 		RewardFame:   60,
 		FameNation:   3, // Windurst
 	},
+	{
+		// 2026-09-24, founder real-time: turned a real, found-live gear-persistence bug (leg
+		// armor bought from the Scout equipped fine in-session but silently vanished on the next
+		// reconnect -- see apps2/mud/equip_persist.go's own resolveEquipEntry fix) into an
+		// in-fiction reason the Scout has been missing his own trousers this whole time.
+		ID:           "missing-pants",
+		Title:        "The Missing Pants",
+		Desc:         "The Scout's spare trousers dissolved in the swamp muck years ago -- he's patrolled bare-legged ever since. Bring him 3 Slime Oil from the Swampville slimes and he'll finally have enough to tan a real pair.",
+		GiverNPCID:   "scout",
+		RequireItems: map[string]int{"slime-oil": 3},
+		RequireKills: map[string]int{},
+		RewardFlow:    250,
+		RewardItem:   "leather-legs",
+		RewardFame:   45,
+		FameNation:   3, // Windurst
+	},
 }
 
 // Bank is a indexed set of quest definitions, keyed by quest ID.

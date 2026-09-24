@@ -10,8 +10,8 @@ func starterBank() *Bank {
 
 func TestStarterQuestCount(t *testing.T) {
 	b := starterBank()
-	if got := len(b.All()); got != 5 {
-		t.Fatalf("expected 5 starter quests, got %d", got)
+	if got := len(b.All()); got != 6 {
+		t.Fatalf("expected 6 starter quests, got %d", got)
 	}
 }
 
@@ -40,8 +40,8 @@ func TestBankForNPC(t *testing.T) {
 		t.Errorf("expected 2 guildmaster quests, got %d", len(guildmasterQuests))
 	}
 	scoutQuests := b.ForNPC("scout")
-	if len(scoutQuests) != 2 {
-		t.Errorf("expected 2 scout quests, got %d", len(scoutQuests))
+	if len(scoutQuests) != 3 {
+		t.Errorf("expected 3 scout quests, got %d", len(scoutQuests))
 	}
 	merchantQuests := b.ForNPC("merchant")
 	if len(merchantQuests) != 1 {
@@ -227,6 +227,30 @@ func TestTurnInFameReward(t *testing.T) {
 	}
 	if res.FameNation != 1 {
 		t.Errorf("expected FameNation=1 (Sandoria), got %d", res.FameNation)
+	}
+}
+
+// TestTurnInMissingPantsReward guards the real 2026-09-24 quest (Swampville's "The Missing
+// Pants"), added as an in-fiction wrapper around the real leg-armor persistence fix in
+// apps2/mud/equip_persist.go: the quest must actually hand back leather-legs, the exact item ID
+// that used to silently vanish on reconnect.
+func TestTurnInMissingPantsReward(t *testing.T) {
+	b := starterBank()
+	j := NewJournal()
+	q, err := b.Get("missing-pants")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if q.GiverNPCID != "scout" {
+		t.Errorf("expected the Scout (Swampville) to give this quest, got %q", q.GiverNPCID)
+	}
+	j.Accept(q)
+	res, err := j.TurnIn(b, "missing-pants", map[string]int{"slime-oil": 3})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.Item != "leather-legs" {
+		t.Errorf("expected leather-legs item reward, got %q", res.Item)
 	}
 }
 

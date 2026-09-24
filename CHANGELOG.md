@@ -1,3 +1,17 @@
+## 2026-09-24
+
+- fix(apps2/mud): real gear-persistence bug -- leg (and every other legacy itemIL-only) armor
+  equipped fine in-session but silently vanished on the very next reconnect, while the sword
+  (a real itemdefReg entry) always survived. Root cause: `resolveEquipEntry` (the reload path
+  `loadEquipmentFromIDUNA` uses) only ever checked `itemdefReg`, never `cmdEquip`'s own itemIL
+  legacy-item fallback. Fixed by mirroring that same fallback in `resolveEquipEntry`, fixing every
+  itemIL-only item's persistence at once (leather-legs/body/helm/feet/hands/belt,
+  bone/iron-earring, cotton-cape, bronze-ring, bronze/iron-sword, bronze/iron-shield), plus their
+  missing `itemDisplayName` entries. 2 new tests (legacy fallback, registry-takes-priority).
+- feat(server/quest): "The Missing Pants" -- new Swampville (Scout NPC) starter quest wrapping the
+  above fix in fiction: bring 3 Slime Oil, receive a real, now-actually-persistent pair of
+  Leather Legs. 1 new test (6th starter quest).
+
 ## 2026-09-22
 
 - fix(battlegrounds_gui): synced forked arena engine (protocol.h, arena_game.c/.h + 7 new PARENA
