@@ -1,5 +1,15 @@
 ## 2026-09-24
 
+- feat(server/food): new food item MINESTRONE -- founder real-time: "add ministrone to GFD too,"
+  same session as matching additions to SHANKPIT/BIG_O (their own C `food_items.h`-based systems;
+  GFD's is a separate, pre-existing, real FFXI-inspired Go stat-buff registry, `server/food/
+  food.go`, unrelated codebase). A hearty vegetable-and-bean soup: VIT+3/MND+4/HP+35, 25-minute
+  duration -- same register as the existing Crab Soup but vegetable-themed with a longer "slow
+  home cooking" duration. No hardcoded item count anywhere in this package (`Registry.All()`
+  derives from the slice), so this was a pure addition, no bookkeeping elsewhere to update. New
+  `TestMinestroneStats` (matching the existing per-item stat-assertion convention); full
+  `server/food` suite (14/14) and `go build`/`go vet ./...` clean.
+
 - fix(apps2/mud): real gear-persistence bug -- leg (and every other legacy itemIL-only) armor
   equipped fine in-session but silently vanished on the very next reconnect, while the sword
   (a real itemdefReg entry) always survived. Root cause: `resolveEquipEntry` (the reload path

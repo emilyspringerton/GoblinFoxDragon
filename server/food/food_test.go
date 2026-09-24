@@ -142,3 +142,14 @@ func TestSwampHerbalTeaStats(t *testing.T) {
 		t.Errorf("SwampHerbalTea stats wrong: INT=%d MND=%d MP=%d", f.INTBonus, f.MNDBonus, f.MPBonus)
 	}
 }
+
+func TestMinestroneStats(t *testing.T) {
+	r := DefaultRegistry()
+	f, err := r.Get(IDMinestrone)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if f.VITBonus != 3 || f.MNDBonus != 4 || f.HPBonus != 35 || f.Duration != 25*time.Minute {
+		t.Errorf("Minestrone stats wrong: VIT=%d MND=%d HP=%d Duration=%v", f.VITBonus, f.MNDBonus, f.HPBonus, f.Duration)
+	}
+}

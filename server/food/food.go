@@ -103,6 +103,7 @@ const (
 	IDFishAndChips     = "food-fish-and-chips"
 	IDCrabSoup         = "food-crab-soup"
 	IDSwampHerbalTea   = "food-swamp-herbal-tea"
+	IDMinestrone       = "food-minestrone"
 )
 
 // StandardFoods returns the default food registry for DragonsNShit.
@@ -163,6 +164,18 @@ func StandardFoods() []Food {
 			MNDBonus: 3,
 			MPBonus:  30,
 			Duration: 20 * time.Minute,
+		},
+		{
+			// Founder real-time, 2026-09-24: "add ministrone to GFD too" (same session as
+			// SHANKPIT/BIG_O's own FOOD_MINESTRONE additions). A hearty vegetable-and-bean soup --
+			// VIT/MND comfort food, same register as Crab Soup but vegetable-themed rather than
+			// seafood, with a longer duration to match its "slow home cooking" character.
+			ID:       IDMinestrone,
+			Name:     "Minestrone",
+			VITBonus: 3,
+			MNDBonus: 4,
+			HPBonus:  35,
+			Duration: 25 * time.Minute,
 		},
 	}
 }
