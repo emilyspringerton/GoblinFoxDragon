@@ -16,4 +16,4 @@
 // GoblinFoxDragon/apps2/wsudprelay's own doc comment).
 Module = typeof Module !== 'undefined' ? Module : {};
 Module.websocket = Module.websocket || {};
-Module.websocket.url = 'wss://okemily.com/gfd-ws/{port}';
+Module.websocket.url = 'wss://ws.rg.okemily.com/gfd-ws/{port}';
