@@ -187,6 +187,13 @@ static char g_player_id[64] = "";
 
 static char iduna_host[128] = "127.0.0.1";
 static int iduna_port = 8080;
+/* Town's own game-server host (mud events API :7171, worldapi :7070). Same host as IDUNA when the
+ * game servers shared the box; since the GKE move (K8S-GS-06) they live at gfd.rg.okemily.com while
+ * IDUNA stays on the box, so GFD_TOWN_HOST (set by the CI PLAY.bat) overrides it. */
+static const char *town_host(void) {
+    const char *h = getenv("GFD_TOWN_HOST");
+    return (h && h[0]) ? h : iduna_host;
+}
 static char iduna_agent_name[128] = "";
 static char iduna_agent_secret[256] = "";
 static int iduna_agent_configured = 0;
@@ -3654,7 +3661,7 @@ static void town_load_terrain_test(void) {
         snprintf(path, sizeof(path), "/heightmap?scene=%d&cx=0&cz=0", g_terrain_test[i].scene);
         char resp[8192];
         int status = 0;
-        if (http_get_json(iduna_host, TOWN_WORLDAPI_PORT, path, NULL,
+        if (http_get_json(town_host(), TOWN_WORLDAPI_PORT, path, NULL,
                            resp, sizeof(resp), &status) != 0 || status != 200) {
             continue;
         }
@@ -3765,7 +3772,7 @@ static void dfzone_load(void) {
     snprintf(path, sizeof(path), "/heightmap?scene=%d&cx=0&cz=0", g_dfzone_scene);
     char resp[8192];
     int status = 0;
-    if (http_get_json(iduna_host, TOWN_WORLDAPI_PORT, path, NULL, resp, sizeof(resp), &status) != 0
+    if (http_get_json(town_host(), TOWN_WORLDAPI_PORT, path, NULL, resp, sizeof(resp), &status) != 0
         || status != 200) {
         return;
     }
@@ -5059,7 +5066,7 @@ static int town_mud_command(const char *command, char *out_buf, size_t out_buf_s
     snprintf(body, sizeof(body), "{\"character_id\":\"%s\",\"command\":\"%s\"}", g_town_char_id, cmd_esc);
     char resp[4096];
     int status = 0;
-    if (http_post_json(iduna_host, TOWN_MUD_API_PORT, "/api/town/command", NULL, body, resp, sizeof(resp), &status) != 0) return 0;
+    if (http_post_json(town_host(), TOWN_MUD_API_PORT, "/api/town/command", NULL, body, resp, sizeof(resp), &status) != 0) return 0;
     if (status != 200) return 0;
     if (!http_extract_json_string_field(resp, "output", out_buf, out_buf_size)) return 0;
 
@@ -5477,7 +5484,7 @@ static int ah_fetch(const char *command, char *out_text, size_t out_text_len) {
     snprintf(body, sizeof(body), "{\"character_id\":\"%s\",\"command\":\"%s\"}", g_town_char_id, cmd_esc);
     char resp[4096];
     int status = 0;
-    if (http_post_json(iduna_host, TOWN_MUD_API_PORT, "/api/town/command", NULL, body, resp, sizeof(resp), &status) != 0) return 0;
+    if (http_post_json(town_host(), TOWN_MUD_API_PORT, "/api/town/command", NULL, body, resp, sizeof(resp), &status) != 0) return 0;
     if (status != 200) return 0;
     return http_extract_json_string_field(resp, "output", out_text, out_text_len);
 }
@@ -5884,7 +5891,7 @@ static int townshop_fetch(const char *command, char *out_text, size_t out_text_l
     snprintf(body, sizeof(body), "{\"character_id\":\"%s\",\"command\":\"%s\"}", g_town_char_id, cmd_esc);
     char resp[4096];
     int status = 0;
-    if (http_post_json(iduna_host, TOWN_MUD_API_PORT, "/api/town/command", NULL, body, resp, sizeof(resp), &status) != 0) return 0;
+    if (http_post_json(town_host(), TOWN_MUD_API_PORT, "/api/town/command", NULL, body, resp, sizeof(resp), &status) != 0) return 0;
     if (status != 200) return 0;
     return http_extract_json_string_field(resp, "output", out_text, out_text_len);
 }

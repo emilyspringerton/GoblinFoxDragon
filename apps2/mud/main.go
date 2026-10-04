@@ -2418,7 +2418,7 @@ var guestBlockedCommands = map[string]string{
 // (founder, live, 2026-09-12: "it needs to say ssh in at okemily.com -p 2222 or something like
 // that make it nice"). A first connection with a never-before-seen key runs the real claim flow
 // (choose a permanent name, done); a returning key just resumes straight in.
-const sshUpgradeHint = "ssh -p 2222 okemily.com -- first time binds a fresh key to a permanent name, no password, no signup form."
+const sshUpgradeHint = "ssh -p 2222 gfd.rg.okemily.com -- first time binds a fresh key to a permanent name, no password, no signup form."
 
 // guestBlockedMessage explains the real reason and the real upgrade path, per the spec's own
 // "Blocked-command responses explain the upgrade rather than only denying" requirement -- a bare

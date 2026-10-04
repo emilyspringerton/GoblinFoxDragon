@@ -64,11 +64,11 @@ everything you need.
 ### Connect
 
 ```
-telnet okemily.com 2323
+telnet gfd.rg.okemily.com 2323
 ```
 or, if your environment doesn't have `telnet`:
 ```
-nc okemily.com 2323
+nc gfd.rg.okemily.com 2323
 ```
 Any raw TCP client that can send/receive plain text works — this is a real, plain, pre-web
 protocol. No TLS, no handshake beyond the game's own text prompts.

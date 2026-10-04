@@ -87,8 +87,8 @@ func TestGuestGate_MessageGivesTheRealConnectCommandNotComingSoon(t *testing.T) 
 		if strings.Contains(lower, "coming soon") {
 			t.Errorf("guestBlockedMessage(%q) still says \"coming soon\" -- SSH is live, this must name the real command: %s", category, msg)
 		}
-		if !strings.Contains(msg, "ssh -p 2222 okemily.com") {
-			t.Errorf("guestBlockedMessage(%q) should give the real, concrete connect command (ssh -p 2222 okemily.com), got: %s", category, msg)
+		if !strings.Contains(msg, "ssh -p 2222 gfd.rg.okemily.com") {
+			t.Errorf("guestBlockedMessage(%q) should give the real, concrete connect command (ssh -p 2222 gfd.rg.okemily.com), got: %s", category, msg)
 		}
 	}
 }

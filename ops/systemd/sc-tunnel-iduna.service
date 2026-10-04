@@ -1,0 +1,14 @@
+[Unit]
+Description=PARENA secure-channel tunnel -> IDUNA (:8443 encrypted -> 127.0.0.1:8080), for cluster-hosted game servers
+After=network-online.target
+
+[Service]
+ExecStart=%h/bin/sc_tunnel server 8443 127.0.0.1 8080 %h/.config/sc-tunnel/iduna.key
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+
+[Install]
+WantedBy=default.target

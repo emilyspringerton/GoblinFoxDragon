@@ -304,7 +304,7 @@ jobs:
           # box as IDUNA -- a real downloaded PLAY.bat run on the founder's own machine needs this
           # set explicitly, or every login fails with "Could not reach login server". IDUNA
           # listens on *:8080 (confirmed, not loopback-only), same public IP --queue already uses.
-          printf '%s\r\n' "@echo off" "set IDUNA_BASE_URL=http://198.58.107.85:8080" "echo DragonsNShit -- log in with your IDUNA account when prompted." "DragonsNShit_MUD_GUI.exe --queue rg.okemily.com" "pause" > DragonsNShit_MUD_GUI_Client/PLAY.bat
+          printf '%s\r\n' "@echo off" "set IDUNA_BASE_URL=http://198.58.107.85:8080" "set GFD_TOWN_HOST=gfd.rg.okemily.com" "echo DragonsNShit -- log in with your IDUNA account when prompted." "DragonsNShit_MUD_GUI.exe --queue rg.okemily.com" "pause" > DragonsNShit_MUD_GUI_Client/PLAY.bat
           zip -r "DragonsNShit_MUD_GUI_Client_${BUILD}.zip" DragonsNShit_MUD_GUI_Client
 
           # Backend package (Go preferred; legacy C server optional fallback)
