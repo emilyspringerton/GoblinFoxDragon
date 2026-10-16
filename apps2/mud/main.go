@@ -2591,6 +2591,8 @@ func handle(p *player, line string) {
 		cmdYell(p, strings.Join(args, " "))
 	case "guild", "g":
 		cmdGuildChat(p, strings.Join(args, " "))
+	case "global", "gc":
+		cmdGlobalChat(p, strings.Join(args, " "))
 	case "ls-create":
 		if len(args) < 2 {
 			p.send("Usage: ls-create <name> <tag>")
@@ -4167,6 +4169,51 @@ func cmdYell(p *player, msg string) {
 	syncChatSession(p)
 	deliverChat(p.slot, chat.ChatYell, "", msg)
 	p.prompt()
+}
+
+// cmdGlobalChat -- cross-game global chat (founder real-time, 2026-10-16: "a global chat in GFD mud
+// so that everyone in there can talk to everyone in shankpit via that gfd phone app"). Shown to every
+// MUD player right here, and posted to IDUNA's chat bus (channel "shankpit", source "mud") where
+// every SHANKPIT client's GFD phone app picks it up. Replies come back via globalChatPoller.
+func cmdGlobalChat(p *player, msg string) {
+	if msg == "" {
+		p.send("Global chat what?")
+		p.prompt()
+		return
+	}
+	name := p.name
+	broadcastAll(fmt.Sprintf("[Global] %s: %s", name, msg))
+	go func() { _ = gw.iduna.PostChatMessageAs("shankpit", name, "mud", msg) }()
+}
+
+// globalChatPoller relays SHANKPIT-origin global chat (channel "shankpit", any source but this MUD's
+// own, already echoed locally) to every connected MUD player. First tick only records the high-water
+// mark so a restart doesn't replay history.
+func globalChatPoller() {
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+	last := int64(-1)
+	for range ticker.C {
+		msgs, err := gw.iduna.GetChatMessages(max(last, 0), 50)
+		if err != nil {
+			continue
+		}
+		first := last < 0
+		for _, m := range msgs {
+			if m.ID > last {
+				last = m.ID
+			}
+			if first || m.Channel != "shankpit" || m.SenderSource == "mud" {
+				continue
+			}
+			gw.mu.Lock()
+			broadcastAll(fmt.Sprintf("[SHANKPIT] %s: %s", m.SenderName, m.Body))
+			gw.mu.Unlock()
+		}
+		if first && last < 0 {
+			last = 0
+		}
+	}
 }
 
 func cmdGuildChat(p *player, msg string) {
@@ -9645,6 +9692,7 @@ func main() {
 	initTRAPXCity()
 
 	go gameLoop()
+	go globalChatPoller()
 
 	// Start world-event HTTP API if enabled.
 	if *apiPort > 0 {
