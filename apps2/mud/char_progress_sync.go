@@ -88,6 +88,46 @@ func syncCharLevelAndFlow(p *player) {
 		}
 		p.headlessSyncedFlow = p.flow
 	}
+	pullFlowFromIduna(p, charID)
+}
+
+// flowPullEvery: how many 1Hz ticks between pulls of the authoritative IDUNA balance.
+const flowPullEvery = 10
+
+// reconcileFlow decides what a player's Flow should be after looking at IDUNA's balance.
+// Flow is the cross-world currency: it also moves on IDUNA's side while a player is in the MUD
+// (a hat bought on WOTAN, a sale of a player-drawn hat paying the designer 88%). The MUD only
+// ever pushed deltas, so those changes were invisible until reconnect -- and a later local
+// spend could be rejected by IDUNA. Adopt the remote balance ONLY when the player has no
+// unsynced local change (local == synced), so a pull can never swallow in-flight earnings.
+func reconcileFlow(local, synced, remote int) (newFlow int, changed bool) {
+	if local != synced || remote == local {
+		return local, false
+	}
+	return remote, true
+}
+
+// pullFlowFromIduna runs every flowPullEvery ticks from syncCharLevelAndFlow.
+func pullFlowFromIduna(p *player, charID string) {
+	p.flowPullTick++
+	if p.flowPullTick < flowPullEvery {
+		return
+	}
+	p.flowPullTick = 0
+	ch, err := gw.iduna.GetCharacter(charID)
+	if err != nil {
+		return
+	}
+	before := p.flow
+	if nf, changed := reconcileFlow(p.flow, p.headlessSyncedFlow, ch.GoldBalance); changed {
+		p.flow = nf
+		p.headlessSyncedFlow = nf
+		if nf > before {
+			p.sendf("[Flow +%d -- from your BrawlPit hat sales or another world. Balance: %d]", nf-before, nf)
+		} else {
+			p.sendf("[Flow -%d -- spent in another world. Balance: %d]", before-nf, nf)
+		}
+	}
 }
 
 // miningSkillDelta/fishingSkillDelta return p's real gather-skill change since the last sync

@@ -2683,3 +2683,13 @@
 
 - feat(worldapi): S40-02 server/worldapi package — /chunks endpoint + ChunkGenerator interface (Apple #1413)
 
+
+## 2026-10-16
+
+- ci(deploy): `.github/workflows/deploy.yml` -- every push to `master` runs the MUD + server tests,
+  builds the `gfd` image via Cloud Build (WIF auth, in-workflow defaults) tagged with the short
+  SHA; EMILY's in-cluster gitops-autodeploy picks up the tag (`GFD_TAG`) and rolls it out. Founder:
+  "GFD needs auto deploy".
+- feat(mud): Flow is now pulled from IDUNA every 10s when the player has no unsynced local change
+  (`reconcileFlow`), so hat-store purchases and designer earnings made on WOTAN show up in the
+  MUD without reconnecting and a later local spend can no longer be silently rejected.

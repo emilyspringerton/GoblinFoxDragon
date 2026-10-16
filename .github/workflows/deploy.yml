@@ -1,0 +1,44 @@
+name: Build and push gfd image (auto-deploy)
+
+# GFD auto-deploy (founder real-time 2026-10-16: "GFD needs auto deploy"). Every push to master
+# builds the gfd image (mud + server-go) via Cloud Build, tagged with the short commit SHA, with
+# Workload Identity auth (no stored key) -- same pattern as SHANKPIT/WOTAN/IDUNA. The in-cluster
+# gitops-autodeploy CronJob (EMILY/gitops/watch-tags.sh, GFD_TAG -> image `gfd`) notices the new
+# tag on its next poll, bumps tags.env, and gitops-sync applies it: no cluster credentials here.
+# The vars have in-workflow defaults (EMILY/gitops/CI_SETUP.md) so no repo Variables are needed.
+on:
+  push:
+    branches: [master]
+    paths-ignore: ['**.md', 'docs/**', 'docs2/**', 'apps2/battlegrounds_gui/**']
+  workflow_dispatch: {}
+
+concurrency:
+  group: gfd-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test (gate the deploy on the MUD + backend suites)
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: GOWORK=off go test ./apps2/mud/... ./server/...
+
+      - name: Auth to GCP (Workload Identity, no stored key)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER || 'projects/532442865445/locations/global/workloadIdentityPools/github/providers/github' }}
+          service_account: ${{ vars.GCP_CI_SERVICE_ACCOUNT || 'github-ci@project-d24a71e9-2daf-4b2d-917.iam.gserviceaccount.com' }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build + push
+        run: scripts/build-image.sh "$(git rev-parse --short HEAD)"

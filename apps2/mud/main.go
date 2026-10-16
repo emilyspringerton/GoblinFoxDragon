@@ -942,6 +942,7 @@ type player struct {
 	// every real telnet player.
 	headlessSyncedLevel int
 	headlessSyncedXP    int
+	flowPullTick        int // ticks since the last IDUNA balance pull (char_progress_sync.go)
 	headlessSyncedFlow  int
 	// headlessSyncedInventory (S252-00/01, GFD-AH-93944 -- real fix for the Auction House
 	// "no items shown" bug): same real reasoning as headlessSyncedLevel/XP/Flow above, applied
