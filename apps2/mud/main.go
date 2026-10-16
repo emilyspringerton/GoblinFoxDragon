@@ -8634,7 +8634,11 @@ func handleConn(conn net.Conn, isGuest bool, preset *presetIdentity, echoInput b
 		// resolved before handleConn is ever called.
 		name = preset.name
 		send("Welcome to DragonsNShit MUD.")
-		send(fmt.Sprintf("SSH-bound identity confirmed: %s. Full access -- bank, auction house,", name))
+		how := "SSH-bound"
+		if strings.HasPrefix(preset.fingerprint, "web:") {
+			how = "IDUNA-bound" // browser sessions (ws_listener.go) bind through the account, not an SSH key
+		}
+		send(fmt.Sprintf("%s identity confirmed: %s. Full access -- bank, auction house,", how, name))
 		send("bazaar, and player chat are all unlocked.")
 	} else {
 		send("Welcome to DragonsNShit MUD.")
@@ -9608,6 +9612,8 @@ func startWorldEventAPI(port int) {
 func main() {
 	port := flag.Int("port", mudPort, "MUD TCP port")
 	apiPort := flag.Int("api-port", 7171, "world-events HTTP API port (0 = disabled)")
+	webTrustXFF := flag.Bool("web-trust-xff", false, "trust the load balancer's X-Forwarded-For (second-to-last entry) as the client IP for the browser listener; only set behind Google's external LB")
+	webPort := flag.Int("web-port", 8480, "browser WebSocket listener port (IDUNA-token auth; wotan.okemily.com/GFD; 0 = disabled)")
 	sshPort := flag.Int("ssh-port", 2222, "SSH listener port, public-key/TOFU only, no identity binding yet (SSH_TRANSPORT_IDENTITY_SPEC.md Stage 4; 0 = disabled)")
 	flag.Parse()
 
@@ -9650,6 +9656,11 @@ func main() {
 	// binding (5) landing first. See ssh_listener.go for the real implementation.
 	if *sshPort > 0 {
 		go startSSHListener(*sshPort)
+	}
+	// Browser transport (ws_listener.go): same handleConn, identity from an IDUNA SSO token.
+	if *webPort > 0 {
+		wsTrustXFF = *webTrustXFF
+		go startWebListener(*webPort)
 	}
 
 	addr := fmt.Sprintf(":%d", *port)

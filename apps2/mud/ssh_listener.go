@@ -26,6 +26,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -363,7 +364,27 @@ func validateSSHClaimName(name string) (ok bool, reason string) {
 // there is no player/game-world state until a real character exists to attach it to). Returns nil
 // (caller falls back to guest) on rate-limit, read error/disconnect, or repeated abandonment --
 // never blocks forever.
-func runSSHClaimFlow(adapter *sshConnAdapter, fingerprint, pubKeyLine string) *presetIdentity {
+func runSSHClaimFlow(adapter claimConn, fingerprint, pubKeyLine string) *presetIdentity {
+	return runClaimFlow(adapter, fingerprint, pubKeyLine, "SSH key", "")
+}
+
+// claimConn is the slice of a transport runClaimFlow needs: raw read/write for the name prompt,
+// the peer address for per-IP rate limiting, and whether the client expects server-side echo.
+// sshConnAdapter and the WebSocket adapter (ws_listener.go) both satisfy it, which is what lets
+// the browser client reach the exact same name-creation code SSH uses.
+type claimConn interface {
+	io.ReadWriter
+	RemoteAddr() net.Addr
+	echoesInput() bool
+}
+
+func (a *sshConnAdapter) echoesInput() bool { return a.ptyRequested }
+
+// runClaimFlow is runSSHClaimFlow's transport-agnostic body. subject names what is being bound
+// ("SSH key", "IDUNA account") in the player-facing text. ownerPlayerID, when set, is the IDUNA
+// account that will own the new character (the browser path passes the token's own player_id, so
+// WOTAN's by-player lookups -- the hat store -- find it); empty keeps SSH's per-name player id.
+func runClaimFlow(adapter claimConn, fingerprint, pubKeyLine, subject, ownerPlayerID string) *presetIdentity {
 	ip := ipOnly(adapter.RemoteAddr())
 	send := func(s string) { adapter.Write([]byte(normalizeLineEndings(s) + "\r\n")) }
 
@@ -373,8 +394,8 @@ func runSSHClaimFlow(adapter *sshConnAdapter, fingerprint, pubKeyLine string) *p
 		return nil
 	}
 
-	send("No character is bound to this SSH key yet.")
-	send("Choose a permanent character name (2-20 letters/digits) -- this key will be bound to it for good.")
+	send(fmt.Sprintf("No character is bound to this %s yet.", subject))
+	send(fmt.Sprintf("Choose a permanent character name (2-20 letters/digits) -- this %s will be bound to it for good.", subject))
 
 	reader := bufio.NewReader(adapter)
 	const maxAttempts = 5 // bounded retry loop -- a client stuck retyping an invalid/taken name forever still terminates
@@ -385,7 +406,7 @@ func runSSHClaimFlow(adapter *sshConnAdapter, fingerprint, pubKeyLine string) *p
 		// exactly the founder-reported live bug ("it wont let me type"): a real PTY client sends
 		// a bare '\r' on Enter (ReadString('\n') never returns) and does its OWN local echo only
 		// when there's no PTY, so a PTY session sees nothing it types without this.
-		line, err := readTerminalLine(reader, adapter, adapter.ptyRequested)
+		line, err := readTerminalLine(reader, adapter, adapter.echoesInput())
 		if err != nil {
 			return nil
 		}
@@ -395,7 +416,11 @@ func runSSHClaimFlow(adapter *sshConnAdapter, fingerprint, pubKeyLine string) *p
 			continue
 		}
 
-		newID, err := gw.iduna.CreateCharacter(mudPlayerIDFor(name), name, job.WAR)
+		owner := ownerPlayerID
+		if owner == "" {
+			owner = mudPlayerIDFor(name)
+		}
+		newID, err := gw.iduna.CreateCharacter(owner, name, job.WAR)
 		switch {
 		case err == nil:
 			if bindErr := gw.iduna.BindSSHKey(newID, fingerprint, pubKeyLine); bindErr != nil {
@@ -407,11 +432,11 @@ func runSSHClaimFlow(adapter *sshConnAdapter, fingerprint, pubKeyLine string) *p
 				// reachable again (CreateCharacter's own name-collision handling below covers a
 				// retry with the same name failing safely).
 				log.Printf("[ssh-claim] character %s created but BindSSHKey failed (orphaned): %v", newID, bindErr)
-				send("Character created, but the key binding failed -- reconnect to try again.")
+				send("Character created, but the binding failed -- reconnect to try again.")
 				return nil
 			}
 			log.Printf("[ssh-claim] new identity claimed character=%s name=%s ip=%s", newID, name, ip)
-			send(fmt.Sprintf("Welcome, %s! Your SSH key is now permanently bound to this character.", name))
+			send(fmt.Sprintf("Welcome, %s! Your %s is now permanently bound to this character.", name, subject))
 			return &presetIdentity{name: name, characterID: newID, fingerprint: fingerprint, justCreated: true}
 		case errors.Is(err, idunaclient.ErrConflict):
 			// §3.1 acceptance: "Different key, same claimed name -> refused, not silently

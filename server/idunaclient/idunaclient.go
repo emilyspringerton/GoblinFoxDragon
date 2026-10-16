@@ -155,6 +155,31 @@ func (c *Client) GetCharacter(characterID string) (*Character, error) {
 	return &ch, nil
 }
 
+// GetCharacterByPlayer resolves a WOTAN/IDUNA player_id to the character that account owns, if
+// any (GET /api/v1/characters/by-player/:player_id -- the same lookup the WOTAN hat store uses).
+// Returns ErrNotFound when the account has no character yet. 2026-10-16: added for the browser
+// transport (apps2/mud/ws_listener.go), which must find a pre-existing character for an IDUNA
+// account before offering to create one.
+func (c *Client) GetCharacterByPlayer(playerID string) (*Character, error) {
+	req, _ := http.NewRequest(http.MethodGet, c.baseURL+"/api/v1/characters/by-player/"+url.PathEscape(playerID), nil)
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, fmt.Errorf("idunaclient: GetCharacterByPlayer: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%w: status %d", ErrServer, resp.StatusCode)
+	}
+	var ch Character
+	if err := json.NewDecoder(resp.Body).Decode(&ch); err != nil {
+		return nil, fmt.Errorf("idunaclient: GetCharacterByPlayer decode: %w", err)
+	}
+	return &ch, nil
+}
+
 // GetCharacterByName resolves name to its character record via IDUNA's real, case-INSENSITIVE
 // lookup (SSH_TRANSPORT_IDENTITY_SPEC.md's own real name-collision gap, founder real-time
 // 2026-09-12: "it should not allow the guest to login as EMILY thats my character on the ssh
