@@ -1286,5 +1286,1615 @@
         "drop_chance": 1.0
       }
     ]
+  },
+  {
+    "kind": "sealed-clerk",
+    "items": [
+      {
+        "id": "vellum-scrap",
+        "name": "Vellum Scrap",
+        "drop_chance": 0.55
+      },
+      {
+        "id": "ink-vial",
+        "name": "Ink Vial",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "iron-shortsword",
+        "name": "Iron Shortsword",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "hand-axe",
+        "name": "Hand Axe",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "brass-staff",
+        "name": "Brass Staff",
+        "drop_chance": 0.012
+      }
+    ]
+  },
+  {
+    "kind": "ink-wraith",
+    "items": [
+      {
+        "id": "vellum-scrap",
+        "name": "Vellum Scrap",
+        "drop_chance": 0.55
+      },
+      {
+        "id": "ink-vial",
+        "name": "Ink Vial",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "iron-shortsword",
+        "name": "Iron Shortsword",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "hand-axe",
+        "name": "Hand Axe",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "brass-staff",
+        "name": "Brass Staff",
+        "drop_chance": 0.012
+      }
+    ]
+  },
+  {
+    "kind": "box-mimic",
+    "items": [
+      {
+        "id": "vellum-scrap",
+        "name": "Vellum Scrap",
+        "drop_chance": 0.55
+      },
+      {
+        "id": "ink-vial",
+        "name": "Ink Vial",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "iron-shortsword",
+        "name": "Iron Shortsword",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "hand-axe",
+        "name": "Hand Axe",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "brass-staff",
+        "name": "Brass Staff",
+        "drop_chance": 0.012
+      }
+    ]
+  },
+  {
+    "kind": "The Retrieval Cart",
+    "items": [
+      {
+        "id": "swift-blade",
+        "name": "Swift Blade",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "composite-bow",
+        "name": "Composite Bow",
+        "drop_chance": 0.22
+      },
+      {
+        "id": "paltry-bastard-sword",
+        "name": "Paltry Bastard Sword",
+        "drop_chance": 0.15
+      },
+      {
+        "id": "broadsword",
+        "name": "Broadsword",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "vellum-scrap",
+        "name": "Vellum Scrap",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "NOOR-1, Four Days Behind",
+    "items": [
+      {
+        "id": "broadsword",
+        "name": "Broadsword",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "sabre",
+        "name": "Sabre",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "beestinger",
+        "name": "Beestinger",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "ink-vial",
+        "name": "Ink Vial",
+        "drop_chance": 0.8
+      }
+    ]
+  },
+  {
+    "kind": "The Unfiled Clerk",
+    "items": [
+      {
+        "id": "broadsword",
+        "name": "Broadsword",
+        "drop_chance": 0.12
+      },
+      {
+        "id": "sabre",
+        "name": "Sabre",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "beestinger",
+        "name": "Beestinger",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "ink-vial",
+        "name": "Ink Vial",
+        "drop_chance": 0.8
+      }
+    ]
+  },
+  {
+    "kind": "tuning-fork-wraith",
+    "items": [
+      {
+        "id": "lens-shard",
+        "name": "Lens Shard",
+        "drop_chance": 0.55
+      },
+      {
+        "id": "wisp-wax",
+        "name": "Wisp Wax",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "sabre",
+        "name": "Sabre",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "composite-bow",
+        "name": "Composite Bow",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "broadsword",
+        "name": "Broadsword",
+        "drop_chance": 0.012
+      }
+    ]
+  },
+  {
+    "kind": "standing-wave",
+    "items": [
+      {
+        "id": "lens-shard",
+        "name": "Lens Shard",
+        "drop_chance": 0.55
+      },
+      {
+        "id": "wisp-wax",
+        "name": "Wisp Wax",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "sabre",
+        "name": "Sabre",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "composite-bow",
+        "name": "Composite Bow",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "broadsword",
+        "name": "Broadsword",
+        "drop_chance": 0.012
+      }
+    ]
+  },
+  {
+    "kind": "goetic-echo",
+    "items": [
+      {
+        "id": "lens-shard",
+        "name": "Lens Shard",
+        "drop_chance": 0.55
+      },
+      {
+        "id": "wisp-wax",
+        "name": "Wisp Wax",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "sabre",
+        "name": "Sabre",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "composite-bow",
+        "name": "Composite Bow",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "broadsword",
+        "name": "Broadsword",
+        "drop_chance": 0.012
+      }
+    ]
+  },
+  {
+    "kind": "Paimon, the Court Voice",
+    "items": [
+      {
+        "id": "steel-sword",
+        "name": "Steel Sword",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "hidden-dagger-of-kali",
+        "name": "Hidden Dagger of Kali",
+        "drop_chance": 0.22
+      },
+      {
+        "id": "banjo",
+        "name": "Banjo",
+        "drop_chance": 0.15
+      },
+      {
+        "id": "swift-blade",
+        "name": "Swift Blade",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "lens-shard",
+        "name": "Lens Shard",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Vassago, the Soft Foresight",
+    "items": [
+      {
+        "id": "swift-blade",
+        "name": "Swift Blade",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "paltry-bastard-sword",
+        "name": "Paltry Bastard Sword",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "beestinger",
+        "name": "Beestinger",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "wisp-wax",
+        "name": "Wisp Wax",
+        "drop_chance": 0.8
+      }
+    ]
+  },
+  {
+    "kind": "Beleth, the Detonation",
+    "items": [
+      {
+        "id": "swift-blade",
+        "name": "Swift Blade",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "paltry-bastard-sword",
+        "name": "Paltry Bastard Sword",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "beestinger",
+        "name": "Beestinger",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "wisp-wax",
+        "name": "Wisp Wax",
+        "drop_chance": 0.8
+      }
+    ]
+  },
+  {
+    "kind": "Zagan, the Standstill's Confessor",
+    "items": [
+      {
+        "id": "swift-blade",
+        "name": "Swift Blade",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "paltry-bastard-sword",
+        "name": "Paltry Bastard Sword",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "beestinger",
+        "name": "Beestinger",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "wisp-wax",
+        "name": "Wisp Wax",
+        "drop_chance": 0.8
+      }
+    ]
+  },
+  {
+    "kind": "Buer, the Wheel-Physician",
+    "items": [
+      {
+        "id": "swift-blade",
+        "name": "Swift Blade",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "paltry-bastard-sword",
+        "name": "Paltry Bastard Sword",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "beestinger",
+        "name": "Beestinger",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "wisp-wax",
+        "name": "Wisp Wax",
+        "drop_chance": 0.8
+      }
+    ]
+  },
+  {
+    "kind": "The Seventy First Chair",
+    "items": [
+      {
+        "id": "swift-blade",
+        "name": "Swift Blade",
+        "drop_chance": 0.12
+      },
+      {
+        "id": "paltry-bastard-sword",
+        "name": "Paltry Bastard Sword",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "beestinger",
+        "name": "Beestinger",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "wisp-wax",
+        "name": "Wisp Wax",
+        "drop_chance": 0.8
+      }
+    ]
+  },
+  {
+    "kind": "draugr-remnant",
+    "items": [
+      {
+        "id": "pellet-bone",
+        "name": "Pellet Bone",
+        "drop_chance": 0.55
+      },
+      {
+        "id": "hedge-hide",
+        "name": "Hedge Hide",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "swift-blade",
+        "name": "Swift Blade",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "composite-bow",
+        "name": "Composite Bow",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "hidden-dagger-of-kali",
+        "name": "Hidden Dagger of Kali",
+        "drop_chance": 0.012
+      }
+    ]
+  },
+  {
+    "kind": "raven-scribe",
+    "items": [
+      {
+        "id": "pellet-bone",
+        "name": "Pellet Bone",
+        "drop_chance": 0.55
+      },
+      {
+        "id": "hedge-hide",
+        "name": "Hedge Hide",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "swift-blade",
+        "name": "Swift Blade",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "composite-bow",
+        "name": "Composite Bow",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "hidden-dagger-of-kali",
+        "name": "Hidden Dagger of Kali",
+        "drop_chance": 0.012
+      }
+    ]
+  },
+  {
+    "kind": "hall-thrall",
+    "items": [
+      {
+        "id": "pellet-bone",
+        "name": "Pellet Bone",
+        "drop_chance": 0.55
+      },
+      {
+        "id": "hedge-hide",
+        "name": "Hedge Hide",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "swift-blade",
+        "name": "Swift Blade",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "composite-bow",
+        "name": "Composite Bow",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "hidden-dagger-of-kali",
+        "name": "Hidden Dagger of Kali",
+        "drop_chance": 0.012
+      }
+    ]
+  },
+  {
+    "kind": "Gunnr, Who Argued With a Raven",
+    "items": [
+      {
+        "id": "sunken-dagger-of-kali",
+        "name": "Sunken Dagger of Kali",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "death's-gambit",
+        "name": "Death's Gambit",
+        "drop_chance": 0.22
+      },
+      {
+        "id": "steel-sword",
+        "name": "Steel Sword",
+        "drop_chance": 0.15
+      },
+      {
+        "id": "steel-sword",
+        "name": "Steel Sword",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "pellet-bone",
+        "name": "Pellet Bone",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Loki, Who Isn't Here",
+    "items": [
+      {
+        "id": "steel-sword",
+        "name": "Steel Sword",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "banjo",
+        "name": "Banjo",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "hidden-dagger-of-kali",
+        "name": "Hidden Dagger of Kali",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "hedge-hide",
+        "name": "Hedge Hide",
+        "drop_chance": 0.8
+      }
+    ]
+  },
+  {
+    "kind": "Gary, Bifrost Security",
+    "items": [
+      {
+        "id": "steel-sword",
+        "name": "Steel Sword",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "banjo",
+        "name": "Banjo",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "hidden-dagger-of-kali",
+        "name": "Hidden Dagger of Kali",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "hedge-hide",
+        "name": "Hedge Hide",
+        "drop_chance": 0.8
+      }
+    ]
+  },
+  {
+    "kind": "Ratatoskr's Debt-Collector",
+    "items": [
+      {
+        "id": "steel-sword",
+        "name": "Steel Sword",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "banjo",
+        "name": "Banjo",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "hidden-dagger-of-kali",
+        "name": "Hidden Dagger of Kali",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "hedge-hide",
+        "name": "Hedge Hide",
+        "drop_chance": 0.8
+      }
+    ]
+  },
+  {
+    "kind": "A Very Patient Draugr",
+    "items": [
+      {
+        "id": "steel-sword",
+        "name": "Steel Sword",
+        "drop_chance": 0.12
+      },
+      {
+        "id": "banjo",
+        "name": "Banjo",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "hidden-dagger-of-kali",
+        "name": "Hidden Dagger of Kali",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "hedge-hide",
+        "name": "Hedge Hide",
+        "drop_chance": 0.8
+      }
+    ]
+  },
+  {
+    "kind": "jade-sentinel",
+    "items": [
+      {
+        "id": "spider-silk",
+        "name": "Spider Silk",
+        "drop_chance": 0.55
+      },
+      {
+        "id": "lizard-tail",
+        "name": "Lizard Tail",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "steel-sword",
+        "name": "Steel Sword",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "sunken-dagger-of-kali",
+        "name": "Sunken Dagger of Kali",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "banjo",
+        "name": "Banjo",
+        "drop_chance": 0.012
+      }
+    ]
+  },
+  {
+    "kind": "peach-thief",
+    "items": [
+      {
+        "id": "spider-silk",
+        "name": "Spider Silk",
+        "drop_chance": 0.55
+      },
+      {
+        "id": "lizard-tail",
+        "name": "Lizard Tail",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "steel-sword",
+        "name": "Steel Sword",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "sunken-dagger-of-kali",
+        "name": "Sunken Dagger of Kali",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "banjo",
+        "name": "Banjo",
+        "drop_chance": 0.012
+      }
+    ]
+  },
+  {
+    "kind": "hopping-corpse",
+    "items": [
+      {
+        "id": "spider-silk",
+        "name": "Spider Silk",
+        "drop_chance": 0.55
+      },
+      {
+        "id": "lizard-tail",
+        "name": "Lizard Tail",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "steel-sword",
+        "name": "Steel Sword",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "sunken-dagger-of-kali",
+        "name": "Sunken Dagger of Kali",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "banjo",
+        "name": "Banjo",
+        "drop_chance": 0.012
+      }
+    ]
+  },
+  {
+    "kind": "He Xiangu, Who Stopped Eating",
+    "items": [
+      {
+        "id": "keen-edge",
+        "name": "Keen Edge",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "titanium-claws",
+        "name": "Titanium Claws",
+        "drop_chance": 0.22
+      },
+      {
+        "id": "heavy-claws",
+        "name": "Heavy Claws",
+        "drop_chance": 0.15
+      },
+      {
+        "id": "death's-gambit",
+        "name": "Death's Gambit",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "spider-silk",
+        "name": "Spider Silk",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Ao Guang's Weather-Debt Collector",
+    "items": [
+      {
+        "id": "death's-gambit",
+        "name": "Death's Gambit",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "healing-staff",
+        "name": "Healing Staff",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "qi-tornado",
+        "name": "Qi Tornado",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "lizard-tail",
+        "name": "Lizard Tail",
+        "drop_chance": 0.8
+      }
+    ]
+  },
+  {
+    "kind": "Han Xiangzi's Flute-Debt",
+    "items": [
+      {
+        "id": "death's-gambit",
+        "name": "Death's Gambit",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "healing-staff",
+        "name": "Healing Staff",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "qi-tornado",
+        "name": "Qi Tornado",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "lizard-tail",
+        "name": "Lizard Tail",
+        "drop_chance": 0.8
+      }
+    ]
+  },
+  {
+    "kind": "A Guest Of The Wall",
+    "items": [
+      {
+        "id": "death's-gambit",
+        "name": "Death's Gambit",
+        "drop_chance": 0.12
+      },
+      {
+        "id": "healing-staff",
+        "name": "Healing Staff",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "qi-tornado",
+        "name": "Qi Tornado",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "lizard-tail",
+        "name": "Lizard Tail",
+        "drop_chance": 0.8
+      }
+    ]
+  },
+  {
+    "kind": "wake-mourner",
+    "items": [
+      {
+        "id": "down-feather",
+        "name": "Down Feather",
+        "drop_chance": 0.55
+      },
+      {
+        "id": "wolf-pelt",
+        "name": "Wolf Pelt",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "death's-gambit",
+        "name": "Death's Gambit",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "healing-staff",
+        "name": "Healing Staff",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "titanium-claws",
+        "name": "Titanium Claws",
+        "drop_chance": 0.012
+      }
+    ]
+  },
+  {
+    "kind": "highland-kelpie",
+    "items": [
+      {
+        "id": "down-feather",
+        "name": "Down Feather",
+        "drop_chance": 0.55
+      },
+      {
+        "id": "wolf-pelt",
+        "name": "Wolf Pelt",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "death's-gambit",
+        "name": "Death's Gambit",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "healing-staff",
+        "name": "Healing Staff",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "titanium-claws",
+        "name": "Titanium Claws",
+        "drop_chance": 0.012
+      }
+    ]
+  },
+  {
+    "kind": "cairn-wight",
+    "items": [
+      {
+        "id": "down-feather",
+        "name": "Down Feather",
+        "drop_chance": 0.55
+      },
+      {
+        "id": "wolf-pelt",
+        "name": "Wolf Pelt",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "death's-gambit",
+        "name": "Death's Gambit",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "healing-staff",
+        "name": "Healing Staff",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "titanium-claws",
+        "name": "Titanium Claws",
+        "drop_chance": 0.012
+      }
+    ]
+  },
+  {
+    "kind": "The Morrigan, Once Refused",
+    "items": [
+      {
+        "id": "mythril-sword",
+        "name": "Mythril Sword",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "light's-end",
+        "name": "Light's End",
+        "drop_chance": 0.22
+      },
+      {
+        "id": "fourth-remorse",
+        "name": "Fourth Remorse",
+        "drop_chance": 0.15
+      },
+      {
+        "id": "keen-edge",
+        "name": "Keen Edge",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "down-feather",
+        "name": "Down Feather",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "The Dagda",
+    "items": [
+      {
+        "id": "keen-edge",
+        "name": "Keen Edge",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "bow-of-the-gorgon-outcast",
+        "name": "Bow of the Gorgon Outcast",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "utzu-mah-turi",
+        "name": "Utzu Mah Turi",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "wolf-pelt",
+        "name": "Wolf Pelt",
+        "drop_chance": 0.8
+      }
+    ]
+  },
+  {
+    "kind": "A Crow In The Corner",
+    "items": [
+      {
+        "id": "keen-edge",
+        "name": "Keen Edge",
+        "drop_chance": 0.12
+      },
+      {
+        "id": "bow-of-the-gorgon-outcast",
+        "name": "Bow of the Gorgon Outcast",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "utzu-mah-turi",
+        "name": "Utzu Mah Turi",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "wolf-pelt",
+        "name": "Wolf Pelt",
+        "drop_chance": 0.8
+      }
+    ]
+  },
+  {
+    "kind": "spaghetti-wisp",
+    "items": [
+      {
+        "id": "moth-dust",
+        "name": "Moth Dust",
+        "drop_chance": 0.55
+      },
+      {
+        "id": "down-feather",
+        "name": "Down Feather",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "keen-edge",
+        "name": "Keen Edge",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "utzu-mah-turi",
+        "name": "Utzu Mah Turi",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "bow-of-the-gorgon-outcast",
+        "name": "Bow of the Gorgon Outcast",
+        "drop_chance": 0.012
+      }
+    ]
+  },
+  {
+    "kind": "top-hat-toad",
+    "items": [
+      {
+        "id": "moth-dust",
+        "name": "Moth Dust",
+        "drop_chance": 0.55
+      },
+      {
+        "id": "down-feather",
+        "name": "Down Feather",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "keen-edge",
+        "name": "Keen Edge",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "utzu-mah-turi",
+        "name": "Utzu Mah Turi",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "bow-of-the-gorgon-outcast",
+        "name": "Bow of the Gorgon Outcast",
+        "drop_chance": 0.012
+      }
+    ]
+  },
+  {
+    "kind": "telekinetic-mallard",
+    "items": [
+      {
+        "id": "moth-dust",
+        "name": "Moth Dust",
+        "drop_chance": 0.55
+      },
+      {
+        "id": "down-feather",
+        "name": "Down Feather",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "keen-edge",
+        "name": "Keen Edge",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "utzu-mah-turi",
+        "name": "Utzu Mah Turi",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "bow-of-the-gorgon-outcast",
+        "name": "Bow of the Gorgon Outcast",
+        "drop_chance": 0.012
+      }
+    ]
+  },
+  {
+    "kind": "The Unicorn, Allegedly a Robot",
+    "items": [
+      {
+        "id": "icewraith-claymore",
+        "name": "Icewraith Claymore",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "fourth-remorse",
+        "name": "Fourth Remorse",
+        "drop_chance": 0.22
+      },
+      {
+        "id": "shepherd's-staff",
+        "name": "Shepherd's Staff",
+        "drop_chance": 0.15
+      },
+      {
+        "id": "fourth-remorse",
+        "name": "Fourth Remorse",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "moth-dust",
+        "name": "Moth Dust",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "The Ghost, Self-Identified as Alien",
+    "items": [
+      {
+        "id": "fourth-remorse",
+        "name": "Fourth Remorse",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "light's-end",
+        "name": "Light's End",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "shepherd's-staff",
+        "name": "Shepherd's Staff",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "down-feather",
+        "name": "Down Feather",
+        "drop_chance": 0.8
+      }
+    ]
+  },
+  {
+    "kind": "The Frog, Keeper of a Secret",
+    "items": [
+      {
+        "id": "fourth-remorse",
+        "name": "Fourth Remorse",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "light's-end",
+        "name": "Light's End",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "shepherd's-staff",
+        "name": "Shepherd's Staff",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "down-feather",
+        "name": "Down Feather",
+        "drop_chance": 0.8
+      }
+    ]
+  },
+  {
+    "kind": "The Tree, Speaking French",
+    "items": [
+      {
+        "id": "fourth-remorse",
+        "name": "Fourth Remorse",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "light's-end",
+        "name": "Light's End",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "shepherd's-staff",
+        "name": "Shepherd's Staff",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "down-feather",
+        "name": "Down Feather",
+        "drop_chance": 0.8
+      }
+    ]
+  },
+  {
+    "kind": "A Duck, Reportedly Telekinetic",
+    "items": [
+      {
+        "id": "fourth-remorse",
+        "name": "Fourth Remorse",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "light's-end",
+        "name": "Light's End",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "shepherd's-staff",
+        "name": "Shepherd's Staff",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "down-feather",
+        "name": "Down Feather",
+        "drop_chance": 0.8
+      }
+    ]
+  },
+  {
+    "kind": "A Second Duck",
+    "items": [
+      {
+        "id": "fourth-remorse",
+        "name": "Fourth Remorse",
+        "drop_chance": 0.12
+      },
+      {
+        "id": "light's-end",
+        "name": "Light's End",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "shepherd's-staff",
+        "name": "Shepherd's Staff",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "down-feather",
+        "name": "Down Feather",
+        "drop_chance": 0.8
+      }
+    ]
+  },
+  {
+    "kind": "difference-engine",
+    "items": [
+      {
+        "id": "vellum-scrap",
+        "name": "Vellum Scrap",
+        "drop_chance": 0.55
+      },
+      {
+        "id": "lens-shard",
+        "name": "Lens Shard",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "fourth-remorse",
+        "name": "Fourth Remorse",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "light's-end",
+        "name": "Light's End",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "shepherd's-staff",
+        "name": "Shepherd's Staff",
+        "drop_chance": 0.012
+      }
+    ]
+  },
+  {
+    "kind": "worm-scribe",
+    "items": [
+      {
+        "id": "vellum-scrap",
+        "name": "Vellum Scrap",
+        "drop_chance": 0.55
+      },
+      {
+        "id": "lens-shard",
+        "name": "Lens Shard",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "fourth-remorse",
+        "name": "Fourth Remorse",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "light's-end",
+        "name": "Light's End",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "shepherd's-staff",
+        "name": "Shepherd's Staff",
+        "drop_chance": 0.012
+      }
+    ]
+  },
+  {
+    "kind": "unmarked-wanderer",
+    "items": [
+      {
+        "id": "vellum-scrap",
+        "name": "Vellum Scrap",
+        "drop_chance": 0.55
+      },
+      {
+        "id": "lens-shard",
+        "name": "Lens Shard",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "fourth-remorse",
+        "name": "Fourth Remorse",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "light's-end",
+        "name": "Light's End",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "shepherd's-staff",
+        "name": "Shepherd's Staff",
+        "drop_chance": 0.012
+      }
+    ]
+  },
+  {
+    "kind": "Cain, East of Eden",
+    "items": [
+      {
+        "id": "last-regret",
+        "name": "Last Regret",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "icewraith-claymore",
+        "name": "Icewraith Claymore",
+        "drop_chance": 0.22
+      },
+      {
+        "id": "fourth-remorse",
+        "name": "Fourth Remorse",
+        "drop_chance": 0.15
+      },
+      {
+        "id": "icewraith-claymore",
+        "name": "Icewraith Claymore",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "vellum-scrap",
+        "name": "Vellum Scrap",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Abraham of Worms, the Mage",
+    "items": [
+      {
+        "id": "icewraith-claymore",
+        "name": "Icewraith Claymore",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "mythril-sword",
+        "name": "Mythril Sword",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "shepherd's-staff",
+        "name": "Shepherd's Staff",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "lens-shard",
+        "name": "Lens Shard",
+        "drop_chance": 0.8
+      }
+    ]
+  },
+  {
+    "kind": "Ada Lovelace, Pilot",
+    "items": [
+      {
+        "id": "icewraith-claymore",
+        "name": "Icewraith Claymore",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "mythril-sword",
+        "name": "Mythril Sword",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "shepherd's-staff",
+        "name": "Shepherd's Staff",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "lens-shard",
+        "name": "Lens Shard",
+        "drop_chance": 0.8
+      }
+    ]
+  },
+  {
+    "kind": "MnM, the Shapeshifting Crab",
+    "items": [
+      {
+        "id": "icewraith-claymore",
+        "name": "Icewraith Claymore",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "mythril-sword",
+        "name": "Mythril Sword",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "shepherd's-staff",
+        "name": "Shepherd's Staff",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "lens-shard",
+        "name": "Lens Shard",
+        "drop_chance": 0.8
+      }
+    ]
+  },
+  {
+    "kind": "A Mark Bearer",
+    "items": [
+      {
+        "id": "icewraith-claymore",
+        "name": "Icewraith Claymore",
+        "drop_chance": 0.12
+      },
+      {
+        "id": "mythril-sword",
+        "name": "Mythril Sword",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "shepherd's-staff",
+        "name": "Shepherd's Staff",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "lens-shard",
+        "name": "Lens Shard",
+        "drop_chance": 0.8
+      }
+    ]
+  },
+  {
+    "kind": "arena-gladiator",
+    "items": [
+      {
+        "id": "beetle-shell",
+        "name": "Beetle Shell",
+        "drop_chance": 0.55
+      },
+      {
+        "id": "wolf-fang",
+        "name": "Wolf Fang",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "icewraith-claymore",
+        "name": "Icewraith Claymore",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "mythril-sword",
+        "name": "Mythril Sword",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "light's-end",
+        "name": "Light's End",
+        "drop_chance": 0.012
+      }
+    ]
+  },
+  {
+    "kind": "pit-hound",
+    "items": [
+      {
+        "id": "beetle-shell",
+        "name": "Beetle Shell",
+        "drop_chance": 0.55
+      },
+      {
+        "id": "wolf-fang",
+        "name": "Wolf Fang",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "icewraith-claymore",
+        "name": "Icewraith Claymore",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "mythril-sword",
+        "name": "Mythril Sword",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "light's-end",
+        "name": "Light's End",
+        "drop_chance": 0.012
+      }
+    ]
+  },
+  {
+    "kind": "trial-automaton",
+    "items": [
+      {
+        "id": "beetle-shell",
+        "name": "Beetle Shell",
+        "drop_chance": 0.55
+      },
+      {
+        "id": "wolf-fang",
+        "name": "Wolf Fang",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "icewraith-claymore",
+        "name": "Icewraith Claymore",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "mythril-sword",
+        "name": "Mythril Sword",
+        "drop_chance": 0.012
+      },
+      {
+        "id": "light's-end",
+        "name": "Light's End",
+        "drop_chance": 0.012
+      }
+    ]
+  },
+  {
+    "kind": "The Proving Warden",
+    "items": [
+      {
+        "id": "mikazuki",
+        "name": "Mikazuki",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "juzumaru",
+        "name": "Juzumaru",
+        "drop_chance": 0.22
+      },
+      {
+        "id": "onimaru",
+        "name": "Onimaru",
+        "drop_chance": 0.15
+      },
+      {
+        "id": "last-regret",
+        "name": "Last Regret",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "beetle-shell",
+        "name": "Beetle Shell",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "A Reigning Champion",
+    "items": [
+      {
+        "id": "last-regret",
+        "name": "Last Regret",
+        "drop_chance": 0.12
+      },
+      {
+        "id": "fourth-remorse",
+        "name": "Fourth Remorse",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "shepherd's-staff",
+        "name": "Shepherd's Staff",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "wolf-fang",
+        "name": "Wolf Fang",
+        "drop_chance": 0.8
+      }
+    ]
   }
 ]

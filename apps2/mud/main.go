@@ -81,7 +81,6 @@ import (
 	"dragonsnshit/server/timeline"
 	"dragonsnshit/server/watcher"
 	"dragonsnshit/server/weather"
-	"dragonsnshit/server/worldapi"
 	"dragonsnshit/server/worldcrisis"
 	"dragonsnshit/server/worldevent"
 	"dragonsnshit/server/xp"
@@ -1237,22 +1236,28 @@ func initWorld() *world {
 	// (0 reserved, matching GenerateDungeonLayout's own doc comment convention of a real,
 	// meaningful non-zero seed) -- fixed, not per-session-random, since this is a v0 shared
 	// persistent instance, not a per-party procedural one (see above).
+	// Multi-room dungeons (scripts/gen_dungeons.py): each roster dungeon is its entrance zone
+	// (dungeonZoneBase+i, safe, empty) plus five connected room zones with level-scaled mobs, an
+	// elite or two and a boss. The boss and elites come from the (IDUNA-editable) dungeon roster.
 	for i := range mob.DungeonRoster {
-		zoneID := dungeonZoneBase + i
-		seed := int64(i + 1)
-		layout := worldapi.GenerateDungeonLayout(seed)
-		entrance := layout.Rooms[layout.EntranceIdx]
-		if err := w.zoneMgr.AddZone(&zone.Zone{
-			ID:     zoneID,
-			Name:   mob.DungeonRoster[i].Name,
-			SpawnX: float64(entrance.CenterX),
-			SpawnY: 2,
-			SpawnZ: float64(entrance.CenterZ),
-		}); err != nil {
-			fmt.Printf("warn: dungeon zone %d registration: %v\n", zoneID, err)
+		if err := w.zoneMgr.AddZone(&zone.Zone{ID: dungeonZoneBase + i, Name: mob.DungeonRoster[i].Name, SpawnX: 0, SpawnY: 2, SpawnZ: 0}); err != nil {
+			fmt.Printf("warn: dungeon zone %d registration: %v\n", dungeonZoneBase+i, err)
+		}
+	}
+	for _, room := range mob.DungeonRoomTable {
+		if room.Index == 0 {
 			continue
 		}
-		spawnInto(zoneID, mob.GenerateDungeonSpawns(layout, i, zoneID, seed))
+		name := room.Name
+		if room.Dungeon < len(mob.DungeonRoster) {
+			name = mob.DungeonRoster[room.Dungeon].Name + ": " + room.Name
+		}
+		w.mobRegs[room.ZoneID] = mob.New()
+		if err := w.zoneMgr.AddZone(&zone.Zone{ID: room.ZoneID, Name: name, SpawnX: 0, SpawnY: 2, SpawnZ: 0}); err != nil {
+			fmt.Printf("warn: dungeon room %d registration: %v\n", room.ZoneID, err)
+			continue
+		}
+		spawnInto(room.ZoneID, mob.DungeonRoomSpawns(room.ZoneID))
 	}
 
 	w.minePoints[0] = gather.MeadowMiningPoints()
@@ -3576,7 +3581,7 @@ func cmdLook(p *player) {
 	if sm, ok := zoneSmell[p.zoneID]; ok {
 		p.sendf("You smell: %s", sm)
 	}
-	if sky := weather.ZoneSky(p.zoneID, time.Now()); sky.Element != weather.None {
+	if sky := skyAt(p.zoneID, time.Now()); sky.Element != weather.None {
 		p.sendf("The sky: %s.", skyString(sky))
 	}
 
@@ -7452,7 +7457,11 @@ func cmdCastDarkMagic(p *player, spell string) {
 func cmdDungeons(p *player) {
 	p.send("Dungeons:")
 	for i, d := range mob.DungeonRoster {
-		p.sendf("  %d. %s", i+1, d.Name)
+		band := ""
+		if i < len(mob.DungeonLevelBands) {
+			band = fmt.Sprintf("  (Lv %d-%d, six rooms)", mob.DungeonLevelBands[i][0], mob.DungeonLevelBands[i][1])
+		}
+		p.sendf("  %d. %s%s", i+1, d.Name, band)
 	}
 	p.send("Use 'dungeon-enter <number>' to travel.")
 	p.prompt()

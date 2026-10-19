@@ -321,5 +321,365 @@
       "window_close_sec": 2700,
       "respawn_minutes": 120
     }
+  },
+  {
+    "zone_id": 301,
+    "kind": "sealed-clerk",
+    "enabled": true
+  },
+  {
+    "zone_id": 301,
+    "kind": "ink-wraith",
+    "enabled": true
+  },
+  {
+    "zone_id": 302,
+    "kind": "sealed-clerk",
+    "enabled": true
+  },
+  {
+    "zone_id": 302,
+    "kind": "ink-wraith",
+    "enabled": true
+  },
+  {
+    "zone_id": 302,
+    "kind": "box-mimic",
+    "enabled": true
+  },
+  {
+    "zone_id": 303,
+    "kind": "box-mimic",
+    "enabled": true
+  },
+  {
+    "zone_id": 304,
+    "kind": "ink-wraith",
+    "enabled": true
+  },
+  {
+    "zone_id": 304,
+    "kind": "box-mimic",
+    "enabled": true
+  },
+  {
+    "zone_id": 305,
+    "kind": "box-mimic",
+    "enabled": true
+  },
+  {
+    "zone_id": 311,
+    "kind": "tuning-fork-wraith",
+    "enabled": true
+  },
+  {
+    "zone_id": 311,
+    "kind": "standing-wave",
+    "enabled": true
+  },
+  {
+    "zone_id": 312,
+    "kind": "tuning-fork-wraith",
+    "enabled": true
+  },
+  {
+    "zone_id": 312,
+    "kind": "standing-wave",
+    "enabled": true
+  },
+  {
+    "zone_id": 312,
+    "kind": "goetic-echo",
+    "enabled": true
+  },
+  {
+    "zone_id": 313,
+    "kind": "goetic-echo",
+    "enabled": true
+  },
+  {
+    "zone_id": 314,
+    "kind": "standing-wave",
+    "enabled": true
+  },
+  {
+    "zone_id": 314,
+    "kind": "goetic-echo",
+    "enabled": true
+  },
+  {
+    "zone_id": 315,
+    "kind": "goetic-echo",
+    "enabled": true
+  },
+  {
+    "zone_id": 321,
+    "kind": "draugr-remnant",
+    "enabled": true
+  },
+  {
+    "zone_id": 321,
+    "kind": "raven-scribe",
+    "enabled": true
+  },
+  {
+    "zone_id": 322,
+    "kind": "draugr-remnant",
+    "enabled": true
+  },
+  {
+    "zone_id": 322,
+    "kind": "raven-scribe",
+    "enabled": true
+  },
+  {
+    "zone_id": 322,
+    "kind": "hall-thrall",
+    "enabled": true
+  },
+  {
+    "zone_id": 323,
+    "kind": "hall-thrall",
+    "enabled": true
+  },
+  {
+    "zone_id": 324,
+    "kind": "raven-scribe",
+    "enabled": true
+  },
+  {
+    "zone_id": 324,
+    "kind": "hall-thrall",
+    "enabled": true
+  },
+  {
+    "zone_id": 325,
+    "kind": "hall-thrall",
+    "enabled": true
+  },
+  {
+    "zone_id": 331,
+    "kind": "jade-sentinel",
+    "enabled": true
+  },
+  {
+    "zone_id": 331,
+    "kind": "peach-thief",
+    "enabled": true
+  },
+  {
+    "zone_id": 332,
+    "kind": "jade-sentinel",
+    "enabled": true
+  },
+  {
+    "zone_id": 332,
+    "kind": "peach-thief",
+    "enabled": true
+  },
+  {
+    "zone_id": 332,
+    "kind": "hopping-corpse",
+    "enabled": true
+  },
+  {
+    "zone_id": 333,
+    "kind": "hopping-corpse",
+    "enabled": true
+  },
+  {
+    "zone_id": 334,
+    "kind": "peach-thief",
+    "enabled": true
+  },
+  {
+    "zone_id": 334,
+    "kind": "hopping-corpse",
+    "enabled": true
+  },
+  {
+    "zone_id": 335,
+    "kind": "hopping-corpse",
+    "enabled": true
+  },
+  {
+    "zone_id": 341,
+    "kind": "wake-mourner",
+    "enabled": true
+  },
+  {
+    "zone_id": 341,
+    "kind": "highland-kelpie",
+    "enabled": true
+  },
+  {
+    "zone_id": 342,
+    "kind": "wake-mourner",
+    "enabled": true
+  },
+  {
+    "zone_id": 342,
+    "kind": "highland-kelpie",
+    "enabled": true
+  },
+  {
+    "zone_id": 342,
+    "kind": "cairn-wight",
+    "enabled": true
+  },
+  {
+    "zone_id": 343,
+    "kind": "cairn-wight",
+    "enabled": true
+  },
+  {
+    "zone_id": 344,
+    "kind": "highland-kelpie",
+    "enabled": true
+  },
+  {
+    "zone_id": 344,
+    "kind": "cairn-wight",
+    "enabled": true
+  },
+  {
+    "zone_id": 345,
+    "kind": "cairn-wight",
+    "enabled": true
+  },
+  {
+    "zone_id": 351,
+    "kind": "spaghetti-wisp",
+    "enabled": true
+  },
+  {
+    "zone_id": 351,
+    "kind": "top-hat-toad",
+    "enabled": true
+  },
+  {
+    "zone_id": 352,
+    "kind": "spaghetti-wisp",
+    "enabled": true
+  },
+  {
+    "zone_id": 352,
+    "kind": "top-hat-toad",
+    "enabled": true
+  },
+  {
+    "zone_id": 352,
+    "kind": "telekinetic-mallard",
+    "enabled": true
+  },
+  {
+    "zone_id": 353,
+    "kind": "telekinetic-mallard",
+    "enabled": true
+  },
+  {
+    "zone_id": 354,
+    "kind": "top-hat-toad",
+    "enabled": true
+  },
+  {
+    "zone_id": 354,
+    "kind": "telekinetic-mallard",
+    "enabled": true
+  },
+  {
+    "zone_id": 355,
+    "kind": "telekinetic-mallard",
+    "enabled": true
+  },
+  {
+    "zone_id": 361,
+    "kind": "difference-engine",
+    "enabled": true
+  },
+  {
+    "zone_id": 361,
+    "kind": "worm-scribe",
+    "enabled": true
+  },
+  {
+    "zone_id": 362,
+    "kind": "difference-engine",
+    "enabled": true
+  },
+  {
+    "zone_id": 362,
+    "kind": "worm-scribe",
+    "enabled": true
+  },
+  {
+    "zone_id": 362,
+    "kind": "unmarked-wanderer",
+    "enabled": true
+  },
+  {
+    "zone_id": 363,
+    "kind": "unmarked-wanderer",
+    "enabled": true
+  },
+  {
+    "zone_id": 364,
+    "kind": "worm-scribe",
+    "enabled": true
+  },
+  {
+    "zone_id": 364,
+    "kind": "unmarked-wanderer",
+    "enabled": true
+  },
+  {
+    "zone_id": 365,
+    "kind": "unmarked-wanderer",
+    "enabled": true
+  },
+  {
+    "zone_id": 371,
+    "kind": "arena-gladiator",
+    "enabled": true
+  },
+  {
+    "zone_id": 371,
+    "kind": "pit-hound",
+    "enabled": true
+  },
+  {
+    "zone_id": 372,
+    "kind": "arena-gladiator",
+    "enabled": true
+  },
+  {
+    "zone_id": 372,
+    "kind": "pit-hound",
+    "enabled": true
+  },
+  {
+    "zone_id": 372,
+    "kind": "trial-automaton",
+    "enabled": true
+  },
+  {
+    "zone_id": 373,
+    "kind": "trial-automaton",
+    "enabled": true
+  },
+  {
+    "zone_id": 374,
+    "kind": "pit-hound",
+    "enabled": true
+  },
+  {
+    "zone_id": 374,
+    "kind": "trial-automaton",
+    "enabled": true
+  },
+  {
+    "zone_id": 375,
+    "kind": "trial-automaton",
+    "enabled": true
   }
 ]

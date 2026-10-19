@@ -19,7 +19,28 @@ import (
 
 // craftEnvAt is the sky a synthesis in zoneID happens under at time t.
 func craftEnvAt(zoneID int, t time.Time) craft.Env {
-	return craft.Env{Day: weather.DayElement(t), Sky: weather.ZoneSky(zoneID, t)}
+	return craft.Env{Day: weather.DayElement(t), Sky: skyAt(zoneID, t)}
+}
+
+// indoorZone reports zones with a roof: dungeons, archives, caves and the like have no weather.
+func indoorZone(id int) bool {
+	switch {
+	case id >= 208 && id <= 215, id >= 300 && id < 400: // dungeons and their rooms
+		return true
+	}
+	switch id {
+	case 2, 12, 16, 201, 203, 204, 205: // Caves, Roost Deeps, Cataloguer's Stacks, School, Cairngorms, Vatican, Underport
+		return true
+	}
+	return false
+}
+
+// skyAt is the zone's weather, or none when indoors.
+func skyAt(zoneID int, t time.Time) weather.Sky {
+	if indoorZone(zoneID) {
+		return weather.Sky{}
+	}
+	return weather.ZoneSky(zoneID, t)
 }
 
 func skyString(s weather.Sky) string {
@@ -213,7 +234,11 @@ func cmdTime(p *player) {
 	env := craftEnvAt(p.zoneID, now)
 	p.sendf("\r\n=== Time & Sky ===")
 	p.sendf("  Today is %s. The day turns in %s.", weather.DayName(env.Day), weather.NextDayChange(now).Sub(now).Round(time.Minute))
-	p.sendf("  Sky over %s: %s.", zoneName(p.zoneID), skyString(env.Sky))
+	if indoorZone(p.zoneID) {
+		p.sendf("  You are indoors at %s: no weather reaches you here.", zoneName(p.zoneID))
+	} else {
+		p.sendf("  Sky over %s: %s.", zoneName(p.zoneID), skyString(env.Sky))
+	}
 	p.send("  Crystals under this sky (crafting):")
 	for _, e := range weather.AllElements {
 		cr := string(e) + "-crystal"
