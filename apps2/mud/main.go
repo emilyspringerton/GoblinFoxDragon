@@ -639,6 +639,7 @@ func npcByID(id string) *npcDef {
 var questBank = func() *quest.Bank {
 	all := append(quest.StarterQuests, quest.TRAPXChainQuests()...)
 	all = append(all, quest.OwlZoneQuests...)
+	all = append(all, quest.ExtraQuests...)
 	return quest.NewBank(all)
 }()
 
@@ -3440,6 +3441,7 @@ func cmdQuestAccept(p *player, questID string) {
 }
 
 func cmdQuestTurnIn(p *player, questID string) {
+	q, _ := questBank.Get(questID)
 	res, err := p.questJournal.TurnIn(questBank, questID, p.inventory)
 	if err != nil {
 		p.sendf("Cannot turn in quest: %v", err)
@@ -3447,6 +3449,10 @@ func cmdQuestTurnIn(p *player, questID string) {
 		return
 	}
 	saveQuestJournal(p)
+	if q != nil && len(q.RequireItems) > 0 {
+		removeItems(p, q.RequireItems) // the items you were asked to bring are handed over
+		p.sendf("You hand over the requested items.")
+	}
 	p.flow += res.Flow
 	p.sendf("Quest complete! +%d flow.", res.Flow)
 	if res.Item != "" {
