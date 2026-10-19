@@ -115,6 +115,9 @@ func registerKit(entries ...*kitEntry) {
 // kitLevelFor returns the level the player can use e at, and which role grants it ("" if none).
 // Main job uses the character level; a sub job uses half of it and only for spells.
 func kitLevelFor(p *player, e *kitEntry) (ok bool, needed int, role string) {
+	if len(e.Jobs) == 0 { // an item effect: anyone can use it
+		return true, 0, "item"
+	}
 	lvl := p.charXP.Level
 	if min, has := e.Jobs[p.jobID]; has {
 		return lvl >= min, min, "main"

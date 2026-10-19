@@ -5277,5 +5277,5343 @@
       "ex"
     ],
     "id": 1335
+  },
+  {
+    "id": 2000,
+    "name": "Ash Lumber",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Pale pale timber from the Handington lumberyard."
+  },
+  {
+    "id": 2001,
+    "name": "Heather Lumber",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Wiry upland timber from Wren's Perch."
+  },
+  {
+    "id": 2002,
+    "name": "Reed Lumber",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Light, hollow marsh reed bundled for building."
+  },
+  {
+    "id": 2003,
+    "name": "Moor Oak Lumber",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Dark oak that has soaked up a century of fog."
+  },
+  {
+    "id": 2004,
+    "name": "Ridge Pine Lumber",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Straight, cold-hardened pine from the Eastwind Ridge."
+  },
+  {
+    "id": 2005,
+    "name": "Tanuki Rice",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Short-grain rice from the Osaka party store back room."
+  },
+  {
+    "id": 2006,
+    "name": "Party Store Flour",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A paper sack of flour. Best before: ambiguous."
+  },
+  {
+    "id": 2007,
+    "name": "Brine Salt",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Coarse grey salt, scraped from Ichthyosapien shell-markings."
+  },
+  {
+    "id": 2008,
+    "name": "Shrine Greens",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Bundled greens from a shrine garden. Offered, then collected."
+  },
+  {
+    "id": 2009,
+    "name": "Spring Water",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A stoppered flask of clean spring water."
+  },
+  {
+    "id": 2010,
+    "name": "Lamp Wick",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Braided wick for the Eastwind lamps."
+  },
+  {
+    "id": 2011,
+    "name": "Copper Ingot",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A bar of copper."
+  },
+  {
+    "id": 2012,
+    "name": "Tin Ingot",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A bar of tin."
+  },
+  {
+    "id": 2013,
+    "name": "Iron Ingot",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A bar of iron."
+  },
+  {
+    "id": 2014,
+    "name": "Quill-Brass Ingot",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Copper and tin alloyed the Eastwind way: bright, plain, hard to tarnish."
+  },
+  {
+    "id": 2015,
+    "name": "Silver Ingot",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A bar of silver, stamped with a shell-mark."
+  },
+  {
+    "id": 2016,
+    "name": "Shell-Steel Ingot",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Iron folded with crushed beetle carapace. Heikegani smiths guard the ratio."
+  },
+  {
+    "id": 2017,
+    "name": "Swampite Ingot",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Black, faintly warm metal from the bog."
+  },
+  {
+    "id": 2018,
+    "name": "Gold Ingot",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A bar of gold. The ledger notes its weight."
+  },
+  {
+    "id": 2019,
+    "name": "Ward-Steel Ingot",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Steel tempered with protocol stone. It resists being documented."
+  },
+  {
+    "id": 2020,
+    "name": "Cured Wolf Pelt",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A supple, cured wolf pelt."
+  },
+  {
+    "id": 2021,
+    "name": "Cured Hare Hide",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A soft cured hare hide."
+  },
+  {
+    "id": 2022,
+    "name": "Cured Badger Hide",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A tough cured badger hide."
+  },
+  {
+    "id": 2023,
+    "name": "Rimefox Leather",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Frost-stiff leather that never quite thaws."
+  },
+  {
+    "id": 2024,
+    "name": "Mini-Bike Leather",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Scuffed, oil-stained leather with a very particular smell of gasoline and freedom."
+  },
+  {
+    "id": 2025,
+    "name": "Spider Silk Cloth",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A bolt of Kuroshio silk, light and nearly invisible."
+  },
+  {
+    "id": 2026,
+    "name": "Down Cloth",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Fledgling down felted into a warm cloth."
+  },
+  {
+    "id": 2027,
+    "name": "Vellum Weave",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Archive vellum thread woven with ink. It will not be read aloud."
+  },
+  {
+    "id": 2028,
+    "name": "Wraith Cloth",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Cloth spun from windwraith thread; it moves when the air doesn't."
+  },
+  {
+    "id": 2029,
+    "name": "Ward Paper",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Talisman paper, blank. For now."
+  },
+  {
+    "id": 2030,
+    "name": "Ash Planks",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Sawn ash."
+  },
+  {
+    "id": 2031,
+    "name": "Heather Planks",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Sawn heather-wood."
+  },
+  {
+    "id": 2032,
+    "name": "Reed Planks",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Pressed reed boards."
+  },
+  {
+    "id": 2033,
+    "name": "Moor Oak Planks",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Sawn moor oak."
+  },
+  {
+    "id": 2034,
+    "name": "Ridge Pine Planks",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Sawn pine."
+  },
+  {
+    "id": 2035,
+    "name": "Bone Meal",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Ground pellet-bone."
+  },
+  {
+    "id": 2036,
+    "name": "Ward Ink",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Black ink for talismans and for documents that must outlive their authors."
+  },
+  {
+    "id": 2037,
+    "name": "Shell Glue",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Gluey resin boiled from crab shell."
+  },
+  {
+    "id": 2038,
+    "name": "Dough",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A lump of Party Store Flour and water."
+  },
+  {
+    "id": 2039,
+    "name": "Stock",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A savory stock base."
+  },
+  {
+    "id": 2040,
+    "name": "Light Crystal",
+    "category": "crystal",
+    "stack_size": 12,
+    "model_id": "crystal_water",
+    "description": "A crystal that hums at the edge of hearing."
+  },
+  {
+    "id": 2041,
+    "name": "Dark Crystal",
+    "category": "crystal",
+    "stack_size": 12,
+    "model_id": "crystal_earth",
+    "description": "A crystal that seems to take the light in rather than give it back."
+  },
+  {
+    "id": 2042,
+    "name": "Silver Ore",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Bright ore, mined in the murk."
+  },
+  {
+    "id": 2043,
+    "name": "Swampite",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Black bog ore, warm to the touch."
+  },
+  {
+    "id": 2044,
+    "name": "Clay",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Wet grey clay."
+  },
+  {
+    "id": 2045,
+    "name": "Peat",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Dense, dark fuel."
+  },
+  {
+    "id": 2046,
+    "name": "Beetle Shell",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2047,
+    "name": "Echo Drop",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2048,
+    "name": "Spider Silk",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2049,
+    "name": "Spider Venom",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2050,
+    "name": "Wolf Pelt",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2051,
+    "name": "Wolf Fang",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2052,
+    "name": "Leech Blood",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2053,
+    "name": "Lizard Tail",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2054,
+    "name": "Rabbit Hide",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2055,
+    "name": "Slime Oil",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2056,
+    "name": "Sunderworm Carapace",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2247,
+    "name": "Sunderworm Fang",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2058,
+    "name": "Worm Sinew",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2059,
+    "name": "Mouse Whisker",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2060,
+    "name": "Owl Pellet",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2061,
+    "name": "Down Feather",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2062,
+    "name": "Moth Dust",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2063,
+    "name": "Brass Plate Shard",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2064,
+    "name": "Sentry Quill",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2065,
+    "name": "Kestrel Pinion",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2066,
+    "name": "Badger Claw",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2067,
+    "name": "Hedge Hide",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2068,
+    "name": "Vole Pelt",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2069,
+    "name": "Pellet Bone",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2070,
+    "name": "Slug Ichor",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2071,
+    "name": "Heron Quill",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2072,
+    "name": "Roost Wing",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2073,
+    "name": "Guano Clump",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2074,
+    "name": "Crawler Mandible",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2075,
+    "name": "Shade Feather",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2076,
+    "name": "Eagle Owl Plume",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2077,
+    "name": "Lens Shard",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2078,
+    "name": "Wisp Glass",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2079,
+    "name": "Rime Pelt",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2080,
+    "name": "Hare Pelt",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2081,
+    "name": "Sleet Crystal",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2082,
+    "name": "Snowfeather",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2083,
+    "name": "Wraith Thread",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2084,
+    "name": "Vellum Scrap",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2085,
+    "name": "Ink Vial",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2086,
+    "name": "Bookbinding Paste",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2087,
+    "name": "Wisp Wax",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2088,
+    "name": "Hag Feather",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2089,
+    "name": "Lamp Oil",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2090,
+    "name": "Protocol Stone",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2091,
+    "name": "Black Bar Shard",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2092,
+    "name": "Redacted Feather",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2093,
+    "name": "Copper Shortsword",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "sword",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN",
+      "RUN",
+      "BLU",
+      "COR"
+    ],
+    "level": 3,
+    "stats": {
+      "attack": 15,
+      "str": 1,
+      "accuracy": 0
+    },
+    "model_id": "sword_iron_short",
+    "delay": 220
+  },
+  {
+    "id": 2094,
+    "name": "Copper Shortsword +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "sword",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN",
+      "RUN",
+      "BLU",
+      "COR"
+    ],
+    "level": 3,
+    "stats": {
+      "attack": 16,
+      "str": 2,
+      "accuracy": 1
+    },
+    "model_id": "sword_iron_short",
+    "delay": 220,
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2095,
+    "name": "Copper Knife",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "dagger",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "ASN",
+      "COR"
+    ],
+    "level": 2,
+    "stats": {
+      "attack": 10,
+      "str": 1,
+      "accuracy": 0
+    },
+    "model_id": "dagger_basic",
+    "delay": 160
+  },
+  {
+    "id": 2096,
+    "name": "Copper Knife +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "dagger",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "ASN",
+      "COR"
+    ],
+    "level": 2,
+    "stats": {
+      "attack": 11,
+      "str": 2,
+      "accuracy": 1
+    },
+    "model_id": "dagger_basic",
+    "delay": 160,
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2097,
+    "name": "Copper Hatchet",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "axe",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "DRK",
+      "BST",
+      "RUN"
+    ],
+    "level": 5,
+    "stats": {
+      "attack": 20,
+      "str": 1,
+      "accuracy": 0
+    },
+    "model_id": "axe_hand",
+    "delay": 240
+  },
+  {
+    "id": 2098,
+    "name": "Copper Hatchet +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "axe",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "DRK",
+      "BST",
+      "RUN"
+    ],
+    "level": 5,
+    "stats": {
+      "attack": 22,
+      "str": 2,
+      "accuracy": 1
+    },
+    "model_id": "axe_hand",
+    "delay": 240,
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2099,
+    "name": "Copper Mail",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 5,
+    "stats": {
+      "defense": 18
+    },
+    "model_id": "body_chain"
+  },
+  {
+    "id": 2100,
+    "name": "Copper Mail +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 5,
+    "stats": {
+      "defense": 19
+    },
+    "model_id": "body_chain",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2101,
+    "name": "Copper Cap",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 4,
+    "stats": {
+      "defense": 9
+    },
+    "model_id": "head_iron"
+  },
+  {
+    "id": 2102,
+    "name": "Copper Cap +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 4,
+    "stats": {
+      "defense": 10
+    },
+    "model_id": "head_iron",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2103,
+    "name": "Quill-Brass Sword",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "sword",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN",
+      "RUN",
+      "BLU",
+      "COR"
+    ],
+    "level": 11,
+    "stats": {
+      "attack": 29,
+      "str": 2,
+      "accuracy": 1,
+      "int": 1
+    },
+    "model_id": "sword_steel",
+    "delay": 228,
+    "description": "Bright brass, balanced like a pen."
+  },
+  {
+    "id": 2104,
+    "name": "Quill-Brass Sword +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "sword",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN",
+      "RUN",
+      "BLU",
+      "COR"
+    ],
+    "level": 11,
+    "stats": {
+      "attack": 31,
+      "str": 3,
+      "accuracy": 2,
+      "int": 2
+    },
+    "model_id": "sword_steel",
+    "delay": 228,
+    "description": "Bright brass, balanced like a pen. (High quality.)"
+  },
+  {
+    "id": 2105,
+    "name": "Quill-Brass Stiletto",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "dagger",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "ASN",
+      "COR"
+    ],
+    "level": 10,
+    "stats": {
+      "attack": 22,
+      "str": 2,
+      "accuracy": 1,
+      "dex": 2
+    },
+    "model_id": "dagger_003",
+    "delay": 164,
+    "description": "Sharpened to a nib."
+  },
+  {
+    "id": 2106,
+    "name": "Quill-Brass Stiletto +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "dagger",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "ASN",
+      "COR"
+    ],
+    "level": 10,
+    "stats": {
+      "attack": 24,
+      "str": 3,
+      "accuracy": 2,
+      "dex": 3
+    },
+    "model_id": "dagger_003",
+    "delay": 164,
+    "description": "Sharpened to a nib. (High quality.)"
+  },
+  {
+    "id": 2107,
+    "name": "Quill-Brass Axe",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "axe",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "DRK",
+      "BST",
+      "RUN"
+    ],
+    "level": 12,
+    "stats": {
+      "attack": 33,
+      "str": 2,
+      "accuracy": 1
+    },
+    "model_id": "axe_hand",
+    "delay": 244
+  },
+  {
+    "id": 2108,
+    "name": "Quill-Brass Axe +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "axe",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "DRK",
+      "BST",
+      "RUN"
+    ],
+    "level": 12,
+    "stats": {
+      "attack": 36,
+      "str": 3,
+      "accuracy": 2
+    },
+    "model_id": "axe_hand",
+    "delay": 244,
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2109,
+    "name": "Quill-Brass Hauberk",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 14,
+    "stats": {
+      "defense": 28,
+      "vit": 2
+    },
+    "model_id": "body_chain"
+  },
+  {
+    "id": 2110,
+    "name": "Quill-Brass Hauberk +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 14,
+    "stats": {
+      "defense": 30,
+      "vit": 3
+    },
+    "model_id": "body_chain",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2111,
+    "name": "Quill-Brass Helm",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 12,
+    "stats": {
+      "defense": 16
+    },
+    "model_id": "head_iron"
+  },
+  {
+    "id": 2112,
+    "name": "Quill-Brass Helm +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 12,
+    "stats": {
+      "defense": 17
+    },
+    "model_id": "head_iron",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2113,
+    "name": "Quill-Brass Gauntlets",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "hand-l",
+      "hand-r"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 13,
+    "stats": {
+      "defense": 16
+    },
+    "model_id": "hands_knuckles"
+  },
+  {
+    "id": 2114,
+    "name": "Quill-Brass Gauntlets +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "hand-l",
+      "hand-r"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 13,
+    "stats": {
+      "defense": 17
+    },
+    "model_id": "hands_knuckles",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2115,
+    "name": "Quill-Brass Greaves",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "legs"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 13,
+    "stats": {
+      "defense": 20
+    },
+    "model_id": "legs_chain"
+  },
+  {
+    "id": 2116,
+    "name": "Quill-Brass Greaves +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "legs"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 13,
+    "stats": {
+      "defense": 22
+    },
+    "model_id": "legs_chain",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2117,
+    "name": "Quill-Brass Sabatons",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "feet"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 13,
+    "stats": {
+      "defense": 16
+    },
+    "model_id": "feet_sabatons"
+  },
+  {
+    "id": 2118,
+    "name": "Quill-Brass Sabatons +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "feet"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 13,
+    "stats": {
+      "defense": 17
+    },
+    "model_id": "feet_sabatons",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2119,
+    "name": "Shell-Steel Cutlass",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "sword",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN",
+      "RUN",
+      "BLU",
+      "COR"
+    ],
+    "level": 26,
+    "stats": {
+      "attack": 54,
+      "str": 3,
+      "accuracy": 3,
+      "vit": 2
+    },
+    "model_id": "sabre_01",
+    "delay": 224,
+    "description": "A debt, collected: shell-steel keeps its edge and its grudges."
+  },
+  {
+    "id": 2120,
+    "name": "Shell-Steel Cutlass +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "sword",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN",
+      "RUN",
+      "BLU",
+      "COR"
+    ],
+    "level": 26,
+    "stats": {
+      "attack": 59,
+      "str": 4,
+      "accuracy": 4,
+      "vit": 3
+    },
+    "model_id": "sabre_01",
+    "delay": 224,
+    "description": "A debt, collected: shell-steel keeps its edge and its grudges. (High quality.)"
+  },
+  {
+    "id": 2121,
+    "name": "Carapace Cleaver",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "axe",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "DRK",
+      "BST",
+      "RUN"
+    ],
+    "level": 28,
+    "stats": {
+      "attack": 64,
+      "str": 3,
+      "accuracy": 3
+    },
+    "model_id": "axe_hand",
+    "delay": 252,
+    "description": "Cleaves cleanly through interest."
+  },
+  {
+    "id": 2122,
+    "name": "Carapace Cleaver +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "axe",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "DRK",
+      "BST",
+      "RUN"
+    ],
+    "level": 28,
+    "stats": {
+      "attack": 70,
+      "str": 4,
+      "accuracy": 4
+    },
+    "model_id": "axe_hand",
+    "delay": 252,
+    "description": "Cleaves cleanly through interest. (High quality.)"
+  },
+  {
+    "id": 2123,
+    "name": "Shell Accountant Letter-Knife",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "dagger",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "ASN",
+      "COR"
+    ],
+    "level": 25,
+    "stats": {
+      "attack": 42,
+      "str": 3,
+      "accuracy": 4,
+      "dex": 3
+    },
+    "model_id": "dagger_kali_01",
+    "delay": 158,
+    "description": "It opens letters. It also opens accounts."
+  },
+  {
+    "id": 2124,
+    "name": "Shell Accountant Letter-Knife +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "dagger",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "ASN",
+      "COR"
+    ],
+    "level": 25,
+    "stats": {
+      "attack": 46,
+      "str": 4,
+      "accuracy": 5,
+      "dex": 4
+    },
+    "model_id": "dagger_kali_01",
+    "delay": 158,
+    "description": "It opens letters. It also opens accounts. (High quality.)"
+  },
+  {
+    "id": 2125,
+    "name": "Shell-Steel Cuirass",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 30,
+    "stats": {
+      "defense": 46,
+      "vit": 4
+    },
+    "model_id": "body_plate_knight",
+    "description": "Every plate carries a face. They carry their ancestors on their backs."
+  },
+  {
+    "id": 2126,
+    "name": "Shell-Steel Cuirass +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 30,
+    "stats": {
+      "defense": 50,
+      "vit": 5
+    },
+    "model_id": "body_plate_knight",
+    "description": "Every plate carries a face. They carry their ancestors on their backs. (High quality.)"
+  },
+  {
+    "id": 2127,
+    "name": "Shell-Steel Helm",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 28,
+    "stats": {
+      "defense": 29,
+      "vit": 2
+    },
+    "model_id": "head_iron"
+  },
+  {
+    "id": 2128,
+    "name": "Shell-Steel Helm +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 28,
+    "stats": {
+      "defense": 31,
+      "vit": 3
+    },
+    "model_id": "head_iron",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2129,
+    "name": "Shell-Steel Gauntlets",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "hand-l",
+      "hand-r"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 28,
+    "stats": {
+      "defense": 29,
+      "str": 2
+    },
+    "model_id": "hands_knuckles"
+  },
+  {
+    "id": 2130,
+    "name": "Shell-Steel Gauntlets +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "hand-l",
+      "hand-r"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 28,
+    "stats": {
+      "defense": 31,
+      "str": 3
+    },
+    "model_id": "hands_knuckles",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2131,
+    "name": "Shell-Steel Greaves",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "legs"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 29,
+    "stats": {
+      "defense": 36,
+      "vit": 3
+    },
+    "model_id": "legs_chain"
+  },
+  {
+    "id": 2132,
+    "name": "Shell-Steel Greaves +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "legs"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 29,
+    "stats": {
+      "defense": 39,
+      "vit": 4
+    },
+    "model_id": "legs_chain",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2133,
+    "name": "Shell-Steel Sabatons",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "feet"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 28,
+    "stats": {
+      "defense": 29,
+      "agi": 2
+    },
+    "model_id": "feet_sabatons"
+  },
+  {
+    "id": 2134,
+    "name": "Shell-Steel Sabatons +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "feet"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 28,
+    "stats": {
+      "defense": 31,
+      "agi": 3
+    },
+    "model_id": "feet_sabatons",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2135,
+    "name": "Swampite Greatsword",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "greatsword",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WAR",
+      "DRK",
+      "RUN"
+    ],
+    "level": 36,
+    "stats": {
+      "attack": 114,
+      "str": 4,
+      "accuracy": 4
+    },
+    "model_id": "greatsword_icewraith",
+    "delay": 400,
+    "description": "Black bog-steel; it never fully cools."
+  },
+  {
+    "id": 2136,
+    "name": "Swampite Greatsword +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "greatsword",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WAR",
+      "DRK",
+      "RUN"
+    ],
+    "level": 36,
+    "stats": {
+      "attack": 125,
+      "str": 5,
+      "accuracy": 5
+    },
+    "model_id": "greatsword_icewraith",
+    "delay": 400,
+    "description": "Black bog-steel; it never fully cools. (High quality.)"
+  },
+  {
+    "id": 2137,
+    "name": "Swampite Tachi",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "katana",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "SAM",
+      "NIN"
+    ],
+    "level": 34,
+    "stats": {
+      "attack": 78,
+      "str": 4,
+      "accuracy": 4,
+      "dex": 3
+    },
+    "model_id": "katana_juzumaru",
+    "delay": 210,
+    "description": "A tachi folded in marsh water."
+  },
+  {
+    "id": 2138,
+    "name": "Swampite Tachi +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "katana",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "SAM",
+      "NIN"
+    ],
+    "level": 34,
+    "stats": {
+      "attack": 85,
+      "str": 5,
+      "accuracy": 5,
+      "dex": 4
+    },
+    "model_id": "katana_juzumaru",
+    "delay": 210,
+    "description": "A tachi folded in marsh water. (High quality.)"
+  },
+  {
+    "id": 2139,
+    "name": "Swampite Plate",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 38,
+    "stats": {
+      "defense": 55,
+      "vit": 5,
+      "str": 2
+    },
+    "model_id": "body_plate_knight"
+  },
+  {
+    "id": 2140,
+    "name": "Swampite Plate +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 38,
+    "stats": {
+      "defense": 60,
+      "vit": 6,
+      "str": 3
+    },
+    "model_id": "body_plate_knight",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2141,
+    "name": "Ward-Nail Dagger",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "dagger",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "ASN",
+      "COR"
+    ],
+    "level": 55,
+    "stats": {
+      "attack": 83,
+      "str": 6,
+      "accuracy": 8,
+      "dex": 5
+    },
+    "model_id": "dagger_sunken_kali",
+    "delay": 154,
+    "description": "A spike of ward-steel. It documents things permanently."
+  },
+  {
+    "id": 2142,
+    "name": "Ward-Nail Dagger +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "dagger",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "ASN",
+      "COR"
+    ],
+    "level": 55,
+    "stats": {
+      "attack": 91,
+      "str": 7,
+      "accuracy": 9,
+      "dex": 6
+    },
+    "model_id": "dagger_sunken_kali",
+    "delay": 154,
+    "description": "A spike of ward-steel. It documents things permanently. (High quality.)"
+  },
+  {
+    "id": 2143,
+    "name": "Talisman Blade",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "sword",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN",
+      "RUN",
+      "BLU",
+      "COR"
+    ],
+    "level": 58,
+    "stats": {
+      "attack": 109,
+      "str": 6,
+      "accuracy": 7,
+      "int": 3,
+      "mnd": 3
+    },
+    "model_id": "weapon_sword_keen_edge",
+    "delay": 220,
+    "description": "Blessed paper folded inside the steel."
+  },
+  {
+    "id": 2144,
+    "name": "Talisman Blade +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "sword",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN",
+      "RUN",
+      "BLU",
+      "COR"
+    ],
+    "level": 58,
+    "stats": {
+      "attack": 119,
+      "str": 7,
+      "accuracy": 8,
+      "int": 4,
+      "mnd": 4
+    },
+    "model_id": "weapon_sword_keen_edge",
+    "delay": 220,
+    "description": "Blessed paper folded inside the steel. (High quality.)"
+  },
+  {
+    "id": 2145,
+    "name": "Ward-Steel Plate",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 60,
+    "stats": {
+      "defense": 80,
+      "vit": 7,
+      "str": 3
+    },
+    "model_id": "body_plate_knight",
+    "description": "It cannot be filmed. The footage keeps coming out as static."
+  },
+  {
+    "id": 2146,
+    "name": "Ward-Steel Plate +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 60,
+    "stats": {
+      "defense": 88,
+      "vit": 8,
+      "str": 4
+    },
+    "model_id": "body_plate_knight",
+    "description": "It cannot be filmed. The footage keeps coming out as static. (High quality.)"
+  },
+  {
+    "id": 2147,
+    "name": "Ward-Steel Helm",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 56,
+    "stats": {
+      "defense": 52,
+      "vit": 3
+    },
+    "model_id": "head_iron"
+  },
+  {
+    "id": 2148,
+    "name": "Ward-Steel Helm +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 56,
+    "stats": {
+      "defense": 57,
+      "vit": 4
+    },
+    "model_id": "head_iron",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2149,
+    "name": "Copper Shell-Mark Ring",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "ringl",
+      "ringr"
+    ],
+    "level": 4,
+    "stats": {
+      "str": 1,
+      "defense": 2
+    },
+    "model_id": "ring_copper",
+    "description": "A copper ring stamped with a single shell-mark."
+  },
+  {
+    "id": 2150,
+    "name": "Copper Shell-Mark Ring +1",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "ringl",
+      "ringr"
+    ],
+    "level": 4,
+    "stats": {
+      "str": 2,
+      "defense": 3
+    },
+    "model_id": "ring_copper",
+    "description": "A copper ring stamped with a single shell-mark. (High quality.)"
+  },
+  {
+    "id": 2151,
+    "name": "Brass Quill Pin",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "neck"
+    ],
+    "level": 9,
+    "stats": {
+      "int": 2,
+      "mnd": 1
+    },
+    "model_id": "neck_choker_dawn",
+    "description": "A brass pin in the shape of a quill."
+  },
+  {
+    "id": 2152,
+    "name": "Brass Quill Pin +1",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "neck"
+    ],
+    "level": 9,
+    "stats": {
+      "int": 3,
+      "mnd": 2
+    },
+    "model_id": "neck_choker_dawn",
+    "description": "A brass pin in the shape of a quill. (High quality.)"
+  },
+  {
+    "id": 2153,
+    "name": "Silver Ledger Band",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "ringl",
+      "ringr"
+    ],
+    "level": 16,
+    "stats": {
+      "mnd": 2,
+      "magic_defense_bonus": 4
+    },
+    "model_id": "ring_silver",
+    "description": "Engraved with columns of very small numbers."
+  },
+  {
+    "id": 2154,
+    "name": "Silver Ledger Band +1",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "ringl",
+      "ringr"
+    ],
+    "level": 16,
+    "stats": {
+      "mnd": 3,
+      "magic_defense_bonus": 5
+    },
+    "model_id": "ring_silver",
+    "description": "Engraved with columns of very small numbers. (High quality.)"
+  },
+  {
+    "id": 2155,
+    "name": "Hospitality Coin Pendant",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "neck"
+    ],
+    "level": 20,
+    "stats": {
+      "chr": 3,
+      "evasion": 6
+    },
+    "model_id": "neck_priestess_charm",
+    "description": "Offer it with a meal and a kind word. The host is bound to be gracious."
+  },
+  {
+    "id": 2156,
+    "name": "Hospitality Coin Pendant +1",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "neck"
+    ],
+    "level": 20,
+    "stats": {
+      "chr": 4,
+      "evasion": 7
+    },
+    "model_id": "neck_priestess_charm",
+    "description": "Offer it with a meal and a kind word. The host is bound to be gracious. (High quality.)"
+  },
+  {
+    "id": 2157,
+    "name": "Tanuki Leaf Charm",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "neck"
+    ],
+    "level": 18,
+    "stats": {
+      "agi": 3,
+      "evasion": 8
+    },
+    "model_id": "neck_priestess_charm",
+    "description": "A gilded leaf. Whatever it was a minute ago, it is a charm now."
+  },
+  {
+    "id": 2158,
+    "name": "Tanuki Leaf Charm +1",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "neck"
+    ],
+    "level": 18,
+    "stats": {
+      "agi": 4,
+      "evasion": 9
+    },
+    "model_id": "neck_priestess_charm",
+    "description": "A gilded leaf. Whatever it was a minute ago, it is a charm now. (High quality.)"
+  },
+  {
+    "id": 2159,
+    "name": "Swampite Signet",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "ringl",
+      "ringr"
+    ],
+    "level": 30,
+    "stats": {
+      "str": 3,
+      "vit": 2,
+      "attack": 6
+    },
+    "model_id": "ring_brass_01",
+    "description": "Warm to the touch."
+  },
+  {
+    "id": 2160,
+    "name": "Swampite Signet +1",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "ringl",
+      "ringr"
+    ],
+    "level": 30,
+    "stats": {
+      "str": 4,
+      "vit": 3,
+      "attack": 7
+    },
+    "model_id": "ring_brass_01",
+    "description": "Warm to the touch. (High quality.)"
+  },
+  {
+    "id": 2161,
+    "name": "Gold Debt Ring",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "ringl",
+      "ringr"
+    ],
+    "level": 36,
+    "stats": {
+      "dex": 3,
+      "accuracy": 8,
+      "magic_attack_bonus": 4
+    },
+    "model_id": "ring_kings_alibi",
+    "description": "Fully paid. The ledger insists."
+  },
+  {
+    "id": 2162,
+    "name": "Gold Debt Ring +1",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "ringl",
+      "ringr"
+    ],
+    "level": 36,
+    "stats": {
+      "dex": 4,
+      "accuracy": 9,
+      "magic_attack_bonus": 5
+    },
+    "model_id": "ring_kings_alibi",
+    "description": "Fully paid. The ledger insists. (High quality.)"
+  },
+  {
+    "id": 2163,
+    "name": "Chrono-Coin Earring",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "earl",
+      "earr"
+    ],
+    "level": 34,
+    "stats": {
+      "agi": 3,
+      "haste": 2
+    },
+    "model_id": "earring_jordan_01",
+    "description": "Heads: 1620. Tails: 1901. It is always both."
+  },
+  {
+    "id": 2164,
+    "name": "Chrono-Coin Earring +1",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "earl",
+      "earr"
+    ],
+    "level": 34,
+    "stats": {
+      "agi": 4,
+      "haste": 3
+    },
+    "model_id": "earring_jordan_01",
+    "description": "Heads: 1620. Tails: 1901. It is always both. (High quality.)"
+  },
+  {
+    "id": 2165,
+    "name": "Stolas Hum Earring",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "earl",
+      "earr"
+    ],
+    "level": 40,
+    "stats": {
+      "int": 3,
+      "mnd": 3,
+      "fast_cast": 3
+    },
+    "model_id": "ear_mage",
+    "description": "Tuned to 7.83 Hz. The hum is not a disguise; it is a frequency."
+  },
+  {
+    "id": 2166,
+    "name": "Stolas Hum Earring +1",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "earl",
+      "earr"
+    ],
+    "level": 40,
+    "stats": {
+      "int": 4,
+      "mnd": 4,
+      "fast_cast": 4
+    },
+    "model_id": "ear_mage",
+    "description": "Tuned to 7.83 Hz. The hum is not a disguise; it is a frequency. (High quality.)"
+  },
+  {
+    "id": 2167,
+    "name": "Lens Pendant",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "neck"
+    ],
+    "level": 32,
+    "stats": {
+      "accuracy": 10,
+      "ranged_accuracy": 8
+    },
+    "model_id": "neck_choker_dawn",
+    "description": "Ground by the Tor lensmen. Everything it shows you is looking back."
+  },
+  {
+    "id": 2168,
+    "name": "Lens Pendant +1",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "neck"
+    ],
+    "level": 32,
+    "stats": {
+      "accuracy": 11,
+      "ranged_accuracy": 9
+    },
+    "model_id": "neck_choker_dawn",
+    "description": "Ground by the Tor lensmen. Everything it shows you is looking back. (High quality.)"
+  },
+  {
+    "id": 2169,
+    "name": "Protocol Seal Ring",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "ringl",
+      "ringr"
+    ],
+    "level": 52,
+    "stats": {
+      "vit": 4,
+      "defense": 10,
+      "magic_defense_bonus": 8
+    },
+    "model_id": "ring_magic_a01",
+    "description": "Stamped: NO ACTION DERIVED FROM OBSERVATION."
+  },
+  {
+    "id": 2170,
+    "name": "Protocol Seal Ring +1",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "ringl",
+      "ringr"
+    ],
+    "level": 52,
+    "stats": {
+      "vit": 5,
+      "defense": 11,
+      "magic_defense_bonus": 9
+    },
+    "model_id": "ring_magic_a01",
+    "description": "Stamped: NO ACTION DERIVED FROM OBSERVATION. (High quality.)"
+  },
+  {
+    "id": 2171,
+    "name": "Shell Parliament Signet",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "neck"
+    ],
+    "level": 46,
+    "stats": {
+      "chr": 5,
+      "enmity": 4,
+      "defense": 8
+    },
+    "model_id": "neck_choker_dawn",
+    "description": "Certifies, to three generations of accountant, that you are good for it."
+  },
+  {
+    "id": 2172,
+    "name": "Shell Parliament Signet +1",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "neck"
+    ],
+    "level": 46,
+    "stats": {
+      "chr": 6,
+      "enmity": 5,
+      "defense": 9
+    },
+    "model_id": "neck_choker_dawn",
+    "description": "Certifies, to three generations of accountant, that you are good for it. (High quality.)"
+  },
+  {
+    "id": 2173,
+    "name": "Fence-Post Staff",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "staff",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "PUP"
+    ],
+    "level": 4,
+    "stats": {
+      "magic_attack_bonus": 6,
+      "mnd": 1,
+      "int": 1
+    },
+    "model_id": "staff_brass",
+    "delay": 200,
+    "description": "Pulled from the Fledgling Field fence. A numbered owlet was displaced."
+  },
+  {
+    "id": 2174,
+    "name": "Fence-Post Staff +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "staff",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "PUP"
+    ],
+    "level": 4,
+    "stats": {
+      "magic_attack_bonus": 7,
+      "mnd": 2,
+      "int": 2
+    },
+    "model_id": "staff_brass",
+    "delay": 200,
+    "description": "Pulled from the Fledgling Field fence. A numbered owlet was displaced. (High quality.)"
+  },
+  {
+    "id": 2175,
+    "name": "Wren Bow",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "bow",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WAR",
+      "RNG",
+      "NIN",
+      "COR"
+    ],
+    "level": 12,
+    "stats": {
+      "attack": 30,
+      "ranged_attack": 27,
+      "accuracy": 3,
+      "agi": 2
+    },
+    "model_id": "bow_simple_01",
+    "delay": 300,
+    "description": "Strung for observation at a distance, per the Protocol."
+  },
+  {
+    "id": 2176,
+    "name": "Wren Bow +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "bow",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WAR",
+      "RNG",
+      "NIN",
+      "COR"
+    ],
+    "level": 12,
+    "stats": {
+      "attack": 33,
+      "ranged_attack": 29,
+      "accuracy": 4,
+      "agi": 3
+    },
+    "model_id": "bow_simple_01",
+    "delay": 300,
+    "description": "Strung for observation at a distance, per the Protocol. (High quality.)"
+  },
+  {
+    "id": 2177,
+    "name": "Pellet Wand",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "staff",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "PUP"
+    ],
+    "level": 10,
+    "stats": {
+      "magic_attack_bonus": 11,
+      "mnd": 2,
+      "int": 2
+    },
+    "model_id": "wand_willow",
+    "delay": 190,
+    "description": "A wand of pressed pellet and reed."
+  },
+  {
+    "id": 2178,
+    "name": "Pellet Wand +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "staff",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "PUP"
+    ],
+    "level": 10,
+    "stats": {
+      "magic_attack_bonus": 12,
+      "mnd": 3,
+      "int": 3
+    },
+    "model_id": "wand_willow",
+    "delay": 190,
+    "description": "A wand of pressed pellet and reed. (High quality.)"
+  },
+  {
+    "id": 2179,
+    "name": "Reed Flute",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "instrument",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "BRD"
+    ],
+    "level": 14,
+    "stats": {
+      "chr": 3,
+      "mnd": 2
+    },
+    "model_id": "banjo_a01",
+    "delay": 200,
+    "description": "Marsh-reed hollowed to a particular grief."
+  },
+  {
+    "id": 2180,
+    "name": "Reed Flute +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "instrument",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "BRD"
+    ],
+    "level": 14,
+    "stats": {
+      "chr": 4,
+      "mnd": 3
+    },
+    "model_id": "banjo_a01",
+    "delay": 200,
+    "description": "Marsh-reed hollowed to a particular grief. (High quality.)"
+  },
+  {
+    "id": 2181,
+    "name": "Boom-Mic Staff",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "staff",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "PUP"
+    ],
+    "level": 22,
+    "stats": {
+      "magic_attack_bonus": 21,
+      "mnd": 3,
+      "int": 3
+    },
+    "model_id": "staff_shepherd_01",
+    "delay": 205,
+    "description": "A documentary crew's boom, fitted with a wooden head. It picks up everything."
+  },
+  {
+    "id": 2182,
+    "name": "Boom-Mic Staff +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "staff",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "PUP"
+    ],
+    "level": 22,
+    "stats": {
+      "magic_attack_bonus": 23,
+      "mnd": 4,
+      "int": 4
+    },
+    "model_id": "staff_shepherd_01",
+    "delay": 205,
+    "description": "A documentary crew's boom, fitted with a wooden head. It picks up everything. (High quality.)"
+  },
+  {
+    "id": 2183,
+    "name": "Tuning-Fork Staff",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "staff",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "PUP"
+    ],
+    "level": 32,
+    "stats": {
+      "magic_attack_bonus": 29,
+      "mnd": 4,
+      "int": 4,
+      "fast_cast": 3
+    },
+    "model_id": "staff_healing",
+    "delay": 195,
+    "description": "Struck once, it sings 7.83 Hz until you stop listening."
+  },
+  {
+    "id": 2184,
+    "name": "Tuning-Fork Staff +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "staff",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "PUP"
+    ],
+    "level": 32,
+    "stats": {
+      "magic_attack_bonus": 31,
+      "mnd": 5,
+      "int": 5,
+      "fast_cast": 4
+    },
+    "model_id": "staff_healing",
+    "delay": 195,
+    "description": "Struck once, it sings 7.83 Hz until you stop listening. (High quality.)"
+  },
+  {
+    "id": 2185,
+    "name": "Eastwind Longbow",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "bow",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WAR",
+      "RNG",
+      "NIN",
+      "COR"
+    ],
+    "level": 30,
+    "stats": {
+      "attack": 61,
+      "ranged_attack": 55,
+      "accuracy": 6,
+      "agi": 3,
+      "ranged_accuracy": 6
+    },
+    "model_id": "bow_composite",
+    "delay": 310,
+    "description": "Drawn against the one wind that never changes."
+  },
+  {
+    "id": 2186,
+    "name": "Eastwind Longbow +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "bow",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WAR",
+      "RNG",
+      "NIN",
+      "COR"
+    ],
+    "level": 30,
+    "stats": {
+      "attack": 67,
+      "ranged_attack": 60,
+      "accuracy": 7,
+      "agi": 4,
+      "ranged_accuracy": 7
+    },
+    "model_id": "bow_composite",
+    "delay": 310,
+    "description": "Drawn against the one wind that never changes. (High quality.)"
+  },
+  {
+    "id": 2187,
+    "name": "Footnote Rod",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "staff",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "PUP"
+    ],
+    "level": 42,
+    "stats": {
+      "magic_attack_bonus": 6,
+      "mnd": 5,
+      "int": 5
+    },
+    "model_id": "staff_brass",
+    "delay": 190,
+    "description": "Every inscription on it is a footnote to another."
+  },
+  {
+    "id": 2188,
+    "name": "Footnote Rod +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "staff",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "PUP"
+    ],
+    "level": 42,
+    "stats": {
+      "magic_attack_bonus": 7,
+      "mnd": 6,
+      "int": 6
+    },
+    "model_id": "staff_brass",
+    "delay": 190,
+    "description": "Every inscription on it is a footnote to another. (High quality.)"
+  },
+  {
+    "id": 2189,
+    "name": "Protocol Gavel",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "h2h",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "MNK",
+      "PUP"
+    ],
+    "level": 50,
+    "stats": {
+      "attack": 86,
+      "str": 4,
+      "accuracy": 6
+    },
+    "model_id": "weapon_h2h_qitornado_01",
+    "delay": 240,
+    "description": "The Cataloguer's gavel; it has never been used, which is why it hits so hard."
+  },
+  {
+    "id": 2190,
+    "name": "Protocol Gavel +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "h2h",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "MNK",
+      "PUP"
+    ],
+    "level": 50,
+    "stats": {
+      "attack": 94,
+      "str": 5,
+      "accuracy": 7
+    },
+    "model_id": "weapon_h2h_qitornado_01",
+    "delay": 240,
+    "description": "The Cataloguer's gavel; it has never been used, which is why it hits so hard. (High quality.)"
+  },
+  {
+    "id": 2191,
+    "name": "Reed Hat",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD",
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 8,
+    "stats": {
+      "defense": 10,
+      "agi": 1
+    },
+    "model_id": "armor_head_greenhat"
+  },
+  {
+    "id": 2192,
+    "name": "Reed Hat +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD",
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 8,
+    "stats": {
+      "defense": 11,
+      "agi": 2
+    },
+    "model_id": "armor_head_greenhat",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2193,
+    "name": "Pine Clogs",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "feet"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD",
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 20,
+    "stats": {
+      "defense": 18,
+      "vit": 2
+    },
+    "model_id": "feet_rugged"
+  },
+  {
+    "id": 2194,
+    "name": "Pine Clogs +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "feet"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD",
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 20,
+    "stats": {
+      "defense": 19,
+      "vit": 3
+    },
+    "model_id": "feet_rugged",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2195,
+    "name": "Wolf-Hide Vest",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 6,
+    "stats": {
+      "defense": 15,
+      "agi": 1
+    },
+    "model_id": "body_leather"
+  },
+  {
+    "id": 2196,
+    "name": "Wolf-Hide Vest +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 6,
+    "stats": {
+      "defense": 16,
+      "agi": 2
+    },
+    "model_id": "body_leather",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2197,
+    "name": "Wolf-Hide Gloves",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "hand-l",
+      "hand-r"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 5,
+    "stats": {
+      "defense": 8
+    },
+    "model_id": "hands_leather"
+  },
+  {
+    "id": 2198,
+    "name": "Wolf-Hide Gloves +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "hand-l",
+      "hand-r"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 5,
+    "stats": {
+      "defense": 9
+    },
+    "model_id": "hands_leather",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2199,
+    "name": "Wolf-Hide Boots",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "feet"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 5,
+    "stats": {
+      "defense": 8
+    },
+    "model_id": "feet_leather"
+  },
+  {
+    "id": 2200,
+    "name": "Wolf-Hide Boots +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "feet"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 5,
+    "stats": {
+      "defense": 9
+    },
+    "model_id": "feet_leather",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2201,
+    "name": "Hare-Hide Cap",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU",
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 9,
+    "stats": {
+      "defense": 10,
+      "agi": 1
+    },
+    "model_id": "head_leather"
+  },
+  {
+    "id": 2202,
+    "name": "Hare-Hide Cap +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU",
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 9,
+    "stats": {
+      "defense": 11,
+      "agi": 2
+    },
+    "model_id": "head_leather",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2203,
+    "name": "Mini-Bike Jacket",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 16,
+    "stats": {
+      "defense": 24,
+      "agi": 3,
+      "evasion": 6
+    },
+    "model_id": "body_leather",
+    "description": "Smells of gasoline and the hot breath of the Osaka store pump."
+  },
+  {
+    "id": 2204,
+    "name": "Mini-Bike Jacket +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 16,
+    "stats": {
+      "defense": 26,
+      "agi": 4,
+      "evasion": 7
+    },
+    "model_id": "body_leather",
+    "description": "Smells of gasoline and the hot breath of the Osaka store pump. (High quality.)"
+  },
+  {
+    "id": 2205,
+    "name": "Mini-Bike Boots",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "feet"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 14,
+    "stats": {
+      "defense": 14,
+      "agi": 2,
+      "haste": 2
+    },
+    "model_id": "feet_leather"
+  },
+  {
+    "id": 2206,
+    "name": "Mini-Bike Boots +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "feet"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 14,
+    "stats": {
+      "defense": 15,
+      "agi": 3,
+      "haste": 3
+    },
+    "model_id": "feet_leather",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2207,
+    "name": "Badger-Hide Coat",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 22,
+    "stats": {
+      "defense": 30,
+      "vit": 3
+    },
+    "model_id": "body_rugged"
+  },
+  {
+    "id": 2208,
+    "name": "Badger-Hide Coat +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 22,
+    "stats": {
+      "defense": 33,
+      "vit": 4
+    },
+    "model_id": "body_rugged",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2209,
+    "name": "Badger-Hide Leggings",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "legs"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 21,
+    "stats": {
+      "defense": 22,
+      "vit": 2
+    },
+    "model_id": "legs_rugged"
+  },
+  {
+    "id": 2210,
+    "name": "Badger-Hide Leggings +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "legs"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 21,
+    "stats": {
+      "defense": 24,
+      "vit": 3
+    },
+    "model_id": "legs_rugged",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2211,
+    "name": "Rimefox Hood",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU",
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 34,
+    "stats": {
+      "defense": 28,
+      "int": 2,
+      "magic_defense_bonus": 4
+    },
+    "model_id": "head_leather"
+  },
+  {
+    "id": 2212,
+    "name": "Rimefox Hood +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU",
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 34,
+    "stats": {
+      "defense": 30,
+      "int": 3,
+      "magic_defense_bonus": 5
+    },
+    "model_id": "head_leather",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2213,
+    "name": "Rimefox Jerkin",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 36,
+    "stats": {
+      "defense": 42,
+      "agi": 4,
+      "evasion": 8
+    },
+    "model_id": "body_leather"
+  },
+  {
+    "id": 2214,
+    "name": "Rimefox Jerkin +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 36,
+    "stats": {
+      "defense": 46,
+      "agi": 5,
+      "evasion": 9
+    },
+    "model_id": "body_leather",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2215,
+    "name": "Shade-Hide Cloak",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 40,
+    "stats": {
+      "defense": 4,
+      "agi": 5,
+      "evasion": 10
+    },
+    "model_id": "body_leather",
+    "description": "Cut from a roost-shade's wing. The light bends around it."
+  },
+  {
+    "id": 2216,
+    "name": "Shade-Hide Cloak +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 40,
+    "stats": {
+      "defense": 5,
+      "agi": 6,
+      "evasion": 11
+    },
+    "model_id": "body_leather",
+    "description": "Cut from a roost-shade's wing. The light bends around it. (High quality.)"
+  },
+  {
+    "id": 2217,
+    "name": "Fledgling Down Robe",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 5,
+    "stats": {
+      "defense": 14,
+      "mnd": 1
+    },
+    "model_id": "body_robe"
+  },
+  {
+    "id": 2218,
+    "name": "Fledgling Down Robe +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 5,
+    "stats": {
+      "defense": 15,
+      "mnd": 2
+    },
+    "model_id": "body_robe",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2219,
+    "name": "Silk Habit",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 12,
+    "stats": {
+      "defense": 21,
+      "int": 2,
+      "mnd": 2
+    },
+    "model_id": "robe_simple_01",
+    "description": "Kuroshio silk: it catches nothing, not even the eye."
+  },
+  {
+    "id": 2220,
+    "name": "Silk Habit +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 12,
+    "stats": {
+      "defense": 23,
+      "int": 3,
+      "mnd": 3
+    },
+    "model_id": "robe_simple_01",
+    "description": "Kuroshio silk: it catches nothing, not even the eye. (High quality.)"
+  },
+  {
+    "id": 2221,
+    "name": "Silk Slippers II",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "feet"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 10,
+    "stats": {
+      "defense": 11,
+      "agi": 1,
+      "fast_cast": 2
+    },
+    "model_id": "feet_silk"
+  },
+  {
+    "id": 2222,
+    "name": "Silk Slippers II +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "feet"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 10,
+    "stats": {
+      "defense": 12,
+      "agi": 2,
+      "fast_cast": 3
+    },
+    "model_id": "feet_silk",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2223,
+    "name": "Silk Cowl",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 11,
+    "stats": {
+      "defense": 12,
+      "int": 1,
+      "mnd": 1
+    },
+    "model_id": "head_leather"
+  },
+  {
+    "id": 2224,
+    "name": "Silk Cowl +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 11,
+    "stats": {
+      "defense": 13,
+      "int": 2,
+      "mnd": 2
+    },
+    "model_id": "head_leather",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2225,
+    "name": "Shrine Tender Robe",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 24,
+    "stats": {
+      "defense": 32,
+      "mnd": 4,
+      "magic_defense_bonus": 6
+    },
+    "model_id": "body_robe",
+    "description": "Worn by those who tend the Yokai shrine gate. Hospitality is the only law."
+  },
+  {
+    "id": 2226,
+    "name": "Shrine Tender Robe +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 24,
+    "stats": {
+      "defense": 35,
+      "mnd": 5,
+      "magic_defense_bonus": 7
+    },
+    "model_id": "body_robe",
+    "description": "Worn by those who tend the Yokai shrine gate. Hospitality is the only law. (High quality.)"
+  },
+  {
+    "id": 2227,
+    "name": "Accountant Coat",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 26,
+    "stats": {
+      "defense": 33,
+      "int": 4,
+      "chr": 2,
+      "enmity": -4
+    },
+    "model_id": "body_wizcoat",
+    "description": "The stitching is columnar. Everything balances."
+  },
+  {
+    "id": 2228,
+    "name": "Accountant Coat +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 26,
+    "stats": {
+      "defense": 36,
+      "int": 5,
+      "chr": 3,
+      "enmity": -3
+    },
+    "model_id": "body_wizcoat",
+    "description": "The stitching is columnar. Everything balances. (High quality.)"
+  },
+  {
+    "id": 2229,
+    "name": "Vellum Cowl",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 36,
+    "stats": {
+      "defense": 28,
+      "int": 3,
+      "magic_attack_bonus": 3
+    },
+    "model_id": "head_leather"
+  },
+  {
+    "id": 2230,
+    "name": "Vellum Cowl +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 36,
+    "stats": {
+      "defense": 30,
+      "int": 4,
+      "magic_attack_bonus": 4
+    },
+    "model_id": "head_leather",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2231,
+    "name": "Cataloguer Robe",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 44,
+    "stats": {
+      "defense": 50,
+      "int": 6,
+      "mnd": 6,
+      "magic_attack_bonus": 5
+    },
+    "model_id": "robe_dark",
+    "description": "Seventeen footnotes are stitched into the hem. They are private."
+  },
+  {
+    "id": 2232,
+    "name": "Cataloguer Robe +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 44,
+    "stats": {
+      "defense": 55,
+      "int": 7,
+      "mnd": 7,
+      "magic_attack_bonus": 6
+    },
+    "model_id": "robe_dark",
+    "description": "Seventeen footnotes are stitched into the hem. They are private. (High quality.)"
+  },
+  {
+    "id": 2233,
+    "name": "Wraith-Cloth Mantle",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 52,
+    "stats": {
+      "defense": 57,
+      "int": 7,
+      "agi": 3,
+      "evasion": 8
+    },
+    "model_id": "robe_crimson_mdl",
+    "description": "It moves when the air doesn't."
+  },
+  {
+    "id": 2234,
+    "name": "Wraith-Cloth Mantle +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 52,
+    "stats": {
+      "defense": 62,
+      "int": 8,
+      "agi": 4,
+      "evasion": 9
+    },
+    "model_id": "robe_crimson_mdl",
+    "description": "It moves when the air doesn't. (High quality.)"
+  },
+  {
+    "id": 2235,
+    "name": "Down Cloak",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "back"
+    ],
+    "level": 8,
+    "stats": {
+      "vit": 1,
+      "defense": 3
+    },
+    "model_id": "back_cloak",
+    "description": "Warm. Quietly unfiled."
+  },
+  {
+    "id": 2236,
+    "name": "Down Cloak +1",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "back"
+    ],
+    "level": 8,
+    "stats": {
+      "vit": 2,
+      "defense": 4
+    },
+    "model_id": "back_cloak",
+    "description": "Warm. Quietly unfiled. (High quality.)"
+  },
+  {
+    "id": 2237,
+    "name": "Ward-Paper Mantle",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "back"
+    ],
+    "level": 28,
+    "stats": {
+      "magic_defense_bonus": 8,
+      "defense": 5
+    },
+    "model_id": "cape_yellow_01",
+    "description": "Talisman paper stitched to cloth, front and back."
+  },
+  {
+    "id": 2238,
+    "name": "Ward-Paper Mantle +1",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "back"
+    ],
+    "level": 28,
+    "stats": {
+      "magic_defense_bonus": 9,
+      "defense": 6
+    },
+    "model_id": "cape_yellow_01",
+    "description": "Talisman paper stitched to cloth, front and back. (High quality.)"
+  },
+  {
+    "id": 2239,
+    "name": "Owl-Bone Dagger",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "dagger",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "ASN",
+      "COR"
+    ],
+    "level": 9,
+    "stats": {
+      "attack": 20,
+      "str": 1,
+      "accuracy": 1,
+      "dex": 2
+    },
+    "model_id": "dagger_basic",
+    "delay": 158,
+    "description": "Whittled from a pellet-bone; faintly labelled."
+  },
+  {
+    "id": 2240,
+    "name": "Owl-Bone Dagger +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "dagger",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "ASN",
+      "COR"
+    ],
+    "level": 9,
+    "stats": {
+      "attack": 22,
+      "str": 2,
+      "accuracy": 2,
+      "dex": 3
+    },
+    "model_id": "dagger_basic",
+    "delay": 158,
+    "description": "Whittled from a pellet-bone; faintly labelled. (High quality.)"
+  },
+  {
+    "id": 2241,
+    "name": "Jawbone Axe",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "axe",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "DRK",
+      "BST",
+      "RUN"
+    ],
+    "level": 14,
+    "stats": {
+      "attack": 37,
+      "str": 2,
+      "accuracy": 1
+    },
+    "model_id": "axe_hand",
+    "delay": 246
+  },
+  {
+    "id": 2242,
+    "name": "Jawbone Axe +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "axe",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "DRK",
+      "BST",
+      "RUN"
+    ],
+    "level": 14,
+    "stats": {
+      "attack": 40,
+      "str": 3,
+      "accuracy": 2
+    },
+    "model_id": "axe_hand",
+    "delay": 246,
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2243,
+    "name": "Mandible Claws",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "h2h",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "MNK",
+      "PUP"
+    ],
+    "level": 20,
+    "stats": {
+      "attack": 40,
+      "str": 3,
+      "accuracy": 2,
+      "dex": 3
+    },
+    "model_id": "h2h_heavy_claws_01",
+    "delay": 230
+  },
+  {
+    "id": 2244,
+    "name": "Mandible Claws +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "h2h",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "MNK",
+      "PUP"
+    ],
+    "level": 20,
+    "stats": {
+      "attack": 44,
+      "str": 4,
+      "accuracy": 3,
+      "dex": 4
+    },
+    "model_id": "h2h_heavy_claws_01",
+    "delay": 230,
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2245,
+    "name": "Wolf-Fang Knife",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "dagger",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "ASN",
+      "COR"
+    ],
+    "level": 8,
+    "stats": {
+      "attack": 3,
+      "str": 1,
+      "accuracy": 1
+    },
+    "model_id": "dagger_basic",
+    "delay": 156
+  },
+  {
+    "id": 2246,
+    "name": "Wolf-Fang Knife +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "dagger",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "ASN",
+      "COR"
+    ],
+    "level": 8,
+    "stats": {
+      "attack": 4,
+      "str": 2,
+      "accuracy": 2
+    },
+    "model_id": "dagger_basic",
+    "delay": 156,
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2057,
+    "name": "Sunderworm Fang Knife",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "dagger",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "ASN",
+      "COR"
+    ],
+    "level": 30,
+    "stats": {
+      "attack": 49,
+      "str": 2,
+      "accuracy": 3,
+      "dex": 4
+    },
+    "model_id": "dagger_kali_01",
+    "delay": 152,
+    "description": "Pried from a head of the Sunderworm. It still wants to dig."
+  },
+  {
+    "id": 2290,
+    "name": "Sunderworm Fang Knife +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "dagger",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "ASN",
+      "COR"
+    ],
+    "level": 30,
+    "stats": {
+      "attack": 53,
+      "str": 3,
+      "accuracy": 4,
+      "dex": 5
+    },
+    "model_id": "dagger_kali_01",
+    "delay": 152,
+    "description": "Pried from a head of the Sunderworm. It still wants to dig. (High quality.)"
+  },
+  {
+    "id": 2249,
+    "name": "Pellet-Bone Cap",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN",
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 12,
+    "stats": {
+      "defense": 13,
+      "vit": 1
+    },
+    "model_id": "helm_bone_plate_mk1"
+  },
+  {
+    "id": 2250,
+    "name": "Pellet-Bone Cap +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN",
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 12,
+    "stats": {
+      "defense": 14,
+      "vit": 2
+    },
+    "model_id": "helm_bone_plate_mk1",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2251,
+    "name": "Beetle-Shell Breastplate",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 16,
+    "stats": {
+      "defense": 30,
+      "vit": 3
+    },
+    "model_id": "body_chain"
+  },
+  {
+    "id": 2252,
+    "name": "Beetle-Shell Breastplate +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 16,
+    "stats": {
+      "defense": 33,
+      "vit": 4
+    },
+    "model_id": "body_chain",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2253,
+    "name": "Brine-Shell Mail",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 28,
+    "stats": {
+      "defense": 44,
+      "vit": 4,
+      "magic_defense_bonus": 6
+    },
+    "model_id": "body_plate_knight",
+    "description": "Ichthyosapien shell-markings are still legible on the inside."
+  },
+  {
+    "id": 2254,
+    "name": "Brine-Shell Mail +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 28,
+    "stats": {
+      "defense": 48,
+      "vit": 5,
+      "magic_defense_bonus": 7
+    },
+    "model_id": "body_plate_knight",
+    "description": "Ichthyosapien shell-markings are still legible on the inside. (High quality.)"
+  },
+  {
+    "id": 2255,
+    "name": "Roost-Wing Gauntlets",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "hand-l",
+      "hand-r"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU",
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 18,
+    "stats": {
+      "defense": 16,
+      "dex": 2
+    },
+    "model_id": "bone_plate_gauntlets_m"
+  },
+  {
+    "id": 2256,
+    "name": "Roost-Wing Gauntlets +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "hand-l",
+      "hand-r"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU",
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 18,
+    "stats": {
+      "defense": 17,
+      "dex": 3
+    },
+    "model_id": "bone_plate_gauntlets_m",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2257,
+    "name": "Eagle-Plume Crown",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD",
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 30,
+    "stats": {
+      "defense": 25,
+      "agi": 2,
+      "accuracy": 8
+    },
+    "model_id": "head_vag_crown_a"
+  },
+  {
+    "id": 2258,
+    "name": "Eagle-Plume Crown +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD",
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 30,
+    "stats": {
+      "defense": 27,
+      "agi": 3,
+      "accuracy": 9
+    },
+    "model_id": "head_vag_crown_a",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2259,
+    "name": "Lizard-Bone Greaves",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "legs"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN",
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 14,
+    "stats": {
+      "defense": 17,
+      "agi": 2
+    },
+    "model_id": "legs_rugged"
+  },
+  {
+    "id": 2260,
+    "name": "Lizard-Bone Greaves +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "legs"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN",
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 14,
+    "stats": {
+      "defense": 18,
+      "agi": 3
+    },
+    "model_id": "legs_rugged",
+    "description": "(High quality.)"
+  },
+  {
+    "id": 2261,
+    "name": "Redacted Mask",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN",
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 48,
+    "stats": {
+      "defense": 37,
+      "str": 4,
+      "crit_rate": 3
+    },
+    "model_id": "head_gladiator_bloodstained_01",
+    "description": "Black bars across the eyes. What it saw was struck from the record."
+  },
+  {
+    "id": 2262,
+    "name": "Redacted Mask +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "head"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN",
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 48,
+    "stats": {
+      "defense": 40,
+      "str": 5,
+      "crit_rate": 4
+    },
+    "model_id": "head_gladiator_bloodstained_01",
+    "description": "Black bars across the eyes. What it saw was struck from the record. (High quality.)"
+  },
+  {
+    "id": 2263,
+    "name": "Shell-Salve",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_potion",
+    "description": "A viscous shell-resin salve. Closes wounds, and files a note about them."
+  },
+  {
+    "id": 2264,
+    "name": "Hospitality Draught",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_potion",
+    "description": "Offered with a smile. You owe the host nothing; the host owes you everything."
+  },
+  {
+    "id": 2265,
+    "name": "Eastwind Tonic",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_ether",
+    "description": "Cold, clean, and faintly bureaucratic. Restores MP."
+  },
+  {
+    "id": 2266,
+    "name": "Vellum Ether",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_ether",
+    "description": "Ink-black and sharp. A full measure of mana."
+  },
+  {
+    "id": 2267,
+    "name": "Owl Tea",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_potion",
+    "description": "Pellet-leaf tea. Recovers a little of everything."
+  },
+  {
+    "id": 2268,
+    "name": "Brine Elixir",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_hipotion",
+    "description": "Ichthyosapien brine, distilled. Restores a great deal of HP and MP."
+  },
+  {
+    "id": 2269,
+    "name": "Ward-Ink Tonic",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_potion",
+    "description": "Drinks like a signature. Purges ailments."
+  },
+  {
+    "id": 2270,
+    "name": "Venom Flask",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_potion",
+    "description": "A glass flask of concentrated venom. Coats your weapon for several hits."
+  },
+  {
+    "id": 2271,
+    "name": "Numbing Resin",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_potion",
+    "description": "Grey resin that deadens whatever it touches. Coats your weapon."
+  },
+  {
+    "id": 2272,
+    "name": "Sleeping Powder",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_potion",
+    "description": "Poppy dust in a paper twist. Thrown, it puts nearby foes to sleep."
+  },
+  {
+    "id": 2273,
+    "name": "Smoke Pellet",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_potion",
+    "description": "Burst it and you are somewhere else. Blinds foes and hides you."
+  },
+  {
+    "id": 2274,
+    "name": "Party Store Firework",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_potion",
+    "description": "Sold behind the counter at the Osaka store. Area fire damage."
+  },
+  {
+    "id": 2275,
+    "name": "Acid Flask Refill",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_potion",
+    "description": "Corrosive tincture. Poisons and weakens when thrown."
+  },
+  {
+    "id": 2276,
+    "name": "Spirit Lantern",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_potion",
+    "description": "A paper lantern lit with a wisp's wax. Party regen while lit."
+  },
+  {
+    "id": 2277,
+    "name": "Party Store Hot Dog",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_food_minestrone",
+    "description": "From the roller grill. Time has not touched it. Neither has hunger."
+  },
+  {
+    "id": 2278,
+    "name": "Tanuki Onigiri",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_food_minestrone",
+    "description": "Rice with a surprise in the middle. The surprise is a leaf."
+  },
+  {
+    "id": 2279,
+    "name": "Carp Udon",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_food_minestrone",
+    "description": "Thick noodles in carp stock. Warm in a way that is hard to file."
+  },
+  {
+    "id": 2280,
+    "name": "Bass Teriyaki",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_food_minestrone",
+    "description": "A glazed bass on rice."
+  },
+  {
+    "id": 2281,
+    "name": "Trout Meuniere",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_food_minestrone",
+    "description": "Pan-fried trout. The Eastwind quartermaster approves."
+  },
+  {
+    "id": 2282,
+    "name": "Crab Ramen",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_food_minestrone",
+    "description": "Ramen with a whole crab in it. The crab is a Heikegani cousin. Do not ask."
+  },
+  {
+    "id": 2283,
+    "name": "Eel Skewers",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_food_minestrone",
+    "description": "Grilled bog eel on a stick. Earthy."
+  },
+  {
+    "id": 2284,
+    "name": "Mud Crab Bisque",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_food_minestrone",
+    "description": "Thick, dark, and quietly nourishing."
+  },
+  {
+    "id": 2285,
+    "name": "Bog Eel Stew",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_food_minestrone",
+    "description": "A stew the swamp is proud of."
+  },
+  {
+    "id": 2286,
+    "name": "Crimson Trout Roast",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_food_minestrone",
+    "description": "Crimson trout roasted over lamp-oil flame."
+  },
+  {
+    "id": 2287,
+    "name": "Squid Ink Pasta",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_food_minestrone",
+    "description": "Black as a redacted line. Sharpens the mind."
+  },
+  {
+    "id": 2288,
+    "name": "Hospitality Feast",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_food_minestrone",
+    "description": "A full meal offered in good faith. The host is bound to your wellbeing."
+  },
+  {
+    "id": 2289,
+    "name": "Stolas Soup",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_food_minestrone",
+    "description": "Hums faintly at 7.83 Hz. You will see slightly further ahead."
   }
 ]

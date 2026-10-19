@@ -151,7 +151,7 @@ ZONES = [
   npc=("stacks-archivist-quill", "Stacks Archivist Quill", "Silence is not required. It is merely observed. Quills, vellum, and the occasional bloodied index card are all for sale. Do not touch the footnotes."),
   mobs=[M("paper-moth", 620, 44, 5.2, 22, 6, 14, [("Vellum Scrap", .6), ("Moth Dust", .25)]),
         M("ink-mite-swarm", 700, 54, 4.6, 24, 5, 24, [("Ink Vial", .6), ("Vellum Scrap", .3)]),
-        M("stack-warden", 950, 68, 3.8, 28, 3, 34, [("Binder's Paste", .6), ("Vellum Scrap", .35)])],
+        M("stack-warden", 950, 68, 3.8, 28, 3, 34, [("Bookbinding Paste", .6), ("Vellum Scrap", .35)])],
   variants=[("paper-moth", "Archive Moth", 1.8), ("ink-mite-swarm", "Indelible Swarm", 1.5)],
   nms=[N("nm-the-overdue-tome", "The Overdue Tome", "stack-warden", 3800, 84, 26, 4.2, .2, 500, 2400, 90, ["Overdue Greatsword", "Bookbinder Gloves"]),
        N("nm-footnote-seventeen", "Footnote Seventeen", "ink-mite-swarm", 3300, 80, 28, 5.0, .2, 500, 2400, 90, ["Footnote Ring", "Marginalia Cloak"])],

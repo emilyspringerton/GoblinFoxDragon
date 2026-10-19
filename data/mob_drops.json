@@ -746,8 +746,8 @@
     "kind": "stack-warden",
     "items": [
       {
-        "id": "binder's-paste",
-        "name": "Binder's Paste",
+        "id": "bookbinding-paste",
+        "name": "Bookbinding Paste",
         "drop_chance": 0.6
       },
       {

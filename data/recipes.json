@@ -1,0 +1,1941 @@
+[
+  {
+    "id": "copper-ingot",
+    "name": "Copper Ingot",
+    "craft": "blacksmith",
+    "difficulty": 1,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "copper-ore": 2
+    },
+    "result": "copper-ingot"
+  },
+  {
+    "id": "tin-ingot",
+    "name": "Tin Ingot",
+    "craft": "blacksmith",
+    "difficulty": 4,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "tin-ore": 2
+    },
+    "result": "tin-ingot"
+  },
+  {
+    "id": "smelt-iron-ingot",
+    "name": "Smelt Iron Ingot",
+    "craft": "blacksmith",
+    "difficulty": 12,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "iron-ore": 2
+    },
+    "result": "iron-ingot"
+  },
+  {
+    "id": "quill-brass-ingot",
+    "name": "Quill-Brass Ingot",
+    "craft": "blacksmith",
+    "difficulty": 14,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "copper-ingot": 1,
+      "tin-ingot": 1
+    },
+    "result": "quill-brass-ingot"
+  },
+  {
+    "id": "silver-ingot",
+    "name": "Silver Ingot",
+    "craft": "blacksmith",
+    "difficulty": 26,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "silver-ore": 2
+    },
+    "result": "silver-ingot"
+  },
+  {
+    "id": "shell-steel-ingot",
+    "name": "Shell-Steel Ingot",
+    "craft": "blacksmith",
+    "difficulty": 30,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "iron-ingot": 2,
+      "beetle-shell": 2
+    },
+    "result": "shell-steel-ingot"
+  },
+  {
+    "id": "swampite-ingot",
+    "name": "Swampite Ingot",
+    "craft": "blacksmith",
+    "difficulty": 36,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "swampite": 2
+    },
+    "result": "swampite-ingot"
+  },
+  {
+    "id": "gold-ingot",
+    "name": "Gold Ingot",
+    "craft": "blacksmith",
+    "difficulty": 48,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "gold-ore": 2
+    },
+    "result": "gold-ingot"
+  },
+  {
+    "id": "ward-steel-ingot",
+    "name": "Ward-Steel Ingot",
+    "craft": "blacksmith",
+    "difficulty": 70,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "iron-ingot": 2,
+      "protocol-stone": 2,
+      "dark-crystal": 1
+    },
+    "result": "ward-steel-ingot"
+  },
+  {
+    "id": "copper-shortsword",
+    "name": "Copper Shortsword",
+    "craft": "blacksmith",
+    "difficulty": 3,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "copper-ingot": 2
+    },
+    "result": "copper-shortsword",
+    "hq1": "copper-shortsword-+1",
+    "hq2": "copper-shortsword-+1",
+    "hq3": "copper-shortsword-+1"
+  },
+  {
+    "id": "copper-knife",
+    "name": "Copper Knife",
+    "craft": "blacksmith",
+    "difficulty": 2,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "copper-ingot": 1
+    },
+    "result": "copper-knife",
+    "hq1": "copper-knife-+1",
+    "hq2": "copper-knife-+1",
+    "hq3": "copper-knife-+1"
+  },
+  {
+    "id": "copper-hatchet",
+    "name": "Copper Hatchet",
+    "craft": "blacksmith",
+    "difficulty": 5,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "copper-ingot": 2,
+      "ash-planks": 1
+    },
+    "result": "copper-hatchet",
+    "hq1": "copper-hatchet-+1",
+    "hq2": "copper-hatchet-+1",
+    "hq3": "copper-hatchet-+1"
+  },
+  {
+    "id": "copper-mail",
+    "name": "Copper Mail",
+    "craft": "blacksmith",
+    "difficulty": 8,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "copper-ingot": 4
+    },
+    "result": "copper-mail",
+    "hq1": "copper-mail-+1",
+    "hq2": "copper-mail-+1",
+    "hq3": "copper-mail-+1"
+  },
+  {
+    "id": "copper-cap",
+    "name": "Copper Cap",
+    "craft": "blacksmith",
+    "difficulty": 6,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "copper-ingot": 2
+    },
+    "result": "copper-cap",
+    "hq1": "copper-cap-+1",
+    "hq2": "copper-cap-+1",
+    "hq3": "copper-cap-+1"
+  },
+  {
+    "id": "quill-brass-sword",
+    "name": "Quill-Brass Sword",
+    "craft": "blacksmith",
+    "difficulty": 18,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "quill-brass-ingot": 2,
+      "sentry-quill": 1
+    },
+    "result": "quill-brass-sword",
+    "hq1": "quill-brass-sword-+1",
+    "hq2": "quill-brass-sword-+1",
+    "hq3": "quill-brass-sword-+1"
+  },
+  {
+    "id": "quill-brass-stiletto",
+    "name": "Quill-Brass Stiletto",
+    "craft": "blacksmith",
+    "difficulty": 16,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "quill-brass-ingot": 1,
+      "sentry-quill": 1
+    },
+    "result": "quill-brass-stiletto",
+    "hq1": "quill-brass-stiletto-+1",
+    "hq2": "quill-brass-stiletto-+1",
+    "hq3": "quill-brass-stiletto-+1"
+  },
+  {
+    "id": "quill-brass-axe",
+    "name": "Quill-Brass Axe",
+    "craft": "blacksmith",
+    "difficulty": 20,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "quill-brass-ingot": 2,
+      "heather-planks": 1
+    },
+    "result": "quill-brass-axe",
+    "hq1": "quill-brass-axe-+1",
+    "hq2": "quill-brass-axe-+1",
+    "hq3": "quill-brass-axe-+1"
+  },
+  {
+    "id": "quill-brass-hauberk",
+    "name": "Quill-Brass Hauberk",
+    "craft": "blacksmith",
+    "difficulty": 24,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "quill-brass-ingot": 4,
+      "down-cloth": 1
+    },
+    "result": "quill-brass-hauberk",
+    "hq1": "quill-brass-hauberk-+1",
+    "hq2": "quill-brass-hauberk-+1",
+    "hq3": "quill-brass-hauberk-+1"
+  },
+  {
+    "id": "quill-brass-helm",
+    "name": "Quill-Brass Helm",
+    "craft": "blacksmith",
+    "difficulty": 20,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "quill-brass-ingot": 2,
+      "brass-plate-shard": 1
+    },
+    "result": "quill-brass-helm",
+    "hq1": "quill-brass-helm-+1",
+    "hq2": "quill-brass-helm-+1",
+    "hq3": "quill-brass-helm-+1"
+  },
+  {
+    "id": "quill-brass-gauntlets",
+    "name": "Quill-Brass Gauntlets",
+    "craft": "blacksmith",
+    "difficulty": 22,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "quill-brass-ingot": 2,
+      "cured-hare-hide": 1
+    },
+    "result": "quill-brass-gauntlets",
+    "hq1": "quill-brass-gauntlets-+1",
+    "hq2": "quill-brass-gauntlets-+1",
+    "hq3": "quill-brass-gauntlets-+1"
+  },
+  {
+    "id": "quill-brass-greaves",
+    "name": "Quill-Brass Greaves",
+    "craft": "blacksmith",
+    "difficulty": 22,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "quill-brass-ingot": 3
+    },
+    "result": "quill-brass-greaves",
+    "hq1": "quill-brass-greaves-+1",
+    "hq2": "quill-brass-greaves-+1",
+    "hq3": "quill-brass-greaves-+1"
+  },
+  {
+    "id": "quill-brass-sabatons",
+    "name": "Quill-Brass Sabatons",
+    "craft": "blacksmith",
+    "difficulty": 22,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "quill-brass-ingot": 2,
+      "cured-hare-hide": 1
+    },
+    "result": "quill-brass-sabatons",
+    "hq1": "quill-brass-sabatons-+1",
+    "hq2": "quill-brass-sabatons-+1",
+    "hq3": "quill-brass-sabatons-+1"
+  },
+  {
+    "id": "shell-steel-cutlass",
+    "name": "Shell-Steel Cutlass",
+    "craft": "blacksmith",
+    "difficulty": 34,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "shell-steel-ingot": 2,
+      "shell-glue": 1
+    },
+    "result": "shell-steel-cutlass",
+    "hq1": "shell-steel-cutlass-+1",
+    "hq2": "shell-steel-cutlass-+1",
+    "hq3": "shell-steel-cutlass-+1"
+  },
+  {
+    "id": "carapace-cleaver",
+    "name": "Carapace Cleaver",
+    "craft": "blacksmith",
+    "difficulty": 36,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "shell-steel-ingot": 3,
+      "beetle-shell": 2
+    },
+    "result": "carapace-cleaver",
+    "hq1": "carapace-cleaver-+1",
+    "hq2": "carapace-cleaver-+1",
+    "hq3": "carapace-cleaver-+1"
+  },
+  {
+    "id": "shell-accountant-letter-knife",
+    "name": "Shell Accountant Letter-Knife",
+    "craft": "blacksmith",
+    "difficulty": 32,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "shell-steel-ingot": 1,
+      "silver-ingot": 1
+    },
+    "result": "shell-accountant-letter-knife",
+    "hq1": "shell-accountant-letter-knife-+1",
+    "hq2": "shell-accountant-letter-knife-+1",
+    "hq3": "shell-accountant-letter-knife-+1"
+  },
+  {
+    "id": "shell-steel-cuirass",
+    "name": "Shell-Steel Cuirass",
+    "craft": "blacksmith",
+    "difficulty": 40,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "shell-steel-ingot": 5,
+      "shell-glue": 2
+    },
+    "result": "shell-steel-cuirass",
+    "hq1": "shell-steel-cuirass-+1",
+    "hq2": "shell-steel-cuirass-+1",
+    "hq3": "shell-steel-cuirass-+1"
+  },
+  {
+    "id": "shell-steel-helm",
+    "name": "Shell-Steel Helm",
+    "craft": "blacksmith",
+    "difficulty": 36,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "shell-steel-ingot": 3
+    },
+    "result": "shell-steel-helm",
+    "hq1": "shell-steel-helm-+1",
+    "hq2": "shell-steel-helm-+1",
+    "hq3": "shell-steel-helm-+1"
+  },
+  {
+    "id": "shell-steel-gauntlets",
+    "name": "Shell-Steel Gauntlets",
+    "craft": "blacksmith",
+    "difficulty": 38,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "shell-steel-ingot": 3,
+      "cured-badger-hide": 1
+    },
+    "result": "shell-steel-gauntlets",
+    "hq1": "shell-steel-gauntlets-+1",
+    "hq2": "shell-steel-gauntlets-+1",
+    "hq3": "shell-steel-gauntlets-+1"
+  },
+  {
+    "id": "shell-steel-greaves",
+    "name": "Shell-Steel Greaves",
+    "craft": "blacksmith",
+    "difficulty": 38,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "shell-steel-ingot": 4
+    },
+    "result": "shell-steel-greaves",
+    "hq1": "shell-steel-greaves-+1",
+    "hq2": "shell-steel-greaves-+1",
+    "hq3": "shell-steel-greaves-+1"
+  },
+  {
+    "id": "shell-steel-sabatons",
+    "name": "Shell-Steel Sabatons",
+    "craft": "blacksmith",
+    "difficulty": 38,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "shell-steel-ingot": 3,
+      "cured-badger-hide": 1
+    },
+    "result": "shell-steel-sabatons",
+    "hq1": "shell-steel-sabatons-+1",
+    "hq2": "shell-steel-sabatons-+1",
+    "hq3": "shell-steel-sabatons-+1"
+  },
+  {
+    "id": "swampite-greatsword",
+    "name": "Swampite Greatsword",
+    "craft": "blacksmith",
+    "difficulty": 52,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "swampite-ingot": 4,
+      "spider-silk": 2
+    },
+    "result": "swampite-greatsword",
+    "hq1": "swampite-greatsword-+1",
+    "hq2": "swampite-greatsword-+1",
+    "hq3": "swampite-greatsword-+1"
+  },
+  {
+    "id": "swampite-tachi",
+    "name": "Swampite Tachi",
+    "craft": "blacksmith",
+    "difficulty": 50,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "swampite-ingot": 3,
+      "peat": 2
+    },
+    "result": "swampite-tachi",
+    "hq1": "swampite-tachi-+1",
+    "hq2": "swampite-tachi-+1",
+    "hq3": "swampite-tachi-+1"
+  },
+  {
+    "id": "swampite-plate",
+    "name": "Swampite Plate",
+    "craft": "blacksmith",
+    "difficulty": 54,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "swampite-ingot": 5,
+      "cured-badger-hide": 2
+    },
+    "result": "swampite-plate",
+    "hq1": "swampite-plate-+1",
+    "hq2": "swampite-plate-+1",
+    "hq3": "swampite-plate-+1"
+  },
+  {
+    "id": "ward-nail-dagger",
+    "name": "Ward-Nail Dagger",
+    "craft": "blacksmith",
+    "difficulty": 72,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "ward-steel-ingot": 2,
+      "ward-ink": 1
+    },
+    "result": "ward-nail-dagger",
+    "hq1": "ward-nail-dagger-+1",
+    "hq2": "ward-nail-dagger-+1",
+    "hq3": "ward-nail-dagger-+1"
+  },
+  {
+    "id": "talisman-blade",
+    "name": "Talisman Blade",
+    "craft": "blacksmith",
+    "difficulty": 76,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "ward-steel-ingot": 3,
+      "ward-paper": 2
+    },
+    "result": "talisman-blade",
+    "hq1": "talisman-blade-+1",
+    "hq2": "talisman-blade-+1",
+    "hq3": "talisman-blade-+1"
+  },
+  {
+    "id": "ward-steel-plate",
+    "name": "Ward-Steel Plate",
+    "craft": "blacksmith",
+    "difficulty": 82,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "ward-steel-ingot": 6,
+      "black-bar-shard": 2
+    },
+    "result": "ward-steel-plate",
+    "hq1": "ward-steel-plate-+1",
+    "hq2": "ward-steel-plate-+1",
+    "hq3": "ward-steel-plate-+1"
+  },
+  {
+    "id": "ward-steel-helm",
+    "name": "Ward-Steel Helm",
+    "craft": "blacksmith",
+    "difficulty": 76,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "ward-steel-ingot": 3
+    },
+    "result": "ward-steel-helm",
+    "hq1": "ward-steel-helm-+1",
+    "hq2": "ward-steel-helm-+1",
+    "hq3": "ward-steel-helm-+1"
+  },
+  {
+    "id": "copper-shell-mark-ring",
+    "name": "Copper Shell-Mark Ring",
+    "craft": "goldsmithing",
+    "difficulty": 5,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "copper-ingot": 1
+    },
+    "result": "copper-shell-mark-ring",
+    "hq1": "copper-shell-mark-ring-+1",
+    "hq2": "copper-shell-mark-ring-+1",
+    "hq3": "copper-shell-mark-ring-+1"
+  },
+  {
+    "id": "brass-quill-pin",
+    "name": "Brass Quill Pin",
+    "craft": "goldsmithing",
+    "difficulty": 14,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "quill-brass-ingot": 1,
+      "sentry-quill": 1
+    },
+    "result": "brass-quill-pin",
+    "hq1": "brass-quill-pin-+1",
+    "hq2": "brass-quill-pin-+1",
+    "hq3": "brass-quill-pin-+1"
+  },
+  {
+    "id": "silver-ledger-band",
+    "name": "Silver Ledger Band",
+    "craft": "goldsmithing",
+    "difficulty": 26,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "silver-ingot": 1,
+      "ink-vial": 1
+    },
+    "result": "silver-ledger-band",
+    "hq1": "silver-ledger-band-+1",
+    "hq2": "silver-ledger-band-+1",
+    "hq3": "silver-ledger-band-+1"
+  },
+  {
+    "id": "hospitality-coin-pendant",
+    "name": "Hospitality Coin Pendant",
+    "craft": "goldsmithing",
+    "difficulty": 30,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "silver-ingot": 2,
+      "tanuki-rice": 1
+    },
+    "result": "hospitality-coin-pendant",
+    "hq1": "hospitality-coin-pendant-+1",
+    "hq2": "hospitality-coin-pendant-+1",
+    "hq3": "hospitality-coin-pendant-+1"
+  },
+  {
+    "id": "tanuki-leaf-charm",
+    "name": "Tanuki Leaf Charm",
+    "craft": "goldsmithing",
+    "difficulty": 28,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "silver-ingot": 1,
+      "shrine-greens": 1
+    },
+    "result": "tanuki-leaf-charm",
+    "hq1": "tanuki-leaf-charm-+1",
+    "hq2": "tanuki-leaf-charm-+1",
+    "hq3": "tanuki-leaf-charm-+1"
+  },
+  {
+    "id": "swampite-signet",
+    "name": "Swampite Signet",
+    "craft": "goldsmithing",
+    "difficulty": 42,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "swampite-ingot": 1,
+      "silver-ingot": 1
+    },
+    "result": "swampite-signet",
+    "hq1": "swampite-signet-+1",
+    "hq2": "swampite-signet-+1",
+    "hq3": "swampite-signet-+1"
+  },
+  {
+    "id": "gold-debt-ring",
+    "name": "Gold Debt Ring",
+    "craft": "goldsmithing",
+    "difficulty": 52,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "gold-ingot": 1,
+      "silver-ingot": 1
+    },
+    "result": "gold-debt-ring",
+    "hq1": "gold-debt-ring-+1",
+    "hq2": "gold-debt-ring-+1",
+    "hq3": "gold-debt-ring-+1"
+  },
+  {
+    "id": "chrono-coin-earring",
+    "name": "Chrono-Coin Earring",
+    "craft": "goldsmithing",
+    "difficulty": 46,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "gold-ingot": 1,
+      "wisp-glass": 1
+    },
+    "result": "chrono-coin-earring",
+    "hq1": "chrono-coin-earring-+1",
+    "hq2": "chrono-coin-earring-+1",
+    "hq3": "chrono-coin-earring-+1"
+  },
+  {
+    "id": "stolas-hum-earring",
+    "name": "Stolas Hum Earring",
+    "craft": "goldsmithing",
+    "difficulty": 58,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "gold-ingot": 1,
+      "lens-shard": 2
+    },
+    "result": "stolas-hum-earring",
+    "hq1": "stolas-hum-earring-+1",
+    "hq2": "stolas-hum-earring-+1",
+    "hq3": "stolas-hum-earring-+1"
+  },
+  {
+    "id": "lens-pendant",
+    "name": "Lens Pendant",
+    "craft": "goldsmithing",
+    "difficulty": 44,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "silver-ingot": 1,
+      "lens-shard": 2
+    },
+    "result": "lens-pendant",
+    "hq1": "lens-pendant-+1",
+    "hq2": "lens-pendant-+1",
+    "hq3": "lens-pendant-+1"
+  },
+  {
+    "id": "protocol-seal-ring",
+    "name": "Protocol Seal Ring",
+    "craft": "goldsmithing",
+    "difficulty": 74,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "gold-ingot": 1,
+      "protocol-stone": 1
+    },
+    "result": "protocol-seal-ring",
+    "hq1": "protocol-seal-ring-+1",
+    "hq2": "protocol-seal-ring-+1",
+    "hq3": "protocol-seal-ring-+1"
+  },
+  {
+    "id": "shell-parliament-signet",
+    "name": "Shell Parliament Signet",
+    "craft": "goldsmithing",
+    "difficulty": 64,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "gold-ingot": 2,
+      "shell-glue": 2
+    },
+    "result": "shell-parliament-signet",
+    "hq1": "shell-parliament-signet-+1",
+    "hq2": "shell-parliament-signet-+1",
+    "hq3": "shell-parliament-signet-+1"
+  },
+  {
+    "id": "ash-planks",
+    "name": "Ash Planks",
+    "craft": "woodworking",
+    "difficulty": 2,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "ash-lumber": 2
+    },
+    "result": "ash-planks"
+  },
+  {
+    "id": "heather-planks",
+    "name": "Heather Planks",
+    "craft": "woodworking",
+    "difficulty": 14,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "heather-lumber": 2
+    },
+    "result": "heather-planks"
+  },
+  {
+    "id": "reed-planks",
+    "name": "Reed Planks",
+    "craft": "woodworking",
+    "difficulty": 18,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "reed-lumber": 2
+    },
+    "result": "reed-planks"
+  },
+  {
+    "id": "moor-oak-planks",
+    "name": "Moor Oak Planks",
+    "craft": "woodworking",
+    "difficulty": 34,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "moor-oak-lumber": 2
+    },
+    "result": "moor-oak-planks"
+  },
+  {
+    "id": "ridge-pine-planks",
+    "name": "Ridge Pine Planks",
+    "craft": "woodworking",
+    "difficulty": 30,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "ridge-pine-lumber": 2
+    },
+    "result": "ridge-pine-planks"
+  },
+  {
+    "id": "fence-post-staff",
+    "name": "Fence-Post Staff",
+    "craft": "woodworking",
+    "difficulty": 6,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "ash-planks": 2,
+      "down-feather": 1
+    },
+    "result": "fence-post-staff",
+    "hq1": "fence-post-staff-+1",
+    "hq2": "fence-post-staff-+1",
+    "hq3": "fence-post-staff-+1"
+  },
+  {
+    "id": "wren-bow",
+    "name": "Wren Bow",
+    "craft": "woodworking",
+    "difficulty": 18,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "heather-planks": 2,
+      "spider-silk": 2
+    },
+    "result": "wren-bow",
+    "hq1": "wren-bow-+1",
+    "hq2": "wren-bow-+1",
+    "hq3": "wren-bow-+1"
+  },
+  {
+    "id": "pellet-wand",
+    "name": "Pellet Wand",
+    "craft": "woodworking",
+    "difficulty": 16,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "reed-planks": 1,
+      "pellet-bone": 2
+    },
+    "result": "pellet-wand",
+    "hq1": "pellet-wand-+1",
+    "hq2": "pellet-wand-+1",
+    "hq3": "pellet-wand-+1"
+  },
+  {
+    "id": "reed-flute",
+    "name": "Reed Flute",
+    "craft": "woodworking",
+    "difficulty": 22,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "reed-planks": 2,
+      "heron-quill": 1
+    },
+    "result": "reed-flute",
+    "hq1": "reed-flute-+1",
+    "hq2": "reed-flute-+1",
+    "hq3": "reed-flute-+1"
+  },
+  {
+    "id": "boom-mic-staff",
+    "name": "Boom-Mic Staff",
+    "craft": "woodworking",
+    "difficulty": 30,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "ridge-pine-planks": 2,
+      "brass-plate-shard": 2
+    },
+    "result": "boom-mic-staff",
+    "hq1": "boom-mic-staff-+1",
+    "hq2": "boom-mic-staff-+1",
+    "hq3": "boom-mic-staff-+1"
+  },
+  {
+    "id": "tuning-fork-staff",
+    "name": "Tuning-Fork Staff",
+    "craft": "woodworking",
+    "difficulty": 44,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "moor-oak-planks": 2,
+      "lens-shard": 2,
+      "silver-ingot": 1
+    },
+    "result": "tuning-fork-staff",
+    "hq1": "tuning-fork-staff-+1",
+    "hq2": "tuning-fork-staff-+1",
+    "hq3": "tuning-fork-staff-+1"
+  },
+  {
+    "id": "eastwind-longbow",
+    "name": "Eastwind Longbow",
+    "craft": "woodworking",
+    "difficulty": 40,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "ridge-pine-planks": 3,
+      "snowfeather": 2,
+      "spider-silk": 2
+    },
+    "result": "eastwind-longbow",
+    "hq1": "eastwind-longbow-+1",
+    "hq2": "eastwind-longbow-+1",
+    "hq3": "eastwind-longbow-+1"
+  },
+  {
+    "id": "footnote-rod",
+    "name": "Footnote Rod",
+    "craft": "woodworking",
+    "difficulty": 60,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "moor-oak-planks": 3,
+      "ink-vial": 2,
+      "wisp-wax": 2
+    },
+    "result": "footnote-rod",
+    "hq1": "footnote-rod-+1",
+    "hq2": "footnote-rod-+1",
+    "hq3": "footnote-rod-+1"
+  },
+  {
+    "id": "protocol-gavel",
+    "name": "Protocol Gavel",
+    "craft": "woodworking",
+    "difficulty": 70,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "moor-oak-planks": 2,
+      "protocol-stone": 2,
+      "shell-glue": 1
+    },
+    "result": "protocol-gavel",
+    "hq1": "protocol-gavel-+1",
+    "hq2": "protocol-gavel-+1",
+    "hq3": "protocol-gavel-+1"
+  },
+  {
+    "id": "reed-hat",
+    "name": "Reed Hat",
+    "craft": "woodworking",
+    "difficulty": 12,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "reed-planks": 1,
+      "down-cloth": 1
+    },
+    "result": "reed-hat",
+    "hq1": "reed-hat-+1",
+    "hq2": "reed-hat-+1",
+    "hq3": "reed-hat-+1"
+  },
+  {
+    "id": "pine-clogs",
+    "name": "Pine Clogs",
+    "craft": "woodworking",
+    "difficulty": 28,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "ridge-pine-planks": 1,
+      "cured-hare-hide": 1
+    },
+    "result": "pine-clogs",
+    "hq1": "pine-clogs-+1",
+    "hq2": "pine-clogs-+1",
+    "hq3": "pine-clogs-+1"
+  },
+  {
+    "id": "cured-wolf-pelt",
+    "name": "Cured Wolf Pelt",
+    "craft": "leathercraft",
+    "difficulty": 4,
+    "crystal": "thunder-crystal",
+    "ingredients": {
+      "wolf-pelt": 2
+    },
+    "result": "cured-wolf-pelt"
+  },
+  {
+    "id": "cured-hare-hide",
+    "name": "Cured Hare Hide",
+    "craft": "leathercraft",
+    "difficulty": 8,
+    "crystal": "thunder-crystal",
+    "ingredients": {
+      "hare-pelt": 2
+    },
+    "result": "cured-hare-hide"
+  },
+  {
+    "id": "cured-badger-hide",
+    "name": "Cured Badger Hide",
+    "craft": "leathercraft",
+    "difficulty": 18,
+    "crystal": "thunder-crystal",
+    "ingredients": {
+      "hedge-hide": 2
+    },
+    "result": "cured-badger-hide"
+  },
+  {
+    "id": "rimefox-leather",
+    "name": "Rimefox Leather",
+    "craft": "leathercraft",
+    "difficulty": 36,
+    "crystal": "thunder-crystal",
+    "ingredients": {
+      "rime-pelt": 2
+    },
+    "result": "rimefox-leather"
+  },
+  {
+    "id": "mini-bike-leather",
+    "name": "Mini-Bike Leather",
+    "craft": "leathercraft",
+    "difficulty": 22,
+    "crystal": "thunder-crystal",
+    "ingredients": {
+      "cured-wolf-pelt": 2,
+      "lamp-oil": 1
+    },
+    "result": "mini-bike-leather"
+  },
+  {
+    "id": "wolf-hide-vest",
+    "name": "Wolf-Hide Vest",
+    "craft": "leathercraft",
+    "difficulty": 10,
+    "crystal": "thunder-crystal",
+    "ingredients": {
+      "cured-wolf-pelt": 3
+    },
+    "result": "wolf-hide-vest",
+    "hq1": "wolf-hide-vest-+1",
+    "hq2": "wolf-hide-vest-+1",
+    "hq3": "wolf-hide-vest-+1"
+  },
+  {
+    "id": "wolf-hide-gloves",
+    "name": "Wolf-Hide Gloves",
+    "craft": "leathercraft",
+    "difficulty": 8,
+    "crystal": "thunder-crystal",
+    "ingredients": {
+      "cured-wolf-pelt": 1,
+      "wolf-fang": 1
+    },
+    "result": "wolf-hide-gloves",
+    "hq1": "wolf-hide-gloves-+1",
+    "hq2": "wolf-hide-gloves-+1",
+    "hq3": "wolf-hide-gloves-+1"
+  },
+  {
+    "id": "wolf-hide-boots",
+    "name": "Wolf-Hide Boots",
+    "craft": "leathercraft",
+    "difficulty": 8,
+    "crystal": "thunder-crystal",
+    "ingredients": {
+      "cured-wolf-pelt": 2
+    },
+    "result": "wolf-hide-boots",
+    "hq1": "wolf-hide-boots-+1",
+    "hq2": "wolf-hide-boots-+1",
+    "hq3": "wolf-hide-boots-+1"
+  },
+  {
+    "id": "hare-hide-cap",
+    "name": "Hare-Hide Cap",
+    "craft": "leathercraft",
+    "difficulty": 14,
+    "crystal": "thunder-crystal",
+    "ingredients": {
+      "cured-hare-hide": 2
+    },
+    "result": "hare-hide-cap",
+    "hq1": "hare-hide-cap-+1",
+    "hq2": "hare-hide-cap-+1",
+    "hq3": "hare-hide-cap-+1"
+  },
+  {
+    "id": "mini-bike-jacket",
+    "name": "Mini-Bike Jacket",
+    "craft": "leathercraft",
+    "difficulty": 26,
+    "crystal": "thunder-crystal",
+    "ingredients": {
+      "mini-bike-leather": 3,
+      "iron-ingot": 1
+    },
+    "result": "mini-bike-jacket",
+    "hq1": "mini-bike-jacket-+1",
+    "hq2": "mini-bike-jacket-+1",
+    "hq3": "mini-bike-jacket-+1"
+  },
+  {
+    "id": "mini-bike-boots",
+    "name": "Mini-Bike Boots",
+    "craft": "leathercraft",
+    "difficulty": 24,
+    "crystal": "thunder-crystal",
+    "ingredients": {
+      "mini-bike-leather": 2
+    },
+    "result": "mini-bike-boots",
+    "hq1": "mini-bike-boots-+1",
+    "hq2": "mini-bike-boots-+1",
+    "hq3": "mini-bike-boots-+1"
+  },
+  {
+    "id": "badger-hide-coat",
+    "name": "Badger-Hide Coat",
+    "craft": "leathercraft",
+    "difficulty": 32,
+    "crystal": "thunder-crystal",
+    "ingredients": {
+      "cured-badger-hide": 4
+    },
+    "result": "badger-hide-coat",
+    "hq1": "badger-hide-coat-+1",
+    "hq2": "badger-hide-coat-+1",
+    "hq3": "badger-hide-coat-+1"
+  },
+  {
+    "id": "badger-hide-leggings",
+    "name": "Badger-Hide Leggings",
+    "craft": "leathercraft",
+    "difficulty": 30,
+    "crystal": "thunder-crystal",
+    "ingredients": {
+      "cured-badger-hide": 3
+    },
+    "result": "badger-hide-leggings",
+    "hq1": "badger-hide-leggings-+1",
+    "hq2": "badger-hide-leggings-+1",
+    "hq3": "badger-hide-leggings-+1"
+  },
+  {
+    "id": "rimefox-hood",
+    "name": "Rimefox Hood",
+    "craft": "leathercraft",
+    "difficulty": 46,
+    "crystal": "thunder-crystal",
+    "ingredients": {
+      "rimefox-leather": 2,
+      "snowfeather": 1
+    },
+    "result": "rimefox-hood",
+    "hq1": "rimefox-hood-+1",
+    "hq2": "rimefox-hood-+1",
+    "hq3": "rimefox-hood-+1"
+  },
+  {
+    "id": "rimefox-jerkin",
+    "name": "Rimefox Jerkin",
+    "craft": "leathercraft",
+    "difficulty": 50,
+    "crystal": "thunder-crystal",
+    "ingredients": {
+      "rimefox-leather": 4
+    },
+    "result": "rimefox-jerkin",
+    "hq1": "rimefox-jerkin-+1",
+    "hq2": "rimefox-jerkin-+1",
+    "hq3": "rimefox-jerkin-+1"
+  },
+  {
+    "id": "shade-hide-cloak",
+    "name": "Shade-Hide Cloak",
+    "craft": "leathercraft",
+    "difficulty": 56,
+    "crystal": "thunder-crystal",
+    "ingredients": {
+      "rimefox-leather": 2,
+      "shade-feather": 3
+    },
+    "result": "shade-hide-cloak",
+    "hq1": "shade-hide-cloak-+1",
+    "hq2": "shade-hide-cloak-+1",
+    "hq3": "shade-hide-cloak-+1"
+  },
+  {
+    "id": "spider-silk-cloth",
+    "name": "Spider Silk Cloth",
+    "craft": "clothcraft",
+    "difficulty": 8,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "spider-silk": 3
+    },
+    "result": "spider-silk-cloth"
+  },
+  {
+    "id": "down-cloth",
+    "name": "Down Cloth",
+    "craft": "clothcraft",
+    "difficulty": 10,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "down-feather": 4
+    },
+    "result": "down-cloth"
+  },
+  {
+    "id": "vellum-weave",
+    "name": "Vellum Weave",
+    "craft": "clothcraft",
+    "difficulty": 40,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "vellum-scrap": 4,
+      "ink-vial": 1
+    },
+    "result": "vellum-weave"
+  },
+  {
+    "id": "wraith-cloth",
+    "name": "Wraith Cloth",
+    "craft": "clothcraft",
+    "difficulty": 55,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "wraith-thread": 3
+    },
+    "result": "wraith-cloth"
+  },
+  {
+    "id": "fledgling-down-robe",
+    "name": "Fledgling Down Robe",
+    "craft": "clothcraft",
+    "difficulty": 8,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "down-cloth": 3
+    },
+    "result": "fledgling-down-robe",
+    "hq1": "fledgling-down-robe-+1",
+    "hq2": "fledgling-down-robe-+1",
+    "hq3": "fledgling-down-robe-+1"
+  },
+  {
+    "id": "silk-habit",
+    "name": "Silk Habit",
+    "craft": "clothcraft",
+    "difficulty": 16,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "spider-silk-cloth": 3
+    },
+    "result": "silk-habit",
+    "hq1": "silk-habit-+1",
+    "hq2": "silk-habit-+1",
+    "hq3": "silk-habit-+1"
+  },
+  {
+    "id": "silk-slippers-ii",
+    "name": "Silk Slippers II",
+    "craft": "clothcraft",
+    "difficulty": 14,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "spider-silk-cloth": 1,
+      "down-cloth": 1
+    },
+    "result": "silk-slippers-ii",
+    "hq1": "silk-slippers-ii-+1",
+    "hq2": "silk-slippers-ii-+1",
+    "hq3": "silk-slippers-ii-+1"
+  },
+  {
+    "id": "silk-cowl",
+    "name": "Silk Cowl",
+    "craft": "clothcraft",
+    "difficulty": 15,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "spider-silk-cloth": 2
+    },
+    "result": "silk-cowl",
+    "hq1": "silk-cowl-+1",
+    "hq2": "silk-cowl-+1",
+    "hq3": "silk-cowl-+1"
+  },
+  {
+    "id": "shrine-tender-robe",
+    "name": "Shrine Tender Robe",
+    "craft": "clothcraft",
+    "difficulty": 34,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "spider-silk-cloth": 4,
+      "shrine-greens": 2
+    },
+    "result": "shrine-tender-robe",
+    "hq1": "shrine-tender-robe-+1",
+    "hq2": "shrine-tender-robe-+1",
+    "hq3": "shrine-tender-robe-+1"
+  },
+  {
+    "id": "accountant-coat",
+    "name": "Accountant Coat",
+    "craft": "clothcraft",
+    "difficulty": 36,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "spider-silk-cloth": 3,
+      "ink-vial": 2
+    },
+    "result": "accountant-coat",
+    "hq1": "accountant-coat-+1",
+    "hq2": "accountant-coat-+1",
+    "hq3": "accountant-coat-+1"
+  },
+  {
+    "id": "vellum-cowl",
+    "name": "Vellum Cowl",
+    "craft": "clothcraft",
+    "difficulty": 48,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "vellum-weave": 2
+    },
+    "result": "vellum-cowl",
+    "hq1": "vellum-cowl-+1",
+    "hq2": "vellum-cowl-+1",
+    "hq3": "vellum-cowl-+1"
+  },
+  {
+    "id": "cataloguer-robe",
+    "name": "Cataloguer Robe",
+    "craft": "clothcraft",
+    "difficulty": 62,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "vellum-weave": 4,
+      "wisp-wax": 2
+    },
+    "result": "cataloguer-robe",
+    "hq1": "cataloguer-robe-+1",
+    "hq2": "cataloguer-robe-+1",
+    "hq3": "cataloguer-robe-+1"
+  },
+  {
+    "id": "wraith-cloth-mantle",
+    "name": "Wraith-Cloth Mantle",
+    "craft": "clothcraft",
+    "difficulty": 72,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "wraith-cloth": 4,
+      "snowfeather": 2
+    },
+    "result": "wraith-cloth-mantle",
+    "hq1": "wraith-cloth-mantle-+1",
+    "hq2": "wraith-cloth-mantle-+1",
+    "hq3": "wraith-cloth-mantle-+1"
+  },
+  {
+    "id": "down-cloak",
+    "name": "Down Cloak",
+    "craft": "clothcraft",
+    "difficulty": 12,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "down-cloth": 2
+    },
+    "result": "down-cloak",
+    "hq1": "down-cloak-+1",
+    "hq2": "down-cloak-+1",
+    "hq3": "down-cloak-+1"
+  },
+  {
+    "id": "ward-paper-mantle",
+    "name": "Ward-Paper Mantle",
+    "craft": "clothcraft",
+    "difficulty": 40,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "ward-paper": 3,
+      "spider-silk-cloth": 2
+    },
+    "result": "ward-paper-mantle",
+    "hq1": "ward-paper-mantle-+1",
+    "hq2": "ward-paper-mantle-+1",
+    "hq3": "ward-paper-mantle-+1"
+  },
+  {
+    "id": "bone-meal",
+    "name": "Bone Meal",
+    "craft": "bonecraft",
+    "difficulty": 3,
+    "crystal": "water-crystal",
+    "ingredients": {
+      "pellet-bone": 2
+    },
+    "result": "bone-meal"
+  },
+  {
+    "id": "owl-bone-dagger",
+    "name": "Owl-Bone Dagger",
+    "craft": "bonecraft",
+    "difficulty": 12,
+    "crystal": "water-crystal",
+    "ingredients": {
+      "pellet-bone": 3,
+      "down-feather": 1
+    },
+    "result": "owl-bone-dagger",
+    "hq1": "owl-bone-dagger-+1",
+    "hq2": "owl-bone-dagger-+1",
+    "hq3": "owl-bone-dagger-+1"
+  },
+  {
+    "id": "jawbone-axe",
+    "name": "Jawbone Axe",
+    "craft": "bonecraft",
+    "difficulty": 20,
+    "crystal": "water-crystal",
+    "ingredients": {
+      "badger-claw": 2,
+      "pellet-bone": 3
+    },
+    "result": "jawbone-axe",
+    "hq1": "jawbone-axe-+1",
+    "hq2": "jawbone-axe-+1",
+    "hq3": "jawbone-axe-+1"
+  },
+  {
+    "id": "mandible-claws",
+    "name": "Mandible Claws",
+    "craft": "bonecraft",
+    "difficulty": 28,
+    "crystal": "water-crystal",
+    "ingredients": {
+      "crawler-mandible": 3,
+      "cured-badger-hide": 1
+    },
+    "result": "mandible-claws",
+    "hq1": "mandible-claws-+1",
+    "hq2": "mandible-claws-+1",
+    "hq3": "mandible-claws-+1"
+  },
+  {
+    "id": "wolf-fang-knife",
+    "name": "Wolf-Fang Knife",
+    "craft": "bonecraft",
+    "difficulty": 10,
+    "crystal": "water-crystal",
+    "ingredients": {
+      "wolf-fang": 2,
+      "wolf-pelt": 1
+    },
+    "result": "wolf-fang-knife",
+    "hq1": "wolf-fang-knife-+1",
+    "hq2": "wolf-fang-knife-+1",
+    "hq3": "wolf-fang-knife-+1"
+  },
+  {
+    "id": "sunderworm-fang-knife",
+    "name": "Sunderworm Fang Knife",
+    "craft": "bonecraft",
+    "difficulty": 42,
+    "crystal": "water-crystal",
+    "ingredients": {
+      "sunderworm-fang": 1,
+      "pellet-bone": 2
+    },
+    "result": "sunderworm-fang-knife",
+    "hq1": "sunderworm-fang-knife-+1",
+    "hq2": "sunderworm-fang-knife-+1",
+    "hq3": "sunderworm-fang-knife-+1"
+  },
+  {
+    "id": "pellet-bone-cap",
+    "name": "Pellet-Bone Cap",
+    "craft": "bonecraft",
+    "difficulty": 16,
+    "crystal": "water-crystal",
+    "ingredients": {
+      "pellet-bone": 4,
+      "bone-meal": 1
+    },
+    "result": "pellet-bone-cap",
+    "hq1": "pellet-bone-cap-+1",
+    "hq2": "pellet-bone-cap-+1",
+    "hq3": "pellet-bone-cap-+1"
+  },
+  {
+    "id": "beetle-shell-breastplate",
+    "name": "Beetle-Shell Breastplate",
+    "craft": "bonecraft",
+    "difficulty": 24,
+    "crystal": "water-crystal",
+    "ingredients": {
+      "beetle-shell": 5,
+      "shell-glue": 1
+    },
+    "result": "beetle-shell-breastplate",
+    "hq1": "beetle-shell-breastplate-+1",
+    "hq2": "beetle-shell-breastplate-+1",
+    "hq3": "beetle-shell-breastplate-+1"
+  },
+  {
+    "id": "brine-shell-mail",
+    "name": "Brine-Shell Mail",
+    "craft": "bonecraft",
+    "difficulty": 38,
+    "crystal": "water-crystal",
+    "ingredients": {
+      "beetle-shell": 4,
+      "pellet-bone": 4,
+      "brine-salt": 2
+    },
+    "result": "brine-shell-mail",
+    "hq1": "brine-shell-mail-+1",
+    "hq2": "brine-shell-mail-+1",
+    "hq3": "brine-shell-mail-+1"
+  },
+  {
+    "id": "roost-wing-gauntlets",
+    "name": "Roost-Wing Gauntlets",
+    "craft": "bonecraft",
+    "difficulty": 26,
+    "crystal": "water-crystal",
+    "ingredients": {
+      "roost-wing": 3,
+      "crawler-mandible": 1
+    },
+    "result": "roost-wing-gauntlets",
+    "hq1": "roost-wing-gauntlets-+1",
+    "hq2": "roost-wing-gauntlets-+1",
+    "hq3": "roost-wing-gauntlets-+1"
+  },
+  {
+    "id": "eagle-plume-crown",
+    "name": "Eagle-Plume Crown",
+    "craft": "bonecraft",
+    "difficulty": 40,
+    "crystal": "water-crystal",
+    "ingredients": {
+      "eagle-owl-plume": 3,
+      "pellet-bone": 2
+    },
+    "result": "eagle-plume-crown",
+    "hq1": "eagle-plume-crown-+1",
+    "hq2": "eagle-plume-crown-+1",
+    "hq3": "eagle-plume-crown-+1"
+  },
+  {
+    "id": "lizard-bone-greaves",
+    "name": "Lizard-Bone Greaves",
+    "craft": "bonecraft",
+    "difficulty": 20,
+    "crystal": "water-crystal",
+    "ingredients": {
+      "lizard-tail": 2,
+      "pellet-bone": 2
+    },
+    "result": "lizard-bone-greaves",
+    "hq1": "lizard-bone-greaves-+1",
+    "hq2": "lizard-bone-greaves-+1",
+    "hq3": "lizard-bone-greaves-+1"
+  },
+  {
+    "id": "redacted-mask",
+    "name": "Redacted Mask",
+    "craft": "bonecraft",
+    "difficulty": 66,
+    "crystal": "water-crystal",
+    "ingredients": {
+      "redacted-feather": 2,
+      "black-bar-shard": 2,
+      "bone-meal": 3
+    },
+    "result": "redacted-mask",
+    "hq1": "redacted-mask-+1",
+    "hq2": "redacted-mask-+1",
+    "hq3": "redacted-mask-+1"
+  },
+  {
+    "id": "ward-ink",
+    "name": "Ward Ink",
+    "craft": "alchemy",
+    "difficulty": 6,
+    "crystal": "dark-crystal",
+    "ingredients": {
+      "ink-vial": 1,
+      "lamp-oil": 1
+    },
+    "result": "ward-ink",
+    "yield": 2
+  },
+  {
+    "id": "shell-glue",
+    "name": "Shell Glue",
+    "craft": "alchemy",
+    "difficulty": 5,
+    "crystal": "water-crystal",
+    "ingredients": {
+      "beetle-shell": 1,
+      "slime-oil": 1
+    },
+    "result": "shell-glue",
+    "yield": 2
+  },
+  {
+    "id": "ward-paper",
+    "name": "Ward Paper",
+    "craft": "alchemy",
+    "difficulty": 16,
+    "crystal": "dark-crystal",
+    "ingredients": {
+      "vellum-scrap": 2,
+      "ward-ink": 1
+    },
+    "result": "ward-paper",
+    "yield": 2
+  },
+  {
+    "id": "shell-salve",
+    "name": "Shell-Salve",
+    "craft": "alchemy",
+    "difficulty": 8,
+    "crystal": "water-crystal",
+    "ingredients": {
+      "slime-oil": 1,
+      "shell-glue": 1
+    },
+    "result": "shell-salve",
+    "yield": 2
+  },
+  {
+    "id": "hospitality-draught",
+    "name": "Hospitality Draught",
+    "craft": "alchemy",
+    "difficulty": 24,
+    "crystal": "water-crystal",
+    "ingredients": {
+      "spring-water": 1,
+      "shrine-greens": 1,
+      "leech-blood": 1
+    },
+    "result": "hospitality-draught"
+  },
+  {
+    "id": "eastwind-tonic",
+    "name": "Eastwind Tonic",
+    "craft": "alchemy",
+    "difficulty": 14,
+    "crystal": "water-crystal",
+    "ingredients": {
+      "spring-water": 1,
+      "sentry-quill": 1
+    },
+    "result": "eastwind-tonic"
+  },
+  {
+    "id": "vellum-ether",
+    "name": "Vellum Ether",
+    "craft": "alchemy",
+    "difficulty": 38,
+    "crystal": "dark-crystal",
+    "ingredients": {
+      "spring-water": 1,
+      "ink-vial": 1,
+      "vellum-scrap": 1
+    },
+    "result": "vellum-ether"
+  },
+  {
+    "id": "owl-tea",
+    "name": "Owl Tea",
+    "craft": "alchemy",
+    "difficulty": 10,
+    "crystal": "water-crystal",
+    "ingredients": {
+      "spring-water": 1,
+      "down-feather": 1
+    },
+    "result": "owl-tea"
+  },
+  {
+    "id": "brine-elixir",
+    "name": "Brine Elixir",
+    "craft": "alchemy",
+    "difficulty": 56,
+    "crystal": "water-crystal",
+    "ingredients": {
+      "spring-water": 1,
+      "brine-salt": 2,
+      "pellet-bone": 1,
+      "wisp-glass": 1
+    },
+    "result": "brine-elixir"
+  },
+  {
+    "id": "ward-ink-tonic",
+    "name": "Ward-Ink Tonic",
+    "craft": "alchemy",
+    "difficulty": 20,
+    "crystal": "dark-crystal",
+    "ingredients": {
+      "ward-ink": 1,
+      "spring-water": 1
+    },
+    "result": "ward-ink-tonic"
+  },
+  {
+    "id": "venom-flask",
+    "name": "Venom Flask",
+    "craft": "alchemy",
+    "difficulty": 12,
+    "crystal": "dark-crystal",
+    "ingredients": {
+      "spider-venom": 1,
+      "slime-oil": 1
+    },
+    "result": "venom-flask"
+  },
+  {
+    "id": "numbing-resin",
+    "name": "Numbing Resin",
+    "craft": "alchemy",
+    "difficulty": 22,
+    "crystal": "dark-crystal",
+    "ingredients": {
+      "slug-ichor": 1,
+      "shell-glue": 1
+    },
+    "result": "numbing-resin"
+  },
+  {
+    "id": "sleeping-powder",
+    "name": "Sleeping Powder",
+    "craft": "alchemy",
+    "difficulty": 30,
+    "crystal": "dark-crystal",
+    "ingredients": {
+      "moth-dust": 2,
+      "guano-clump": 1
+    },
+    "result": "sleeping-powder"
+  },
+  {
+    "id": "smoke-pellet",
+    "name": "Smoke Pellet",
+    "craft": "alchemy",
+    "difficulty": 18,
+    "crystal": "dark-crystal",
+    "ingredients": {
+      "moth-dust": 1,
+      "lamp-oil": 1
+    },
+    "result": "smoke-pellet"
+  },
+  {
+    "id": "party-store-firework",
+    "name": "Party Store Firework",
+    "craft": "alchemy",
+    "difficulty": 26,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "lamp-oil": 1,
+      "moth-dust": 1,
+      "ward-paper": 1
+    },
+    "result": "party-store-firework"
+  },
+  {
+    "id": "acid-flask-refill",
+    "name": "Acid Flask Refill",
+    "craft": "alchemy",
+    "difficulty": 34,
+    "crystal": "dark-crystal",
+    "ingredients": {
+      "spider-venom": 1,
+      "slug-ichor": 2
+    },
+    "result": "acid-flask-refill"
+  },
+  {
+    "id": "spirit-lantern",
+    "name": "Spirit Lantern",
+    "craft": "alchemy",
+    "difficulty": 44,
+    "crystal": "light-crystal",
+    "ingredients": {
+      "wisp-wax": 2,
+      "lamp-wick": 1,
+      "ward-paper": 1
+    },
+    "result": "spirit-lantern"
+  },
+  {
+    "id": "dough",
+    "name": "Dough",
+    "craft": "cooking",
+    "difficulty": 2,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "party-store-flour": 1,
+      "spring-water": 1
+    },
+    "result": "dough",
+    "yield": 2
+  },
+  {
+    "id": "stock",
+    "name": "Stock",
+    "craft": "cooking",
+    "difficulty": 6,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "fish-carp": 1,
+      "brine-salt": 1
+    },
+    "result": "stock",
+    "yield": 2
+  },
+  {
+    "id": "party-store-hot-dog",
+    "name": "Party Store Hot Dog",
+    "craft": "cooking",
+    "difficulty": 4,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "dough": 1,
+      "stock": 1
+    },
+    "result": "party-store-hot-dog"
+  },
+  {
+    "id": "tanuki-onigiri",
+    "name": "Tanuki Onigiri",
+    "craft": "cooking",
+    "difficulty": 8,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "tanuki-rice": 1,
+      "fish-fullmoon-sardine": 1
+    },
+    "result": "tanuki-onigiri",
+    "yield": 2
+  },
+  {
+    "id": "carp-udon",
+    "name": "Carp Udon",
+    "craft": "cooking",
+    "difficulty": 16,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "dough": 1,
+      "stock": 1,
+      "shrine-greens": 1
+    },
+    "result": "carp-udon"
+  },
+  {
+    "id": "bass-teriyaki",
+    "name": "Bass Teriyaki",
+    "craft": "cooking",
+    "difficulty": 20,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "fish-bass": 1,
+      "tanuki-rice": 1,
+      "brine-salt": 1
+    },
+    "result": "bass-teriyaki"
+  },
+  {
+    "id": "trout-meuniere",
+    "name": "Trout Meuniere",
+    "craft": "cooking",
+    "difficulty": 24,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "fish-trout": 1,
+      "party-store-flour": 1,
+      "brine-salt": 1
+    },
+    "result": "trout-meuniere"
+  },
+  {
+    "id": "crab-ramen",
+    "name": "Crab Ramen",
+    "craft": "cooking",
+    "difficulty": 28,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "dough": 1,
+      "stock": 1,
+      "fish-crab": 1
+    },
+    "result": "crab-ramen"
+  },
+  {
+    "id": "eel-skewers",
+    "name": "Eel Skewers",
+    "craft": "cooking",
+    "difficulty": 32,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "fish-eel": 2,
+      "brine-salt": 1
+    },
+    "result": "eel-skewers"
+  },
+  {
+    "id": "mud-crab-bisque",
+    "name": "Mud Crab Bisque",
+    "craft": "cooking",
+    "difficulty": 38,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "fish-mud-crab": 1,
+      "stock": 1,
+      "party-store-flour": 1
+    },
+    "result": "mud-crab-bisque"
+  },
+  {
+    "id": "bog-eel-stew",
+    "name": "Bog Eel Stew",
+    "craft": "cooking",
+    "difficulty": 46,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "fish-bog-eel": 1,
+      "stock": 1,
+      "peat": 1
+    },
+    "result": "bog-eel-stew"
+  },
+  {
+    "id": "crimson-trout-roast",
+    "name": "Crimson Trout Roast",
+    "craft": "cooking",
+    "difficulty": 52,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "fish-crimson-trout": 1,
+      "lamp-oil": 1,
+      "brine-salt": 1
+    },
+    "result": "crimson-trout-roast"
+  },
+  {
+    "id": "squid-ink-pasta",
+    "name": "Squid Ink Pasta",
+    "craft": "cooking",
+    "difficulty": 62,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "fish-giant-squid": 1,
+      "dough": 1,
+      "ink-vial": 1
+    },
+    "result": "squid-ink-pasta"
+  },
+  {
+    "id": "hospitality-feast",
+    "name": "Hospitality Feast",
+    "craft": "cooking",
+    "difficulty": 72,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "tanuki-rice": 2,
+      "fish-trophy-bass": 1,
+      "shrine-greens": 2,
+      "brine-salt": 1
+    },
+    "result": "hospitality-feast"
+  },
+  {
+    "id": "stolas-soup",
+    "name": "Stolas Soup",
+    "craft": "cooking",
+    "difficulty": 84,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "stock": 2,
+      "wisp-glass": 1,
+      "shrine-greens": 1,
+      "fish-giant-squid": 1
+    },
+    "result": "stolas-soup"
+  }
+]

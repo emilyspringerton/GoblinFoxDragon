@@ -262,6 +262,13 @@ func itemName(id string) string {
 	if n, ok := itemDisplayName[id]; ok {
 		return n
 	}
+	// Anything in data/items.json (crafted gear, ingots, foods, crystals ...) names itself.
+	if def, ok := itemdefReg.ByName(id); ok {
+		return def.Name
+	}
+	if n := gather.FishName(id); n != id {
+		return n
+	}
 	return id
 }
 
@@ -893,8 +900,9 @@ type player struct {
 	pendingGuaranteedCrit bool
 	// kitRecasts: per-spell recast deadlines for the data-driven spell kit (kit.go). coating: an armed
 	// melee coating (Envenom, Drain Samba ...) that applies its effect on the next landed hits.
-	kitRecasts map[string]time.Time
-	coating    *weaponCoating
+	kitRecasts  map[string]time.Time
+	syncedCraft map[string]float64 // craft skill baselines for the IDUNA delta sync
+	coating     *weaponCoating
 	// castingSpell/castingCompletesAt (JOB_SPELL_SYSTEM_NORTHSTAR.md §1 Phase 1 remainder, "real
 	// cast time" -- case 3 of the four timing models named there) back the real deferred-cast
 	// mechanism in ability.go: non-empty/non-zero only while a spell with CastTime > 0 is resolving.
@@ -1254,7 +1262,7 @@ func initWorld() *world {
 	w.fishPts[0] = gather.MeadowFishingPoints()
 	w.fishPts[3] = gather.SwampFishingPoints()
 
-	w.foodReg = food.DefaultRegistry()
+	w.foodReg = food.NewRegistry(append(food.StandardFoods(), loreFoods...))
 
 	return w
 }
@@ -1731,6 +1739,7 @@ func tickAll() {
 		// connection's disconnect defer, silently losing any progress since the last save. Now
 		// synced every tick (1Hz) for every player, not just headless ones -- see
 		// char_progress_sync.go.
+		expireFood(p, now)
 		syncCharLevelAndFlow(p)
 		syncGatherSkills(p) // founder real-time: "can we make sure fishing skill persists too?"
 		// Expire Invisible/Sneak.
@@ -2941,9 +2950,24 @@ func handle(p *player, line string) {
 			p.prompt()
 			return
 		}
-		cmdCraft(p, args[0])
+		count := 1
+		if len(args) >= 2 {
+			if n, err := strconv.Atoi(args[1]); err == nil {
+				count = n
+			}
+		}
+		cmdCraft(p, strings.ToLower(args[0]), count)
 	case "recipes":
-		cmdRecipes(p)
+		cmdRecipes(p, args)
+	case "recipe":
+		if len(args) == 0 {
+			p.send("Usage: recipe <recipe-id>")
+			p.prompt()
+			return
+		}
+		cmdRecipeDetail(p, strings.ToLower(args[0]))
+	case "time", "sky":
+		cmdTime(p)
 	case "craft-skills", "cs":
 		cmdCraftSkills(p)
 	case "lot":
@@ -3520,6 +3544,9 @@ func cmdLook(p *player) {
 	if sm, ok := zoneSmell[p.zoneID]; ok {
 		p.sendf("You smell: %s", sm)
 	}
+	if sky := weather.ZoneSky(p.zoneID, time.Now()); sky.Element != weather.None {
+		p.sendf("The sky: %s.", skyString(sky))
+	}
 
 	// Field manual active?
 	if m, ok := gw.fieldManuals[p.zoneID]; ok && m != nil && m.Active(time.Now()) {
@@ -3890,11 +3917,11 @@ func cmdMine(p *player) {
 		p.sendf("You swing your pickaxe at %s but find nothing.", pt.Name)
 	} else if y.HQ {
 		p.sendf(">>> HQ! <<< You excavate %s from %s! (x%d)", y.ItemName, pt.Name, y.Qty)
-		p.inventory[y.ItemID] += y.Qty
+		p.inventory[canonicalItemID(y.ItemID)] += y.Qty
 		p.miningSkill += 0.5
 	} else {
 		p.sendf("You mine %s from %s.", y.ItemName, pt.Name)
-		p.inventory[y.ItemID] += y.Qty
+		p.inventory[canonicalItemID(y.ItemID)] += y.Qty
 		p.miningSkill += 0.1
 	}
 	if p.miningSkill > gather.SkillCap {
@@ -4889,6 +4916,13 @@ func cmdUseItem(p *player, itemID string) {
 		return
 	}
 
+	if useItemKit(p, itemID) {
+		return
+	}
+	if _, _, isFood := resolveFood(p, itemID); isFood {
+		cmdEat(p, itemID)
+		return
+	}
 	switch itemID {
 	case "echo-drop":
 		cmdRemoveDebuffs(p)
@@ -5009,20 +5043,6 @@ func weaponDelayFor(p *player) int {
 	return def.Delay
 }
 
-func cmdEat(p *player, itemID string) {
-	now := time.Now()
-	effect, err := gw.foodReg.Eat(itemID, now)
-	if err != nil {
-		p.sendf("You don't have that food or it's not edible (%v).", err)
-		p.prompt()
-		return
-	}
-	p.foodEffect = effect
-	p.sendf("You eat %s. (%s for %s)", effect.Food.Name,
-		foodStatSummary(effect.Food), formatDuration(effect.Food.Duration))
-	p.prompt()
-}
-
 func cmdFoodBuff(p *player) {
 	now := time.Now()
 	if p.foodEffect == nil || !p.foodEffect.IsActive(now) {
@@ -5052,6 +5072,12 @@ func foodStatSummary(f food.Food) string {
 	}
 	if f.MNDBonus != 0 {
 		parts = append(parts, fmt.Sprintf("MND+%d", f.MNDBonus))
+	}
+	if f.AGIBonus != 0 {
+		parts = append(parts, fmt.Sprintf("AGI+%d", f.AGIBonus))
+	}
+	if f.CHRBonus != 0 {
+		parts = append(parts, fmt.Sprintf("CHR+%d", f.CHRBonus))
 	}
 	if f.HPBonus != 0 {
 		parts = append(parts, fmt.Sprintf("HP+%d", f.HPBonus))
@@ -5959,114 +5985,6 @@ func cmdInventory(p *player) {
 		// it fine, cmdInventory just never did). Same bracket-id convention ah_parse_rows
 		// already extracts from every other AH screen (categories, my listings).
 		p.sendf("  %-30s  x%d  [%s]", itemName(id), p.inventory[id], id)
-	}
-	p.prompt()
-}
-
-func cmdRecipes(p *player) {
-	p.send("\r\n=== Known Recipes ===")
-	for recipeID, ingredients := range recipeIngredients {
-		recipe, err := craft.LookupRecipe(recipeID)
-		if err != nil {
-			continue
-		}
-		skillLvl, _ := p.craftSkill.Level(recipe.CraftType)
-		pct := craft.SuccessChance(skillLvl, recipe.Difficulty) * 100
-		p.sendf("  %-20s  [%s lv%.0f]  success: %.0f%%", recipeID, recipe.CraftType, recipe.Difficulty, pct)
-		for ingID, qty := range ingredients {
-			have := p.inventory[ingID]
-			haveStr := fmt.Sprintf("(have %d)", have)
-			if have < qty {
-				haveStr = fmt.Sprintf("(MISSING: need %d, have %d)", qty, have)
-			}
-			p.sendf("    %dx %s %s", qty, itemName(ingID), haveStr)
-		}
-		p.sendf("    → %s", itemName(recipe.ItemID))
-	}
-	p.prompt()
-}
-
-func cmdCraftSkills(p *player) {
-	p.send("\r\n=== Craft Skills ===")
-	for _, ct := range craft.AllCrafts {
-		lvl, _ := p.craftSkill.Level(ct)
-		p.sendf("  %-14s  %.1f / %.0f", ct, lvl, craft.SkillCap)
-	}
-	p.prompt()
-}
-
-func cmdCraft(p *player, recipeID string) {
-	if p.homePoint.IsKO {
-		p.send("You are KO'd.")
-		p.prompt()
-		return
-	}
-	recipe, err := craft.LookupRecipe(recipeID)
-	if err != nil {
-		p.sendf("Unknown recipe %q. Use 'recipes' to see available recipes.", recipeID)
-		p.prompt()
-		return
-	}
-	ingredients, ok := recipeIngredients[recipeID]
-	if !ok {
-		p.sendf("No ingredient table for recipe %q.", recipeID)
-		p.prompt()
-		return
-	}
-
-	// Check inventory has all ingredients.
-	for ingID, qty := range ingredients {
-		if p.inventory[ingID] < qty {
-			p.sendf("Missing ingredient: %dx %s (have %d).", qty, itemName(ingID), p.inventory[ingID])
-			p.prompt()
-			return
-		}
-	}
-
-	// Consume ingredients.
-	for ingID, qty := range ingredients {
-		p.inventory[ingID] -= qty
-		if p.inventory[ingID] == 0 {
-			delete(p.inventory, ingID)
-		}
-	}
-
-	skillLvl, _ := p.craftSkill.Level(recipe.CraftType)
-	result, err := craft.Attempt(recipe, skillLvl, gw.rng)
-	if err == craft.ErrBreak {
-		p.send(">>> BREAK! <<< Your synthesis failed catastrophically — ingredients destroyed.")
-		p.sendf("  (craft skill: %s %.1f)", recipe.CraftType, skillLvl)
-		p.prompt()
-		return
-	}
-	if !result.Success {
-		// Failure: ingredients are gone (already consumed), no output.
-		p.sendf("Your synthesis failed. (craft skill: %s %.1f  difficulty: %.0f)",
-			recipe.CraftType, skillLvl, recipe.Difficulty)
-		// Small skill gain on failure.
-		_ = p.craftSkill.SetLevel(recipe.CraftType, skillLvl+0.05)
-		p.prompt()
-		return
-	}
-
-	// Success.
-	p.inventory[result.ItemID]++
-	_ = p.craftSkill.SetLevel(recipe.CraftType, skillLvl+0.1)
-	newSkill, _ := p.craftSkill.Level(recipe.CraftType)
-	if result.HQTier > 0 {
-		p.sendf(">>> HQ%d! <<< You synthesise %s! (craft skill: %.1f)", result.HQTier, itemName(result.ItemID), newSkill)
-	} else {
-		p.sendf("Synthesis complete: %s. (craft skill: %.1f)", itemName(result.ItemID), newSkill)
-	}
-
-	// Post-synthesis special effects (S126-15):
-	if strings.HasPrefix(result.ItemID, "atlas-page") {
-		// Atlas Page merges all known zone IDs into the player's cartography atlas.
-		zoneIDs := gw.zoneMgr.ZoneIDs()
-		added := p.atlas.DiscoverAll(zoneIDs)
-		if added > 0 {
-			p.sendf("[Cartography] Atlas merged: %d new zones discovered.", added)
-		}
 	}
 	p.prompt()
 }
@@ -8581,6 +8499,7 @@ func getOrCreateHeadlessPlayer(characterID string) (*player, error) {
 	// tick's delta check is correctly zero rather than re-sending an already-current value.
 	p.syncedMiningSkill = p.miningSkill
 	p.syncedFishingSkill = p.fishingSkill
+	loadCraftSkills(p, loadedSkills)
 	p.recastTracker = job.NewRecastTracker(abilitiesFor(p)) // include the saved sub job's abilities
 	loadEquipmentFromIDUNA(p, characterID)                  // real production data-loss fix: "gear needs to persist"
 	gw.charIDBySlot[slot] = ch.CharacterID
@@ -8922,6 +8841,7 @@ func handleConn(conn net.Conn, isGuest bool, preset *presetIdentity, echoInput b
 			if skills, err := gw.iduna.GetSkills(ch.CharacterID); err == nil {
 				p.miningSkill = skills["mining"]
 				p.fishingSkill = skills["fishing"]
+				loadCraftSkills(p, skills)
 			}
 			// Real production data-loss fix: "gear needs to persist what the fuck why was that
 			// deferred" -- restore whatever was actually equipped last session. A no-op for a
@@ -8968,6 +8888,7 @@ func handleConn(conn net.Conn, isGuest bool, preset *presetIdentity, echoInput b
 			if skills, err := gw.iduna.GetSkills(ch.CharacterID); err == nil {
 				p.miningSkill = skills["mining"]
 				p.fishingSkill = skills["fishing"]
+				loadCraftSkills(p, skills)
 			}
 			// Real production data-loss fix: "gear needs to persist what the fuck why was that
 			// deferred" -- restore whatever was actually equipped last session.
@@ -9766,6 +9687,13 @@ func main() {
 	// Load item definitions (non-fatal: equip restrictions skipped if missing).
 	if err := itemdefReg.LoadFile("data/items.json"); err != nil {
 		fmt.Printf("warn: itemdef load: %v (equip restrictions disabled)\n", err)
+	}
+
+	// Load the crystal-synthesis recipe book (non-fatal: only the legacy code recipes remain without it).
+	if n, err := craft.LoadRecipesFile("data/recipes.json"); err != nil {
+		fmt.Printf("warn: recipes load: %v (only built-in recipes available)\n", err)
+	} else {
+		fmt.Printf("loaded %d synthesis recipes\n", n)
 	}
 
 	// Load mob drop tables (non-fatal: mobs fall back to flow-drop if missing).

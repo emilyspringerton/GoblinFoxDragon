@@ -14,21 +14,23 @@ import (
 
 // Food describes a consumable food item and its stat buffs.
 type Food struct {
-	ID        string
-	Name      string
-	STRBonus  int
-	DEXBonus  int
-	VITBonus  int
-	INTBonus  int
-	MNDBonus  int
-	HPBonus   int
-	MPBonus   int
-	Duration  time.Duration
+	ID       string
+	Name     string
+	STRBonus int
+	DEXBonus int
+	VITBonus int
+	INTBonus int
+	MNDBonus int
+	AGIBonus int
+	CHRBonus int
+	HPBonus  int
+	MPBonus  int
+	Duration time.Duration
 }
 
 // FoodEffect tracks an active food buff on a character.
 type FoodEffect struct {
-	Food     Food
+	Food      Food
 	ExpiresAt time.Time
 }
 
@@ -95,15 +97,15 @@ func (r *Registry) Eat(id string, now time.Time) (*FoodEffect, error) {
 // --- Standard food items (FFXI-inspired) ---
 
 const (
-	IDMeatMithkabob    = "food-meat-mithkabob"
-	IDTavnazianSalad   = "food-tavnazian-salad"
-	IDRolanberryPie    = "food-rolanberry-pie"
-	IDSelbinaMilk      = "food-selbina-milk"
-	IDPear             = "food-pear"
-	IDFishAndChips     = "food-fish-and-chips"
-	IDCrabSoup         = "food-crab-soup"
-	IDSwampHerbalTea   = "food-swamp-herbal-tea"
-	IDMinestrone       = "food-minestrone"
+	IDMeatMithkabob  = "food-meat-mithkabob"
+	IDTavnazianSalad = "food-tavnazian-salad"
+	IDRolanberryPie  = "food-rolanberry-pie"
+	IDSelbinaMilk    = "food-selbina-milk"
+	IDPear           = "food-pear"
+	IDFishAndChips   = "food-fish-and-chips"
+	IDCrabSoup       = "food-crab-soup"
+	IDSwampHerbalTea = "food-swamp-herbal-tea"
+	IDMinestrone     = "food-minestrone"
 )
 
 // StandardFoods returns the default food registry for DragonsNShit.
@@ -135,10 +137,10 @@ func StandardFoods() []Food {
 			Duration: 10 * time.Minute,
 		},
 		{
-			ID:      IDPear,
-			Name:    "Pear",
-			HPBonus: 10,
-			MPBonus: 10,
+			ID:       IDPear,
+			Name:     "Pear",
+			HPBonus:  10,
+			MPBonus:  10,
 			Duration: 5 * time.Minute,
 		},
 		{

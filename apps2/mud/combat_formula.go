@@ -74,6 +74,15 @@ func playerCombatStats(p *player) job.Stats {
 	s.INT += eq["int"]
 	s.MND += eq["mnd"]
 	s.CHR += eq["chr"]
+	if f := activeFood(p); f != nil { // cooked food buffs finally count
+		s.STR += f.STRBonus
+		s.DEX += f.DEXBonus
+		s.VIT += f.VITBonus
+		s.AGI += f.AGIBonus
+		s.INT += f.INTBonus
+		s.MND += f.MNDBonus
+		s.CHR += f.CHRBonus
+	}
 	return s
 }
 

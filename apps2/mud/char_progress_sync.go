@@ -161,6 +161,7 @@ func syncGatherSkills(p *player) {
 			p.syncedMiningSkill += delta
 		}
 	}
+	syncCraftSkills(p, charID)
 	if delta := fishingSkillDelta(p); delta != 0 {
 		if err := gw.iduna.IncrementSkill(charID, "fishing", delta); err == nil {
 			p.syncedFishingSkill += delta

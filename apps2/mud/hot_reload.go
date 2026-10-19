@@ -14,6 +14,8 @@ package main
 
 import (
 	"log"
+
+	"dragonsnshit/server/craft"
 	"os"
 	"os/signal"
 	"syscall"
@@ -29,6 +31,11 @@ func reloadableDataFiles() {
 		log.Printf("[hot-reload] itemdef reload failed (kept previous data): %v", err)
 	} else {
 		log.Printf("[hot-reload] data/items.json reloaded")
+	}
+	if n, err := craft.LoadRecipesFile("data/recipes.json"); err != nil {
+		log.Printf("[hot-reload] recipes reload failed (kept previous data): %v", err)
+	} else {
+		log.Printf("[hot-reload] data/recipes.json reloaded (%d recipes)", n)
 	}
 	if err := mobDropReg.LoadFile("data/mob_drops.json"); err != nil {
 		log.Printf("[hot-reload] mobdrop reload failed (kept previous data): %v", err)

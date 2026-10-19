@@ -144,7 +144,12 @@ func resistsMobDebuff(p *player, kind status.Kind) bool {
 // gearMaxBonuses returns the max HP / MP the equipped gear adds.
 func gearMaxBonuses(p *player) (hp, mp int) {
 	g := gearStats(p)
-	return g["hp"], g["mp"]
+	hp, mp = g["hp"], g["mp"]
+	if f := activeFood(p); f != nil {
+		hp += f.HPBonus
+		mp += f.MPBonus
+	}
+	return hp, mp
 }
 
 // gearRegen returns gear HP/MP regen per game tick.
