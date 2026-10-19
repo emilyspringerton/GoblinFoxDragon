@@ -116,6 +116,10 @@ type Mob struct {
 	BurrowDuration time.Duration // how long to stay underground
 	lastBurrow     time.Time     // when the last burrow began (zero = never burrowed)
 	burrowEnd      time.Time     // when the current burrow finishes
+
+	// Crowd control / status effects (cc.go).
+	CCResist         float64 // 0-1 resistance to hard CC; NM IDs default to NMCCResist
+	cc               *ccState // nil until the first effect lands; a pointer keeps Mob comparable
 }
 
 func (m *Mob) alive() bool     { return m.State != StateDead }
@@ -154,6 +158,7 @@ type Event struct {
 
 // HitResult is returned by Hit.
 type HitResult struct {
+	Woke   bool // true if this direct hit broke a Sleep
 	Dealt  int  // damage actually applied (capped at remaining HP)
 	Died   bool // true if this hit killed the mob
 	Tagged bool // true if this hit set the tag (first damaging hit)
@@ -256,6 +261,7 @@ func (reg *Registry) Revive(id string, pos Pos) error {
 	m.DiedAt = time.Time{}
 	m.lastBurrow = time.Time{}
 	m.burrowEnd = time.Time{}
+	m.cc = nil
 	return nil
 }
 
@@ -271,6 +277,10 @@ func (reg *Registry) All() []string {
 // Hit applies damage from a player to a mob and updates tagging.
 // Returns HitResult and any events (EvtMobDied).
 func (reg *Registry) Hit(mobID, attackerSlot string, damage int) (HitResult, []Event, error) {
+	return reg.hit(mobID, attackerSlot, damage, true)
+}
+
+func (reg *Registry) hit(mobID, attackerSlot string, damage int, direct bool) (HitResult, []Event, error) {
 	m, ok := reg.mobs[mobID]
 	if !ok {
 		return HitResult{}, nil, ErrMobNotFound
@@ -298,6 +308,9 @@ func (reg *Registry) Hit(mobID, attackerSlot string, damage int) (HitResult, []E
 	}
 	m.HP -= actual
 	res.Dealt = actual
+	if direct && actual > 0 && m.HP > 0 {
+		res.Woke = m.wake(time.Now())
+	}
 
 	var events []Event
 	if m.HP <= 0 {
@@ -343,6 +356,14 @@ func (reg *Registry) Tick(now time.Time, dt float64, players []PlayerPositions) 
 
 func tickMob(m *Mob, now time.Time, dt float64, players []PlayerPositions) []Event {
 	var events []Event
+
+	events = append(events, tickEffects(m, now)...)
+	if !m.alive() {
+		return events
+	}
+	if m.Has(FxSleep) || m.Has(FxStun) {
+		return events // frozen: no aggro scan, no chase, no swing
+	}
 
 	// Handle burrow surface: if currently burrowed and the burrow has ended, surface.
 	if m.State == StateBurrowed {
@@ -406,19 +427,24 @@ func tickMob(m *Mob, now time.Time, dt float64, players []PlayerPositions) []Eve
 		}
 
 		// Move toward target.
-		step := m.MoveSpeed * dt
-		m.Pos = moveToward(m.Pos, targetPos, step)
+		if !m.Has(FxBind) {
+			step := m.MoveSpeed * dt
+			m.Pos = moveToward(m.Pos, targetPos, step)
+		}
 
 		// Melee check.
 		if dist(m.Pos, targetPos) <= m.MeleeRange {
-			if now.Sub(m.lastSwing) >= m.SwingDelay {
+			delay, lost, dmg := swingModifiers(m, m.MeleeDamage)
+			if now.Sub(m.lastSwing) >= delay {
 				m.lastSwing = now
-				events = append(events, Event{
-					Kind:   EvtMobAttack,
-					MobID:  m.ID,
-					Slot:   m.AggroSlot,
-					Damage: m.MeleeDamage,
-				})
+				if !lost {
+					events = append(events, Event{
+						Kind:   EvtMobAttack,
+						MobID:  m.ID,
+						Slot:   m.AggroSlot,
+						Damage: dmg,
+					})
+				}
 			}
 		}
 
