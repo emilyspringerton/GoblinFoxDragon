@@ -153,12 +153,17 @@ func syncGatherSkills(p *player) {
 	if charID == "" {
 		return
 	}
+	// Only advance the synced baseline when IDUNA actually accepted the delta. Marking it synced
+	// on a failed call (IDUNA down/restarting, timeout) silently lost that skill gain for good:
+	// the delta was never re-sent. Left unsynced, it is retried on the next tick.
 	if delta := miningSkillDelta(p); delta != 0 {
-		_ = gw.iduna.IncrementSkill(charID, "mining", delta)
-		p.syncedMiningSkill = p.miningSkill
+		if err := gw.iduna.IncrementSkill(charID, "mining", delta); err == nil {
+			p.syncedMiningSkill += delta
+		}
 	}
 	if delta := fishingSkillDelta(p); delta != 0 {
-		_ = gw.iduna.IncrementSkill(charID, "fishing", delta)
-		p.syncedFishingSkill = p.fishingSkill
+		if err := gw.iduna.IncrementSkill(charID, "fishing", delta); err == nil {
+			p.syncedFishingSkill += delta
+		}
 	}
 }

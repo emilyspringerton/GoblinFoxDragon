@@ -970,7 +970,7 @@ func (p *player) sendf(f string, args ...interface{}) {
 }
 
 func (p *player) prompt() {
-	netHaste := p.statFX.NetHastePct()
+	netHaste := hasteTotal(p)
 	wx := ""
 	if gw != nil && gw.weatherEngine != nil {
 		ph := gw.weatherEngine.Phase()
@@ -1398,6 +1398,9 @@ func resolveKill(p *player, killedMob *mob.Mob, reg *mob.Registry, now time.Time
 
 	// Quest kill tracking.
 	updated := p.questJournal.RecordKill(killedMob.Kind)
+	if len(updated) > 0 {
+		saveQuestJournal(p)
+	}
 	for _, qid := range updated {
 		if st, ok := p.questJournal.Active[qid]; ok {
 			if q, err := questBank.Get(qid); err == nil {
@@ -1469,15 +1472,18 @@ func resolveKill(p *player, killedMob *mob.Mob, reg *mob.Registry, now time.Time
 // applyJobStats recomputes maxHP/maxMP for p based on their current job + level
 // and caps current HP/MP to the new max. Must be called with gw.mu held (or at login).
 func applyJobStats(p *player) {
+	gearHP, gearMP := gearMaxBonuses(p)
 	if hp, err := job.HPAtLevel(p.jobID, p.charXP.Level); err == nil {
-		p.maxHP = hp
+		p.maxHP = hp + gearHP
 		if p.hp > p.maxHP {
 			p.hp = p.maxHP
 		}
 	}
 	if mp, err := job.MPAtLevel(p.jobID, p.charXP.Level); err == nil {
 		p.maxMP = mp
-		if mp == 0 {
+		if mp > 0 {
+			p.maxMP = mp + gearMP
+		} else {
 			p.maxMP = 0 // melee job — no MP pool
 		}
 		if p.mp > p.maxMP {
@@ -1809,6 +1815,7 @@ func tickAll() {
 		// scope boundary: PvP duel combat (this same loop's own earlier "Duel combat" branch,
 		// above) still calls TickPlayer directly and keeps the old flat-damage behavior --
 		// touching that mob-registry-based duel mechanic wasn't part of this pass.
+		p.combat.SwingDelay = swingDelayFor(p) // haste/slow (gear + status) now change swing speed
 		mobID, err := reg.ReadyToSwing(p.combat, p.pos, p.zoneID, now)
 		if err != nil {
 			if err == mob.ErrMobDead || err == mob.ErrMobNotFound {
@@ -1849,7 +1856,14 @@ func tickAll() {
 			continue
 		}
 		if res.Dealt > 0 {
-			gained := p.tp.AddTP(weaponDelayFor(p), float64(p.statFX.NetHastePct()))
+			gained := p.tp.AddTP(weaponDelayFor(p), float64(hasteTotal(p)))
+			if st := storeTPBonus(p); st > 0 {
+				p.tp.Current += st
+				gained += st
+				if p.tp.Current > 300 {
+					p.tp.Current = 300
+				}
+			}
 			critTag := ""
 			if isCrit {
 				critTag = " Critical hit!"
@@ -1861,7 +1875,7 @@ func tickAll() {
 				if gw.mobEnmity[mobID] == nil {
 					gw.mobEnmity[mobID] = enmity.NewTable()
 				}
-				gw.mobEnmity[mobID].Add(p.slot, res.Dealt)
+				gw.mobEnmity[mobID].Add(p.slot, enmityScale(p, res.Dealt))
 				// Switch mob AggroSlot to highest enmity player.
 				if topSlot, err := gw.mobEnmity[mobID].Top(); err == nil {
 					if m, ok := reg.Get(mobID); ok && m.AggroSlot != topSlot {
@@ -1920,6 +1934,10 @@ func tickAll() {
 	for _, p := range gw.players {
 		if p.homePoint.IsKO {
 			continue
+		}
+		if rh, rm := gearRegen(p); (rh > 0 && p.hp < p.maxHP) || (rm > 0 && p.mp < p.maxMP) {
+			p.hp = clampInt(p.hp+rh, 0, p.maxHP)
+			p.mp = clampInt(p.mp+rm, 0, p.maxMP)
 		}
 		res := p.statFX.Tick(now)
 		for _, ev := range res.Events {
@@ -3309,6 +3327,7 @@ func cmdQuestAccept(p *player, questID string) {
 		p.prompt()
 		return
 	}
+	saveQuestJournal(p)
 	p.sendf("Quest accepted: %s", q.Title)
 	p.sendf("  %s", q.Desc)
 	p.prompt()
@@ -3321,6 +3340,7 @@ func cmdQuestTurnIn(p *player, questID string) {
 		p.prompt()
 		return
 	}
+	saveQuestJournal(p)
 	p.flow += res.Flow
 	p.sendf("Quest complete! +%d flow.", res.Flow)
 	if res.Item != "" {
@@ -3718,7 +3738,7 @@ func cmdWS(p *player, overrideName string) {
 		if gw.mobEnmity[mobID] == nil {
 			gw.mobEnmity[mobID] = enmity.NewTable()
 		}
-		gw.mobEnmity[mobID].Add(p.slot, res.Dealt)
+		gw.mobEnmity[mobID].Add(p.slot, enmityScale(p, res.Dealt))
 		if topSlot, terr := gw.mobEnmity[mobID].Top(); terr == nil {
 			if m, ok := reg.Get(mobID); ok && m.AggroSlot != topSlot {
 				m.AggroSlot = topSlot
@@ -3892,7 +3912,10 @@ func cmdStatus(p *player) {
 	if p.foodEffect != nil && p.foodEffect.IsActive(time.Now()) {
 		p.sendf("  Food buff:    %s (%s)", p.foodEffect.Food.Name, foodStatSummary(p.foodEffect.Food))
 	}
-	p.sendf("  Haste:        %d%%", p.statFX.NetHastePct())
+	p.sendf("  Haste:        %d%%", hasteTotal(p))
+	for _, line := range statSheet(p) {
+		p.send("  " + line)
+	}
 	if p.statFX.IsParalyzed() {
 		p.send("  ** PARALYZED **")
 	}
@@ -4533,6 +4556,7 @@ func cmdEquip(p *player, slotName, itemID string) {
 	if dn, ok := itemDisplayName[itemID]; ok {
 		dispName = dn
 	}
+	applyJobStats(p) // gear hp/mp bonuses
 	p.sendf("Equipped %s in %s slot.", dispName, slotName)
 	if eIL, err := p.equip.EffectiveIL(); err == nil {
 		p.sendf("  Effective IL: %d", eIL)
@@ -4590,6 +4614,7 @@ func cmdUnequip(p *player, slotName string) {
 	if dn, ok := itemDisplayName[item.ItemID]; ok {
 		dispName = dn
 	}
+	applyJobStats(p)
 	p.sendf("Unequipped %s from %s.", dispName, slotName)
 	p.prompt()
 }
@@ -6693,6 +6718,10 @@ func mobSpellcast(p *player, mobID string, now time.Time) {
 		pool = []status.Kind{status.Slow, status.Poison}
 	}
 	kind := pool[gw.rng.Intn(len(pool))]
+	if resistsMobDebuff(p, kind) {
+		p.sendf("\r\n[!] %s casts %s on you -- you resist!", mobID, mobSpellNames[kind])
+		return
+	}
 	effect := status.Effect{
 		Kind:      kind,
 		Potency:   10,
@@ -6825,7 +6854,7 @@ func castNow(p *player, spell string, targetName string) {
 			return
 		}
 		p.mp -= cureCost
-		healed := 100
+		healed := healPower(p, 100)
 		tgt.hp += healed
 		if tgt.hp > tgt.maxHP {
 			tgt.hp = tgt.maxHP
@@ -6855,7 +6884,7 @@ func castNow(p *player, spell string, targetName string) {
 			return
 		}
 		p.mp -= cure2Cost
-		healed := 250
+		healed := healPower(p, 250)
 		tgt.hp += healed
 		if tgt.hp > tgt.maxHP {
 			tgt.hp = tgt.maxHP
@@ -7720,14 +7749,10 @@ func cmdCastBlackMagic(p *player, spell string) {
 	p.mp -= def.MPCost
 	// INT scales damage: +1 damage per INT point above 10.
 	intBonus := 0
-	if p.charJob != nil {
-		if stats, err := p.charJob.CombinedStats(); err == nil {
-			if stats.INT > 10 {
-				intBonus = stats.INT - 10
-			}
-		}
+	if st := playerCombatStats(p); st.INT > 10 {
+		intBonus = st.INT - 10
 	}
-	dmg := def.BaseDmg + intBonus
+	dmg := spellPower(p, def.BaseDmg+intBonus, def.Element)
 	// Real fix (2026-08-04, founder, live: "ensure spell casting works on the worms and puts
 	// them into combat") -- this used to mutate m.HP directly and hand-roll its own death check,
 	// silently bypassing reg.Hit (server/mob/mob.go), the ONLY real path that sets AggroSlot/
@@ -8472,7 +8497,7 @@ func getOrCreateHeadlessPlayer(characterID string) (*player, error) {
 		meritBank:     merit.NewMeritBank(),
 		recastTracker: job.NewRecastTracker(abilitiesForJob(startJobID)),
 		petSlot:       pet.NewSlot(),
-		questJournal:  quest.NewJournal(),
+		questJournal:  mudQuestStore.load(characterID),
 		atlas:         cartography.NewAtlas(),
 		fameStore:     fame.NewStore(),
 		inventory:     loadedInventory,
@@ -8967,6 +8992,7 @@ func handleConn(conn net.Conn, isGuest bool, preset *presetIdentity, echoInput b
 			// UpdateCharacterLevel/UpdatePosition just above already use (a one-shot disconnect
 			// event, not a repeated per-command call like runHeadlessCommand's own diffed sync).
 			_ = gw.iduna.SetInventory(charID, p.inventory)
+			mudQuestStore.save(charID, p.questJournal)
 		}
 
 		gw.mu.Lock()

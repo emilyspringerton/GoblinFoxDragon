@@ -5,7 +5,7 @@ package mob
 // OwlZoneMobs: Eastwind Owl zone cluster (zones 10-18) base mob tables, keyed by zone ID.
 var OwlZoneMobs = map[int][]OwlMobDef{
 	10: {
-		{Kind: "field-mouse", HP: 60, Damage: 5, MoveSpeed: 3.0, AggroRange: 0.0, LeashRange: 20.0, MeleeRange: 2.0, SwingMS: 3000, Count: 6, Ring: 16.0},
+		{Kind: "field-mouse", HP: 60, Damage: 5, MoveSpeed: 3.0, AggroRange: 0.5, LeashRange: 20.0, MeleeRange: 2.0, SwingMS: 3000, Count: 6, Ring: 16.0},
 		{Kind: "fledgling-owlet", HP: 95, Damage: 9, MoveSpeed: 3.4, AggroRange: 9.0, LeashRange: 28.0, MeleeRange: 2.0, SwingMS: 3000, Count: 5, Ring: 26.0},
 		{Kind: "dust-moth", HP: 130, Damage: 13, MoveSpeed: 4.2, AggroRange: 12.0, LeashRange: 34.0, MeleeRange: 2.0, SwingMS: 3000, Count: 3, Ring: 35.0},
 	},
@@ -30,7 +30,7 @@ var OwlZoneMobs = map[int][]OwlMobDef{
 		{Kind: "tor-rimefox", HP: 700, Damage: 54, MoveSpeed: 5.6, AggroRange: 22.0, LeashRange: 54.0, MeleeRange: 2.0, SwingMS: 3000, Count: 3, Ring: 35.0},
 	},
 	15: {
-		{Kind: "sleet-hare", HP: 480, Damage: 34, MoveSpeed: 5.6, AggroRange: 0.0, LeashRange: 20.0, MeleeRange: 2.0, SwingMS: 3000, Count: 6, Ring: 15.0},
+		{Kind: "sleet-hare", HP: 480, Damage: 34, MoveSpeed: 5.6, AggroRange: 0.5, LeashRange: 20.0, MeleeRange: 2.0, SwingMS: 3000, Count: 6, Ring: 15.0},
 		{Kind: "ridge-snowy-owl", HP: 600, Damage: 44, MoveSpeed: 5.0, AggroRange: 22.0, LeashRange: 54.0, MeleeRange: 2.0, SwingMS: 3000, Count: 5, Ring: 25.0},
 		{Kind: "windwraith", HP: 740, Damage: 54, MoveSpeed: 6.0, AggroRange: 26.0, LeashRange: 62.0, MeleeRange: 2.0, SwingMS: 3000, Count: 3, Ring: 35.0},
 	},

@@ -15,6 +15,7 @@ import (
 
 	"dragonsnshit/server/job"
 	"dragonsnshit/server/rng"
+	"dragonsnshit/server/status"
 )
 
 const (
@@ -65,7 +66,7 @@ func playerCombatStats(p *player) job.Stats {
 			s = cs
 		}
 	}
-	eq := equipStatTotals(p)
+	eq := gearStats(p)
 	s.STR += eq["str"]
 	s.DEX += eq["dex"]
 	s.VIT += eq["vit"]
@@ -98,7 +99,7 @@ func equipStatTotals(p *player) map[string]int {
 // equipped item with no "attack" stat of its own (armor, accessories, a weapon that just hasn't
 // had one authored) -- a real, honest default, not an error.
 func equipAttackBonus(p *player) int {
-	return equipStatTotals(p)["attack"]
+	return gearStats(p)["attack"]
 }
 
 func clampPercent(v, lo, hi int) int {
@@ -172,7 +173,7 @@ func resolvePlayerAutoAttackDamage(p *player, baseDamage int) (hit bool, crit bo
 	// contributes +10% hit chance and +20 flat damage) -- meaningful without swamping the
 	// existing STR/DEX-driven formula.
 	skillLvl := weaponSkillLevel(p, currentWeaponType(p))
-	hitChance := clampPercent(combatBaseHitChance+stats.DEX/2+skillLvl/10, combatMinHitChance, combatMaxHitChance)
+	hitChance := clampPercent(combatBaseHitChance+stats.DEX/2+skillLvl/10+gearStats(p)["accuracy"]/3+p.statFX.Potency(status.AccuracyUp), combatMinHitChance, combatMaxHitChance)
 	if !pityRoll(hitChance, &p.pityOwnHit) {
 		return false, false, 0
 	}
@@ -191,12 +192,15 @@ func resolvePlayerAutoAttackDamage(p *player, baseDamage int) (hit bool, crit bo
 		mean = baseDamage * stats.STR / 10
 	}
 	dmg := rollDamageVariance(mean)
+	if up := p.statFX.Potency(status.AttackUp); up > 0 {
+		dmg = dmg * (100 + up) / 100
+	}
 	if p.pendingAttackBonus > 0 {
 		dmg = int(float64(dmg) * (1 + p.pendingAttackBonus))
 		p.pendingAttackBonus = 0
 	}
 
-	critChance := clampPercent(combatBaseCritChance+stats.DEX/10, 0, combatMaxCritChance)
+	critChance := clampPercent(combatBaseCritChance+stats.DEX/10+gearStats(p)["crit_rate"]+p.statFX.Potency(status.CritUp), 0, combatMaxCritChance)
 	isCrit := pityRoll(critChance, &p.pityOwnCrit)
 	if p.pendingGuaranteedCrit {
 		isCrit = true
@@ -218,7 +222,7 @@ func resolvePlayerAutoAttackDamage(p *player, baseDamage int) (hit bool, crit bo
 // player's own real VIT reduces whatever damage lands. Returns (hit, crit, damage).
 func resolveMobAutoAttackDamage(p *player, mobMeleeDamage int) (hit bool, crit bool, damage int) {
 	stats := playerCombatStats(p)
-	mobHitChance := clampPercent(combatMobBaseHitChance-stats.AGI/2, combatMinHitChance, combatMaxHitChance)
+	mobHitChance := clampPercent(combatMobBaseHitChance-stats.AGI/2-gearStats(p)["evasion"]/3-p.statFX.Potency(status.EvasionUp), combatMinHitChance, combatMaxHitChance)
 	// Player's desired outcome is a miss -> desired chance is the complement of the mob landing.
 	if pityRoll(100-mobHitChance, &p.pityAvoidHit) {
 		return false, false, 0
@@ -231,5 +235,15 @@ func resolveMobAutoAttackDamage(p *player, mobMeleeDamage int) (hit bool, crit b
 		dmg = int(float64(dmg) * combatCritMultiplier)
 	}
 	dmg = reduceIncomingDamage(dmg, stats.VIT)
+	dmg -= gearStats(p)["defense"] / 4 // gear defense
+	if dmg < 1 {
+		dmg = 1
+	}
+	if def := p.statFX.PhysDefBonus(); def > 0 { // Protect finally does something in melee
+		dmg -= def / 2
+		if dmg < 1 {
+			dmg = 1
+		}
+	}
 	return true, isCrit, dmg
 }

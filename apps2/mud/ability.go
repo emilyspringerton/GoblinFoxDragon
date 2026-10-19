@@ -208,6 +208,7 @@ func beginCast(p *player, spell, targetName string, castTime time.Duration) {
 		p.prompt()
 		return
 	}
+	castTime = fastCastTime(p, castTime)
 	p.castingSpell = spell
 	p.castingCompletesAt = time.Now().Add(castTime)
 	p.sendf("You begin casting %s... (%s)", spellDisplayName(spell), castTime.Round(100*time.Millisecond))

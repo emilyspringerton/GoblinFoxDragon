@@ -2,7 +2,10 @@
 
 package main
 
-import "dragonsnshit/server/fame"
+import (
+	"dragonsnshit/server/fame"
+	"dragonsnshit/server/status"
+)
 
 // owlZoneNames: display names for the Owl cluster, used when registering the zones.
 var owlZoneNames = map[int]string{
@@ -187,6 +190,33 @@ func init() {
 		{ID: "protocol-boots", Price: 2580},
 		{ID: "protocol-hood", Price: 2580},
 	}
+	mobSpellPool["field-mouse"] = []status.Kind{status.Slow}
+	mobSpellPool["fledgling-owlet"] = []status.Kind{status.Silence}
+	mobSpellPool["dust-moth"] = []status.Kind{status.Slow}
+	mobSpellPool["wren-sentry"] = []status.Kind{status.Silence}
+	mobSpellPool["banded-kestrel"] = []status.Kind{status.Slow}
+	mobSpellPool["hedge-badger"] = []status.Kind{status.Slow}
+	mobSpellPool["bog-vole"] = []status.Kind{status.Slow}
+	mobSpellPool["pellet-slug"] = []status.Kind{status.Poison, status.Slow}
+	mobSpellPool["marsh-heron"] = []status.Kind{status.Poison}
+	mobSpellPool["roost-bat"] = []status.Kind{status.Silence, status.Slow}
+	mobSpellPool["guano-crawler"] = []status.Kind{status.Poison}
+	mobSpellPool["barn-owl-shade"] = []status.Kind{status.Silence, status.Bind}
+	mobSpellPool["tor-eagle-owl"] = []status.Kind{status.Silence, status.Paralyze}
+	mobSpellPool["lens-wisp"] = []status.Kind{status.Paralyze}
+	mobSpellPool["tor-rimefox"] = []status.Kind{status.Slow, status.Bind}
+	mobSpellPool["sleet-hare"] = []status.Kind{status.Slow}
+	mobSpellPool["ridge-snowy-owl"] = []status.Kind{status.Silence, status.Slow}
+	mobSpellPool["windwraith"] = []status.Kind{status.Silence, status.Bind}
+	mobSpellPool["paper-moth"] = []status.Kind{status.Bind}
+	mobSpellPool["ink-mite-swarm"] = []status.Kind{status.Poison, status.Bind}
+	mobSpellPool["stack-warden"] = []status.Kind{status.Bind, status.Paralyze}
+	mobSpellPool["footnote-wisp"] = []status.Kind{status.Silence, status.Bind}
+	mobSpellPool["moor-hag-owl"] = []status.Kind{status.Poison, status.Silence}
+	mobSpellPool["bog-lamp"] = []status.Kind{status.Paralyze, status.Slow}
+	mobSpellPool["protocol-sentinel"] = []status.Kind{status.Bind, status.Paralyze}
+	mobSpellPool["redacted-owl"] = []status.Kind{status.Silence, status.Bind, status.Paralyze}
+	mobSpellPool["unfiled-archivist"] = []status.Kind{status.Silence, status.Bind, status.Paralyze, status.Poison}
 	itemDisplayName["archivist-blade"] = "Archivist Blade"
 	itemDisplayName["archivist-boots"] = "Archivist Boots"
 	itemDisplayName["archivist-hood"] = "Archivist Hood"

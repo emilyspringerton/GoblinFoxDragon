@@ -52,6 +52,12 @@ const (
 	Refresh Kind = 12 // MP recovery per tick
 	Protect Kind = 13 // physical defense bonus (flat)
 	Shell   Kind = 14 // magic defense bonus (flat)
+
+	// Combat buffs added with the job kit layer (apps2/mud/kit.go). Potency is a percentage.
+	AttackUp   Kind = 15 // +% melee damage
+	AccuracyUp Kind = 16 // +% to-hit
+	EvasionUp  Kind = 17 // +% chance to avoid a mob's swing
+	CritUp     Kind = 18 // +% critical hit chance
 )
 
 func (k Kind) String() string {
@@ -76,6 +82,14 @@ func (k Kind) String() string {
 		return "Protect"
 	case Shell:
 		return "Shell"
+	case AttackUp:
+		return "Attack Up"
+	case AccuracyUp:
+		return "Accuracy Up"
+	case EvasionUp:
+		return "Evasion Up"
+	case CritUp:
+		return "Crit Rate Up"
 	default:
 		return fmt.Sprintf("Kind(%d)", int(k))
 	}
@@ -100,6 +114,11 @@ var kindCategory = map[Kind]Category{
 	Refresh:  CategoryBuff,
 	Protect:  CategoryBuff,
 	Shell:    CategoryBuff,
+
+	AttackUp:   CategoryBuff,
+	AccuracyUp: CategoryBuff,
+	EvasionUp:  CategoryBuff,
+	CritUp:     CategoryBuff,
 }
 
 // Cat returns the category of a Kind, or 0 if unknown.
@@ -264,6 +283,14 @@ func (s *Stack) NetHastePct() int {
 		slow = e.Potency
 	}
 	return haste - slow
+}
+
+// Potency returns the potency of an active effect of the given kind (0 if absent).
+func (s *Stack) Potency(k Kind) int {
+	if e, ok := s.effects[k]; ok {
+		return e.Potency
+	}
+	return 0
 }
 
 // PhysDefBonus returns the flat physical defense bonus from Protect (0 if absent).
