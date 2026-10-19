@@ -3508,5 +3508,1774 @@
     },
     "stack_size": 1,
     "model_id": "robe_simple_01"
+  },
+  {
+    "id": 1100,
+    "name": "Fledgling Blade",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "level": 5,
+    "stats": {
+      "attack": 18,
+      "str": 1
+    },
+    "stack_size": 1,
+    "model_id": "sword_iron_short",
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN"
+    ],
+    "weapon_type": "sword",
+    "delay": 228
+  },
+  {
+    "id": 1101,
+    "name": "Fledgling Talon",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "level": 5,
+    "stats": {
+      "attack": 14,
+      "dex": 1
+    },
+    "stack_size": 1,
+    "model_id": "dagger_basic",
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC"
+    ],
+    "weapon_type": "dagger",
+    "delay": 168
+  },
+  {
+    "id": 1102,
+    "name": "Fledgling Perch",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "level": 5,
+    "stats": {
+      "magic_attack_bonus": 6,
+      "mnd": 1
+    },
+    "stack_size": 1,
+    "model_id": "staff_brass",
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH"
+    ],
+    "weapon_type": "staff",
+    "delay": 198
+  },
+  {
+    "id": 1103,
+    "name": "Fledgling Jerkin",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "level": 5,
+    "stats": {
+      "defense": 13,
+      "vit": 1
+    },
+    "stack_size": 1,
+    "model_id": "body_rugged",
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ]
+  },
+  {
+    "id": 1104,
+    "name": "Fledgling Robe",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "level": 5,
+    "stats": {
+      "defense": 9,
+      "mnd": 1,
+      "int": 1
+    },
+    "stack_size": 1,
+    "model_id": "body_robe",
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH"
+    ]
+  },
+  {
+    "id": 1105,
+    "name": "Fledgling Leggings",
+    "category": "armor",
+    "equip_slots": [
+      "legs"
+    ],
+    "level": 5,
+    "stats": {
+      "defense": 8,
+      "agi": 0
+    },
+    "stack_size": 1,
+    "model_id": "legs_rugged"
+  },
+  {
+    "id": 1106,
+    "name": "Fledgling Mitts",
+    "category": "armor",
+    "equip_slots": [
+      "hand-l",
+      "hand-r"
+    ],
+    "level": 5,
+    "stats": {
+      "defense": 5,
+      "dex": 0
+    },
+    "stack_size": 1,
+    "model_id": "hands_rugged"
+  },
+  {
+    "id": 1107,
+    "name": "Fledgling Boots",
+    "category": "armor",
+    "equip_slots": [
+      "feet"
+    ],
+    "level": 5,
+    "stats": {
+      "defense": 5,
+      "agi": 0
+    },
+    "stack_size": 1,
+    "model_id": "feet_rugged"
+  },
+  {
+    "id": 1108,
+    "name": "Fledgling Hood",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "level": 5,
+    "stats": {
+      "defense": 6,
+      "vit": 0
+    },
+    "stack_size": 1,
+    "model_id": "head_rugged"
+  },
+  {
+    "id": 1109,
+    "name": "Observer Blade",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "level": 12,
+    "stats": {
+      "attack": 29,
+      "str": 2
+    },
+    "stack_size": 1,
+    "model_id": "sword_iron_short",
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN"
+    ],
+    "weapon_type": "sword",
+    "delay": 234
+  },
+  {
+    "id": 1110,
+    "name": "Observer Talon",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "level": 12,
+    "stats": {
+      "attack": 23,
+      "dex": 2
+    },
+    "stack_size": 1,
+    "model_id": "dagger_basic",
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC"
+    ],
+    "weapon_type": "dagger",
+    "delay": 171
+  },
+  {
+    "id": 1111,
+    "name": "Observer Perch",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "level": 12,
+    "stats": {
+      "magic_attack_bonus": 11,
+      "mnd": 2
+    },
+    "stack_size": 1,
+    "model_id": "staff_brass",
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH"
+    ],
+    "weapon_type": "staff",
+    "delay": 202
+  },
+  {
+    "id": 1112,
+    "name": "Observer Jerkin",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "level": 12,
+    "stats": {
+      "defense": 18,
+      "vit": 2
+    },
+    "stack_size": 1,
+    "model_id": "body_rugged",
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ]
+  },
+  {
+    "id": 1113,
+    "name": "Observer Robe",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "level": 12,
+    "stats": {
+      "defense": 14,
+      "mnd": 2,
+      "int": 2
+    },
+    "stack_size": 1,
+    "model_id": "body_robe",
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH"
+    ]
+  },
+  {
+    "id": 1114,
+    "name": "Observer Leggings",
+    "category": "armor",
+    "equip_slots": [
+      "legs"
+    ],
+    "level": 12,
+    "stats": {
+      "defense": 13,
+      "agi": 0
+    },
+    "stack_size": 1,
+    "model_id": "legs_rugged"
+  },
+  {
+    "id": 1115,
+    "name": "Observer Mitts",
+    "category": "armor",
+    "equip_slots": [
+      "hand-l",
+      "hand-r"
+    ],
+    "level": 12,
+    "stats": {
+      "defense": 10,
+      "dex": 0
+    },
+    "stack_size": 1,
+    "model_id": "hands_rugged"
+  },
+  {
+    "id": 1116,
+    "name": "Observer Boots",
+    "category": "armor",
+    "equip_slots": [
+      "feet"
+    ],
+    "level": 12,
+    "stats": {
+      "defense": 10,
+      "agi": 0
+    },
+    "stack_size": 1,
+    "model_id": "feet_rugged"
+  },
+  {
+    "id": 1117,
+    "name": "Observer Hood",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "level": 12,
+    "stats": {
+      "defense": 11,
+      "vit": 0
+    },
+    "stack_size": 1,
+    "model_id": "head_rugged"
+  },
+  {
+    "id": 1118,
+    "name": "Fieldwing Blade",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "level": 20,
+    "stats": {
+      "attack": 42,
+      "str": 3
+    },
+    "stack_size": 1,
+    "model_id": "sword_steel",
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN"
+    ],
+    "weapon_type": "sword",
+    "delay": 240
+  },
+  {
+    "id": 1119,
+    "name": "Fieldwing Talon",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "level": 20,
+    "stats": {
+      "attack": 34,
+      "dex": 3
+    },
+    "stack_size": 1,
+    "model_id": "dagger_003",
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC"
+    ],
+    "weapon_type": "dagger",
+    "delay": 174
+  },
+  {
+    "id": 1120,
+    "name": "Fieldwing Perch",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "level": 20,
+    "stats": {
+      "magic_attack_bonus": 17,
+      "mnd": 3
+    },
+    "stack_size": 1,
+    "model_id": "staff_brass",
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH"
+    ],
+    "weapon_type": "staff",
+    "delay": 206
+  },
+  {
+    "id": 1121,
+    "name": "Fieldwing Jerkin",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "level": 20,
+    "stats": {
+      "defense": 24,
+      "vit": 2
+    },
+    "stack_size": 1,
+    "model_id": "body_chain",
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ]
+  },
+  {
+    "id": 1122,
+    "name": "Fieldwing Robe",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "level": 20,
+    "stats": {
+      "defense": 20,
+      "mnd": 3,
+      "int": 3
+    },
+    "stack_size": 1,
+    "model_id": "body_robe",
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH"
+    ]
+  },
+  {
+    "id": 1123,
+    "name": "Fieldwing Leggings",
+    "category": "armor",
+    "equip_slots": [
+      "legs"
+    ],
+    "level": 20,
+    "stats": {
+      "defense": 19,
+      "agi": 1
+    },
+    "stack_size": 1,
+    "model_id": "legs_chain"
+  },
+  {
+    "id": 1124,
+    "name": "Fieldwing Mitts",
+    "category": "armor",
+    "equip_slots": [
+      "hand-l",
+      "hand-r"
+    ],
+    "level": 20,
+    "stats": {
+      "defense": 16,
+      "dex": 1
+    },
+    "stack_size": 1,
+    "model_id": "hands_rugged"
+  },
+  {
+    "id": 1125,
+    "name": "Fieldwing Boots",
+    "category": "armor",
+    "equip_slots": [
+      "feet"
+    ],
+    "level": 20,
+    "stats": {
+      "defense": 16,
+      "agi": 1
+    },
+    "stack_size": 1,
+    "model_id": "feet_rugged"
+  },
+  {
+    "id": 1126,
+    "name": "Fieldwing Hood",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "level": 20,
+    "stats": {
+      "defense": 17,
+      "vit": 1
+    },
+    "stack_size": 1,
+    "model_id": "head_rugged"
+  },
+  {
+    "id": 1127,
+    "name": "Archivist Blade",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "level": 30,
+    "stats": {
+      "attack": 58,
+      "str": 4
+    },
+    "stack_size": 1,
+    "model_id": "sword_steel",
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN"
+    ],
+    "weapon_type": "sword",
+    "delay": 246
+  },
+  {
+    "id": 1128,
+    "name": "Archivist Talon",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "level": 30,
+    "stats": {
+      "attack": 46,
+      "dex": 4
+    },
+    "stack_size": 1,
+    "model_id": "dagger_003",
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC"
+    ],
+    "weapon_type": "dagger",
+    "delay": 177
+  },
+  {
+    "id": 1129,
+    "name": "Archivist Perch",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "level": 30,
+    "stats": {
+      "magic_attack_bonus": 24,
+      "mnd": 4
+    },
+    "stack_size": 1,
+    "model_id": "staff_brass",
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH"
+    ],
+    "weapon_type": "staff",
+    "delay": 210
+  },
+  {
+    "id": 1130,
+    "name": "Archivist Jerkin",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "level": 30,
+    "stats": {
+      "defense": 31,
+      "vit": 3
+    },
+    "stack_size": 1,
+    "model_id": "body_chain",
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ]
+  },
+  {
+    "id": 1131,
+    "name": "Archivist Robe",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "level": 30,
+    "stats": {
+      "defense": 27,
+      "mnd": 4,
+      "int": 4
+    },
+    "stack_size": 1,
+    "model_id": "body_robe",
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH"
+    ]
+  },
+  {
+    "id": 1132,
+    "name": "Archivist Leggings",
+    "category": "armor",
+    "equip_slots": [
+      "legs"
+    ],
+    "level": 30,
+    "stats": {
+      "defense": 26,
+      "agi": 2
+    },
+    "stack_size": 1,
+    "model_id": "legs_chain"
+  },
+  {
+    "id": 1133,
+    "name": "Archivist Mitts",
+    "category": "armor",
+    "equip_slots": [
+      "hand-l",
+      "hand-r"
+    ],
+    "level": 30,
+    "stats": {
+      "defense": 23,
+      "dex": 2
+    },
+    "stack_size": 1,
+    "model_id": "hands_rugged"
+  },
+  {
+    "id": 1134,
+    "name": "Archivist Boots",
+    "category": "armor",
+    "equip_slots": [
+      "feet"
+    ],
+    "level": 30,
+    "stats": {
+      "defense": 23,
+      "agi": 2
+    },
+    "stack_size": 1,
+    "model_id": "feet_rugged"
+  },
+  {
+    "id": 1135,
+    "name": "Archivist Hood",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "level": 30,
+    "stats": {
+      "defense": 24,
+      "vit": 2
+    },
+    "stack_size": 1,
+    "model_id": "head_rugged"
+  },
+  {
+    "id": 1136,
+    "name": "Protocol Blade",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "level": 40,
+    "stats": {
+      "attack": 74,
+      "str": 5
+    },
+    "stack_size": 1,
+    "model_id": "sword_steel",
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN"
+    ],
+    "weapon_type": "sword",
+    "delay": 252
+  },
+  {
+    "id": 1137,
+    "name": "Protocol Talon",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "level": 40,
+    "stats": {
+      "attack": 59,
+      "dex": 5
+    },
+    "stack_size": 1,
+    "model_id": "dagger_003",
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC"
+    ],
+    "weapon_type": "dagger",
+    "delay": 180
+  },
+  {
+    "id": 1138,
+    "name": "Protocol Perch",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "level": 40,
+    "stats": {
+      "magic_attack_bonus": 31,
+      "mnd": 6
+    },
+    "stack_size": 1,
+    "model_id": "staff_brass",
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH"
+    ],
+    "weapon_type": "staff",
+    "delay": 214
+  },
+  {
+    "id": 1139,
+    "name": "Protocol Jerkin",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "level": 40,
+    "stats": {
+      "defense": 39,
+      "vit": 4
+    },
+    "stack_size": 1,
+    "model_id": "body_chain",
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ]
+  },
+  {
+    "id": 1140,
+    "name": "Protocol Robe",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "level": 40,
+    "stats": {
+      "defense": 35,
+      "mnd": 5,
+      "int": 5
+    },
+    "stack_size": 1,
+    "model_id": "body_robe",
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH"
+    ]
+  },
+  {
+    "id": 1141,
+    "name": "Protocol Leggings",
+    "category": "armor",
+    "equip_slots": [
+      "legs"
+    ],
+    "level": 40,
+    "stats": {
+      "defense": 34,
+      "agi": 2
+    },
+    "stack_size": 1,
+    "model_id": "legs_chain"
+  },
+  {
+    "id": 1142,
+    "name": "Protocol Mitts",
+    "category": "armor",
+    "equip_slots": [
+      "hand-l",
+      "hand-r"
+    ],
+    "level": 40,
+    "stats": {
+      "defense": 31,
+      "dex": 2
+    },
+    "stack_size": 1,
+    "model_id": "hands_rugged"
+  },
+  {
+    "id": 1143,
+    "name": "Protocol Boots",
+    "category": "armor",
+    "equip_slots": [
+      "feet"
+    ],
+    "level": 40,
+    "stats": {
+      "defense": 31,
+      "agi": 2
+    },
+    "stack_size": 1,
+    "model_id": "feet_rugged"
+  },
+  {
+    "id": 1144,
+    "name": "Protocol Hood",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "level": 40,
+    "stats": {
+      "defense": 32,
+      "vit": 2
+    },
+    "stack_size": 1,
+    "model_id": "head_rugged"
+  },
+  {
+    "name": "Strix Talon",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "level": 8,
+    "stats": {
+      "attack": 24,
+      "dex": 3,
+      "accuracy": 4
+    },
+    "stack_size": 1,
+    "model_id": "dagger_kali_01",
+    "flags": [
+      "rare"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC"
+    ],
+    "weapon_type": "dagger",
+    "delay": 160,
+    "description": "Shed by the Brood Mother during a very quiet moult.",
+    "id": 1300
+  },
+  {
+    "name": "Downy Mantle",
+    "category": "accessory",
+    "equip_slots": [
+      "back"
+    ],
+    "level": 6,
+    "stats": {
+      "agi": 3,
+      "defense": 5,
+      "evasion": 4
+    },
+    "stack_size": 1,
+    "model_id": "cape_yellow_01",
+    "flags": [
+      "rare"
+    ],
+    "id": 1301
+  },
+  {
+    "name": "Mousewright Band",
+    "category": "accessory",
+    "equip_slots": [
+      "ringl",
+      "ringr"
+    ],
+    "level": 7,
+    "stats": {
+      "str": 1,
+      "dex": 2,
+      "accuracy": 5
+    },
+    "stack_size": 1,
+    "model_id": "ring_copper",
+    "flags": [
+      "rare"
+    ],
+    "id": 1302
+  },
+  {
+    "name": "Whisker Charm",
+    "category": "accessory",
+    "equip_slots": [
+      "neck"
+    ],
+    "level": 6,
+    "stats": {
+      "agi": 2,
+      "evasion": 6
+    },
+    "stack_size": 1,
+    "model_id": "neck_priestess_charm",
+    "flags": [
+      "rare"
+    ],
+    "id": 1303
+  },
+  {
+    "name": "Drafted Complaint Blade",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "level": 14,
+    "stats": {
+      "attack": 40,
+      "str": 3,
+      "accuracy": 6
+    },
+    "stack_size": 1,
+    "model_id": "sabre_01",
+    "flags": [
+      "rare"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN"
+    ],
+    "weapon_type": "sword",
+    "delay": 222,
+    "description": "Edge honed on 300 years of unsubmitted paperwork.",
+    "id": 1304
+  },
+  {
+    "name": "Wren Ledger Staff",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "level": 13,
+    "stats": {
+      "magic_attack_bonus": 16,
+      "mnd": 3,
+      "int": 2
+    },
+    "stack_size": 1,
+    "model_id": "staff_healing",
+    "flags": [
+      "rare"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH"
+    ],
+    "weapon_type": "staff",
+    "delay": 192,
+    "id": 1305
+  },
+  {
+    "name": "Hedgemaw Hide Vest",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "level": 13,
+    "stats": {
+      "defense": 30,
+      "vit": 4,
+      "str": 2
+    },
+    "stack_size": 1,
+    "model_id": "body_leather",
+    "flags": [
+      "rare"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ],
+    "id": 1306
+  },
+  {
+    "name": "Burrower Belt",
+    "category": "accessory",
+    "equip_slots": [
+      "waist"
+    ],
+    "level": 12,
+    "stats": {
+      "vit": 3,
+      "defense": 4,
+      "haste": 2
+    },
+    "stack_size": 1,
+    "model_id": "waist_belt_life",
+    "flags": [
+      "rare"
+    ],
+    "id": 1307
+  },
+  {
+    "name": "Pellet Plate Cap",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "level": 15,
+    "stats": {
+      "defense": 16,
+      "vit": 3,
+      "mnd": 1
+    },
+    "stack_size": 1,
+    "model_id": "helm_bone_plate_mk1",
+    "flags": [
+      "rare"
+    ],
+    "id": 1308
+  },
+  {
+    "name": "Compacted Ring",
+    "category": "accessory",
+    "equip_slots": [
+      "ringl",
+      "ringr"
+    ],
+    "level": 14,
+    "stats": {
+      "vit": 2,
+      "defense": 4,
+      "str": 2
+    },
+    "stack_size": 1,
+    "model_id": "ring_brass_01",
+    "flags": [
+      "rare"
+    ],
+    "id": 1309
+  },
+  {
+    "name": "Heron Quill Bow",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "level": 16,
+    "stats": {
+      "attack": 38,
+      "agi": 3,
+      "accuracy": 8
+    },
+    "stack_size": 1,
+    "model_id": "bow_gorgon_01",
+    "flags": [
+      "rare"
+    ],
+    "jobs": [
+      "WAR",
+      "RNG",
+      "NIN"
+    ],
+    "weapon_type": "bow",
+    "delay": 300,
+    "id": 1310
+  },
+  {
+    "name": "Waders of Record",
+    "category": "armor",
+    "equip_slots": [
+      "feet"
+    ],
+    "level": 15,
+    "stats": {
+      "defense": 14,
+      "agi": 3,
+      "evasion": 5
+    },
+    "stack_size": 1,
+    "model_id": "boots_winter_01",
+    "flags": [
+      "rare"
+    ],
+    "id": 1311
+  },
+  {
+    "name": "Prince Slick Gauntlets",
+    "category": "armor",
+    "equip_slots": [
+      "hand-l",
+      "hand-r"
+    ],
+    "level": 17,
+    "stats": {
+      "defense": 15,
+      "dex": 3,
+      "attack": 6
+    },
+    "stack_size": 1,
+    "model_id": "bone_plate_gauntlets_m",
+    "flags": [
+      "rare"
+    ],
+    "id": 1312
+  },
+  {
+    "name": "Guano Tooth",
+    "category": "accessory",
+    "equip_slots": [
+      "earl",
+      "earr"
+    ],
+    "level": 16,
+    "stats": {
+      "str": 2,
+      "attack": 6
+    },
+    "stack_size": 1,
+    "model_id": "ear_spike",
+    "flags": [
+      "rare"
+    ],
+    "id": 1313
+  },
+  {
+    "name": "Nightroost Katana",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "level": 18,
+    "stats": {
+      "attack": 52,
+      "dex": 3,
+      "evasion": 4
+    },
+    "stack_size": 1,
+    "model_id": "katana_juzumaru",
+    "flags": [
+      "rare"
+    ],
+    "jobs": [
+      "SAM",
+      "NIN"
+    ],
+    "weapon_type": "katana",
+    "delay": 210,
+    "description": "Forged in a room with no light, for a hand that needed none.",
+    "id": 1314
+  },
+  {
+    "name": "Shade Wing Cape",
+    "category": "accessory",
+    "equip_slots": [
+      "back"
+    ],
+    "level": 18,
+    "stats": {
+      "agi": 4,
+      "evasion": 8,
+      "defense": 6
+    },
+    "stack_size": 1,
+    "model_id": "threads_of_missing_gods_mantle",
+    "flags": [
+      "rare"
+    ],
+    "id": 1315
+  },
+  {
+    "name": "Lensmaster Monocle",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "level": 26,
+    "stats": {
+      "defense": 18,
+      "int": 5,
+      "mnd": 5,
+      "accuracy": 8
+    },
+    "stack_size": 1,
+    "model_id": "head_icarus_crown",
+    "flags": [
+      "rare"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH"
+    ],
+    "id": 1316
+  },
+  {
+    "name": "Prismatic Ring",
+    "category": "accessory",
+    "equip_slots": [
+      "ringl",
+      "ringr"
+    ],
+    "level": 25,
+    "stats": {
+      "int": 4,
+      "magic_attack_bonus": 6
+    },
+    "stack_size": 1,
+    "model_id": "ring_magic_a01",
+    "flags": [
+      "rare"
+    ],
+    "id": 1317
+  },
+  {
+    "name": "Blind Parliament Robe",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "level": 27,
+    "stats": {
+      "defense": 28,
+      "mnd": 6,
+      "int": 6
+    },
+    "stack_size": 1,
+    "model_id": "robe_dark",
+    "flags": [
+      "rare"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH"
+    ],
+    "id": 1318
+  },
+  {
+    "name": "Eyeless Dagger",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "level": 26,
+    "stats": {
+      "attack": 60,
+      "dex": 5,
+      "evasion": 6
+    },
+    "stack_size": 1,
+    "model_id": "dagger_sunken_kali",
+    "flags": [
+      "rare"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC"
+    ],
+    "weapon_type": "dagger",
+    "delay": 156,
+    "id": 1319
+  },
+  {
+    "name": "Matriarch Plume Mantle",
+    "category": "accessory",
+    "equip_slots": [
+      "back"
+    ],
+    "level": 24,
+    "stats": {
+      "agi": 5,
+      "defense": 8,
+      "evasion": 8
+    },
+    "stack_size": 1,
+    "model_id": "cape_yellow_01",
+    "flags": [
+      "rare"
+    ],
+    "id": 1320
+  },
+  {
+    "name": "Snowfeather Sabatons",
+    "category": "armor",
+    "equip_slots": [
+      "feet"
+    ],
+    "level": 23,
+    "stats": {
+      "defense": 20,
+      "agi": 4,
+      "evasion": 6
+    },
+    "stack_size": 1,
+    "model_id": "feet_sabatons",
+    "flags": [
+      "rare"
+    ],
+    "id": 1321
+  },
+  {
+    "name": "Gale Index Staff",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "level": 25,
+    "stats": {
+      "magic_attack_bonus": 28,
+      "int": 4,
+      "mnd": 4
+    },
+    "stack_size": 1,
+    "model_id": "staff_shepherd_01",
+    "flags": [
+      "rare"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH"
+    ],
+    "weapon_type": "staff",
+    "delay": 186,
+    "id": 1322
+  },
+  {
+    "name": "Windbound Sash",
+    "category": "accessory",
+    "equip_slots": [
+      "waist"
+    ],
+    "level": 24,
+    "stats": {
+      "agi": 5,
+      "evasion": 10,
+      "haste": 3
+    },
+    "stack_size": 1,
+    "model_id": "waist_sash",
+    "flags": [
+      "rare"
+    ],
+    "jobs": [
+      "NIN",
+      "THF",
+      "DNC"
+    ],
+    "id": 1323
+  },
+  {
+    "name": "Overdue Greatsword",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "level": 31,
+    "stats": {
+      "attack": 92,
+      "str": 6,
+      "accuracy": 6
+    },
+    "stack_size": 1,
+    "model_id": "greatsword_icewraith",
+    "flags": [
+      "rare",
+      "ex"
+    ],
+    "jobs": [
+      "WAR",
+      "DRK"
+    ],
+    "weapon_type": "greatsword",
+    "delay": 420,
+    "description": "Three centuries overdue. The fine is you.",
+    "id": 1324
+  },
+  {
+    "name": "Bookbinder Gloves",
+    "category": "armor",
+    "equip_slots": [
+      "hand-l",
+      "hand-r"
+    ],
+    "level": 30,
+    "stats": {
+      "defense": 22,
+      "dex": 5,
+      "attack": 8
+    },
+    "stack_size": 1,
+    "model_id": "glove_faithful_01",
+    "flags": [
+      "rare",
+      "ex"
+    ],
+    "id": 1325
+  },
+  {
+    "name": "Footnote Ring",
+    "category": "accessory",
+    "equip_slots": [
+      "ringl",
+      "ringr"
+    ],
+    "level": 29,
+    "stats": {
+      "int": 5,
+      "mnd": 5,
+      "magic_attack_bonus": 8
+    },
+    "stack_size": 1,
+    "model_id": "raven_ring_a",
+    "flags": [
+      "rare",
+      "ex"
+    ],
+    "id": 1326
+  },
+  {
+    "name": "Marginalia Cloak",
+    "category": "accessory",
+    "equip_slots": [
+      "back"
+    ],
+    "level": 30,
+    "stats": {
+      "agi": 6,
+      "evasion": 12,
+      "defense": 10
+    },
+    "stack_size": 1,
+    "model_id": "threads_of_missing_gods_mantle",
+    "flags": [
+      "rare",
+      "ex"
+    ],
+    "id": 1327
+  },
+  {
+    "name": "Seven Drafts Blade",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "level": 29,
+    "stats": {
+      "attack": 74,
+      "str": 5,
+      "accuracy": 8
+    },
+    "stack_size": 1,
+    "model_id": "weapon_sword_keen_edge",
+    "flags": [
+      "rare",
+      "ex"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN"
+    ],
+    "weapon_type": "sword",
+    "delay": 216,
+    "description": "Revised seven times. Never submitted.",
+    "id": 1328
+  },
+  {
+    "name": "Unsent Ring",
+    "category": "accessory",
+    "equip_slots": [
+      "ringl",
+      "ringr"
+    ],
+    "level": 27,
+    "stats": {
+      "cha": 4,
+      "mnd": 4,
+      "evasion": 6
+    },
+    "stack_size": 1,
+    "model_id": "ring_glass_01",
+    "flags": [
+      "rare",
+      "ex"
+    ],
+    "id": 1329
+  },
+  {
+    "name": "Moor Cataloguer Coat",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "level": 30,
+    "stats": {
+      "defense": 34,
+      "mnd": 7,
+      "int": 7
+    },
+    "stack_size": 1,
+    "model_id": "robe_crimson_mdl",
+    "flags": [
+      "rare",
+      "ex"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH"
+    ],
+    "id": 1330
+  },
+  {
+    "name": "Wisp Lantern Charm",
+    "category": "accessory",
+    "equip_slots": [
+      "neck"
+    ],
+    "level": 28,
+    "stats": {
+      "int": 4,
+      "mnd": 4,
+      "evasion": 8
+    },
+    "stack_size": 1,
+    "model_id": "neck_choker_dawn",
+    "flags": [
+      "rare",
+      "ex"
+    ],
+    "id": 1331
+  },
+  {
+    "name": "Seventeen Footnote Staff",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "level": 45,
+    "stats": {
+      "magic_attack_bonus": 60,
+      "int": 10,
+      "mnd": 10
+    },
+    "stack_size": 1,
+    "model_id": "staff_shepherd_01",
+    "flags": [
+      "rare",
+      "ex"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH"
+    ],
+    "weapon_type": "staff",
+    "delay": 180,
+    "description": "Every footnote is private. Every footnote is also a weapon.",
+    "id": 1332
+  },
+  {
+    "name": "Insufferable Choker",
+    "category": "accessory",
+    "equip_slots": [
+      "neck"
+    ],
+    "level": 44,
+    "stats": {
+      "str": 6,
+      "dex": 6,
+      "vit": 6,
+      "agi": 6,
+      "int": 6,
+      "mnd": 6,
+      "defense": 12
+    },
+    "stack_size": 1,
+    "model_id": "enigma_curse_neck",
+    "flags": [
+      "rare",
+      "ex"
+    ],
+    "description": "Documented as insufferable in seventeen footnotes.",
+    "id": 1333
+  },
+  {
+    "name": "Redacted Edge",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "level": 44,
+    "stats": {
+      "attack": 128,
+      "str": 9,
+      "accuracy": 12
+    },
+    "stack_size": 1,
+    "model_id": "ws_remorse_dark",
+    "flags": [
+      "rare",
+      "ex"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN"
+    ],
+    "weapon_type": "sword",
+    "delay": 210,
+    "description": "The blade, in the record, is blacked out.",
+    "id": 1334
+  },
+  {
+    "name": "Black Bar Mantle",
+    "category": "accessory",
+    "equip_slots": [
+      "back"
+    ],
+    "level": 43,
+    "stats": {
+      "agi": 9,
+      "evasion": 20,
+      "defense": 18
+    },
+    "stack_size": 1,
+    "model_id": "threads_of_missing_gods_mantle",
+    "flags": [
+      "rare",
+      "ex"
+    ],
+    "id": 1335
   }
 ]

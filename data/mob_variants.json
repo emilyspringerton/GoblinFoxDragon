@@ -1,5 +1,107 @@
 [
-  {"base_kind": "worm", "display_name": "Elder Worm", "power_mul": 1.6},
-  {"base_kind": "rabbit", "display_name": "Fierce Rabbit", "power_mul": 1.8},
-  {"base_kind": "leech", "display_name": "Bloated Leech", "power_mul": 1.7}
+  {
+    "base_kind": "worm",
+    "display_name": "Elder Worm",
+    "power_mul": 1.6
+  },
+  {
+    "base_kind": "rabbit",
+    "display_name": "Fierce Rabbit",
+    "power_mul": 1.8
+  },
+  {
+    "base_kind": "leech",
+    "display_name": "Bloated Leech",
+    "power_mul": 1.7
+  },
+  {
+    "base_kind": "field-mouse",
+    "display_name": "Overfed Mouse",
+    "power_mul": 1.8
+  },
+  {
+    "base_kind": "fledgling-owlet",
+    "display_name": "Brooding Owlet",
+    "power_mul": 1.5
+  },
+  {
+    "base_kind": "wren-sentry",
+    "display_name": "Sentry of Record",
+    "power_mul": 1.8
+  },
+  {
+    "base_kind": "banded-kestrel",
+    "display_name": "Dire Kestrel",
+    "power_mul": 1.5
+  },
+  {
+    "base_kind": "bog-vole",
+    "display_name": "Greedy Vole",
+    "power_mul": 1.8
+  },
+  {
+    "base_kind": "pellet-slug",
+    "display_name": "Bloated Pellet Slug",
+    "power_mul": 1.5
+  },
+  {
+    "base_kind": "roost-bat",
+    "display_name": "Elder Roost Bat",
+    "power_mul": 1.8
+  },
+  {
+    "base_kind": "guano-crawler",
+    "display_name": "Corpulent Crawler",
+    "power_mul": 1.5
+  },
+  {
+    "base_kind": "tor-eagle-owl",
+    "display_name": "Greater Eagle Owl",
+    "power_mul": 1.8
+  },
+  {
+    "base_kind": "lens-wisp",
+    "display_name": "Focused Wisp",
+    "power_mul": 1.5
+  },
+  {
+    "base_kind": "sleet-hare",
+    "display_name": "Blizzard Hare",
+    "power_mul": 1.8
+  },
+  {
+    "base_kind": "ridge-snowy-owl",
+    "display_name": "Matriarch's Chick",
+    "power_mul": 1.5
+  },
+  {
+    "base_kind": "paper-moth",
+    "display_name": "Archive Moth",
+    "power_mul": 1.8
+  },
+  {
+    "base_kind": "ink-mite-swarm",
+    "display_name": "Indelible Swarm",
+    "power_mul": 1.5
+  },
+  {
+    "base_kind": "footnote-wisp",
+    "display_name": "Bitter Footnote",
+    "power_mul": 1.8
+  },
+  {
+    "base_kind": "moor-hag-owl",
+    "display_name": "Hag of the Fourth Stone",
+    "power_mul": 1.5
+  },
+  {
+    "base_kind": "protocol-sentinel",
+    "display_name": "Sentinel Prime",
+    "power_mul": 1.8
+  },
+  {
+    "base_kind": "redacted-owl",
+    "display_name": "Fully Redacted Owl",
+    "power_mul": 1.5
+  }
 ]

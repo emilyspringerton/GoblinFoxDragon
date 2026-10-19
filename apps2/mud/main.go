@@ -414,7 +414,7 @@ var zoneDesc = map[int]string{
 	203: "[TYLER: CAIRNGORMS ARCHIVE / Eastwind Owls / Institutional] Climate-controlled corridor, " +
 		"endless shelving of sealed document boxes. Eastwind Owls maintain order here. " +
 		"CAST terminals line the east wall, each streaming archive data. " +
-		"Exits: up (Detroit Apartment), east (Vatican Corridors), south (Osaka Underport).",
+		"Exits: up (Detroit Apartment), east (Vatican Corridors), south (Osaka Underport), west (Protocol Wall).",
 	204: "[TYLER: VATICAN CORRIDORS / Ichthyosapiens / Underground] Ancient stone passages beneath an institutional complex. " +
 		"The corridor smells of salt water. Ichthyosapien shell markings line the lower walls. " +
 		"A CAST terminal in the alcove shows Eastwind archive streams. " +
@@ -632,6 +632,7 @@ func npcByID(id string) *npcDef {
 // Includes StarterQuests + TRAPX job unlock chains (S122-04).
 var questBank = func() *quest.Bank {
 	all := append(quest.StarterQuests, quest.TRAPXChainQuests()...)
+	all = append(all, quest.OwlZoneQuests...)
 	return quest.NewBank(all)
 }()
 
@@ -1203,6 +1204,20 @@ func initWorld() *world {
 	// rather than a reuse of Meadow.
 	spawnInto(4, mob.TownSquareWormSpawns())
 
+	// Eastwind Owl cluster (zones 10-18): branches off Meadow/Hills/Caves/Swamp, mob strength
+	// rising zone over zone. Base mobs come from the generated mob.OwlZoneMobs ring tables;
+	// harder variants, NMs and per-zone toggles come from data/mob_variants.json and
+	// data/mob_spawns.json (IDUNA mob-spawn admin) through the same spawnInto path as every
+	// other zone. Content source: scripts/gen_owl_zones.py.
+	for _, zid := range mob.OwlZoneIDs() {
+		w.mobRegs[zid] = mob.New()
+		if err := w.zoneMgr.AddZone(&zone.Zone{ID: zid, Name: owlZoneNames[zid], SpawnX: 0, SpawnY: 2, SpawnZ: 0}); err != nil {
+			fmt.Printf("warn: owl zone %d registration: %v\n", zid, err)
+			continue
+		}
+		spawnInto(zid, mob.OwlZoneSpawns(zid))
+	}
+
 	// GFD-993944: register the 8 real named dungeon zones (see the mobRegs init loop above for
 	// the real decisive routing reasoning) and populate each with a real, deterministically
 	// seeded layout + mob.GenerateDungeonSpawns roster -- the exact same DungeonRoster content
@@ -1489,6 +1504,9 @@ func dropsForMob(kind string) []loot.Item {
 
 // nmMobFor returns a Mob template for the given NM ID.
 func nmMobFor(nmID string) mob.Mob {
+	if m, ok := mob.OwlNMTemplate(nmID); ok {
+		return m
+	}
 	switch nmID {
 	case "nm-king-worm":
 		return mob.Mob{
@@ -3452,6 +3470,9 @@ func cmdLook(p *player) {
 	z, _ := gw.zoneMgr.Get(p.zoneID)
 	p.sendf("\r\n=== %s ===", z.Name)
 	p.send(zoneDesc[p.zoneID])
+	if sm, ok := zoneSmell[p.zoneID]; ok {
+		p.sendf("You smell: %s", sm)
+	}
 
 	// Field manual active?
 	if m, ok := gw.fieldManuals[p.zoneID]; ok && m != nil && m.Active(time.Now()) {

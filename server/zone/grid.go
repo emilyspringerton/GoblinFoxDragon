@@ -41,11 +41,20 @@ type ZoneBounds struct {
 // and the founder's own "doubled the size of the town" note -- padded generously rather than
 // guessed tight, since an oversized bound just means a few unused outer cells, not a bug.
 var zoneBoundsByID = map[int]ZoneBounds{
-	0: {MinX: -40, MaxX: 40, MinZ: -40, MaxZ: 40},  // Meadow -- MeadowWormSpawns spans ±35
-	1: {MinX: -45, MaxX: 45, MinZ: -45, MaxZ: 45},  // Hills -- HillsSpawns spans ±42
-	2: {MinX: -25, MaxX: 25, MinZ: -55, MaxZ: 20},  // Caves -- CavesSpawns spans X ±20, Z +18..-50 (narrows away from the entrance)
-	3: {MinX: -45, MaxX: 45, MinZ: -45, MaxZ: 45},  // Swampville -- SwampvilleSpawns spans ±42
-	4: {MinX: -60, MaxX: 60, MinZ: -60, MaxZ: 60},  // New Handington -- approximate, see doc comment above
+	0:  {MinX: -40, MaxX: 40, MinZ: -40, MaxZ: 40}, // Meadow -- MeadowWormSpawns spans ±35
+	1:  {MinX: -45, MaxX: 45, MinZ: -45, MaxZ: 45}, // Hills -- HillsSpawns spans ±42
+	2:  {MinX: -25, MaxX: 25, MinZ: -55, MaxZ: 20}, // Caves -- CavesSpawns spans X ±20, Z +18..-50 (narrows away from the entrance)
+	3:  {MinX: -45, MaxX: 45, MinZ: -45, MaxZ: 45}, // Swampville -- SwampvilleSpawns spans ±42
+	4:  {MinX: -60, MaxX: 60, MinZ: -60, MaxZ: 60}, // New Handington -- approximate, see doc comment above
+	10: {MinX: -40, MaxX: 40, MinZ: -40, MaxZ: 40}, // Eastwind Owl cluster (scripts/gen_owl_zones.py)
+	11: {MinX: -45, MaxX: 45, MinZ: -45, MaxZ: 45}, // Eastwind Owl cluster (scripts/gen_owl_zones.py)
+	12: {MinX: -45, MaxX: 45, MinZ: -45, MaxZ: 45}, // Eastwind Owl cluster (scripts/gen_owl_zones.py)
+	13: {MinX: -45, MaxX: 45, MinZ: -45, MaxZ: 45}, // Eastwind Owl cluster (scripts/gen_owl_zones.py)
+	14: {MinX: -45, MaxX: 45, MinZ: -45, MaxZ: 45}, // Eastwind Owl cluster (scripts/gen_owl_zones.py)
+	15: {MinX: -45, MaxX: 45, MinZ: -45, MaxZ: 45}, // Eastwind Owl cluster (scripts/gen_owl_zones.py)
+	16: {MinX: -40, MaxX: 40, MinZ: -40, MaxZ: 40}, // Eastwind Owl cluster (scripts/gen_owl_zones.py)
+	17: {MinX: -45, MaxX: 45, MinZ: -45, MaxZ: 45}, // Eastwind Owl cluster (scripts/gen_owl_zones.py)
+	18: {MinX: -40, MaxX: 40, MinZ: -40, MaxZ: 40}, // Eastwind Owl cluster (scripts/gen_owl_zones.py)
 }
 
 // BoundsFor returns the real bounding box for a zone, and whether one is registered.

@@ -1,3 +1,7 @@
+## 2026-10-19
+
+- feat(world): **Eastwind Owl zone cluster** -- 9 new zones (10-18) branching off Meadow/Hills/Caves/Swamp, answering player feedback that there were only 4 zones. Owl-rank themed (Fledgling -> Cataloguer), levels 3-45, easy-to-hard mob spreads per zone, 18 harder named variants, 18 notorious monsters (exotic gear drops only from NMs, never sold), 9 vendor/quest NPCs with 19 quests, tiered basic shop gear (5 tiers x 9 pieces), and a TYLER-voiced smell line on every zone (new and existing) shown on entry/`look`. Generated from `scripts/gen_owl_zones.py` into the IDUNA-editable data files plus `server/mob/owl_gen.go`, `server/quest/owl_quests_gen.go`, `apps2/mud/owl_content_gen.go`. README updated. Tests: `server/mob/owl_test.go`, `apps2/mud/owl_zones_test.go`, `owl_world_test.go` (boots the real world and walks a player in).
+
 ## 2026-10-16
 
 - feat(mud): **`global` / `gc` chat** -- shown to every MUD player and posted to IDUNA's chat bus (channel `shankpit`, source `mud`), plus `globalChatPoller` relaying every SHANKPIT GFD-phone message (`[SHANKPIT] name: text`) to all MUD players. Founder real-time: "a global chat in GFD mud so everyone in there can talk to everyone in shankpit via that gfd phone app". `apps2/server-go` (UDP client) is not wired to the channel. Needs the IDUNA change deployed first.

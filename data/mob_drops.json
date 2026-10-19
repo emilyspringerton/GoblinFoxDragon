@@ -201,5 +201,770 @@
         "name": "Earth Crystal"
       }
     ]
+  },
+  {
+    "kind": "field-mouse",
+    "items": [
+      {
+        "id": "mouse-whisker",
+        "name": "Mouse Whisker",
+        "drop_chance": 0.6
+      },
+      {
+        "id": "owl-pellet",
+        "name": "Owl Pellet",
+        "drop_chance": 0.35
+      }
+    ]
+  },
+  {
+    "kind": "fledgling-owlet",
+    "items": [
+      {
+        "id": "down-feather",
+        "name": "Down Feather",
+        "drop_chance": 0.6
+      },
+      {
+        "id": "owl-pellet",
+        "name": "Owl Pellet",
+        "drop_chance": 0.3
+      }
+    ]
+  },
+  {
+    "kind": "dust-moth",
+    "items": [
+      {
+        "id": "moth-dust",
+        "name": "Moth Dust",
+        "drop_chance": 0.6
+      },
+      {
+        "id": "down-feather",
+        "name": "Down Feather",
+        "drop_chance": 0.25
+      }
+    ]
+  },
+  {
+    "kind": "Brood Mother Strix",
+    "items": [
+      {
+        "id": "strix-talon",
+        "name": "Strix Talon",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "downy-mantle",
+        "name": "Downy Mantle",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Old Mousewright",
+    "items": [
+      {
+        "id": "mousewright-band",
+        "name": "Mousewright Band",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "whisker-charm",
+        "name": "Whisker Charm",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "wren-sentry",
+    "items": [
+      {
+        "id": "brass-plate-shard",
+        "name": "Brass Plate Shard",
+        "drop_chance": 0.6
+      },
+      {
+        "id": "sentry-quill",
+        "name": "Sentry Quill",
+        "drop_chance": 0.4
+      }
+    ]
+  },
+  {
+    "kind": "banded-kestrel",
+    "items": [
+      {
+        "id": "kestrel-pinion",
+        "name": "Kestrel Pinion",
+        "drop_chance": 0.6
+      },
+      {
+        "id": "sentry-quill",
+        "name": "Sentry Quill",
+        "drop_chance": 0.25
+      }
+    ]
+  },
+  {
+    "kind": "hedge-badger",
+    "items": [
+      {
+        "id": "badger-claw",
+        "name": "Badger Claw",
+        "drop_chance": 0.6
+      },
+      {
+        "id": "hedge-hide",
+        "name": "Hedge Hide",
+        "drop_chance": 0.4
+      }
+    ]
+  },
+  {
+    "kind": "WREN-3 Unretired",
+    "items": [
+      {
+        "id": "drafted-complaint-blade",
+        "name": "Drafted Complaint Blade",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "wren-ledger-staff",
+        "name": "Wren Ledger Staff",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Hedgemaw",
+    "items": [
+      {
+        "id": "hedgemaw-hide-vest",
+        "name": "Hedgemaw Hide Vest",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "burrower-belt",
+        "name": "Burrower Belt",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "bog-vole",
+    "items": [
+      {
+        "id": "vole-pelt",
+        "name": "Vole Pelt",
+        "drop_chance": 0.6
+      },
+      {
+        "id": "pellet-bone",
+        "name": "Pellet Bone",
+        "drop_chance": 0.4
+      }
+    ]
+  },
+  {
+    "kind": "pellet-slug",
+    "items": [
+      {
+        "id": "pellet-bone",
+        "name": "Pellet Bone",
+        "drop_chance": 0.6
+      },
+      {
+        "id": "slug-ichor",
+        "name": "Slug Ichor",
+        "drop_chance": 0.35
+      }
+    ]
+  },
+  {
+    "kind": "marsh-heron",
+    "items": [
+      {
+        "id": "heron-quill",
+        "name": "Heron Quill",
+        "drop_chance": 0.6
+      },
+      {
+        "id": "pellet-bone",
+        "name": "Pellet Bone",
+        "drop_chance": 0.3
+      }
+    ]
+  },
+  {
+    "kind": "Pellet Colossus",
+    "items": [
+      {
+        "id": "pellet-plate-cap",
+        "name": "Pellet Plate Cap",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "compacted-ring",
+        "name": "Compacted Ring",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Heron of Record",
+    "items": [
+      {
+        "id": "heron-quill-bow",
+        "name": "Heron Quill Bow",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "waders-of-record",
+        "name": "Waders of Record",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "roost-bat",
+    "items": [
+      {
+        "id": "roost-wing",
+        "name": "Roost Wing",
+        "drop_chance": 0.6
+      },
+      {
+        "id": "guano-clump",
+        "name": "Guano Clump",
+        "drop_chance": 0.4
+      }
+    ]
+  },
+  {
+    "kind": "guano-crawler",
+    "items": [
+      {
+        "id": "guano-clump",
+        "name": "Guano Clump",
+        "drop_chance": 0.6
+      },
+      {
+        "id": "crawler-mandible",
+        "name": "Crawler Mandible",
+        "drop_chance": 0.35
+      }
+    ]
+  },
+  {
+    "kind": "barn-owl-shade",
+    "items": [
+      {
+        "id": "shade-feather",
+        "name": "Shade Feather",
+        "drop_chance": 0.6
+      },
+      {
+        "id": "roost-wing",
+        "name": "Roost Wing",
+        "drop_chance": 0.25
+      }
+    ]
+  },
+  {
+    "kind": "Guano Prince",
+    "items": [
+      {
+        "id": "prince-slick-gauntlets",
+        "name": "Prince Slick Gauntlets",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "guano-tooth",
+        "name": "Guano Tooth",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Unlit Roost-Mother",
+    "items": [
+      {
+        "id": "nightroost-katana",
+        "name": "Nightroost Katana",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "shade-wing-cape",
+        "name": "Shade Wing Cape",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "tor-eagle-owl",
+    "items": [
+      {
+        "id": "eagle-owl-plume",
+        "name": "Eagle Owl Plume",
+        "drop_chance": 0.6
+      },
+      {
+        "id": "lens-shard",
+        "name": "Lens Shard",
+        "drop_chance": 0.35
+      }
+    ]
+  },
+  {
+    "kind": "lens-wisp",
+    "items": [
+      {
+        "id": "lens-shard",
+        "name": "Lens Shard",
+        "drop_chance": 0.6
+      },
+      {
+        "id": "wisp-glass",
+        "name": "Wisp Glass",
+        "drop_chance": 0.4
+      }
+    ]
+  },
+  {
+    "kind": "tor-rimefox",
+    "items": [
+      {
+        "id": "rime-pelt",
+        "name": "Rime Pelt",
+        "drop_chance": 0.6
+      },
+      {
+        "id": "lens-shard",
+        "name": "Lens Shard",
+        "drop_chance": 0.25
+      }
+    ]
+  },
+  {
+    "kind": "The Lensmaster",
+    "items": [
+      {
+        "id": "lensmaster-monocle",
+        "name": "Lensmaster Monocle",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "prismatic-ring",
+        "name": "Prismatic Ring",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Parliament Without Eyes",
+    "items": [
+      {
+        "id": "blind-parliament-robe",
+        "name": "Blind Parliament Robe",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "eyeless-dagger",
+        "name": "Eyeless Dagger",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "sleet-hare",
+    "items": [
+      {
+        "id": "hare-pelt",
+        "name": "Hare Pelt",
+        "drop_chance": 0.6
+      },
+      {
+        "id": "sleet-crystal",
+        "name": "Sleet Crystal",
+        "drop_chance": 0.35
+      }
+    ]
+  },
+  {
+    "kind": "ridge-snowy-owl",
+    "items": [
+      {
+        "id": "snowfeather",
+        "name": "Snowfeather",
+        "drop_chance": 0.6
+      },
+      {
+        "id": "sleet-crystal",
+        "name": "Sleet Crystal",
+        "drop_chance": 0.3
+      }
+    ]
+  },
+  {
+    "kind": "windwraith",
+    "items": [
+      {
+        "id": "wraith-thread",
+        "name": "Wraith Thread",
+        "drop_chance": 0.6
+      },
+      {
+        "id": "sleet-crystal",
+        "name": "Sleet Crystal",
+        "drop_chance": 0.3
+      }
+    ]
+  },
+  {
+    "kind": "Eastwind Matriarch",
+    "items": [
+      {
+        "id": "matriarch-plume-mantle",
+        "name": "Matriarch Plume Mantle",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "snowfeather-sabatons",
+        "name": "Snowfeather Sabatons",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Gale Apprentice-Cataloguer",
+    "items": [
+      {
+        "id": "gale-index-staff",
+        "name": "Gale Index Staff",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "windbound-sash",
+        "name": "Windbound Sash",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "paper-moth",
+    "items": [
+      {
+        "id": "vellum-scrap",
+        "name": "Vellum Scrap",
+        "drop_chance": 0.6
+      },
+      {
+        "id": "moth-dust",
+        "name": "Moth Dust",
+        "drop_chance": 0.25
+      }
+    ]
+  },
+  {
+    "kind": "ink-mite-swarm",
+    "items": [
+      {
+        "id": "ink-vial",
+        "name": "Ink Vial",
+        "drop_chance": 0.6
+      },
+      {
+        "id": "vellum-scrap",
+        "name": "Vellum Scrap",
+        "drop_chance": 0.3
+      }
+    ]
+  },
+  {
+    "kind": "stack-warden",
+    "items": [
+      {
+        "id": "binder's-paste",
+        "name": "Binder's Paste",
+        "drop_chance": 0.6
+      },
+      {
+        "id": "vellum-scrap",
+        "name": "Vellum Scrap",
+        "drop_chance": 0.35
+      }
+    ]
+  },
+  {
+    "kind": "The Overdue Tome",
+    "items": [
+      {
+        "id": "overdue-greatsword",
+        "name": "Overdue Greatsword",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "bookbinder-gloves",
+        "name": "Bookbinder Gloves",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Footnote Seventeen",
+    "items": [
+      {
+        "id": "footnote-ring",
+        "name": "Footnote Ring",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "marginalia-cloak",
+        "name": "Marginalia Cloak",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "footnote-wisp",
+    "items": [
+      {
+        "id": "wisp-wax",
+        "name": "Wisp Wax",
+        "drop_chance": 0.6
+      },
+      {
+        "id": "ink-vial",
+        "name": "Ink Vial",
+        "drop_chance": 0.25
+      }
+    ]
+  },
+  {
+    "kind": "moor-hag-owl",
+    "items": [
+      {
+        "id": "hag-feather",
+        "name": "Hag Feather",
+        "drop_chance": 0.6
+      },
+      {
+        "id": "wisp-wax",
+        "name": "Wisp Wax",
+        "drop_chance": 0.3
+      }
+    ]
+  },
+  {
+    "kind": "bog-lamp",
+    "items": [
+      {
+        "id": "wisp-wax",
+        "name": "Wisp Wax",
+        "drop_chance": 0.5
+      },
+      {
+        "id": "lamp-oil",
+        "name": "Lamp Oil",
+        "drop_chance": 0.6
+      }
+    ]
+  },
+  {
+    "kind": "Draft Complaint",
+    "items": [
+      {
+        "id": "seven-drafts-blade",
+        "name": "Seven Drafts Blade",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "unsent-ring",
+        "name": "Unsent Ring",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Moor Cataloguer",
+    "items": [
+      {
+        "id": "moor-cataloguer-coat",
+        "name": "Moor Cataloguer Coat",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "wisp-lantern-charm",
+        "name": "Wisp Lantern Charm",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "protocol-sentinel",
+    "items": [
+      {
+        "id": "protocol-stone",
+        "name": "Protocol Stone",
+        "drop_chance": 0.6
+      },
+      {
+        "id": "black-bar-shard",
+        "name": "Black Bar Shard",
+        "drop_chance": 0.3
+      }
+    ]
+  },
+  {
+    "kind": "redacted-owl",
+    "items": [
+      {
+        "id": "black-bar-shard",
+        "name": "Black Bar Shard",
+        "drop_chance": 0.6
+      },
+      {
+        "id": "redacted-feather",
+        "name": "Redacted Feather",
+        "drop_chance": 0.4
+      }
+    ]
+  },
+  {
+    "kind": "unfiled-archivist",
+    "items": [
+      {
+        "id": "protocol-stone",
+        "name": "Protocol Stone",
+        "drop_chance": 0.5
+      },
+      {
+        "id": "ink-vial",
+        "name": "Ink Vial",
+        "drop_chance": 0.5
+      }
+    ]
+  },
+  {
+    "kind": "The Cataloguer",
+    "items": [
+      {
+        "id": "seventeen-footnote-staff",
+        "name": "Seventeen Footnote Staff",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "insufferable-choker",
+        "name": "Insufferable Choker",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Redaction Itself",
+    "items": [
+      {
+        "id": "redacted-edge",
+        "name": "Redacted Edge",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "black-bar-mantle",
+        "name": "Black Bar Mantle",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
   }
 ]

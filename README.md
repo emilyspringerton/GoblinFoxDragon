@@ -260,6 +260,38 @@ experimentation will surface far more than any single doc could list without bec
 
 ---
 
+## The Eastwind Owl zones (telnet/web MUD) {#eastwind-owl-zones}
+
+Nine zones branch off the starter areas, themed on the Eastwind Owls of the TYLER universe
+(Fledgling -> Observer -> Field Observer Designate "WREN" -> Archivist -> Cataloguer). Mob
+strength rises zone over zone, and every zone mixes easy and hard mobs plus harder named variants.
+
+| Zone | From | Levels |
+|---|---|---|
+| Fledgling Field (10) | Meadow, `west` | 3-8 |
+| Wren's Perch (11) | Hills, `north` | 8-14 |
+| Pellet Marsh (13) | Swampville, `east` | 10-16 |
+| Roost Deeps (12) | Caves, `south` | 12-18 |
+| Eastwind Ridge (15) | Wren's Perch, `north` | 18-26 |
+| Observation Tor (14) | Fledgling Field, `north` | 20-28 |
+| Footnote Moor (17) | Pellet Marsh, `north` | 22-30 |
+| Cataloguer's Stacks (16) | Roost Deeps, `down` | 24-32 |
+| Protocol Wall (18) | Observation Tor `north`, Eastwind Ridge `up`, Footnote Moor `east` | 36-45 |
+
+Each zone has a vendor/quest NPC (basic weapons and armor for that level band, plus the usual
+consumables), two quests, two notorious monsters (NMs), and a smell line on entry. **Exotic gear
+(rare/exclusive) drops only from NMs** and is never sold. The Protocol Wall's east gate leads to
+the Cairngorms Archive in the city cluster.
+
+Content is data, not hand-written: `python3 scripts/gen_owl_zones.py` regenerates
+`data/items.json` / `mob_drops.json` / `mob_variants.json` / `mob_spawns.json` (the files the
+IDUNA admin tools `/admin/gfd-items`, `gfd-mob-drops` and `gfd-mob-spawns` edit, so everything
+stays tunable there) plus the `*_gen.go` tables. Status: unit tests and a boot-and-walk test pass;
+not yet playtested live, and all numbers (HP, damage, prices, drop rates) are a first draft.
+Vendor and quest tables are Go-side (`owl_content_gen.go`), not editable from IDUNA yet.
+
+---
+
 ## Known, honest limitations (read before reporting a "bug")
 
 - **The GUI is not the game** — see [The GUI](#the-gui-battlegrounds_gui----real-but-limited)
