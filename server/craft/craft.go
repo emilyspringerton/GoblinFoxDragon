@@ -21,6 +21,7 @@ package craft
 import (
 	"errors"
 	"math/rand"
+	"sync"
 )
 
 // CraftType identifies a crafting guild / skill.
@@ -78,6 +79,13 @@ type Recipe struct {
 	HQ1ItemID   string   // HQ1 result (may equal ItemID)
 	HQ2ItemID   string   // HQ2 result
 	HQ3ItemID   string   // HQ3 result
+
+	// Data-driven recipes (data/recipes.json, see recipes.go). Recipes defined in code above have
+	// no Ingredients/Crystal; the MUD keeps their ingredients in its own table.
+	Name        string         `json:"name,omitempty"`
+	Crystal     string         `json:"crystal,omitempty"`     // consumed on every attempt
+	Ingredients map[string]int `json:"ingredients,omitempty"` // itemID -> quantity
+	Yield       int            `json:"yield,omitempty"`       // items produced on success (default 1)
 }
 
 // CraftSkill holds a character's skill level per craft.
@@ -258,7 +266,8 @@ func AtlasPageRecipe() Recipe {
 	}
 }
 
-// registry is the server-side recipe lookup table.
+// registry is the server-side recipe lookup table (guarded: data recipes can be hot reloaded).
+var registryMu sync.RWMutex
 var registry = func() map[string]Recipe {
 	m := map[string]Recipe{}
 	for _, r := range []Recipe{
@@ -275,6 +284,8 @@ var ErrUnknownRecipe = errors.New("craft: unknown recipe ID")
 
 // LookupRecipe returns the Recipe for the given ID, or ErrUnknownRecipe.
 func LookupRecipe(id string) (Recipe, error) {
+	registryMu.RLock()
+	defer registryMu.RUnlock()
 	r, ok := registry[id]
 	if !ok {
 		return Recipe{}, ErrUnknownRecipe
