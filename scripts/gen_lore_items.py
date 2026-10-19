@@ -31,6 +31,15 @@ GREAT = ["WAR", "DRK", "RUN"]
 H2H = ["MNK", "PUP"]
 INSTR = ["BRD"]
 
+
+SLOT_FIX = {"ringl": "ring-l", "ringr": "ring-r", "earl": "ear-l", "earr": "ear-r"}
+def fix_slots(rows):
+    """gear's slots are ring-l/ring-r/ear-l/ear-r; older rows used ringl/earl and could not be equipped."""
+    for r in rows:
+        if r.get("equip_slots"):
+            r["equip_slots"] = [SLOT_FIX.get(s, s) for s in r["equip_slots"]]
+    return rows
+
 items, recipes = [], []
 _stable = {}
 
@@ -444,6 +453,9 @@ VENDOR_STOCK = {
     "quartermaster": [("fire-crystal", 120), ("water-crystal", 120), ("wind-crystal", 120), ("earth-crystal", 120),
                       ("ice-crystal", 120), ("thunder-crystal", 120), ("ash-lumber", 60), ("party-store-flour", 25),
                       ("tanuki-rice", 30), ("brine-salt", 20), ("spring-water", 15), ("shrine-greens", 35)],
+    "guildmaster": [("fire-crystal", 120), ("water-crystal", 120), ("wind-crystal", 120), ("ice-crystal", 120),
+                    ("thunder-crystal", 120), ("ash-lumber", 60), ("party-store-flour", 25), ("tanuki-rice", 30),
+                    ("brine-salt", 20), ("spring-water", 15), ("shrine-greens", 35)],
     "wren-9": [("heather-lumber", 90), ("lamp-wick", 40), ("light-crystal", 180), ("spring-water", 15)],
     "pellet-reader-moss": [("reed-lumber", 100), ("spring-water", 15), ("dark-crystal", 180)],
     "roost-keeper-orla": [("dark-crystal", 180), ("lamp-wick", 40)],
@@ -465,7 +477,7 @@ def main():
     have_names = {i["name"] for i in existing}
     # Dark Crystal might already exist; never duplicate a name outside our range
     items_out = [i for i in items if i["name"] not in have_names]
-    json.dump(existing + items_out, open(P("data/items.json"), "w"), indent=2, ensure_ascii=False)
+    json.dump(fix_slots(existing + items_out), open(P("data/items.json"), "w"), indent=2, ensure_ascii=False)
     open(P("data/items.json"), "a").write("\n")
 
     # recipes.json (ids unique)

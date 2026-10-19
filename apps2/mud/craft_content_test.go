@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"dragonsnshit/server/craft"
+	"dragonsnshit/server/gear"
 	"dragonsnshit/server/itemdef"
 	"dragonsnshit/server/job"
 )
@@ -160,8 +161,10 @@ func TestNewGearOnlyUsesImplementedStats(t *testing.T) {
 	for _, j := range job.AllJobs {
 		validJob[string(j)] = true
 	}
-	validSlot := map[string]bool{"main": true, "off": true, "ranged": true, "head": true, "body": true, "hand-l": true, "hand-r": true, "legs": true,
-		"feet": true, "neck": true, "waist": true, "back": true, "earl": true, "earr": true, "ringl": true, "ringr": true}
+	validSlot := map[string]bool{}
+	for _, sl := range gear.AllSlots {
+		validSlot[sl] = true
+	}
 	n := 0
 	for _, it := range loadRawItems(t) {
 		if it.ID < 1100 || it.ID >= 3000 || it.Cat == "material" {
@@ -241,5 +244,21 @@ func TestConsumablesAndFoodsAreWiredToRealItems(t *testing.T) {
 func TestCanonicalIDsFoldGatheringOntoRecipeIDs(t *testing.T) {
 	if canonicalItemID("crystal-earth") != "earth-crystal" || canonicalItemID("ore-iron") != "iron-ore" || canonicalItemID("fish-carp") != "fish-carp" {
 		t.Errorf("canonicalItemID wrong")
+	}
+}
+
+// Every item in the whole database must be equippable into a slot the engine really has. Older rows
+// used "ringl"/"earl" while gear uses "ring-l"/"ear-l", which silently made them unequippable.
+func TestEveryItemUsesARealEquipSlot(t *testing.T) {
+	valid := map[string]bool{}
+	for _, sl := range gear.AllSlots {
+		valid[sl] = true
+	}
+	for _, it := range loadRawItems(t) {
+		for _, sl := range it.Slots {
+			if !valid[sl] {
+				t.Errorf("%s (id %d): slot %q is not a real equipment slot", it.Name, it.ID, sl)
+			}
+		}
 	}
 }

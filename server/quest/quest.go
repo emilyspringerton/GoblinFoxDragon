@@ -60,7 +60,7 @@ var StarterQuests = []*Quest{
 		Desc:         "Hunt down the King Worm NM in the Swamp.",
 		GiverNPCID:   "guildmaster",
 		RequireItems: map[string]int{},
-		RequireKills: map[string]int{"king-worm": 1},
+		RequireKills: map[string]int{"Wyrmund the Worm King": 1},
 		RewardFlow:    500,
 		RewardItem:   "iron-sword",
 		RewardFame:   75,

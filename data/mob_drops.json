@@ -56,7 +56,7 @@
     ]
   },
   {
-    "kind": "king worm",
+    "kind": "wyrmund the worm king",
     "items": [
       {
         "id": "king-sinew",
@@ -99,7 +99,7 @@
     ]
   },
   {
-    "kind": "marsh leech",
+    "kind": "lady sanguine",
     "items": [
       {
         "id": "marsh-blood",
@@ -203,6 +203,326 @@
     ]
   },
   {
+    "kind": "Brood Mother Strix",
+    "items": [
+      {
+        "id": "strix-talon",
+        "name": "Strix Talon",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "downy-mantle",
+        "name": "Downy Mantle",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Old Mousewright",
+    "items": [
+      {
+        "id": "mousewright-band",
+        "name": "Mousewright Band",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "whisker-charm",
+        "name": "Whisker Charm",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Hedgemaw",
+    "items": [
+      {
+        "id": "hedgemaw-hide-vest",
+        "name": "Hedgemaw Hide Vest",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "burrower-belt",
+        "name": "Burrower Belt",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Pellet Colossus",
+    "items": [
+      {
+        "id": "pellet-plate-cap",
+        "name": "Pellet Plate Cap",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "compacted-ring",
+        "name": "Compacted Ring",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Heron of Record",
+    "items": [
+      {
+        "id": "heron-quill-bow",
+        "name": "Heron Quill Bow",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "waders-of-record",
+        "name": "Waders of Record",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Guano Prince",
+    "items": [
+      {
+        "id": "prince-slick-gauntlets",
+        "name": "Prince Slick Gauntlets",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "guano-tooth",
+        "name": "Guano Tooth",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Unlit Roost-Mother",
+    "items": [
+      {
+        "id": "nightroost-katana",
+        "name": "Nightroost Katana",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "shade-wing-cape",
+        "name": "Shade Wing Cape",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "The Lensmaster",
+    "items": [
+      {
+        "id": "lensmaster-monocle",
+        "name": "Lensmaster Monocle",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "prismatic-ring",
+        "name": "Prismatic Ring",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Parliament Without Eyes",
+    "items": [
+      {
+        "id": "blind-parliament-robe",
+        "name": "Blind Parliament Robe",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "eyeless-dagger",
+        "name": "Eyeless Dagger",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Eastwind Matriarch",
+    "items": [
+      {
+        "id": "matriarch-plume-mantle",
+        "name": "Matriarch Plume Mantle",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "snowfeather-sabatons",
+        "name": "Snowfeather Sabatons",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Gale Apprentice-Cataloguer",
+    "items": [
+      {
+        "id": "gale-index-staff",
+        "name": "Gale Index Staff",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "windbound-sash",
+        "name": "Windbound Sash",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "The Overdue Tome",
+    "items": [
+      {
+        "id": "overdue-greatsword",
+        "name": "Overdue Greatsword",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "bookbinder-gloves",
+        "name": "Bookbinder Gloves",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Footnote Seventeen",
+    "items": [
+      {
+        "id": "footnote-ring",
+        "name": "Footnote Ring",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "marginalia-cloak",
+        "name": "Marginalia Cloak",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Draft Complaint",
+    "items": [
+      {
+        "id": "seven-drafts-blade",
+        "name": "Seven Drafts Blade",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "unsent-ring",
+        "name": "Unsent Ring",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Moor Cataloguer",
+    "items": [
+      {
+        "id": "moor-cataloguer-coat",
+        "name": "Moor Cataloguer Coat",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "wisp-lantern-charm",
+        "name": "Wisp Lantern Charm",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Redaction Itself",
+    "items": [
+      {
+        "id": "redacted-edge",
+        "name": "Redacted Edge",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "black-bar-mantle",
+        "name": "Black Bar Mantle",
+        "drop_chance": 0.45
+      },
+      {
+        "id": "nm-owl-token",
+        "name": "Owl Token",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
     "kind": "field-mouse",
     "items": [
       {
@@ -248,7 +568,7 @@
     ]
   },
   {
-    "kind": "Brood Mother Strix",
+    "kind": "Ottoline the Brood-Mother",
     "items": [
       {
         "id": "strix-talon",
@@ -268,7 +588,7 @@
     ]
   },
   {
-    "kind": "Old Mousewright",
+    "kind": "Barnaby Mousewright",
     "items": [
       {
         "id": "mousewright-band",
@@ -353,7 +673,7 @@
     ]
   },
   {
-    "kind": "Hedgemaw",
+    "kind": "Sir Hedgemaw",
     "items": [
       {
         "id": "hedgemaw-hide-vest",
@@ -418,7 +738,7 @@
     ]
   },
   {
-    "kind": "Pellet Colossus",
+    "kind": "Old Mother Gristle",
     "items": [
       {
         "id": "pellet-plate-cap",
@@ -438,7 +758,7 @@
     ]
   },
   {
-    "kind": "Heron of Record",
+    "kind": "Ser Longshanks",
     "items": [
       {
         "id": "heron-quill-bow",
@@ -503,7 +823,7 @@
     ]
   },
   {
-    "kind": "Guano Prince",
+    "kind": "Prince Fenwick",
     "items": [
       {
         "id": "prince-slick-gauntlets",
@@ -523,7 +843,7 @@
     ]
   },
   {
-    "kind": "Unlit Roost-Mother",
+    "kind": "Mother Nyx",
     "items": [
       {
         "id": "nightroost-katana",
@@ -588,7 +908,7 @@
     ]
   },
   {
-    "kind": "The Lensmaster",
+    "kind": "Orrin Vale the Lensmaster",
     "items": [
       {
         "id": "lensmaster-monocle",
@@ -608,7 +928,7 @@
     ]
   },
   {
-    "kind": "Parliament Without Eyes",
+    "kind": "Dame Blindfold",
     "items": [
       {
         "id": "blind-parliament-robe",
@@ -673,7 +993,7 @@
     ]
   },
   {
-    "kind": "Eastwind Matriarch",
+    "kind": "Matriarch Boreal",
     "items": [
       {
         "id": "matriarch-plume-mantle",
@@ -693,7 +1013,7 @@
     ]
   },
   {
-    "kind": "Gale Apprentice-Cataloguer",
+    "kind": "Gale Fennimore",
     "items": [
       {
         "id": "gale-index-staff",
@@ -758,7 +1078,7 @@
     ]
   },
   {
-    "kind": "The Overdue Tome",
+    "kind": "Sister Margin",
     "items": [
       {
         "id": "overdue-greatsword",
@@ -778,7 +1098,7 @@
     ]
   },
   {
-    "kind": "Footnote Seventeen",
+    "kind": "Little Seventeen",
     "items": [
       {
         "id": "footnote-ring",
@@ -843,7 +1163,7 @@
     ]
   },
   {
-    "kind": "Draft Complaint",
+    "kind": "Mistress Draft",
     "items": [
       {
         "id": "seven-drafts-blade",
@@ -863,7 +1183,7 @@
     ]
   },
   {
-    "kind": "Moor Cataloguer",
+    "kind": "Wick the Moor-Cataloguer",
     "items": [
       {
         "id": "moor-cataloguer-coat",
@@ -948,7 +1268,7 @@
     ]
   },
   {
-    "kind": "Redaction Itself",
+    "kind": "Mx. Redact",
     "items": [
       {
         "id": "redacted-edge",

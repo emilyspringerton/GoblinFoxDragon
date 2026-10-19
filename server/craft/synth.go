@@ -115,11 +115,11 @@ func SkillGainFor(gap float64, success bool) float64 {
 	var g float64
 	switch {
 	case gap < 0:
-		g = 0.25
+		g = 0.5
 	case gap < 10:
-		g = 0.15
+		g = 0.3
 	case gap < 25:
-		g = 0.05
+		g = 0.1
 	}
 	if !success {
 		g *= 0.5

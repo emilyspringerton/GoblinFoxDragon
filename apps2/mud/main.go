@@ -1533,26 +1533,58 @@ func nmMobFor(nmID string) mob.Mob {
 	switch nmID {
 	case "nm-king-worm":
 		return mob.Mob{
-			ID: nmID, Kind: "King Worm",
+			ID: nmID, Kind: "Wyrmund the Worm King",
 			HP: 800, MaxHP: 800,
 			AggroRange: 15, LeashRange: 40, MeleeRange: 3,
 			MoveSpeed: 4, MeleeDamage: 60, SwingDelay: 2 * time.Second,
 		}
 	case "nm-marsh-leech":
 		return mob.Mob{
-			ID: nmID, Kind: "Marsh Leech",
+			ID: nmID, Kind: "Lady Sanguine",
 			HP: 600, MaxHP: 600,
 			AggroRange: 12, LeashRange: 35, MeleeRange: 3,
 			MoveSpeed: 5, MeleeDamage: 50, SwingDelay: 2 * time.Second,
 		}
 	default:
 		return mob.Mob{
-			ID: nmID, Kind: nmID,
+			ID: nmID, Kind: nmCharacterName(nmID),
 			HP: 500, MaxHP: 500,
 			AggroRange: 10, LeashRange: 30, MeleeRange: 3,
 			MoveSpeed: 4, MeleeDamage: 40,
 		}
 	}
+}
+
+// legacyNMNames gives the older Notorious Monsters real character names. They used to appear in
+// game as their raw IDs ("nm-ancient-wolf").
+var legacyNMNames = map[string]string{
+	"nm-great-beetle": "Brutus Ironshell",
+	"nm-ancient-wolf": "Fenrisa the Ancient",
+	"nm-bone-knight":  "Sir Aldric Bonecleave",
+	"nm-venom-queen":  "Queen Seraphine",
+	"nm-slime-king":   "Blorp the Slime King",
+	"nm-king-worm":    "Wyrmund the Worm King",
+	"nm-marsh-leech":  "Lady Sanguine",
+}
+
+// nmCharacterName is the player-facing name of an NM id: its character name if known, otherwise
+// the id with its prefix stripped and words capitalised -- never the raw "nm-..." id.
+func nmCharacterName(nmID string) string {
+	if n, ok := legacyNMNames[nmID]; ok {
+		return n
+	}
+	words := strings.Split(strings.TrimPrefix(strings.TrimPrefix(nmID, "hnm-"), "nm-"), "-")
+	for i, w := range words {
+		if w != "" {
+			words[i] = strings.ToUpper(w[:1]) + w[1:]
+		}
+	}
+	return strings.Join(words, " ")
+}
+
+// displayMobID hides the internal nm-/hnm- prefix in lists; attack/target accept it with or without.
+func displayMobID(id string) string {
+	return strings.TrimPrefix(strings.TrimPrefix(id, "hnm-"), "nm-")
 }
 
 // announceNMPop broadcasts an NM pop message to all players in the zone.
@@ -3574,7 +3606,7 @@ func cmdLook(p *player) {
 			} else if m.State == mob.StatePursuing {
 				stateStr = " (!)"
 			}
-			p.sendf("  [%s] %s  HP:%d/%d%s%s", m.ID, m.Label(), m.HP, m.MaxHP, stateStr, m.StatusTags())
+			p.sendf("  [%s] %s  HP:%d/%d%s%s", displayMobID(m.ID), m.Label(), m.HP, m.MaxHP, stateStr, m.StatusTags())
 		}
 	} else {
 		p.send("No creatures in sight.")
@@ -3695,6 +3727,7 @@ func cmdAttack(p *player, target string) {
 	for _, id := range reg.All() {
 		m, _ := reg.Get(id)
 		if strings.HasPrefix(strings.ToLower(id), strings.ToLower(target)) ||
+			strings.HasPrefix(strings.ToLower(displayMobID(id)), strings.ToLower(target)) ||
 			strings.HasPrefix(strings.ToLower(m.Kind), strings.ToLower(target)) ||
 			strings.HasPrefix(strings.ToLower(m.Label()), strings.ToLower(target)) {
 			found = m

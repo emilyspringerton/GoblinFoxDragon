@@ -45,7 +45,7 @@ func TestQuestJournalSurvivesLogoutAndRestart(t *testing.T) {
 	if other := s2.load("char-2"); len(other.Active) != 0 || len(other.Completed) != 0 {
 		t.Errorf("journals leaked between characters")
 	}
-	got.RecordKill("Old Mousewright")
+	got.RecordKill("Barnaby Mousewright")
 	if ok, _ := got.IsMet("owl-10-mousewright", map[string]int{}); !ok {
 		t.Errorf("restored quest should be completable after the kill")
 	}

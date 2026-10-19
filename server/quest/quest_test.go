@@ -203,7 +203,7 @@ func TestTurnInItemReward(t *testing.T) {
 	j := NewJournal()
 	q, _ := b.Get("defeat-king-worm")
 	j.Accept(q)
-	j.RecordKill("king-worm")
+	j.RecordKill("Wyrmund the Worm King")
 	res, err := j.TurnIn(b, "defeat-king-worm", map[string]int{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
