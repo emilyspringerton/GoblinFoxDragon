@@ -292,6 +292,30 @@ Vendor and quest tables are Go-side (`owl_content_gen.go`), not editable from ID
 
 ---
 
+## Jobs, spells, crafting, dungeons and the 24-hour mobs (telnet/web MUD)
+
+- **All 23 jobs are playable.** `spells` lists your spells and job abilities (main job, plus the sub job at half
+  your level); `cast <id> [target]`, `ja <id> [target]`. About 230 FFXI-inspired entries live in
+  `apps2/mud/kit_data*.go` and run through one executor (`kit.go`). `setsubjob` needs level 18, adds the sub job's
+  MP and abilities. ASN is the poison/alchemy enfeeble hybrid with the strongest crowd control.
+- **Crowd control works like Bard Lullaby** (`server/mob/cc.go`): area sleep that breaks on direct damage and gets
+  harder to re-apply to the same mob, plus bind/stun/paralyze/slow/blind/weaken/silence and poison DoTs. Notorious
+  monsters and bosses resist it.
+- **Stats are real**: gear defense, accuracy, evasion, crit, haste (also swing speed), magic attack/defense bonus,
+  HP/MP, fast cast, enmity, store TP, regen and elemental affinity all change combat (`stats.go`, shown by `status`).
+- **Crystal crafting** with 141 recipes in all eight guilds (`data/recipes.json`): `recipes`, `recipe <id>`,
+  `craft <id> [n]`. Every attempt eats a crystal; the day's element (8-element cycle, one real hour each) and the
+  zone's elemental weather help or hurt it, and it can fail or break. `time` shows today's sky. Cooked food buffs and
+  crafted consumables work; craft skill is saved.
+- **Dungeons** are six-room chains (`dungeons`, `dungeon-enter <n>`) with level-scaled mobs, elites and a boss from the
+  IDUNA-editable roster, dropping weapons from the item database.
+- **24-hour notorious mobs** (`hnm`): eight end-game characters (Nidhogg, Tesla, No-Name the Kitsune ...) in the city
+  districts that drop the elite gear. Their respawn timers are saved so a restart cannot reset them.
+- Content is generated: `scripts/gen_owl_zones.py`, `gen_lore_items.py`, `gen_dungeons.py`, `gen_hnm.py`.
+  Status: unit and boot tests pass; balance numbers are a first draft and none of this has been tuned by live play.
+
+---
+
 ## Known, honest limitations (read before reporting a "bug")
 
 - **The GUI is not the game** — see [The GUI](#the-gui-battlegrounds_gui----real-but-limited)

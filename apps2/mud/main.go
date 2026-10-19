@@ -1333,6 +1333,10 @@ func broadcastZoneNoLock(zoneID int, msg, exceptSlot string) {
 // Must be called with gw.mu held.
 func resolveKill(p *player, killedMob *mob.Mob, reg *mob.Registry, now time.Time) {
 	baseXP := killedMob.MaxHP * xpPerHP
+	if d, ok := hnmByID[killedMob.ID]; ok {
+		baseXP = d.XP // a fixed, sane award instead of HP*10
+		hnmKilled(d, p.name, now)
+	}
 
 	// GFD-x-123/124: real mod event broker "mob.death" publish -- any subscribed mod can react
 	// to a kill with a real, typed I32 decision. Real content today: the "nm-" ID prefix is the
@@ -1391,12 +1395,14 @@ func resolveKill(p *player, killedMob *mob.Mob, reg *mob.Registry, now time.Time
 		awardXP(p, baseXP, now)
 	}
 
-	// Queue mob respawn.
-	gw.deadQueue = append(gw.deadQueue, deadMob{
-		m:         *killedMob,
-		respawnAt: now.Add(respawnDelay),
-		zoneID:    p.zoneID,
-	})
+	// Queue mob respawn (HNMs come back on their own 24 hour timer instead).
+	if !isHNM(killedMob.ID) {
+		gw.deadQueue = append(gw.deadQueue, deadMob{
+			m:         *killedMob,
+			respawnAt: now.Add(respawnDelay),
+			zoneID:    p.zoneID,
+		})
+	}
 
 	// Loot pool.
 	openLootPool(p, killedMob, now)
@@ -1589,7 +1595,7 @@ func nmCharacterName(nmID string) string {
 
 // displayMobID hides the internal nm-/hnm- prefix in lists; attack/target accept it with or without.
 func displayMobID(id string) string {
-	return strings.TrimPrefix(strings.TrimPrefix(id, "hnm-"), "nm-")
+	return strings.TrimPrefix(strings.TrimPrefix(id, "nm-"), "hnm-")
 }
 
 // announceNMPop broadcasts an NM pop message to all players in the zone.
@@ -2248,6 +2254,8 @@ func tickAll() {
 		}
 	}
 
+	hnmTick(now)
+
 	// NM spawn checks.
 	for zoneID, spawns := range gw.nmSpawns {
 		for _, spawn := range spawns {
@@ -2816,6 +2824,8 @@ func handle(p *player, line string) {
 		cmdBazaar(p, args)
 	case "bank":
 		cmdBank(p, args)
+	case "hnm", "notorious":
+		cmdHNM(p)
 	case "weather":
 		cmdWeather(p)
 	case "survey":
@@ -3611,7 +3621,7 @@ func cmdLook(p *player) {
 			} else if m.State == mob.StatePursuing {
 				stateStr = " (!)"
 			}
-			p.sendf("  [%s] %s  HP:%d/%d%s%s", displayMobID(m.ID), m.Label(), m.HP, m.MaxHP, stateStr, m.StatusTags())
+			p.sendf("  [%s] %s  HP:%d/%d%s%s%s", displayMobID(m.ID), m.Label(), m.HP, m.MaxHP, stateStr, m.StatusTags(), hnmListLine(m))
 		}
 	} else {
 		p.send("No creatures in sight.")
@@ -9759,6 +9769,7 @@ func main() {
 
 	gw = initWorld()
 	initTRAPXCity()
+	hnmInit(time.Now()) // spawn the 24-hour end-game mobs whose timers have run out
 
 	go gameLoop()
 	go globalChatPoller()

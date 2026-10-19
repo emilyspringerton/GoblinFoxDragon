@@ -2896,5 +2896,330 @@
         "drop_chance": 0.8
       }
     ]
+  },
+  {
+    "kind": "The Producer (Voice Only)",
+    "items": [
+      {
+        "id": "operator's-tunic",
+        "name": "Operator's Tunic",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "helm-of-the-forgotten-kingdom",
+        "name": "Helm of the Forgotten Kingdom",
+        "drop_chance": 0.2
+      },
+      {
+        "id": "gloves-of-the-faithful",
+        "name": "Gloves of the Faithful",
+        "drop_chance": 0.25
+      },
+      {
+        "id": "fourth-remorse",
+        "name": "Fourth Remorse",
+        "drop_chance": 0.15
+      },
+      {
+        "id": "filthy-trinket",
+        "name": "Filthy Trinket",
+        "drop_chance": 0.12
+      },
+      {
+        "id": "last-regret",
+        "name": "Last Regret",
+        "drop_chance": 0.06
+      },
+      {
+        "id": "notorious-trophy",
+        "name": "Notorious Trophy",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "The Custodian Process",
+    "items": [
+      {
+        "id": "soul-of-jordan",
+        "name": "Soul of Jordan",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "crown-of-the-eternal-vagrant",
+        "name": "Crown of the Eternal Vagrant",
+        "drop_chance": 0.06
+      },
+      {
+        "id": "enigma's-curse",
+        "name": "Enigma's Curse",
+        "drop_chance": 0.25
+      },
+      {
+        "id": "rune-of-cain",
+        "name": "Rune of Cain",
+        "drop_chance": 0.18
+      },
+      {
+        "id": "loki's-favor",
+        "name": "Loki's Favor",
+        "drop_chance": 0.15
+      },
+      {
+        "id": "blue-garter",
+        "name": "Blue Garter",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "notorious-trophy",
+        "name": "Notorious Trophy",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Nikola Tesla, the Unfinished Tower",
+    "items": [
+      {
+        "id": "last-regret",
+        "name": "Last Regret",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "raven's-gift",
+        "name": "Raven's Gift",
+        "drop_chance": 0.2
+      },
+      {
+        "id": "loki's-favor",
+        "name": "Loki's Favor",
+        "drop_chance": 0.12
+      },
+      {
+        "id": "boots-of-winter",
+        "name": "Boots of Winter",
+        "drop_chance": 0.25
+      },
+      {
+        "id": "qi-tornado",
+        "name": "Qi Tornado",
+        "drop_chance": 0.15
+      },
+      {
+        "id": "light's-end",
+        "name": "Light's End",
+        "drop_chance": 0.12
+      },
+      {
+        "id": "notorious-trophy",
+        "name": "Notorious Trophy",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Nidhogg, Root-Gnawer",
+    "items": [
+      {
+        "id": "helm-of-the-dragon-king",
+        "name": "Helm of the Dragon King",
+        "drop_chance": 0.12
+      },
+      {
+        "id": "icewraith-claymore",
+        "name": "Icewraith Claymore",
+        "drop_chance": 0.22
+      },
+      {
+        "id": "knight's-plate",
+        "name": "Knight's Plate",
+        "drop_chance": 0.2
+      },
+      {
+        "id": "excalibur",
+        "name": "Excalibur",
+        "drop_chance": 0.01
+      },
+      {
+        "id": "bone-plate-gauntlets",
+        "name": "Bone Plate Gauntlets",
+        "drop_chance": 0.3
+      },
+      {
+        "id": "mythril-sword",
+        "name": "Mythril Sword",
+        "drop_chance": 0.25
+      },
+      {
+        "id": "notorious-trophy",
+        "name": "Notorious Trophy",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "The Sleeper Beneath the Sleeper College",
+    "items": [
+      {
+        "id": "choker-of-dawn",
+        "name": "Choker of Dawn",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "white-gloves",
+        "name": "White Gloves",
+        "drop_chance": 0.12
+      },
+      {
+        "id": "stone-of-the-gentle-plague",
+        "name": "Stone of the Gentle Plague",
+        "drop_chance": 0.15
+      },
+      {
+        "id": "taint's-embrace",
+        "name": "Taint's Embrace",
+        "drop_chance": 0.12
+      },
+      {
+        "id": "shepherd's-staff",
+        "name": "Shepherd's Staff",
+        "drop_chance": 0.2
+      },
+      {
+        "id": "parlay-of-the-shy-priestess",
+        "name": "Parlay of the Shy Priestess",
+        "drop_chance": 0.22
+      },
+      {
+        "id": "notorious-trophy",
+        "name": "Notorious Trophy",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "No Foreclosure, the Crustocrat",
+    "items": [
+      {
+        "id": "king's-alibi",
+        "name": "King's Alibi",
+        "drop_chance": 0.08
+      },
+      {
+        "id": "debt's-favor",
+        "name": "Debt's Favor",
+        "drop_chance": 0.12
+      },
+      {
+        "id": "blue-garter",
+        "name": "Blue Garter",
+        "drop_chance": 0.12
+      },
+      {
+        "id": "soul-of-jordan",
+        "name": "Soul of Jordan",
+        "drop_chance": 0.03
+      },
+      {
+        "id": "gummy-candy",
+        "name": "Gummy Candy",
+        "drop_chance": 0.4
+      },
+      {
+        "id": "mythril-sword",
+        "name": "Mythril Sword",
+        "drop_chance": 0.2
+      },
+      {
+        "id": "notorious-trophy",
+        "name": "Notorious Trophy",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "Arachne, Queen of the Kuroshio Web",
+    "items": [
+      {
+        "id": "bow-of-the-gorgon-outcast",
+        "name": "Bow of the Gorgon Outcast",
+        "drop_chance": 0.22
+      },
+      {
+        "id": "utzu-mah-turi",
+        "name": "Utzu Mah Turi",
+        "drop_chance": 0.2
+      },
+      {
+        "id": "sunken-dagger-of-kali",
+        "name": "Sunken Dagger of Kali",
+        "drop_chance": 0.25
+      },
+      {
+        "id": "hidden-dagger-of-kali",
+        "name": "Hidden Dagger of Kali",
+        "drop_chance": 0.25
+      },
+      {
+        "id": "mikazuki",
+        "name": "Mikazuki",
+        "drop_chance": 0.05
+      },
+      {
+        "id": "boots-of-winter",
+        "name": "Boots of Winter",
+        "drop_chance": 0.2
+      },
+      {
+        "id": "notorious-trophy",
+        "name": "Notorious Trophy",
+        "drop_chance": 1.0
+      }
+    ]
+  },
+  {
+    "kind": "No-Name, the Kitsune of Nine Tails",
+    "items": [
+      {
+        "id": "onimaru",
+        "name": "Onimaru",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "mikazuki",
+        "name": "Mikazuki",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "juzumaru",
+        "name": "Juzumaru",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "ōdenta",
+        "name": "Ōdenta",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "dōjigiri",
+        "name": "Dōjigiri",
+        "drop_chance": 0.1
+      },
+      {
+        "id": "soul-of-jordan",
+        "name": "Soul of Jordan",
+        "drop_chance": 0.04
+      },
+      {
+        "id": "loki's-favor",
+        "name": "Loki's Favor",
+        "drop_chance": 0.15
+      },
+      {
+        "id": "notorious-trophy",
+        "name": "Notorious Trophy",
+        "drop_chance": 1.0
+      }
+    ]
   }
 ]

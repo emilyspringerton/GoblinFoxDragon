@@ -169,6 +169,7 @@ def build_materials():
                  ("Vellum Weave", "Archive vellum thread woven with ink. It will not be read aloud."),
                  ("Wraith Cloth", "Cloth spun from windwraith thread; it moves when the air doesn't."),
                  ("Ward Paper", "Talisman paper, blank. For now."),
+                 ("Notorious Trophy", "Proof of a kill that mattered. Quest givers and collectors pay well for these."),
                  ("Ash Planks", "Sawn ash."), ("Heather Planks", "Sawn heather-wood."), ("Reed Planks", "Pressed reed boards."),
                  ("Moor Oak Planks", "Sawn moor oak."), ("Ridge Pine Planks", "Sawn pine."),
                  ("Bone Meal", "Ground pellet-bone."), ("Ward Ink", "Black ink for talismans and for documents that must outlive their authors."),

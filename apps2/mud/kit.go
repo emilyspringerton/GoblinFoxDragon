@@ -804,5 +804,7 @@ func resolveDotKill(zoneID int, reg *mob.Registry, ev mob.Event, now time.Time) 
 		killer.prompt()
 		return
 	}
-	gw.deadQueue = append(gw.deadQueue, deadMob{m: *m, respawnAt: now.Add(respawnDelay), zoneID: zoneID})
+	if !isHNM(m.ID) {
+		gw.deadQueue = append(gw.deadQueue, deadMob{m: *m, respawnAt: now.Add(respawnDelay), zoneID: zoneID})
+	}
 }
