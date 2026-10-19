@@ -9,18 +9,51 @@ import (
 
 // owlZoneNames: display names for the Owl cluster, used when registering the zones.
 var owlZoneNames = map[int]string{
-	10: "Fledgling Field",
-	11: "Wren's Perch",
-	13: "Pellet Marsh",
-	12: "Roost Deeps",
-	14: "Observation Tor",
-	15: "Eastwind Ridge",
-	16: "Cataloguer's Stacks",
-	17: "Footnote Moor",
-	18: "Protocol Wall",
+	10:  "Fledgling Field",
+	11:  "Wren's Perch",
+	13:  "Pellet Marsh",
+	12:  "Roost Deeps",
+	14:  "Observation Tor",
+	15:  "Eastwind Ridge",
+	16:  "Cataloguer's Stacks",
+	17:  "Footnote Moor",
+	18:  "Protocol Wall",
+	19:  "Handington Docks",
+	32:  "Aboard the Open Balance",
+	20:  "Open Balance Quay",
+	21:  "Salt Flats",
+	22:  "Pilgrim's Terraces",
+	23:  "Tidepool Fields",
+	24:  "Cormorant Marsh",
+	25:  "Shrine Stair of a Thousand Gates",
+	26:  "Sunken Chapel Coast",
+	27:  "Geode Mines",
+	401: "Geode Mines: The Shaft",
+	402: "Geode Mines: The Crystal Cavern",
+	403: "Geode Mines: The Heart Geode",
+	410: "Sunken Chapel: The Nave",
+	411: "Sunken Chapel: The Baptistry of Brine",
+	412: "Sunken Chapel: The Crypt of the Sleepers",
+	28:  "Tanuki Council Road",
+	29:  "Web Cliffs",
+	30:  "Foreclosure Anchorage",
+	31:  "The Wellspring of Tides",
+	421: "The Tide Vault: Tide Hall",
+	422: "The Tide Vault: Paradox Gallery",
+	423: "The Tide Vault: Cube Reliquary",
+	424: "The Tide Vault: Antechamber of Coins",
+	425: "The Tide Vault: The Still Point",
 }
 
-// init wires the Eastwind Owl cluster (zones 10-18): exits, descriptions, smells,
+// addExit adds one exit, creating the exit table if its zone has none yet (init order across files).
+func addExit(from int, dir string, to int) {
+	if exits[from] == nil {
+		exits[from] = map[string]int{}
+	}
+	exits[from][dir] = to
+}
+
+// init wires the Eastwind Owl zones and the Kuroshio Reach: exits, descriptions, smells,
 // NPCs, vendor catalogs and item display names.
 func init() {
 	exits[10] = map[string]int{"east": 0, "north": 14}
@@ -32,11 +65,37 @@ func init() {
 	exits[16] = map[string]int{"up": 12, "east": 17}
 	exits[17] = map[string]int{"west": 16, "south": 13, "east": 18}
 	exits[18] = map[string]int{"south": 14, "down": 15, "west": 17, "east": 203}
-	exits[0]["west"] = 10
-	exits[1]["north"] = 11
-	exits[3]["east"] = 13
-	exits[2]["south"] = 12
-	exits[203]["west"] = 18
+	exits[19] = map[string]int{"west": 4}
+	exits[32] = map[string]int{}
+	exits[20] = map[string]int{"east": 21, "north": 22, "west": 23}
+	exits[21] = map[string]int{"west": 20, "east": 24, "down": 27}
+	exits[22] = map[string]int{"south": 20, "north": 25}
+	exits[23] = map[string]int{"east": 20, "west": 26}
+	exits[24] = map[string]int{"west": 21, "north": 29}
+	exits[25] = map[string]int{"south": 22, "north": 28}
+	exits[26] = map[string]int{"east": 23, "west": 30, "down": 410}
+	exits[27] = map[string]int{"up": 21, "down": 401}
+	exits[401] = map[string]int{"up": 27, "east": 402}
+	exits[402] = map[string]int{"west": 401, "down": 403}
+	exits[403] = map[string]int{"up": 402}
+	exits[410] = map[string]int{"up": 26, "north": 411}
+	exits[411] = map[string]int{"south": 410, "north": 412}
+	exits[412] = map[string]int{"south": 411}
+	exits[28] = map[string]int{"south": 25, "north": 31}
+	exits[29] = map[string]int{"south": 24, "east": 31}
+	exits[30] = map[string]int{"east": 26, "west": 31}
+	exits[31] = map[string]int{"south": 28, "west": 29, "east": 30, "down": 421}
+	exits[421] = map[string]int{"up": 31, "north": 422}
+	exits[422] = map[string]int{"south": 421, "east": 423, "north": 424}
+	exits[423] = map[string]int{"west": 422}
+	exits[424] = map[string]int{"south": 422, "north": 425}
+	exits[425] = map[string]int{"south": 424}
+	addExit(0, "west", 10)
+	addExit(1, "north", 11)
+	addExit(3, "east", 13)
+	addExit(2, "south", 12)
+	addExit(203, "west", 18)
+	addExit(4, "east", 19)
 	zoneDesc[10] = "[EASTWIND: FLEDGLING FIELD / Eastwind Owls / Pasture] Trampled pasture ringed by fence posts, each topped with a numbered owlet in training. Chalk grids are scratched across the turf; fledglings practise Observation on the field mice. Nobody approaches anything. The Protocol is painted on a board by the gate. (Recommended levels 3-8.)"
 	zoneSmell[10] = "Warm barley dust, mouse nest, and a faint chalky sourness -- the smell of things being watched for the first time."
 	zoneDesc[11] = "[EASTWIND: WREN'S PERCH / Eastwind Owls / Upland] A tilted tableland of heather and surveyor's cairns. Each cairn carries a brass plate: FIELD OBSERVER DESIGNATE WREN, and a number. Several plates have been scratched out. The wind carries nothing but the sound of someone writing. (Recommended levels 8-14.)"
@@ -55,6 +114,57 @@ func init() {
 	zoneSmell[17] = "Peat smoke, wet slate, and the sweet scorch of a candle someone has just snuffed out. The air tastes like an unsent apology."
 	zoneDesc[18] = "[EASTWIND: THE PROTOCOL WALL / Eastwind Owls / Boundary] A curtain wall of dressed stone, forty feet high, carved edge to edge with the Cairngorms Protocol in an unbroken hand. 'No inference beyond the evidence. No action derived from observation.' Gaps in the text have been blacked out. Beyond a heavy gate to the east, the Archive. (Recommended levels 36-45.)"
 	zoneSmell[18] = "Cold dressed stone, iron gate-oil, and a sealed-envelope smell with something underneath it like a held breath. A very long time has passed here, carefully."
+	zoneDesc[19] = "[EASTWIND: HANDINGTON DOCKS / Heikegani Customs / Harbour] Slate-grey piers below the town, crowded with crates stamped with a single shell-mark. The Heikegani cargo ship OPEN BALANCE rides at the end of the longest pier, her crew counting something that will not stay counted. Type 'sail' to take passage to the Kuroshio Reach -- the far shore is for adventurers of level 35 and up. (Recommended levels 1-99.)"
+	zoneSmell[19] = "Tar, hemp rope and cold brine, with the dry papery smell of an invoice stamped paid."
+	zoneDesc[32] = "[EASTWIND: AT SEA / The Open Balance / Deck] The long grey deck of the Heikegani cargo ship, rolling slowly through water the colour of old pewter. A shell-marked ledger is chained to the mast, and an accountant in a sou'wester is reconciling the horizon. There is nowhere to go but onward. (Recommended levels 1-99.)"
+	zoneSmell[32] = "Wet rope, hot ledger-ink and a wind that tastes of a very long way from home."
+	zoneDesc[20] = "[REACH: OPEN BALANCE QUAY / Heikegani Customs / Landfall] A bustling customs quay where the Heikegani stamp every arrival in triplicate. Cranes unload crates of sealed shell-marks; gulls patrol the stacks like clerks. A signpost offers the Salt Flats east, the Pilgrim's Terraces north and the Tidepool Fields west. The ship home -- type 'sail' -- waits at the berth. (Recommended levels 40-44.)"
+	zoneSmell[20] = "Tar, brine and wet rope; underneath, the sharp stationery smell of a customs stamp coming down on your name."
+	zoneDesc[21] = "[REACH: SALT FLATS / Free Reach / Desert] A white plain of cracked brine under a pale sun, shimmering so hard the horizon doubles. Salt-crusted ribs of old wrecks lie half-sunk in the glaze. A mine shaft yawns in the ground to the south. (Recommended levels 42-48.)"
+	zoneSmell[21] = "Hot salt, dry kelp and a faint, metallic note of the sea retreating."
+	zoneDesc[22] = "[REACH: PILGRIM'S TERRACES / Yokai Guild / Hillside] Terraced paths climb a green hill, each level with its own tiny shrine and its own queue of silent figures. They have been waiting for the bell for longer than the hill has had paths. (Recommended levels 44-50.)"
+	zoneSmell[22] = "Incense smoke, wet cedar and the warm, patient smell of a great many people waiting."
+	zoneDesc[23] = "[REACH: TIDEPOOL FIELDS / Ichthyosapien Marches / Shore] Black rock shelves pocked with mirror-still pools, each one a little sea of its own. Things in the pools turn to look at you as you pass, politely, and turn back. (Recommended levels 44-50.)"
+	zoneSmell[23] = "Rotting kelp, cold stone and the clean mineral bite of a tide pool at low water."
+	zoneDesc[24] = "[REACH: CORMORANT MARSH / Free Reach / Wetland] Brown water between reed islands, strung with the stilted nests of cormorants who fish on commission. A kappa magistrate presides, somewhere, over all of it. (Recommended levels 52-60.)"
+	zoneSmell[24] = "Fish oil, reed rot and the green, cold smell of a cucumber just cut open."
+	zoneDesc[25] = "[REACH: SHRINE STAIR OF A THOUSAND GATES / Yokai Guild / Mountain] A staircase of red torii marches up the mountain, gate after gate after gate. Fox-fire drifts between the pillars and every stone fox on the way has turned its head to follow you. (Recommended levels 54-62.)"
+	zoneSmell[25] = "Red lacquer, camphor and the clean smoke of fox-fire burning without fuel."
+	zoneDesc[26] = "[REACH: SUNKEN CHAPEL COAST / Ichthyosapien Marches / Coast] A drowned chapel leans out of the surf, its bell tower dipping into the waves like a spoon into soup. Stairs descend into the flooded nave. Acolytes in barnacled robes sing the tide in. (Recommended levels 54-62.)"
+	zoneSmell[26] = "Wet plaster, cold candle-wax and brine: the smell of a sermon long since underwater."
+	zoneDesc[27] = "[REACH: GEODE MINES / Free Reach / Mine] The mouth of an old salt-and-crystal mine, timbered with whale-ribs. The air is cool and glitters faintly. Lantern-bats hang from the lintel like unlit lamps. (Recommended levels 52-60.)"
+	zoneSmell[27] = "Cold stone, mineral dust and the faint ozone of crystal growing in the dark."
+	zoneDesc[401] = "[REACH: GEODE MINES -- THE SHAFT] A narrow shaft braced with whale-ribs, rope ladders descending into a dark that glitters. Miners' lanterns still hang where they were left. (Recommended levels 54-58.)"
+	zoneSmell[401] = "Lamp oil, cold rock and rope that has been wet and dry a hundred times."
+	zoneDesc[402] = "[REACH: GEODE MINES -- THE CRYSTAL CAVERN] A cavern lined floor to ceiling with pale quartz, every facet holding a small reflection of you that is slightly out of step. (Recommended levels 56-60.)"
+	zoneSmell[402] = "Clean glass, wet limestone and a bright, cold smell like the inside of a bell."
+	zoneDesc[403] = "[REACH: GEODE MINES -- THE HEART GEODE] A hollow the size of a cathedral, its walls a single enormous geode. At its centre a boulder of living quartz is slowly, patiently, turning its attention toward you. (Recommended levels 58-62.)"
+	zoneSmell[403] = "Hot crystal, ozone and the heavy sweetness of something very old waking."
+	zoneDesc[410] = "[REACH: SUNKEN CHAPEL -- THE NAVE] Knee-deep water fills a nave of grey pews. Where the choir loft should be, a school of silver fish sings in perfect fourths. (Recommended levels 56-60.)"
+	zoneSmell[410] = "Standing water, old wood and candle-wax gone soft as butter."
+	zoneDesc[411] = "[REACH: SUNKEN CHAPEL -- THE BAPTISTRY] A round font full of green brine, wide as a pond. Every candle in the room is lit and none of them are wet. (Recommended levels 58-62.)"
+	zoneSmell[411] = "Brine, wax and the green coolness of a baptism that never quite ended."
+	zoneDesc[412] = "[REACH: SUNKEN CHAPEL -- THE CRYPT OF THE SLEEPERS] Niches of shell-marked stone hold sleeping figures, breathing very slowly. At the end of the vault a cardinal in barnacled red presides over the dream. (Recommended levels 60-64.)"
+	zoneSmell[412] = "Cold stone, salt and the heavy sweetness of sleep."
+	zoneDesc[28] = "[REACH: TANUKI COUNCIL ROAD / Yokai Guild / Highway] A broad road of pale stone, lined with teahouses that are, on inspection, entirely made of leaves. Bailiffs in round hats escort travellers to the council at the top, courteously and without any possibility of refusal. (Recommended levels 66-76.)"
+	zoneSmell[28] = "Green tea, hot rice and a leaf-mould smell that is almost, but not quite, the smell of money."
+	zoneDesc[29] = "[REACH: WEB CLIFFS / Kuroshio Arachnids / Cliff] Sea cliffs hung with silk that catches the wind like sails. Every thread hums, very faintly, at a pitch that only becomes obvious when it stops. (Recommended levels 68-78.)"
+	zoneSmell[29] = "Sea spray, cold stone and the dry, clean smell of silk drying in the wind."
+	zoneDesc[30] = "[REACH: FORECLOSURE ANCHORAGE / Shell Parliament / Harbour] A grey harbour crowded with ships that have not sailed in years, each one sealed with a red writ of seizure. Their anchors are chained to the seabed with ledger-links. The tide here is always going out. (Recommended levels 70-80.)"
+	zoneSmell[30] = "Rust, cold iron and the dry, official smell of ink on a writ."
+	zoneDesc[31] = "[REACH: THE WELLSPRING OF TIDES / Chrono-Cube / Spring] A round pool of still, black water at the top of the world. Tides rise and fall in it that belong to no sea. On its shore stand the three roads of the Reach, and below the water a stair descends. (Recommended levels 88-99.)"
+	zoneSmell[31] = "Cold, clean water, a faint hum at 7.83 Hz, and a sharp sweet note like a coin spinning, just before it lands."
+	zoneDesc[421] = "[REACH: THE TIDE VAULT -- TIDE HALL] A hall of black glass where water flows upward along the walls. Every footfall arrives a moment before you take it. (Recommended levels 88-92.)"
+	zoneSmell[421] = "Cold water, polished glass and the faint electric taste of a clock about to strike."
+	zoneDesc[422] = "[REACH: THE TIDE VAULT -- PARADOX GALLERY] A gallery of paintings of the same room from fifty angles, each showing you entering from a different door. (Recommended levels 90-94.)"
+	zoneSmell[422] = "Linseed oil, cold glass and the sweetish smell of a decision made twice."
+	zoneDesc[423] = "[REACH: THE TIDE VAULT -- CUBE RELIQUARY] A shelf of empty plinths, each labelled with the date a Cube once sat there. One date is both 1623 and 1901. (Recommended levels 92-96.)"
+	zoneSmell[423] = "Brass polish, dust and the dry sweetness of an object that has just left."
+	zoneDesc[424] = "[REACH: THE TIDE VAULT -- ANTECHAMBER OF COINS] Ten thousand coins stand on edge in the air, spinning in silence. None have landed. All of them are about to. (Recommended levels 94-98.)"
+	zoneSmell[424] = "Copper, clean water and the held breath of ten thousand almost-decisions."
+	zoneDesc[425] = "[REACH: THE TIDE VAULT -- THE STILL POINT] A room in which nothing is moving, including you. At its centre a single coin hangs in the air, heads and tails at once, waiting for someone to call it. (Recommended levels 96-99.)"
+	zoneSmell[425] = "Nothing: still air, still water. The kind of silence that is also a smell."
+	npcs = append(npcs, npcDef{ID: "fledgling-mara", Name: "Fledgling Mara", ZoneID: 10, Greeting: "I was a fledgling once. It is mostly standing still and being very, very quiet.", FameNation: fame.Neutral})
 	npcs = append(npcs, npcDef{ID: "warden-pip", Name: "Fledgling Warden Pip", ZoneID: 10, Greeting: "Observe. Do not approach. Do not approach *yet* -- the Protocol is very clear on yet. Mind the mice.", FameNation: fame.Neutral})
 	npcVendorCatalog["warden-pip"] = []VendorItem{
 		{ID: "echo-drop", Price: 50},
@@ -70,6 +180,7 @@ func init() {
 		{ID: "fledgling-boots", Price: 180},
 		{ID: "fledgling-hood", Price: 180},
 	}
+	npcs = append(npcs, npcDef{ID: "surveyor-pim", Name: "Surveyor Pim", ZoneID: 11, Greeting: "Every cairn on this perch is a number. I'm missing three. They are not where I left them.", FameNation: fame.Neutral})
 	npcs = append(npcs, npcDef{ID: "wren-9", Name: "Field Observer Designate WREN-9", ZoneID: 11, Greeting: "WREN-3 filed a complaint against himself in 1623 and never withdrew it. I am WREN-9. I have withdrawn nothing, because I have filed nothing. Buy a blade.", FameNation: fame.Neutral})
 	npcVendorCatalog["wren-9"] = []VendorItem{
 		{ID: "echo-drop", Price: 50},
@@ -85,6 +196,7 @@ func init() {
 		{ID: "observer-boots", Price: 480},
 		{ID: "observer-hood", Price: 480},
 	}
+	npcs = append(npcs, npcDef{ID: "ferryman-bog", Name: "Ferryman Bog", ZoneID: 13, Greeting: "Poled these pellets for forty years. Bones and reeds, mostly. Bring me bone and I'll row you anywhere you can't go.", FameNation: fame.Neutral})
 	npcs = append(npcs, npcDef{ID: "pellet-reader-moss", Name: "Pellet Reader Moss", ZoneID: 13, Greeting: "I read what the Owls couldn't keep. It's all in the pellets: the records, the bones, the arguments. Bring me bones and I'll read you something worth paying for.", FameNation: fame.Neutral})
 	npcVendorCatalog["pellet-reader-moss"] = []VendorItem{
 		{ID: "echo-drop", Price: 50},
@@ -100,6 +212,7 @@ func init() {
 		{ID: "observer-boots", Price: 480},
 		{ID: "observer-hood", Price: 480},
 	}
+	npcs = append(npcs, npcDef{ID: "lantern-lad-fitz", Name: "Lantern Lad Fitz", ZoneID: 12, Greeting: "Only job in the Deeps is keeping the lanterns lit. Only problem is the bats keep drinking the oil.", FameNation: fame.Neutral})
 	npcs = append(npcs, npcDef{ID: "roost-keeper-orla", Name: "Roost-Keeper Orla", ZoneID: 12, Greeting: "Mind your voice. The day-sleepers are at their perches and the night-watch is not at its best. If you must fight, fight downwind.", FameNation: fame.Neutral})
 	npcVendorCatalog["roost-keeper-orla"] = []VendorItem{
 		{ID: "echo-drop", Price: 50},
@@ -115,6 +228,7 @@ func init() {
 		{ID: "fieldwing-boots", Price: 980},
 		{ID: "fieldwing-hood", Price: 980},
 	}
+	npcs = append(npcs, npcDef{ID: "lens-grinder-ro", Name: "Lens Grinder Ro", ZoneID: 14, Greeting: "I grind glass until it sees something. Then I grind it until it stops.", FameNation: fame.Neutral})
 	npcs = append(npcs, npcDef{ID: "tor-lensman-aldous", Name: "Tor Lensman Aldous", ZoneID: 14, Greeting: "Every glass up here is pointed at something. Most of it doesn't want to be. Do you want the north glass or the west? Either way: buy a hood.", FameNation: fame.Neutral})
 	npcVendorCatalog["tor-lensman-aldous"] = []VendorItem{
 		{ID: "echo-drop", Price: 50},
@@ -130,6 +244,7 @@ func init() {
 		{ID: "fieldwing-boots", Price: 980},
 		{ID: "fieldwing-hood", Price: 980},
 	}
+	npcs = append(npcs, npcDef{ID: "gale-rider-ytha", Name: "Gale Rider Ytha", ZoneID: 15, Greeting: "I ride the one wind that never changes. It is not interesting. It is, however, reliable.", FameNation: fame.Neutral})
 	npcs = append(npcs, npcDef{ID: "eastwind-quartermaster-sable", Name: "Eastwind Quartermaster Sable", ZoneID: 15, Greeting: "The wind comes from one place. Always. We named ourselves for it. Supplies are on the left; questions are on the right, filed in triplicate.", FameNation: fame.Neutral})
 	npcVendorCatalog["eastwind-quartermaster-sable"] = []VendorItem{
 		{ID: "echo-drop", Price: 50},
@@ -145,6 +260,7 @@ func init() {
 		{ID: "fieldwing-boots", Price: 980},
 		{ID: "fieldwing-hood", Price: 980},
 	}
+	npcs = append(npcs, npcDef{ID: "bindery-apprentice-oz", Name: "Bindery Apprentice Oz", ZoneID: 16, Greeting: "My master rebinds the books that rebind themselves. I fetch the glue.", FameNation: fame.Neutral})
 	npcs = append(npcs, npcDef{ID: "stacks-archivist-quill", Name: "Stacks Archivist Quill", ZoneID: 16, Greeting: "Silence is not required. It is merely observed. Quills, vellum, and the occasional bloodied index card are all for sale. Do not touch the footnotes.", FameNation: fame.Neutral})
 	npcVendorCatalog["stacks-archivist-quill"] = []VendorItem{
 		{ID: "echo-drop", Price: 50},
@@ -160,6 +276,7 @@ func init() {
 		{ID: "archivist-boots", Price: 1680},
 		{ID: "archivist-hood", Price: 1680},
 	}
+	npcs = append(npcs, npcDef{ID: "stone-polisher-agnes", Name: "Stone Polisher Agnes", ZoneID: 17, Greeting: "I polish the footnote stones so the superscripts stay sharp. Nobody thanks me. Nobody should.", FameNation: fame.Neutral})
 	npcs = append(npcs, npcDef{ID: "moor-footnoter-hester", Name: "Moor Footnoter Hester", ZoneID: 17, Greeting: "Each stone is a footnote the Cataloguer didn't dare put in the main text. You may read them. You may not act on them. The Protocol is firm on that, and I am firmer.", FameNation: fame.Neutral})
 	npcVendorCatalog["moor-footnoter-hester"] = []VendorItem{
 		{ID: "echo-drop", Price: 50},
@@ -175,6 +292,7 @@ func init() {
 		{ID: "archivist-boots", Price: 1680},
 		{ID: "archivist-hood", Price: 1680},
 	}
+	npcs = append(npcs, npcDef{ID: "wall-mason-dren", Name: "Wall Mason Dren", ZoneID: 18, Greeting: "Every stone in the Wall is a clause. When one cracks, the sentence changes. I fix sentences.", FameNation: fame.Neutral})
 	npcs = append(npcs, npcDef{ID: "protocol-clerk-vael", Name: "Protocol Clerk Vael", ZoneID: 18, Greeting: "The Protocol prohibits action derived from observation. I observe that you are armed. I will file that. Nothing further. ...The shop is open.", FameNation: fame.Neutral})
 	npcVendorCatalog["protocol-clerk-vael"] = []VendorItem{
 		{ID: "echo-drop", Price: 50},
@@ -189,6 +307,173 @@ func init() {
 		{ID: "protocol-mitts", Price: 2580},
 		{ID: "protocol-boots", Price: 2580},
 		{ID: "protocol-hood", Price: 2580},
+	}
+	npcs = append(npcs, npcDef{ID: "harbourmaster-tsuru", Name: "Harbourmaster Tsuru", ZoneID: 20, Greeting: "I count ships in and ships out. The numbers have never once matched, and the Parliament calls that a healthy balance.", FameNation: fame.Neutral})
+	npcs = append(npcs, npcDef{ID: "customs-clerk-obe", Name: "Customs Clerk Obe", ZoneID: 20, Greeting: "Name, purpose of visit, quantity of debt carried. Don't tell me you have none; everyone has some. Gear is on the left, forms on the right.", FameNation: fame.Neutral})
+	npcVendorCatalog["customs-clerk-obe"] = []VendorItem{
+		{ID: "echo-drop", Price: 50},
+		{ID: "antidote", Price: 80},
+		{ID: "hi-potion", Price: 250},
+		{ID: "pilgrim-blade", Price: 5520},
+		{ID: "pilgrim-talon", Price: 5520},
+		{ID: "pilgrim-perch", Price: 5520},
+		{ID: "pilgrim-jerkin", Price: 4416},
+		{ID: "pilgrim-robe", Price: 4416},
+		{ID: "pilgrim-leggings", Price: 3680},
+		{ID: "pilgrim-mitts", Price: 3680},
+		{ID: "pilgrim-boots", Price: 3680},
+		{ID: "pilgrim-hood", Price: 3680},
+	}
+	npcs = append(npcs, npcDef{ID: "salt-warden-rimu", Name: "Salt Warden Rimu", ZoneID: 21, Greeting: "The flats are the sea's old floor. It will want it back. Carry water; everything out here is thirsty.", FameNation: fame.Neutral})
+	npcVendorCatalog["salt-warden-rimu"] = []VendorItem{
+		{ID: "echo-drop", Price: 50},
+		{ID: "antidote", Price: 80},
+		{ID: "hi-potion", Price: 250},
+		{ID: "pilgrim-blade", Price: 5520},
+		{ID: "pilgrim-talon", Price: 5520},
+		{ID: "pilgrim-perch", Price: 5520},
+		{ID: "pilgrim-jerkin", Price: 4416},
+		{ID: "pilgrim-robe", Price: 4416},
+		{ID: "pilgrim-leggings", Price: 3680},
+		{ID: "pilgrim-mitts", Price: 3680},
+		{ID: "pilgrim-boots", Price: 3680},
+		{ID: "pilgrim-hood", Price: 3680},
+	}
+	npcs = append(npcs, npcDef{ID: "pilgrim-guide-kaede", Name: "Pilgrim Guide Kaede", ZoneID: 22, Greeting: "Walk slowly. Everyone who hurries ends up queuing with the rest. Take a prayer slip if you need to talk to someone.", FameNation: fame.Neutral})
+	npcVendorCatalog["pilgrim-guide-kaede"] = []VendorItem{
+		{ID: "echo-drop", Price: 50},
+		{ID: "antidote", Price: 80},
+		{ID: "hi-potion", Price: 250},
+		{ID: "pilgrim-blade", Price: 5520},
+		{ID: "pilgrim-talon", Price: 5520},
+		{ID: "pilgrim-perch", Price: 5520},
+		{ID: "pilgrim-jerkin", Price: 4416},
+		{ID: "pilgrim-robe", Price: 4416},
+		{ID: "pilgrim-leggings", Price: 3680},
+		{ID: "pilgrim-mitts", Price: 3680},
+		{ID: "pilgrim-boots", Price: 3680},
+		{ID: "pilgrim-hood", Price: 3680},
+	}
+	npcs = append(npcs, npcDef{ID: "tide-reader-nami", Name: "Tide Reader Nami", ZoneID: 23, Greeting: "The pools remember every tide. I read them so I do not have to read the sea. Bring me kelp, and mind the hag.", FameNation: fame.Neutral})
+	npcVendorCatalog["tide-reader-nami"] = []VendorItem{
+		{ID: "echo-drop", Price: 50},
+		{ID: "antidote", Price: 80},
+		{ID: "hi-potion", Price: 250},
+		{ID: "pilgrim-blade", Price: 5520},
+		{ID: "pilgrim-talon", Price: 5520},
+		{ID: "pilgrim-perch", Price: 5520},
+		{ID: "pilgrim-jerkin", Price: 4416},
+		{ID: "pilgrim-robe", Price: 4416},
+		{ID: "pilgrim-leggings", Price: 3680},
+		{ID: "pilgrim-mitts", Price: 3680},
+		{ID: "pilgrim-boots", Price: 3680},
+		{ID: "pilgrim-hood", Price: 3680},
+	}
+	npcs = append(npcs, npcDef{ID: "marsh-factor-gen", Name: "Marsh Factor Gen", ZoneID: 24, Greeting: "The cormorants fish for the Parliament, the kappa fine them for it, and I count the difference. It is a good living.", FameNation: fame.Neutral})
+	npcVendorCatalog["marsh-factor-gen"] = []VendorItem{
+		{ID: "echo-drop", Price: 50},
+		{ID: "antidote", Price: 80},
+		{ID: "hi-potion", Price: 250},
+		{ID: "tidewarden-blade", Price: 7470},
+		{ID: "tidewarden-talon", Price: 7470},
+		{ID: "tidewarden-perch", Price: 7470},
+		{ID: "tidewarden-jerkin", Price: 5976},
+		{ID: "tidewarden-robe", Price: 5976},
+		{ID: "tidewarden-leggings", Price: 4980},
+		{ID: "tidewarden-mitts", Price: 4980},
+		{ID: "tidewarden-boots", Price: 4980},
+		{ID: "tidewarden-hood", Price: 4980},
+	}
+	npcs = append(npcs, npcDef{ID: "gatekeeper-ume", Name: "Gatekeeper Ume", ZoneID: 25, Greeting: "A thousand gates and each one asks a question. Answer politely, answer briefly, and never answer 'technically'.", FameNation: fame.Neutral})
+	npcVendorCatalog["gatekeeper-ume"] = []VendorItem{
+		{ID: "echo-drop", Price: 50},
+		{ID: "antidote", Price: 80},
+		{ID: "hi-potion", Price: 250},
+		{ID: "tidewarden-blade", Price: 7470},
+		{ID: "tidewarden-talon", Price: 7470},
+		{ID: "tidewarden-perch", Price: 7470},
+		{ID: "tidewarden-jerkin", Price: 5976},
+		{ID: "tidewarden-robe", Price: 5976},
+		{ID: "tidewarden-leggings", Price: 4980},
+		{ID: "tidewarden-mitts", Price: 4980},
+		{ID: "tidewarden-boots", Price: 4980},
+		{ID: "tidewarden-hood", Price: 4980},
+	}
+	npcs = append(npcs, npcDef{ID: "sexton-hiro", Name: "Sexton Hiro", ZoneID: 26, Greeting: "The Church of the Sleepers never closed. It just went down. Mind the stairs; the congregation is still in.", FameNation: fame.Neutral})
+	npcVendorCatalog["sexton-hiro"] = []VendorItem{
+		{ID: "echo-drop", Price: 50},
+		{ID: "antidote", Price: 80},
+		{ID: "hi-potion", Price: 250},
+		{ID: "tidewarden-blade", Price: 7470},
+		{ID: "tidewarden-talon", Price: 7470},
+		{ID: "tidewarden-perch", Price: 7470},
+		{ID: "tidewarden-jerkin", Price: 5976},
+		{ID: "tidewarden-robe", Price: 5976},
+		{ID: "tidewarden-leggings", Price: 4980},
+		{ID: "tidewarden-mitts", Price: 4980},
+		{ID: "tidewarden-boots", Price: 4980},
+		{ID: "tidewarden-hood", Price: 4980},
+	}
+	npcs = append(npcs, npcDef{ID: "road-bailiff-kuma", Name: "Bailiff Kuma", ZoneID: 28, Greeting: "The council is in session. The council is always in session. Please keep your hands where the leaves can see them.", FameNation: fame.Neutral})
+	npcs = append(npcs, npcDef{ID: "tea-mistress-fumi", Name: "Tea Mistress Fumi", ZoneID: 28, Greeting: "Hospitality binds both parties, traveller. You will find the host is bound to be gracious -- and so, I'm afraid, are you.", FameNation: fame.Neutral})
+	npcVendorCatalog["tea-mistress-fumi"] = []VendorItem{
+		{ID: "echo-drop", Price: 50},
+		{ID: "antidote", Price: 80},
+		{ID: "hi-potion", Price: 250},
+		{ID: "reachrunner-blade", Price: 9720},
+		{ID: "reachrunner-talon", Price: 9720},
+		{ID: "reachrunner-perch", Price: 9720},
+		{ID: "reachrunner-jerkin", Price: 7776},
+		{ID: "reachrunner-robe", Price: 7776},
+		{ID: "reachrunner-leggings", Price: 6480},
+		{ID: "reachrunner-mitts", Price: 6480},
+		{ID: "reachrunner-boots", Price: 6480},
+		{ID: "reachrunner-hood", Price: 6480},
+	}
+	npcs = append(npcs, npcDef{ID: "silk-factor-orochi", Name: "Silk Factor Orochi", ZoneID: 29, Greeting: "Everything on these cliffs is a thread, and every thread is a message. I deal in the ones nobody is waiting on.", FameNation: fame.Neutral})
+	npcVendorCatalog["silk-factor-orochi"] = []VendorItem{
+		{ID: "echo-drop", Price: 50},
+		{ID: "antidote", Price: 80},
+		{ID: "hi-potion", Price: 250},
+		{ID: "reachrunner-blade", Price: 9720},
+		{ID: "reachrunner-talon", Price: 9720},
+		{ID: "reachrunner-perch", Price: 9720},
+		{ID: "reachrunner-jerkin", Price: 7776},
+		{ID: "reachrunner-robe", Price: 7776},
+		{ID: "reachrunner-leggings", Price: 6480},
+		{ID: "reachrunner-mitts", Price: 6480},
+		{ID: "reachrunner-boots", Price: 6480},
+		{ID: "reachrunner-hood", Price: 6480},
+	}
+	npcs = append(npcs, npcDef{ID: "receiver-hatsu", Name: "Receiver Hatsu", ZoneID: 30, Greeting: "These ships are in receivership. So, technically, are you. Please do not use the word 'technically' near the Admiral.", FameNation: fame.Neutral})
+	npcVendorCatalog["receiver-hatsu"] = []VendorItem{
+		{ID: "echo-drop", Price: 50},
+		{ID: "antidote", Price: 80},
+		{ID: "hi-potion", Price: 250},
+		{ID: "reachrunner-blade", Price: 9720},
+		{ID: "reachrunner-talon", Price: 9720},
+		{ID: "reachrunner-perch", Price: 9720},
+		{ID: "reachrunner-jerkin", Price: 7776},
+		{ID: "reachrunner-robe", Price: 7776},
+		{ID: "reachrunner-leggings", Price: 6480},
+		{ID: "reachrunner-mitts", Price: 6480},
+		{ID: "reachrunner-boots", Price: 6480},
+		{ID: "reachrunner-hood", Price: 6480},
+	}
+	npcs = append(npcs, npcDef{ID: "wellspring-keeper-sora", Name: "Wellspring Keeper Sora", ZoneID: 31, Greeting: "The pool keeps every tide that ever turned. Whatever you carried out of the Reach, you carry back. Mind the Cube below.", FameNation: fame.Neutral})
+	npcVendorCatalog["wellspring-keeper-sora"] = []VendorItem{
+		{ID: "echo-drop", Price: 50},
+		{ID: "antidote", Price: 80},
+		{ID: "hi-potion", Price: 250},
+		{ID: "wellspring-blade", Price: 15120},
+		{ID: "wellspring-talon", Price: 15120},
+		{ID: "wellspring-perch", Price: 15120},
+		{ID: "wellspring-jerkin", Price: 12096},
+		{ID: "wellspring-robe", Price: 12096},
+		{ID: "wellspring-leggings", Price: 10080},
+		{ID: "wellspring-mitts", Price: 10080},
+		{ID: "wellspring-boots", Price: 10080},
+		{ID: "wellspring-hood", Price: 10080},
 	}
 	mobSpellPool["field-mouse"] = []status.Kind{status.Slow}
 	mobSpellPool["fledgling-owlet"] = []status.Kind{status.Silence}
@@ -217,6 +502,69 @@ func init() {
 	mobSpellPool["protocol-sentinel"] = []status.Kind{status.Bind, status.Paralyze}
 	mobSpellPool["redacted-owl"] = []status.Kind{status.Silence, status.Bind, status.Paralyze}
 	mobSpellPool["unfiled-archivist"] = []status.Kind{status.Silence, status.Bind, status.Paralyze, status.Poison}
+	mobSpellPool["quay-rat"] = []status.Kind{status.Slow}
+	mobSpellPool["dock-crab"] = []status.Kind{status.Bind}
+	mobSpellPool["customs-gull"] = []status.Kind{status.Silence}
+	mobSpellPool["salt-hare"] = []status.Kind{status.Slow}
+	mobSpellPool["brine-scorpion"] = []status.Kind{status.Poison}
+	mobSpellPool["glass-lizard"] = []status.Kind{status.Paralyze, status.Slow}
+	mobSpellPool["pilgrim-shade"] = []status.Kind{status.Silence, status.Bind}
+	mobSpellPool["prayer-wheel-mite"] = []status.Kind{status.Slow, status.Paralyze}
+	mobSpellPool["temple-monkey"] = []status.Kind{status.Slow}
+	mobSpellPool["tidepool-crab"] = []status.Kind{status.Bind}
+	mobSpellPool["anemone-stalker"] = []status.Kind{status.Poison, status.Paralyze}
+	mobSpellPool["sea-hag"] = []status.Kind{status.Silence, status.Poison}
+	mobSpellPool["cormorant"] = []status.Kind{status.Slow}
+	mobSpellPool["mud-skipper"] = []status.Kind{status.Poison}
+	mobSpellPool["bog-kappa"] = []status.Kind{status.Bind, status.Silence}
+	mobSpellPool["gate-tengu"] = []status.Kind{status.Silence, status.Slow}
+	mobSpellPool["fox-fire-wisp"] = []status.Kind{status.Silence, status.Paralyze}
+	mobSpellPool["komainu"] = []status.Kind{status.Bind, status.Paralyze}
+	mobSpellPool["brine-acolyte"] = []status.Kind{status.Silence, status.Poison}
+	mobSpellPool["drowned-choirboy"] = []status.Kind{status.Silence}
+	mobSpellPool["shell-sexton"] = []status.Kind{status.Bind, status.Paralyze}
+	mobSpellPool["geode-beetle"] = []status.Kind{status.Slow}
+	mobSpellPool["quartz-crawler"] = []status.Kind{status.Bind, status.Poison}
+	mobSpellPool["lantern-bat"] = []status.Kind{status.Silence, status.Slow}
+	mobSpellPool["geode-beetle"] = []status.Kind{status.Slow}
+	mobSpellPool["quartz-crawler"] = []status.Kind{status.Bind, status.Poison}
+	mobSpellPool["quartz-crawler"] = []status.Kind{status.Bind, status.Poison}
+	mobSpellPool["lantern-bat"] = []status.Kind{status.Silence, status.Slow}
+	mobSpellPool["quartz-crawler"] = []status.Kind{status.Bind, status.Poison}
+	mobSpellPool["geode-beetle"] = []status.Kind{status.Slow}
+	mobSpellPool["brine-acolyte"] = []status.Kind{status.Silence, status.Poison}
+	mobSpellPool["drowned-choirboy"] = []status.Kind{status.Silence}
+	mobSpellPool["drowned-choirboy"] = []status.Kind{status.Silence}
+	mobSpellPool["shell-sexton"] = []status.Kind{status.Bind, status.Paralyze}
+	mobSpellPool["shell-sexton"] = []status.Kind{status.Bind, status.Paralyze}
+	mobSpellPool["drowned-choirboy"] = []status.Kind{status.Silence}
+	mobSpellPool["tanuki-bailiff"] = []status.Kind{status.Bind, status.Silence}
+	mobSpellPool["leaf-bandit"] = []status.Kind{status.Slow, status.Paralyze}
+	mobSpellPool["hospitality-golem"] = []status.Kind{status.Bind, status.Paralyze}
+	mobSpellPool["cliff-weaver"] = []status.Kind{status.Bind, status.Poison}
+	mobSpellPool["thread-sentinel"] = []status.Kind{status.Paralyze, status.Bind}
+	mobSpellPool["silk-wasp"] = []status.Kind{status.Poison, status.Slow}
+	mobSpellPool["foreclosure-bailiff"] = []status.Kind{status.Silence, status.Bind}
+	mobSpellPool["anchor-wight"] = []status.Kind{status.Bind, status.Paralyze}
+	mobSpellPool["ledger-eel"] = []status.Kind{status.Paralyze, status.Poison}
+	mobSpellPool["tide-echo"] = []status.Kind{status.Silence, status.Slow}
+	mobSpellPool["paradox-shade"] = []status.Kind{status.Silence, status.Bind, status.Paralyze}
+	mobSpellPool["cube-warden"] = []status.Kind{status.Bind, status.Paralyze, status.Silence}
+	mobSpellPool["tide-echo"] = []status.Kind{status.Silence, status.Slow}
+	mobSpellPool["paradox-shade"] = []status.Kind{status.Silence, status.Bind, status.Paralyze}
+	mobSpellPool["paradox-shade"] = []status.Kind{status.Silence, status.Bind, status.Paralyze}
+	mobSpellPool["cube-warden"] = []status.Kind{status.Bind, status.Paralyze, status.Silence}
+	mobSpellPool["paradox-shade"] = []status.Kind{status.Silence, status.Bind, status.Paralyze}
+	mobSpellPool["cube-warden"] = []status.Kind{status.Bind, status.Paralyze, status.Silence}
+	mobSpellPool["cube-warden"] = []status.Kind{status.Bind, status.Paralyze, status.Silence}
+	mobSpellPool["paradox-shade"] = []status.Kind{status.Silence, status.Bind, status.Paralyze}
+	mobSpellPool["paradox-shade"] = []status.Kind{status.Silence, status.Bind, status.Paralyze}
+	mobSpellPool["cube-warden"] = []status.Kind{status.Bind, status.Paralyze, status.Silence}
+	itemDisplayName["acolyte-rosary"] = "Acolyte Rosary"
+	itemDisplayName["admiral's-writ-cutlass"] = "Admiral's Writ Cutlass"
+	itemDisplayName["anchor-link"] = "Anchor Link"
+	itemDisplayName["anemone-shawl"] = "Anemone Shawl"
+	itemDisplayName["anemone-tendril"] = "Anemone Tendril"
 	itemDisplayName["archivist-blade"] = "Archivist Blade"
 	itemDisplayName["archivist-boots"] = "Archivist Boots"
 	itemDisplayName["archivist-hood"] = "Archivist Hood"
@@ -227,19 +575,37 @@ func init() {
 	itemDisplayName["archivist-robe"] = "Archivist Robe"
 	itemDisplayName["archivist-talon"] = "Archivist Talon"
 	itemDisplayName["badger-claw"] = "Badger Claw"
+	itemDisplayName["beetle-plate"] = "Beetle Plate"
+	itemDisplayName["bell-metal-staff"] = "Bell-Metal Staff"
 	itemDisplayName["black-bar-mantle"] = "Black Bar Mantle"
 	itemDisplayName["black-bar-shard"] = "Black Bar Shard"
 	itemDisplayName["blind-parliament-robe"] = "Blind Parliament Robe"
 	itemDisplayName["bookbinder-gloves"] = "Bookbinder Gloves"
 	itemDisplayName["bookbinding-paste"] = "Bookbinding Paste"
+	itemDisplayName["both-sides-mantle"] = "Both-Sides Mantle"
 	itemDisplayName["brass-plate-shard"] = "Brass Plate Shard"
+	itemDisplayName["brass-wheel-pin"] = "Brass Wheel Pin"
+	itemDisplayName["brine-pearl"] = "Brine Pearl"
+	itemDisplayName["bunbuku's-teakettle-helm"] = "Bunbuku's Teakettle Helm"
 	itemDisplayName["burrower-belt"] = "Burrower Belt"
+	itemDisplayName["cardinal's-brine-ring"] = "Cardinal's Brine Ring"
+	itemDisplayName["choir-sheet"] = "Choir Sheet"
+	itemDisplayName["chrono-filament"] = "Chrono Filament"
+	itemDisplayName["cinder-rosary"] = "Cinder Rosary"
+	itemDisplayName["coin-flip-blade"] = "Coin-Flip Blade"
 	itemDisplayName["compacted-ring"] = "Compacted Ring"
+	itemDisplayName["cormorant-feather"] = "Cormorant Feather"
+	itemDisplayName["council-gavel"] = "Council Gavel"
+	itemDisplayName["crab-claw"] = "Crab Claw"
 	itemDisplayName["crawler-mandible"] = "Crawler Mandible"
+	itemDisplayName["cube-splinter"] = "Cube Splinter"
+	itemDisplayName["cube-warden's-aegis"] = "Cube Warden's Aegis"
+	itemDisplayName["cucumber-brine"] = "Cucumber Brine"
 	itemDisplayName["down-feather"] = "Down Feather"
 	itemDisplayName["downy-mantle"] = "Downy Mantle"
 	itemDisplayName["drafted-complaint-blade"] = "Drafted Complaint Blade"
 	itemDisplayName["eagle-owl-plume"] = "Eagle Owl Plume"
+	itemDisplayName["eel-skin"] = "Eel Skin"
 	itemDisplayName["eyeless-dagger"] = "Eyeless Dagger"
 	itemDisplayName["fieldwing-blade"] = "Fieldwing Blade"
 	itemDisplayName["fieldwing-boots"] = "Fieldwing Boots"
@@ -250,6 +616,7 @@ func init() {
 	itemDisplayName["fieldwing-perch"] = "Fieldwing Perch"
 	itemDisplayName["fieldwing-robe"] = "Fieldwing Robe"
 	itemDisplayName["fieldwing-talon"] = "Fieldwing Talon"
+	itemDisplayName["fish-oil"] = "Fish Oil"
 	itemDisplayName["fledgling-blade"] = "Fledgling Blade"
 	itemDisplayName["fledgling-boots"] = "Fledgling Boots"
 	itemDisplayName["fledgling-hood"] = "Fledgling Hood"
@@ -260,23 +627,52 @@ func init() {
 	itemDisplayName["fledgling-robe"] = "Fledgling Robe"
 	itemDisplayName["fledgling-talon"] = "Fledgling Talon"
 	itemDisplayName["footnote-ring"] = "Footnote Ring"
+	itemDisplayName["foreclosure-sash"] = "Foreclosure Sash"
+	itemDisplayName["foreclosure-writ"] = "Foreclosure Writ"
+	itemDisplayName["foxfire-blade"] = "Foxfire Blade"
+	itemDisplayName["foxfire-boots"] = "Foxfire Boots"
+	itemDisplayName["foxfire-hood"] = "Foxfire Hood"
+	itemDisplayName["foxfire-jerkin"] = "Foxfire Jerkin"
+	itemDisplayName["foxfire-leggings"] = "Foxfire Leggings"
+	itemDisplayName["foxfire-mitts"] = "Foxfire Mitts"
+	itemDisplayName["foxfire-perch"] = "Foxfire Perch"
+	itemDisplayName["foxfire-robe"] = "Foxfire Robe"
+	itemDisplayName["foxfire-talon"] = "Foxfire Talon"
+	itemDisplayName["foxfire-wick"] = "Foxfire Wick"
 	itemDisplayName["gale-index-staff"] = "Gale Index Staff"
+	itemDisplayName["geode-edge-katana"] = "Geode-Edge Katana"
+	itemDisplayName["geode-shard"] = "Geode Shard"
+	itemDisplayName["glass-scale"] = "Glass Scale"
 	itemDisplayName["guano-clump"] = "Guano Clump"
 	itemDisplayName["guano-tooth"] = "Guano Tooth"
+	itemDisplayName["guardian-stone"] = "Guardian Stone"
+	itemDisplayName["gull-feather"] = "Gull Feather"
 	itemDisplayName["hag-feather"] = "Hag Feather"
+	itemDisplayName["hag-tooth"] = "Hag Tooth"
+	itemDisplayName["halite-crown"] = "Halite Crown"
 	itemDisplayName["hare-pelt"] = "Hare Pelt"
+	itemDisplayName["hayate's-fan"] = "Hayate's Fan"
 	itemDisplayName["hedge-hide"] = "Hedge Hide"
 	itemDisplayName["hedgemaw-hide-vest"] = "Hedgemaw Hide Vest"
 	itemDisplayName["heron-quill"] = "Heron Quill"
 	itemDisplayName["heron-quill-bow"] = "Heron Quill Bow"
+	itemDisplayName["hospitality-token"] = "Hospitality Token"
 	itemDisplayName["ink-vial"] = "Ink Vial"
 	itemDisplayName["insufferable-choker"] = "Insufferable Choker"
+	itemDisplayName["ixchel's-spinneret-charm"] = "Ixchel's Spinneret Charm"
+	itemDisplayName["kappa-hide-greaves"] = "Kappa-Hide Greaves"
+	itemDisplayName["kappa-shell"] = "Kappa Shell"
+	itemDisplayName["kelp-fiber"] = "Kelp Fiber"
 	itemDisplayName["kestrel-pinion"] = "Kestrel Pinion"
 	itemDisplayName["lamp-oil"] = "Lamp Oil"
+	itemDisplayName["lantern-wing"] = "Lantern Wing"
+	itemDisplayName["leaf-seal"] = "Leaf Seal"
 	itemDisplayName["lens-shard"] = "Lens Shard"
 	itemDisplayName["lensmaster-monocle"] = "Lensmaster Monocle"
+	itemDisplayName["magistrate's-dish"] = "Magistrate's Dish"
 	itemDisplayName["marginalia-cloak"] = "Marginalia Cloak"
 	itemDisplayName["matriarch-plume-mantle"] = "Matriarch Plume Mantle"
+	itemDisplayName["monkey-fur"] = "Monkey Fur"
 	itemDisplayName["moor-cataloguer-coat"] = "Moor Cataloguer Coat"
 	itemDisplayName["moth-dust"] = "Moth Dust"
 	itemDisplayName["mouse-whisker"] = "Mouse Whisker"
@@ -294,8 +690,21 @@ func init() {
 	itemDisplayName["observer-talon"] = "Observer Talon"
 	itemDisplayName["overdue-greatsword"] = "Overdue Greatsword"
 	itemDisplayName["owl-pellet"] = "Owl Pellet"
+	itemDisplayName["paradox-dust"] = "Paradox Dust"
+	itemDisplayName["pearl-grit"] = "Pearl Grit"
 	itemDisplayName["pellet-bone"] = "Pellet Bone"
 	itemDisplayName["pellet-plate-cap"] = "Pellet Plate Cap"
+	itemDisplayName["pilgrim-bell"] = "Pilgrim Bell"
+	itemDisplayName["pilgrim-blade"] = "Pilgrim Blade"
+	itemDisplayName["pilgrim-boots"] = "Pilgrim Boots"
+	itemDisplayName["pilgrim-hood"] = "Pilgrim Hood"
+	itemDisplayName["pilgrim-jerkin"] = "Pilgrim Jerkin"
+	itemDisplayName["pilgrim-leggings"] = "Pilgrim Leggings"
+	itemDisplayName["pilgrim-mitts"] = "Pilgrim Mitts"
+	itemDisplayName["pilgrim-perch"] = "Pilgrim Perch"
+	itemDisplayName["pilgrim-robe"] = "Pilgrim Robe"
+	itemDisplayName["pilgrim-talon"] = "Pilgrim Talon"
+	itemDisplayName["prayer-slip"] = "Prayer Slip"
 	itemDisplayName["prince-slick-gauntlets"] = "Prince Slick Gauntlets"
 	itemDisplayName["prismatic-ring"] = "Prismatic Ring"
 	itemDisplayName["protocol-blade"] = "Protocol Blade"
@@ -308,24 +717,79 @@ func init() {
 	itemDisplayName["protocol-robe"] = "Protocol Robe"
 	itemDisplayName["protocol-stone"] = "Protocol Stone"
 	itemDisplayName["protocol-talon"] = "Protocol Talon"
+	itemDisplayName["quartz-heart-pendant"] = "Quartz Heart Pendant"
+	itemDisplayName["quartz-sliver"] = "Quartz Sliver"
+	itemDisplayName["rat-tail"] = "Rat Tail"
+	itemDisplayName["reachrunner-blade"] = "Reachrunner Blade"
+	itemDisplayName["reachrunner-boots"] = "Reachrunner Boots"
+	itemDisplayName["reachrunner-hood"] = "Reachrunner Hood"
+	itemDisplayName["reachrunner-jerkin"] = "Reachrunner Jerkin"
+	itemDisplayName["reachrunner-leggings"] = "Reachrunner Leggings"
+	itemDisplayName["reachrunner-mitts"] = "Reachrunner Mitts"
+	itemDisplayName["reachrunner-perch"] = "Reachrunner Perch"
+	itemDisplayName["reachrunner-robe"] = "Reachrunner Robe"
+	itemDisplayName["reachrunner-talon"] = "Reachrunner Talon"
 	itemDisplayName["redacted-edge"] = "Redacted Edge"
 	itemDisplayName["redacted-feather"] = "Redacted Feather"
 	itemDisplayName["rime-pelt"] = "Rime Pelt"
 	itemDisplayName["roost-wing"] = "Roost Wing"
+	itemDisplayName["salt-crystal"] = "Salt Crystal"
+	itemDisplayName["salt-glass-dagger"] = "Salt-Glass Dagger"
+	itemDisplayName["salt-hare-pelt"] = "Salt Hare Pelt"
+	itemDisplayName["scorpion-stinger"] = "Scorpion Stinger"
 	itemDisplayName["sentry-quill"] = "Sentry Quill"
 	itemDisplayName["seven-drafts-blade"] = "Seven Drafts Blade"
 	itemDisplayName["seventeen-footnote-staff"] = "Seventeen Footnote Staff"
+	itemDisplayName["sexton-key"] = "Sexton Key"
 	itemDisplayName["shade-feather"] = "Shade Feather"
 	itemDisplayName["shade-wing-cape"] = "Shade Wing Cape"
+	itemDisplayName["shell-fragment"] = "Shell Fragment"
+	itemDisplayName["shell-mark-coin"] = "Shell-Mark Coin"
+	itemDisplayName["silkmother's-longbow"] = "Silkmother's Longbow"
+	itemDisplayName["skipper-scale"] = "Skipper Scale"
+	itemDisplayName["sleeper's-crozier"] = "Sleeper's Crozier"
 	itemDisplayName["sleet-crystal"] = "Sleet Crystal"
 	itemDisplayName["slug-ichor"] = "Slug Ichor"
 	itemDisplayName["snowfeather"] = "Snowfeather"
 	itemDisplayName["snowfeather-sabatons"] = "Snowfeather Sabatons"
+	itemDisplayName["stale-ledger-page"] = "Stale Ledger Page"
+	itemDisplayName["stolen-leaf"] = "Stolen Leaf"
 	itemDisplayName["strix-talon"] = "Strix Talon"
+	itemDisplayName["tarred-rope"] = "Tarred Rope"
+	itemDisplayName["teapot-shard"] = "Teapot Shard"
+	itemDisplayName["temple-incense"] = "Temple Incense"
+	itemDisplayName["tengu-feather"] = "Tengu Feather"
+	itemDisplayName["thread-spool"] = "Thread Spool"
+	itemDisplayName["tidepool-rod"] = "Tidepool Rod"
+	itemDisplayName["tidewarden-blade"] = "Tidewarden Blade"
+	itemDisplayName["tidewarden-boots"] = "Tidewarden Boots"
+	itemDisplayName["tidewarden-hood"] = "Tidewarden Hood"
+	itemDisplayName["tidewarden-jerkin"] = "Tidewarden Jerkin"
+	itemDisplayName["tidewarden-leggings"] = "Tidewarden Leggings"
+	itemDisplayName["tidewarden-mitts"] = "Tidewarden Mitts"
+	itemDisplayName["tidewarden-perch"] = "Tidewarden Perch"
+	itemDisplayName["tidewarden-robe"] = "Tidewarden Robe"
+	itemDisplayName["tidewarden-talon"] = "Tidewarden Talon"
+	itemDisplayName["tidewater-vial"] = "Tidewater Vial"
+	itemDisplayName["torii-lacquer"] = "Torii Lacquer"
 	itemDisplayName["unsent-ring"] = "Unsent Ring"
 	itemDisplayName["vellum-scrap"] = "Vellum Scrap"
+	itemDisplayName["vesper's-chrono-blade"] = "Vesper's Chrono Blade"
 	itemDisplayName["vole-pelt"] = "Vole Pelt"
 	itemDisplayName["waders-of-record"] = "Waders of Record"
+	itemDisplayName["warlord's-feathered-cape"] = "Warlord's Feathered Cape"
+	itemDisplayName["wasp-wing"] = "Wasp Wing"
+	itemDisplayName["weaver-silk"] = "Weaver Silk"
+	itemDisplayName["web-spinneret"] = "Web Spinneret"
+	itemDisplayName["wellspring-blade"] = "Wellspring Blade"
+	itemDisplayName["wellspring-boots"] = "Wellspring Boots"
+	itemDisplayName["wellspring-hood"] = "Wellspring Hood"
+	itemDisplayName["wellspring-jerkin"] = "Wellspring Jerkin"
+	itemDisplayName["wellspring-leggings"] = "Wellspring Leggings"
+	itemDisplayName["wellspring-mitts"] = "Wellspring Mitts"
+	itemDisplayName["wellspring-perch"] = "Wellspring Perch"
+	itemDisplayName["wellspring-robe"] = "Wellspring Robe"
+	itemDisplayName["wellspring-talon"] = "Wellspring Talon"
 	itemDisplayName["whisker-charm"] = "Whisker Charm"
 	itemDisplayName["windbound-sash"] = "Windbound Sash"
 	itemDisplayName["wisp-glass"] = "Wisp Glass"

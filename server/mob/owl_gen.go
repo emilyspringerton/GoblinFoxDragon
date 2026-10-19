@@ -49,6 +49,112 @@ var OwlZoneMobs = map[int][]OwlMobDef{
 		{Kind: "redacted-owl", HP: 1500, Damage: 96, MoveSpeed: 5.4, AggroRange: 30.0, LeashRange: 70.0, MeleeRange: 2.0, SwingMS: 3000, Count: 4, Ring: 25.0},
 		{Kind: "unfiled-archivist", HP: 1800, Damage: 112, MoveSpeed: 4.6, AggroRange: 32.0, LeashRange: 74.0, MeleeRange: 2.0, SwingMS: 3000, Count: 3, Ring: 34.0},
 	},
+	19: {},
+	32: {},
+	20: {
+		{Kind: "quay-rat", HP: 1694, Damage: 84, MoveSpeed: 4.0, AggroRange: 0.5, LeashRange: 20.0, MeleeRange: 2.0, SwingMS: 3000, Count: 6, Ring: 15.0},
+		{Kind: "dock-crab", HP: 2165, Damage: 88, MoveSpeed: 4.4, AggroRange: 14.0, LeashRange: 38.0, MeleeRange: 2.0, SwingMS: 3000, Count: 5, Ring: 25.0},
+		{Kind: "customs-gull", HP: 1917, Damage: 92, MoveSpeed: 5.4, AggroRange: 18.0, LeashRange: 46.0, MeleeRange: 2.0, SwingMS: 3000, Count: 3, Ring: 33.0},
+	},
+	21: {
+		{Kind: "salt-hare", HP: 1804, Damage: 88, MoveSpeed: 5.4, AggroRange: 0.5, LeashRange: 20.0, MeleeRange: 2.0, SwingMS: 3000, Count: 6, Ring: 15.0},
+		{Kind: "brine-scorpion", HP: 1974, Damage: 94, MoveSpeed: 4.4, AggroRange: 20.0, LeashRange: 50.0, MeleeRange: 2.0, SwingMS: 3000, Count: 5, Ring: 26.0},
+		{Kind: "glass-lizard", HP: 2684, Damage: 100, MoveSpeed: 4.4, AggroRange: 22.0, LeashRange: 54.0, MeleeRange: 2.0, SwingMS: 3000, Count: 3, Ring: 34.0},
+	},
+	22: {
+		{Kind: "pilgrim-shade", HP: 1917, Damage: 92, MoveSpeed: 4.4, AggroRange: 14.0, LeashRange: 38.0, MeleeRange: 2.0, SwingMS: 3000, Count: 6, Ring: 15.0},
+		{Kind: "prayer-wheel-mite", HP: 2089, Damage: 98, MoveSpeed: 5.0, AggroRange: 20.0, LeashRange: 50.0, MeleeRange: 2.0, SwingMS: 3000, Count: 5, Ring: 26.0},
+		{Kind: "temple-monkey", HP: 2264, Damage: 104, MoveSpeed: 5.6, AggroRange: 22.0, LeashRange: 54.0, MeleeRange: 2.0, SwingMS: 3000, Count: 3, Ring: 34.0},
+	},
+	23: {
+		{Kind: "tidepool-crab", HP: 2300, Damage: 92, MoveSpeed: 4.4, AggroRange: 14.0, LeashRange: 38.0, MeleeRange: 2.0, SwingMS: 3000, Count: 6, Ring: 15.0},
+		{Kind: "anemone-stalker", HP: 2089, Damage: 98, MoveSpeed: 4.4, AggroRange: 20.0, LeashRange: 50.0, MeleeRange: 2.0, SwingMS: 3000, Count: 5, Ring: 26.0},
+		{Kind: "sea-hag", HP: 3056, Damage: 120, MoveSpeed: 4.4, AggroRange: 24.0, LeashRange: 58.0, MeleeRange: 2.0, SwingMS: 3000, Count: 3, Ring: 34.0},
+	},
+	24: {
+		{Kind: "cormorant", HP: 2382, Damage: 108, MoveSpeed: 5.2, AggroRange: 16.0, LeashRange: 42.0, MeleeRange: 2.0, SwingMS: 3000, Count: 6, Ring: 15.0},
+		{Kind: "mud-skipper", HP: 2623, Damage: 116, MoveSpeed: 5.0, AggroRange: 20.0, LeashRange: 50.0, MeleeRange: 2.0, SwingMS: 3000, Count: 5, Ring: 26.0},
+		{Kind: "bog-kappa", HP: 3586, Damage: 124, MoveSpeed: 4.4, AggroRange: 24.0, LeashRange: 58.0, MeleeRange: 2.0, SwingMS: 3000, Count: 3, Ring: 34.0},
+	},
+	25: {
+		{Kind: "gate-tengu", HP: 2502, Damage: 112, MoveSpeed: 5.4, AggroRange: 20.0, LeashRange: 50.0, MeleeRange: 2.0, SwingMS: 3000, Count: 6, Ring: 15.0},
+		{Kind: "fox-fire-wisp", HP: 2745, Damage: 120, MoveSpeed: 5.0, AggroRange: 22.0, LeashRange: 54.0, MeleeRange: 2.0, SwingMS: 3000, Count: 5, Ring: 26.0},
+		{Kind: "komainu", HP: 3892, Damage: 128, MoveSpeed: 4.4, AggroRange: 26.0, LeashRange: 62.0, MeleeRange: 2.0, SwingMS: 3000, Count: 3, Ring: 34.0},
+	},
+	26: {
+		{Kind: "brine-acolyte", HP: 2502, Damage: 112, MoveSpeed: 4.4, AggroRange: 18.0, LeashRange: 46.0, MeleeRange: 2.0, SwingMS: 3000, Count: 6, Ring: 15.0},
+		{Kind: "drowned-choirboy", HP: 2745, Damage: 120, MoveSpeed: 5.0, AggroRange: 22.0, LeashRange: 54.0, MeleeRange: 2.0, SwingMS: 3000, Count: 5, Ring: 26.0},
+		{Kind: "shell-sexton", HP: 3892, Damage: 128, MoveSpeed: 4.4, AggroRange: 24.0, LeashRange: 58.0, MeleeRange: 2.0, SwingMS: 3000, Count: 3, Ring: 34.0},
+	},
+	27: {
+		{Kind: "geode-beetle", HP: 2858, Damage: 108, MoveSpeed: 4.4, AggroRange: 16.0, LeashRange: 42.0, MeleeRange: 2.0, SwingMS: 3000, Count: 6, Ring: 14.0},
+		{Kind: "quartz-crawler", HP: 2623, Damage: 116, MoveSpeed: 4.4, AggroRange: 20.0, LeashRange: 50.0, MeleeRange: 2.0, SwingMS: 3000, Count: 5, Ring: 24.0},
+		{Kind: "lantern-bat", HP: 2869, Damage: 124, MoveSpeed: 5.8, AggroRange: 24.0, LeashRange: 58.0, MeleeRange: 2.0, SwingMS: 3000, Count: 3, Ring: 32.0},
+	},
+	401: {
+		{Kind: "geode-beetle", HP: 3002, Damage: 112, MoveSpeed: 4.4, AggroRange: 16.0, LeashRange: 42.0, MeleeRange: 2.0, SwingMS: 3000, Count: 5, Ring: 14.0},
+		{Kind: "quartz-crawler", HP: 2623, Damage: 116, MoveSpeed: 4.4, AggroRange: 20.0, LeashRange: 50.0, MeleeRange: 2.0, SwingMS: 3000, Count: 4, Ring: 24.0},
+	},
+	402: {
+		{Kind: "quartz-crawler", HP: 2684, Damage: 118, MoveSpeed: 4.4, AggroRange: 20.0, LeashRange: 50.0, MeleeRange: 2.0, SwingMS: 3000, Count: 5, Ring: 24.0},
+		{Kind: "lantern-bat", HP: 2869, Damage: 124, MoveSpeed: 5.8, AggroRange: 24.0, LeashRange: 58.0, MeleeRange: 2.0, SwingMS: 3000, Count: 4, Ring: 32.0},
+	},
+	403: {
+		{Kind: "quartz-crawler", HP: 2869, Damage: 124, MoveSpeed: 4.4, AggroRange: 22.0, LeashRange: 54.0, MeleeRange: 2.0, SwingMS: 3000, Count: 3, Ring: 20.0},
+		{Kind: "geode-beetle", HP: 3892, Damage: 128, MoveSpeed: 4.4, AggroRange: 22.0, LeashRange: 54.0, MeleeRange: 2.0, SwingMS: 3000, Count: 3, Ring: 28.0},
+	},
+	410: {
+		{Kind: "brine-acolyte", HP: 2623, Damage: 116, MoveSpeed: 4.4, AggroRange: 18.0, LeashRange: 46.0, MeleeRange: 2.0, SwingMS: 3000, Count: 5, Ring: 14.0},
+		{Kind: "drowned-choirboy", HP: 2807, Damage: 122, MoveSpeed: 5.0, AggroRange: 22.0, LeashRange: 54.0, MeleeRange: 2.0, SwingMS: 3000, Count: 4, Ring: 24.0},
+	},
+	411: {
+		{Kind: "drowned-choirboy", HP: 2869, Damage: 124, MoveSpeed: 5.0, AggroRange: 22.0, LeashRange: 54.0, MeleeRange: 2.0, SwingMS: 3000, Count: 4, Ring: 14.0},
+		{Kind: "shell-sexton", HP: 3892, Damage: 128, MoveSpeed: 4.4, AggroRange: 24.0, LeashRange: 58.0, MeleeRange: 2.0, SwingMS: 3000, Count: 4, Ring: 24.0},
+	},
+	412: {
+		{Kind: "shell-sexton", HP: 3892, Damage: 128, MoveSpeed: 4.4, AggroRange: 24.0, LeashRange: 58.0, MeleeRange: 2.0, SwingMS: 3000, Count: 3, Ring: 20.0},
+		{Kind: "drowned-choirboy", HP: 2994, Damage: 128, MoveSpeed: 5.0, AggroRange: 22.0, LeashRange: 54.0, MeleeRange: 2.0, SwingMS: 3000, Count: 3, Ring: 28.0},
+	},
+	28: {
+		{Kind: "tanuki-bailiff", HP: 3247, Damage: 136, MoveSpeed: 4.4, AggroRange: 20.0, LeashRange: 50.0, MeleeRange: 2.0, SwingMS: 3000, Count: 6, Ring: 15.0},
+		{Kind: "leaf-bandit", HP: 3571, Damage: 146, MoveSpeed: 5.4, AggroRange: 24.0, LeashRange: 58.0, MeleeRange: 2.0, SwingMS: 3000, Count: 5, Ring: 26.0},
+		{Kind: "hospitality-golem", HP: 5266, Damage: 156, MoveSpeed: 4.4, AggroRange: 28.0, LeashRange: 66.0, MeleeRange: 2.0, SwingMS: 3000, Count: 3, Ring: 34.0},
+	},
+	29: {
+		{Kind: "cliff-weaver", HP: 3376, Damage: 140, MoveSpeed: 4.4, AggroRange: 22.0, LeashRange: 54.0, MeleeRange: 2.0, SwingMS: 3000, Count: 6, Ring: 15.0},
+		{Kind: "thread-sentinel", HP: 3702, Damage: 150, MoveSpeed: 4.4, AggroRange: 26.0, LeashRange: 62.0, MeleeRange: 2.0, SwingMS: 3000, Count: 5, Ring: 26.0},
+		{Kind: "silk-wasp", HP: 4035, Damage: 160, MoveSpeed: 6.0, AggroRange: 28.0, LeashRange: 66.0, MeleeRange: 2.0, SwingMS: 3000, Count: 3, Ring: 34.0},
+	},
+	30: {
+		{Kind: "foreclosure-bailiff", HP: 3506, Damage: 144, MoveSpeed: 4.4, AggroRange: 22.0, LeashRange: 54.0, MeleeRange: 2.0, SwingMS: 3000, Count: 6, Ring: 15.0},
+		{Kind: "anchor-wight", HP: 4984, Damage: 154, MoveSpeed: 4.4, AggroRange: 26.0, LeashRange: 62.0, MeleeRange: 2.0, SwingMS: 3000, Count: 5, Ring: 26.0},
+		{Kind: "ledger-eel", HP: 4170, Damage: 164, MoveSpeed: 5.8, AggroRange: 28.0, LeashRange: 66.0, MeleeRange: 2.0, SwingMS: 3000, Count: 3, Ring: 34.0},
+	},
+	31: {
+		{Kind: "tide-echo", HP: 4720, Damage: 180, MoveSpeed: 4.4, AggroRange: 24.0, LeashRange: 58.0, MeleeRange: 2.0, SwingMS: 3000, Count: 5, Ring: 14.0},
+		{Kind: "paradox-shade", HP: 6001, Damage: 188, MoveSpeed: 4.4, AggroRange: 28.0, LeashRange: 66.0, MeleeRange: 2.0, SwingMS: 3000, Count: 4, Ring: 24.0},
+		{Kind: "cube-warden", HP: 7399, Damage: 196, MoveSpeed: 4.4, AggroRange: 30.0, LeashRange: 70.0, MeleeRange: 2.0, SwingMS: 3000, Count: 2, Ring: 32.0},
+	},
+	421: {
+		{Kind: "tide-echo", HP: 4790, Damage: 182, MoveSpeed: 4.4, AggroRange: 24.0, LeashRange: 58.0, MeleeRange: 2.0, SwingMS: 3000, Count: 5, Ring: 14.0},
+		{Kind: "paradox-shade", HP: 5916, Damage: 186, MoveSpeed: 4.4, AggroRange: 28.0, LeashRange: 66.0, MeleeRange: 2.0, SwingMS: 3000, Count: 4, Ring: 24.0},
+	},
+	422: {
+		{Kind: "paradox-shade", HP: 6001, Damage: 188, MoveSpeed: 4.4, AggroRange: 28.0, LeashRange: 66.0, MeleeRange: 2.0, SwingMS: 3000, Count: 4, Ring: 14.0},
+		{Kind: "cube-warden", HP: 7200, Damage: 192, MoveSpeed: 4.4, AggroRange: 30.0, LeashRange: 70.0, MeleeRange: 2.0, SwingMS: 3000, Count: 3, Ring: 24.0},
+	},
+	423: {
+		{Kind: "paradox-shade", HP: 6086, Damage: 190, MoveSpeed: 4.4, AggroRange: 28.0, LeashRange: 66.0, MeleeRange: 2.0, SwingMS: 3000, Count: 3, Ring: 14.0},
+		{Kind: "cube-warden", HP: 7300, Damage: 194, MoveSpeed: 4.4, AggroRange: 30.0, LeashRange: 70.0, MeleeRange: 2.0, SwingMS: 3000, Count: 4, Ring: 22.0},
+	},
+	424: {
+		{Kind: "cube-warden", HP: 7399, Damage: 196, MoveSpeed: 4.4, AggroRange: 30.0, LeashRange: 70.0, MeleeRange: 2.0, SwingMS: 3000, Count: 4, Ring: 18.0},
+		{Kind: "paradox-shade", HP: 6428, Damage: 198, MoveSpeed: 4.4, AggroRange: 28.0, LeashRange: 66.0, MeleeRange: 2.0, SwingMS: 3000, Count: 3, Ring: 28.0},
+	},
+	425: {
+		{Kind: "paradox-shade", HP: 6428, Damage: 198, MoveSpeed: 4.4, AggroRange: 28.0, LeashRange: 66.0, MeleeRange: 2.0, SwingMS: 3000, Count: 3, Ring: 12.0},
+		{Kind: "cube-warden", HP: 7601, Damage: 200, MoveSpeed: 4.4, AggroRange: 32.0, LeashRange: 74.0, MeleeRange: 2.0, SwingMS: 3000, Count: 2, Ring: 20.0},
+	},
 }
 
 // OwlNMDefs: notorious monsters for the Eastwind Owl zones.
@@ -71,4 +177,16 @@ var OwlNMDefs = []OwlNMDef{
 	{ID: "nm-wick-the-moor-cataloguer", Kind: "Wick the Moor-Cataloguer", ZoneID: 17, HP: 3600, Damage: 86, AggroRange: 28.0, LeashRange: 76.0, MeleeRange: 3.0, MoveSpeed: 4.8, SwingMS: 2200, X: -24.0, Z: -23.0},
 	{ID: "nm-the-cataloguer", Kind: "The Cataloguer", ZoneID: 18, HP: 7500, Damage: 130, AggroRange: 30.0, LeashRange: 80.0, MeleeRange: 3.0, MoveSpeed: 4.8, SwingMS: 2200, X: 24.0, Z: -20.0},
 	{ID: "nm-mx-redact", Kind: "Mx. Redact", ZoneID: 18, HP: 7000, Damage: 140, AggroRange: 32.0, LeashRange: 84.0, MeleeRange: 3.0, MoveSpeed: 5.6, SwingMS: 2200, X: -24.0, Z: -20.0},
+	{ID: "nm-dame-halite", Kind: "Dame Halite", ZoneID: 21, HP: 9662, Damage: 150, AggroRange: 24.0, LeashRange: 68.0, MeleeRange: 3.0, MoveSpeed: 5.0, SwingMS: 2200, X: 24.0, Z: -23.0},
+	{ID: "nm-abbess-cinderbell", Kind: "Abbess Cinderbell", ZoneID: 22, HP: 10188, Damage: 156, AggroRange: 24.0, LeashRange: 68.0, MeleeRange: 3.0, MoveSpeed: 5.0, SwingMS: 2200, X: 24.0, Z: -23.0},
+	{ID: "nm-granny-anemone", Kind: "Granny Anemone", ZoneID: 23, HP: 10188, Damage: 156, AggroRange: 24.0, LeashRange: 68.0, MeleeRange: 3.0, MoveSpeed: 5.0, SwingMS: 2200, X: 24.0, Z: -23.0},
+	{ID: "nm-magistrate-kappa", Kind: "Magistrate Kappa", ZoneID: 24, HP: 12910, Damage: 186, AggroRange: 24.0, LeashRange: 68.0, MeleeRange: 3.0, MoveSpeed: 5.0, SwingMS: 2200, X: 24.0, Z: -23.0},
+	{ID: "nm-tengu-warlord-hayate", Kind: "Tengu Warlord Hayate", ZoneID: 25, HP: 13473, Damage: 192, AggroRange: 24.0, LeashRange: 68.0, MeleeRange: 3.0, MoveSpeed: 5.0, SwingMS: 2200, X: 24.0, Z: -23.0},
+	{ID: "nm-old-quartz-ma", Kind: "Old Quartz Ma", ZoneID: 403, HP: 13473, Damage: 192, AggroRange: 20.0, LeashRange: 60.0, MeleeRange: 3.0, MoveSpeed: 5.0, SwingMS: 2200, X: 24.0, Z: -15.0},
+	{ID: "nm-cardinal-brinewright", Kind: "Cardinal Brinewright", ZoneID: 412, HP: 14040, Damage: 198, AggroRange: 22.0, LeashRange: 64.0, MeleeRange: 3.0, MoveSpeed: 5.0, SwingMS: 2200, X: 24.0, Z: -15.0},
+	{ID: "nm-bailiff-bunbuku", Kind: "Bailiff Bunbuku", ZoneID: 28, HP: 17554, Damage: 234, AggroRange: 24.0, LeashRange: 68.0, MeleeRange: 3.0, MoveSpeed: 5.0, SwingMS: 2200, X: 24.0, Z: -23.0},
+	{ID: "nm-silkmother-ixchel", Kind: "Silkmother Ixchel", ZoneID: 29, HP: 18158, Damage: 240, AggroRange: 24.0, LeashRange: 68.0, MeleeRange: 3.0, MoveSpeed: 5.0, SwingMS: 2200, X: 24.0, Z: -23.0},
+	{ID: "nm-admiral-vesper-foreclose", Kind: "Admiral Vesper Foreclose", ZoneID: 30, HP: 18765, Damage: 246, AggroRange: 24.0, LeashRange: 68.0, MeleeRange: 3.0, MoveSpeed: 5.0, SwingMS: 2200, X: 24.0, Z: -23.0},
+	{ID: "nm-warden-vesper-of-the-cube", Kind: "Warden Vesper of the Cube", ZoneID: 423, HP: 23782, Damage: 294, AggroRange: 24.0, LeashRange: 68.0, MeleeRange: 3.0, MoveSpeed: 5.0, SwingMS: 2200, X: 24.0, Z: -15.0},
+	{ID: "nm-the-coin-that-landed-both-ways", Kind: "The Coin That Landed Both Ways", ZoneID: 425, HP: 24754, Damage: 303, AggroRange: 22.0, LeashRange: 64.0, MeleeRange: 3.0, MoveSpeed: 5.0, SwingMS: 2200, X: 24.0, Z: -15.0},
 }

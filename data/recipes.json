@@ -1937,5 +1937,529 @@
       "fish-giant-squid": 1
     },
     "result": "stolas-soup"
+  },
+  {
+    "id": "pilgrim-steel-ingot",
+    "name": "Pilgrim-Steel Ingot",
+    "craft": "blacksmith",
+    "difficulty": 56,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "iron-ingot": 2,
+      "pilgrim-bell": 1
+    },
+    "result": "pilgrim-steel-ingot"
+  },
+  {
+    "id": "geode-steel-ingot",
+    "name": "Geode-Steel Ingot",
+    "craft": "blacksmith",
+    "difficulty": 70,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "swampite-ingot": 2,
+      "geode-shard": 3
+    },
+    "result": "geode-steel-ingot"
+  },
+  {
+    "id": "pilgrim-steel-blade",
+    "name": "Pilgrim-Steel Blade",
+    "craft": "blacksmith",
+    "difficulty": 62,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "pilgrim-steel-ingot": 3,
+      "torii-lacquer": 1
+    },
+    "result": "pilgrim-steel-blade",
+    "hq1": "pilgrim-steel-blade-+1",
+    "hq2": "pilgrim-steel-blade-+1",
+    "hq3": "pilgrim-steel-blade-+1"
+  },
+  {
+    "id": "pilgrim-steel-plate",
+    "name": "Pilgrim-Steel Plate",
+    "craft": "blacksmith",
+    "difficulty": 68,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "pilgrim-steel-ingot": 6,
+      "monkey-fur": 2
+    },
+    "result": "pilgrim-steel-plate",
+    "hq1": "pilgrim-steel-plate-+1",
+    "hq2": "pilgrim-steel-plate-+1",
+    "hq3": "pilgrim-steel-plate-+1"
+  },
+  {
+    "id": "foreclosure-cleaver",
+    "name": "Foreclosure Cleaver",
+    "craft": "blacksmith",
+    "difficulty": 74,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "shell-steel-ingot": 3,
+      "anchor-link": 3,
+      "foreclosure-writ": 1
+    },
+    "result": "foreclosure-cleaver",
+    "hq1": "foreclosure-cleaver-+1",
+    "hq2": "foreclosure-cleaver-+1",
+    "hq3": "foreclosure-cleaver-+1"
+  },
+  {
+    "id": "geode-steel-tachi",
+    "name": "Geode-Steel Tachi",
+    "craft": "blacksmith",
+    "difficulty": 78,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "geode-steel-ingot": 3,
+      "quartz-sliver": 2
+    },
+    "result": "geode-steel-tachi",
+    "hq1": "geode-steel-tachi-+1",
+    "hq2": "geode-steel-tachi-+1",
+    "hq3": "geode-steel-tachi-+1"
+  },
+  {
+    "id": "tidebreaker-greatsword",
+    "name": "Tidebreaker Greatsword",
+    "craft": "blacksmith",
+    "difficulty": 82,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "shell-steel-ingot": 4,
+      "anchor-link": 4,
+      "pearl-grit": 3
+    },
+    "result": "tidebreaker-greatsword",
+    "hq1": "tidebreaker-greatsword-+1",
+    "hq2": "tidebreaker-greatsword-+1",
+    "hq3": "tidebreaker-greatsword-+1"
+  },
+  {
+    "id": "wellspring-blade",
+    "name": "Wellspring Blade",
+    "craft": "blacksmith",
+    "difficulty": 96,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "ward-steel-ingot": 3,
+      "cube-splinter": 3,
+      "chrono-filament": 1
+    },
+    "result": "wellspring-blade",
+    "hq1": "wellspring-blade-+1",
+    "hq2": "wellspring-blade-+1",
+    "hq3": "wellspring-blade-+1"
+  },
+  {
+    "id": "pearl-grit-earring",
+    "name": "Pearl-Grit Earring",
+    "craft": "goldsmithing",
+    "difficulty": 60,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "silver-ingot": 1,
+      "pearl-grit": 2
+    },
+    "result": "pearl-grit-earring",
+    "hq1": "pearl-grit-earring-+1",
+    "hq2": "pearl-grit-earring-+1",
+    "hq3": "pearl-grit-earring-+1"
+  },
+  {
+    "id": "brine-pearl-pendant",
+    "name": "Brine Pearl Pendant",
+    "craft": "goldsmithing",
+    "difficulty": 64,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "gold-ingot": 1,
+      "brine-pearl": 2
+    },
+    "result": "brine-pearl-pendant",
+    "hq1": "brine-pearl-pendant-+1",
+    "hq2": "brine-pearl-pendant-+1",
+    "hq3": "brine-pearl-pendant-+1"
+  },
+  {
+    "id": "foxfire-ring",
+    "name": "Foxfire Ring",
+    "craft": "goldsmithing",
+    "difficulty": 72,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "gold-ingot": 1,
+      "foxfire-wick": 2
+    },
+    "result": "foxfire-ring",
+    "hq1": "foxfire-ring-+1",
+    "hq2": "foxfire-ring-+1",
+    "hq3": "foxfire-ring-+1"
+  },
+  {
+    "id": "hospitality-token-band",
+    "name": "Hospitality Token Band",
+    "craft": "goldsmithing",
+    "difficulty": 76,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "gold-ingot": 2,
+      "hospitality-token": 3
+    },
+    "result": "hospitality-token-band",
+    "hq1": "hospitality-token-band-+1",
+    "hq2": "hospitality-token-band-+1",
+    "hq3": "hospitality-token-band-+1"
+  },
+  {
+    "id": "cube-splinter-earring",
+    "name": "Cube-Splinter Earring",
+    "craft": "goldsmithing",
+    "difficulty": 92,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "gold-ingot": 2,
+      "cube-splinter": 2
+    },
+    "result": "cube-splinter-earring",
+    "hq1": "cube-splinter-earring-+1",
+    "hq2": "cube-splinter-earring-+1",
+    "hq3": "cube-splinter-earring-+1"
+  },
+  {
+    "id": "chrono-filament-band",
+    "name": "Chrono-Filament Band",
+    "craft": "goldsmithing",
+    "difficulty": 98,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "gold-ingot": 2,
+      "chrono-filament": 2,
+      "paradox-dust": 1
+    },
+    "result": "chrono-filament-band",
+    "hq1": "chrono-filament-band-+1",
+    "hq2": "chrono-filament-band-+1",
+    "hq3": "chrono-filament-band-+1"
+  },
+  {
+    "id": "torii-staff",
+    "name": "Torii Staff",
+    "craft": "woodworking",
+    "difficulty": 66,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "ridge-pine-planks": 3,
+      "torii-lacquer": 2,
+      "prayer-slip": 2
+    },
+    "result": "torii-staff",
+    "hq1": "torii-staff-+1",
+    "hq2": "torii-staff-+1",
+    "hq3": "torii-staff-+1"
+  },
+  {
+    "id": "tengu-longbow",
+    "name": "Tengu Longbow",
+    "craft": "woodworking",
+    "difficulty": 74,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "ridge-pine-planks": 3,
+      "tengu-feather": 3,
+      "weaver-silk": 2
+    },
+    "result": "tengu-longbow",
+    "hq1": "tengu-longbow-+1",
+    "hq2": "tengu-longbow-+1",
+    "hq3": "tengu-longbow-+1"
+  },
+  {
+    "id": "teakettle-rod",
+    "name": "Teakettle Rod",
+    "craft": "woodworking",
+    "difficulty": 80,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "moor-oak-planks": 3,
+      "teapot-shard": 3,
+      "hospitality-token": 2
+    },
+    "result": "teakettle-rod",
+    "hq1": "teakettle-rod-+1",
+    "hq2": "teakettle-rod-+1",
+    "hq3": "teakettle-rod-+1"
+  },
+  {
+    "id": "monkey-fur-vest",
+    "name": "Monkey-Fur Vest",
+    "craft": "leathercraft",
+    "difficulty": 62,
+    "crystal": "thunder-crystal",
+    "ingredients": {
+      "monkey-fur": 4,
+      "cured-badger-hide": 2
+    },
+    "result": "monkey-fur-vest",
+    "hq1": "monkey-fur-vest-+1",
+    "hq2": "monkey-fur-vest-+1",
+    "hq3": "monkey-fur-vest-+1"
+  },
+  {
+    "id": "kappa-shell-boots",
+    "name": "Kappa-Shell Boots",
+    "craft": "leathercraft",
+    "difficulty": 66,
+    "crystal": "thunder-crystal",
+    "ingredients": {
+      "kappa-shell": 2,
+      "mini-bike-leather": 2
+    },
+    "result": "kappa-shell-boots",
+    "hq1": "kappa-shell-boots-+1",
+    "hq2": "kappa-shell-boots-+1",
+    "hq3": "kappa-shell-boots-+1"
+  },
+  {
+    "id": "wasp-wing-jerkin",
+    "name": "Wasp-Wing Jerkin",
+    "craft": "leathercraft",
+    "difficulty": 80,
+    "crystal": "thunder-crystal",
+    "ingredients": {
+      "wasp-wing": 4,
+      "rimefox-leather": 3
+    },
+    "result": "wasp-wing-jerkin",
+    "hq1": "wasp-wing-jerkin-+1",
+    "hq2": "wasp-wing-jerkin-+1",
+    "hq3": "wasp-wing-jerkin-+1"
+  },
+  {
+    "id": "pilgrim-cassock",
+    "name": "Pilgrim Cassock",
+    "craft": "clothcraft",
+    "difficulty": 60,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "spider-silk-cloth": 4,
+      "prayer-slip": 3
+    },
+    "result": "pilgrim-cassock",
+    "hq1": "pilgrim-cassock-+1",
+    "hq2": "pilgrim-cassock-+1",
+    "hq3": "pilgrim-cassock-+1"
+  },
+  {
+    "id": "weaver-silk-robe",
+    "name": "Weaver-Silk Robe",
+    "craft": "clothcraft",
+    "difficulty": 78,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "weaver-silk": 5,
+      "wraith-cloth": 2
+    },
+    "result": "weaver-silk-robe",
+    "hq1": "weaver-silk-robe-+1",
+    "hq2": "weaver-silk-robe-+1",
+    "hq3": "weaver-silk-robe-+1"
+  },
+  {
+    "id": "foxfire-kimono",
+    "name": "Foxfire Kimono",
+    "craft": "clothcraft",
+    "difficulty": 84,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "weaver-silk": 4,
+      "foxfire-wick": 3,
+      "shrine-greens": 2
+    },
+    "result": "foxfire-kimono",
+    "hq1": "foxfire-kimono-+1",
+    "hq2": "foxfire-kimono-+1",
+    "hq3": "foxfire-kimono-+1"
+  },
+  {
+    "id": "wellspring-vestments",
+    "name": "Wellspring Vestments",
+    "craft": "clothcraft",
+    "difficulty": 94,
+    "crystal": "wind-crystal",
+    "ingredients": {
+      "wraith-cloth": 3,
+      "chrono-filament": 2,
+      "paradox-dust": 2
+    },
+    "result": "wellspring-vestments",
+    "hq1": "wellspring-vestments-+1",
+    "hq2": "wellspring-vestments-+1",
+    "hq3": "wellspring-vestments-+1"
+  },
+  {
+    "id": "hag-tooth-dagger",
+    "name": "Hag-Tooth Dagger",
+    "craft": "bonecraft",
+    "difficulty": 62,
+    "crystal": "water-crystal",
+    "ingredients": {
+      "hag-tooth": 3,
+      "pellet-bone": 2
+    },
+    "result": "hag-tooth-dagger",
+    "hq1": "hag-tooth-dagger-+1",
+    "hq2": "hag-tooth-dagger-+1",
+    "hq3": "hag-tooth-dagger-+1"
+  },
+  {
+    "id": "quartz-claws",
+    "name": "Quartz Claws",
+    "craft": "bonecraft",
+    "difficulty": 74,
+    "crystal": "water-crystal",
+    "ingredients": {
+      "quartz-sliver": 4,
+      "crawler-mandible": 2,
+      "bone-meal": 1
+    },
+    "result": "quartz-claws",
+    "hq1": "quartz-claws-+1",
+    "hq2": "quartz-claws-+1",
+    "hq3": "quartz-claws-+1"
+  },
+  {
+    "id": "kappa-shell-cuirass",
+    "name": "Kappa-Shell Cuirass",
+    "craft": "bonecraft",
+    "difficulty": 70,
+    "crystal": "water-crystal",
+    "ingredients": {
+      "kappa-shell": 5,
+      "shell-glue": 2
+    },
+    "result": "kappa-shell-cuirass",
+    "hq1": "kappa-shell-cuirass-+1",
+    "hq2": "kappa-shell-cuirass-+1",
+    "hq3": "kappa-shell-cuirass-+1"
+  },
+  {
+    "id": "salt-tonic",
+    "name": "Salt Tonic",
+    "craft": "alchemy",
+    "difficulty": 58,
+    "crystal": "water-crystal",
+    "ingredients": {
+      "salt-crystal": 2,
+      "spring-water": 1
+    },
+    "result": "salt-tonic"
+  },
+  {
+    "id": "brine-pearl-elixir",
+    "name": "Brine Pearl Elixir",
+    "craft": "alchemy",
+    "difficulty": 68,
+    "crystal": "water-crystal",
+    "ingredients": {
+      "brine-pearl": 2,
+      "kelp-fiber": 1,
+      "spring-water": 1
+    },
+    "result": "brine-pearl-elixir"
+  },
+  {
+    "id": "foxfire-lantern",
+    "name": "Foxfire Lantern",
+    "craft": "alchemy",
+    "difficulty": 72,
+    "crystal": "light-crystal",
+    "ingredients": {
+      "foxfire-wick": 2,
+      "lamp-wick": 1,
+      "ward-paper": 1
+    },
+    "result": "foxfire-lantern"
+  },
+  {
+    "id": "paradox-dust-bomb",
+    "name": "Paradox Dust Bomb",
+    "craft": "alchemy",
+    "difficulty": 88,
+    "crystal": "dark-crystal",
+    "ingredients": {
+      "paradox-dust": 2,
+      "ward-ink": 1
+    },
+    "result": "paradox-dust-bomb"
+  },
+  {
+    "id": "salt-baked-carp",
+    "name": "Salt-Baked Carp",
+    "craft": "cooking",
+    "difficulty": 56,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "fish-carp": 1,
+      "salt-crystal": 2,
+      "brine-salt": 1
+    },
+    "result": "salt-baked-carp"
+  },
+  {
+    "id": "kappa-cucumber-roll",
+    "name": "Kappa Cucumber Roll",
+    "craft": "cooking",
+    "difficulty": 62,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "tanuki-rice": 1,
+      "cucumber-brine": 1,
+      "fish-eel": 1
+    },
+    "result": "kappa-cucumber-roll"
+  },
+  {
+    "id": "tidepool-stew",
+    "name": "Tidepool Stew",
+    "craft": "cooking",
+    "difficulty": 66,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "anemone-tendril": 2,
+      "stock": 1,
+      "kelp-fiber": 1
+    },
+    "result": "tidepool-stew"
+  },
+  {
+    "id": "tanuki-tea-ceremony",
+    "name": "Tanuki Tea Ceremony",
+    "craft": "cooking",
+    "difficulty": 72,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "hospitality-token": 1,
+      "spring-water": 1,
+      "shrine-greens": 2
+    },
+    "result": "tanuki-tea-ceremony"
+  },
+  {
+    "id": "paradox-pie",
+    "name": "Paradox Pie",
+    "craft": "cooking",
+    "difficulty": 92,
+    "crystal": "fire-crystal",
+    "ingredients": {
+      "dough": 2,
+      "tidewater-vial": 1,
+      "paradox-dust": 1
+    },
+    "result": "paradox-pie"
   }
 ]

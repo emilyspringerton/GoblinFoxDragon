@@ -23,7 +23,21 @@ func TestOwlZoneDifficultyRisesAlongBranches(t *testing.T) {
 func TestOwlZoneSpawnsMixTiersWithinZone(t *testing.T) {
 	for _, zid := range OwlZoneIDs() {
 		defs := OwlZoneMobs[zid]
-		if len(defs) < 3 || defs[0].HP >= defs[len(defs)-1].HP {
+		if len(defs) == 0 {
+			continue // docks and the ship deck: no mobs by design
+		}
+		// regular zones have three kinds, weakest first and strongest last; interior rooms have two
+		// and only need some variety
+		lo, hi := defs[0].HP, defs[0].HP
+		for _, d := range defs {
+			if d.HP < lo {
+				lo = d.HP
+			}
+			if d.HP > hi {
+				hi = d.HP
+			}
+		}
+		if lo == hi || (len(defs) >= 3 && defs[0].HP >= defs[len(defs)-1].HP) {
 			t.Errorf("zone %d should have an easy->hard mob spread", zid)
 		}
 		if len(OwlZoneSpawns(zid)) == 0 {

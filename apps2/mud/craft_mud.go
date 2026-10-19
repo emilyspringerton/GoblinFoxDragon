@@ -25,11 +25,11 @@ func craftEnvAt(zoneID int, t time.Time) craft.Env {
 // indoorZone reports zones with a roof: dungeons, archives, caves and the like have no weather.
 func indoorZone(id int) bool {
 	switch {
-	case id >= 208 && id <= 215, id >= 300 && id < 400: // dungeons and their rooms
+	case id >= 208 && id <= 215, id >= 300 && id < 500: // dungeons, vaults and their rooms
 		return true
 	}
 	switch id {
-	case 2, 12, 16, 201, 203, 204, 205: // Caves, Roost Deeps, Cataloguer's Stacks, School, Cairngorms, Vatican, Underport
+	case 2, 12, 16, 27, 201, 203, 204, 205: // Caves, Roost Deeps, Cataloguer's Stacks, School, Cairngorms, Vatican, Underport
 		return true
 	}
 	return false

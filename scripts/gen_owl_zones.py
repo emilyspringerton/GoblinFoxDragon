@@ -252,6 +252,21 @@ SPELLS = {
     "unfiled-archivist": ["Silence", "Bind", "Paralyze", "Poison"],
 }
 
+# ---- the continent (scripts/continent_zones.py) --------------------------------------------------
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import continent_zones
+_cz = continent_zones.build(M, N, X)
+ZONES += _cz["zones"]
+NM_ITEMS += _cz["nm_items"]
+TIERS += _cz["tiers"]
+SPELLS.update(_cz["spells"])
+for _z, _extra in _cz.get("owl_extras", {}).items():
+    for _zone in ZONES:
+        if _zone["id"] == _z:
+            _zone.setdefault("npcs2", []).extend(_extra.get("npcs2", []))
+            _zone.setdefault("quests", []).extend(_extra.get("quests", []))
+
 # ---- helpers -------------------------------------------------------------------------------------
 def load(path): return json.load(open(P(path)))
 def dump(path, obj):
@@ -284,13 +299,13 @@ def main():
     owned_kinds = set()
     for z in ZONES:
         for m in z["mobs"]: owned_kinds.add(m["kind"])
-        for n in z["nms"]: owned_kinds.add(n["kind"].lower())
+        for n in z.get("nms", []): owned_kinds.add(n["kind"].lower())
     drops = [d for d in drops if d["kind"].lower() not in owned_kinds]
     for z in ZONES:
         for m in z["mobs"]:
             drops.append({"kind": m["kind"], "items": [
                 {"id": slug(n), "name": n, "drop_chance": c} for n, c in m["drops"]]})
-        for n in z["nms"]:
+        for n in z.get("nms", []):
             its = [{"id": slug(i), "name": i, "drop_chance": .45} for i in n["items"]]
             its.append({"id": "nm-owl-token", "name": "Owl Token", "drop_chance": 1.0})
             drops.append({"kind": n["kind"], "items": its})
@@ -298,10 +313,10 @@ def main():
 
     # ---- variants ----
     variants = load("data/mob_variants.json")
-    vkinds = {v[0] for z in ZONES for v in z["variants"]}
+    vkinds = {v[0] for z in ZONES for v in z.get("variants", [])}
     variants = [v for v in variants if v["base_kind"] not in vkinds]
     for z in ZONES:
-        for base, name, mul in z["variants"]:
+        for base, name, mul in z.get("variants", []):
             variants.append({"base_kind": base, "display_name": name, "power_mul": mul})
     dump("data/mob_variants.json", variants)
 
@@ -310,7 +325,7 @@ def main():
     zids = {z["id"] for z in ZONES}
     spawns = [s for s in spawns if s["zone_id"] not in zids]
     for z in ZONES:
-        nm_by_ph = {n["ph"]: n for n in z["nms"]}
+        nm_by_ph = {n["ph"]: n for n in z.get("nms", [])}
         for m in z["mobs"]:
             row = {"zone_id": z["id"], "kind": m["kind"], "enabled": True}
             n = nm_by_ph.get(m["kind"])
@@ -333,7 +348,7 @@ def main():
     g.append("// OwlNMDefs: notorious monsters for the Eastwind Owl zones.")
     g.append("var OwlNMDefs = []OwlNMDef{")
     for z in ZONES:
-        for k, n in enumerate(z["nms"]):
+        for k, n in enumerate(z.get("nms", [])):
             x = 8 * (1 if k == 0 else -1)
             g.append(f"\t{{ID: {gostr(n['id'])}, Kind: {gostr(n['kind'])}, ZoneID: {z['id']}, HP: {n['hp']}, Damage: {n['dmg']}, AggroRange: {float(n['aggro'])}, LeashRange: {float(n['aggro']*2+20)}, MeleeRange: 3.0, MoveSpeed: {n['speed']}, SwingMS: 2200, X: {float(x*3)}, Z: {float(-z['bounds'][1]//2)}}},")
     g.append("}\n")
@@ -344,10 +359,12 @@ def main():
          "// OwlZoneQuests are the Eastwind Owl cluster (zones 10-18) quests.",
          "var OwlZoneQuests = []*Quest{"]
     for z in ZONES:
-        for qid, title, desc, items_, kills, flow, reward in z["quests"]:
+        for qt in z.get("quests", []):
+            qid, title, desc, items_, kills, flow, reward = qt[:7]
+            giver = qt[7] if len(qt) > 7 else z["npc"][0]
             ri = ", ".join(f"{gostr(k)}: {v}" for k, v in items_.items())
             rk = ", ".join(f"{gostr(k)}: {v}" for k, v in kills.items())
-            q.append(f"\t{{ID: {gostr(qid)}, Title: {gostr(title)}, Desc: {gostr(desc)}, GiverNPCID: {gostr(z['npc'][0])}, "
+            q.append(f"\t{{ID: {gostr(qid)}, Title: {gostr(title)}, Desc: {gostr(desc)}, GiverNPCID: {gostr(giver)}, "
                      f"RequireItems: map[string]int{{{ri}}}, RequireKills: map[string]int{{{rk}}}, RewardFlow: {flow}, RewardItem: {gostr(reward)}}},")
     q.append("}\n")
     open(P("server/quest/owl_quests_gen.go"), "w").write("\n".join(q))
@@ -358,20 +375,26 @@ def main():
          "// owlZoneNames: display names for the Owl cluster, used when registering the zones.",
          "var owlZoneNames = map[int]string{"]
     for z in ZONES: c.append(f"\t{z['id']}: {gostr(z['name'])},")
-    c += ["}\n", "// init wires the Eastwind Owl cluster (zones 10-18): exits, descriptions, smells,",
+    c += ["}\n", "// addExit adds one exit, creating the exit table if its zone has none yet (init order across files).",
+          "func addExit(from int, dir string, to int) {\n\tif exits[from] == nil {\n\t\texits[from] = map[string]int{}\n\t}\n\texits[from][dir] = to\n}\n",
+          "// init wires the Eastwind Owl zones and the Kuroshio Reach: exits, descriptions, smells,",
           "// NPCs, vendor catalogs and item display names.", "func init() {"]
     # exits
     for z in ZONES:
         c.append(f"\texits[{z['id']}] = map[string]int{{{', '.join(f'{gostr(d)}: {t}' for d, t in z['exits'].items())}}}")
     for z in ZONES:
-        if z["branch"]:
+        if z.get("branch"):
             src, d = z["branch"]
-            c.append(f"\texits[{src}][{gostr(d)}] = {z['id']}")
+            c.append(f"\taddExit({src}, {gostr(d)}, {z['id']})")
     for z in ZONES:
         full = f"{z['desc']} (Recommended levels {z['lv'][0]}-{z['lv'][1]}.)"
         c.append(f"\tzoneDesc[{z['id']}] = {gostr(full)}")
         c.append(f"\tzoneSmell[{z['id']}] = {gostr(z['smell'])}")
     for z in ZONES:
+        for xid, xname, xgreet in z.get("npcs2", []):
+            c.append(f"\tnpcs = append(npcs, npcDef{{ID: {gostr(xid)}, Name: {gostr(xname)}, ZoneID: {z['id']}, Greeting: {gostr(xgreet)}, FameNation: fame.Neutral}})")
+        if not z.get("npc"):
+            continue
         nid_, nname, greet = z["npc"]
         c.append(f"\tnpcs = append(npcs, npcDef{{ID: {gostr(nid_)}, Name: {gostr(nname)}, ZoneID: {z['id']}, Greeting: {gostr(greet)}, FameNation: fame.Neutral}})")
         tier = z["tier"]

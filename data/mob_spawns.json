@@ -62,267 +62,6 @@
     "enabled": true
   },
   {
-    "zone_id": 10,
-    "kind": "field-mouse",
-    "enabled": true,
-    "nm": {
-      "id": "nm-barnaby-mousewright",
-      "spawn_chance": 0.3,
-      "window_open_sec": 180,
-      "window_close_sec": 1200,
-      "respawn_minutes": 40
-    }
-  },
-  {
-    "zone_id": 10,
-    "kind": "fledgling-owlet",
-    "enabled": true,
-    "nm": {
-      "id": "nm-ottoline-brood-mother",
-      "spawn_chance": 0.25,
-      "window_open_sec": 240,
-      "window_close_sec": 1500,
-      "respawn_minutes": 45
-    }
-  },
-  {
-    "zone_id": 10,
-    "kind": "dust-moth",
-    "enabled": true
-  },
-  {
-    "zone_id": 11,
-    "kind": "wren-sentry",
-    "enabled": true,
-    "nm": {
-      "id": "nm-wren-3-unretired",
-      "spawn_chance": 0.22,
-      "window_open_sec": 300,
-      "window_close_sec": 1800,
-      "respawn_minutes": 60
-    }
-  },
-  {
-    "zone_id": 11,
-    "kind": "banded-kestrel",
-    "enabled": true
-  },
-  {
-    "zone_id": 11,
-    "kind": "hedge-badger",
-    "enabled": true,
-    "nm": {
-      "id": "nm-sir-hedgemaw",
-      "spawn_chance": 0.25,
-      "window_open_sec": 300,
-      "window_close_sec": 1800,
-      "respawn_minutes": 60
-    }
-  },
-  {
-    "zone_id": 13,
-    "kind": "bog-vole",
-    "enabled": true
-  },
-  {
-    "zone_id": 13,
-    "kind": "pellet-slug",
-    "enabled": true,
-    "nm": {
-      "id": "nm-old-mother-gristle",
-      "spawn_chance": 0.22,
-      "window_open_sec": 300,
-      "window_close_sec": 1800,
-      "respawn_minutes": 60
-    }
-  },
-  {
-    "zone_id": 13,
-    "kind": "marsh-heron",
-    "enabled": true,
-    "nm": {
-      "id": "nm-ser-longshanks",
-      "spawn_chance": 0.22,
-      "window_open_sec": 300,
-      "window_close_sec": 1800,
-      "respawn_minutes": 60
-    }
-  },
-  {
-    "zone_id": 12,
-    "kind": "roost-bat",
-    "enabled": true
-  },
-  {
-    "zone_id": 12,
-    "kind": "guano-crawler",
-    "enabled": true,
-    "nm": {
-      "id": "nm-prince-fenwick",
-      "spawn_chance": 0.22,
-      "window_open_sec": 300,
-      "window_close_sec": 1800,
-      "respawn_minutes": 65
-    }
-  },
-  {
-    "zone_id": 12,
-    "kind": "barn-owl-shade",
-    "enabled": true,
-    "nm": {
-      "id": "nm-mother-nyx",
-      "spawn_chance": 0.2,
-      "window_open_sec": 300,
-      "window_close_sec": 1800,
-      "respawn_minutes": 70
-    }
-  },
-  {
-    "zone_id": 14,
-    "kind": "tor-eagle-owl",
-    "enabled": true,
-    "nm": {
-      "id": "nm-dame-blindfold",
-      "spawn_chance": 0.2,
-      "window_open_sec": 400,
-      "window_close_sec": 2100,
-      "respawn_minutes": 80
-    }
-  },
-  {
-    "zone_id": 14,
-    "kind": "lens-wisp",
-    "enabled": true,
-    "nm": {
-      "id": "nm-orrin-vale",
-      "spawn_chance": 0.2,
-      "window_open_sec": 400,
-      "window_close_sec": 2100,
-      "respawn_minutes": 75
-    }
-  },
-  {
-    "zone_id": 14,
-    "kind": "tor-rimefox",
-    "enabled": true
-  },
-  {
-    "zone_id": 15,
-    "kind": "sleet-hare",
-    "enabled": true
-  },
-  {
-    "zone_id": 15,
-    "kind": "ridge-snowy-owl",
-    "enabled": true,
-    "nm": {
-      "id": "nm-matriarch-boreal",
-      "spawn_chance": 0.2,
-      "window_open_sec": 400,
-      "window_close_sec": 2100,
-      "respawn_minutes": 80
-    }
-  },
-  {
-    "zone_id": 15,
-    "kind": "windwraith",
-    "enabled": true,
-    "nm": {
-      "id": "nm-gale-fennimore",
-      "spawn_chance": 0.2,
-      "window_open_sec": 400,
-      "window_close_sec": 2100,
-      "respawn_minutes": 80
-    }
-  },
-  {
-    "zone_id": 16,
-    "kind": "paper-moth",
-    "enabled": true
-  },
-  {
-    "zone_id": 16,
-    "kind": "ink-mite-swarm",
-    "enabled": true,
-    "nm": {
-      "id": "nm-little-seventeen",
-      "spawn_chance": 0.2,
-      "window_open_sec": 500,
-      "window_close_sec": 2400,
-      "respawn_minutes": 90
-    }
-  },
-  {
-    "zone_id": 16,
-    "kind": "stack-warden",
-    "enabled": true,
-    "nm": {
-      "id": "nm-sister-margin",
-      "spawn_chance": 0.2,
-      "window_open_sec": 500,
-      "window_close_sec": 2400,
-      "respawn_minutes": 90
-    }
-  },
-  {
-    "zone_id": 17,
-    "kind": "footnote-wisp",
-    "enabled": true,
-    "nm": {
-      "id": "nm-wick-the-moor-cataloguer",
-      "spawn_chance": 0.2,
-      "window_open_sec": 500,
-      "window_close_sec": 2400,
-      "respawn_minutes": 95
-    }
-  },
-  {
-    "zone_id": 17,
-    "kind": "moor-hag-owl",
-    "enabled": true,
-    "nm": {
-      "id": "nm-mistress-draft",
-      "spawn_chance": 0.2,
-      "window_open_sec": 500,
-      "window_close_sec": 2400,
-      "respawn_minutes": 90
-    }
-  },
-  {
-    "zone_id": 17,
-    "kind": "bog-lamp",
-    "enabled": true
-  },
-  {
-    "zone_id": 18,
-    "kind": "protocol-sentinel",
-    "enabled": true
-  },
-  {
-    "zone_id": 18,
-    "kind": "redacted-owl",
-    "enabled": true,
-    "nm": {
-      "id": "nm-mx-redact",
-      "spawn_chance": 0.16,
-      "window_open_sec": 600,
-      "window_close_sec": 2700,
-      "respawn_minutes": 120
-    }
-  },
-  {
-    "zone_id": 18,
-    "kind": "unfiled-archivist",
-    "enabled": true,
-    "nm": {
-      "id": "nm-the-cataloguer",
-      "spawn_chance": 0.16,
-      "window_open_sec": 600,
-      "window_close_sec": 2700,
-      "respawn_minutes": 120
-    }
-  },
-  {
     "zone_id": 301,
     "kind": "sealed-clerk",
     "enabled": true
@@ -681,5 +420,640 @@
     "zone_id": 375,
     "kind": "trial-automaton",
     "enabled": true
+  },
+  {
+    "zone_id": 10,
+    "kind": "field-mouse",
+    "enabled": true,
+    "nm": {
+      "id": "nm-barnaby-mousewright",
+      "spawn_chance": 0.3,
+      "window_open_sec": 180,
+      "window_close_sec": 1200,
+      "respawn_minutes": 40
+    }
+  },
+  {
+    "zone_id": 10,
+    "kind": "fledgling-owlet",
+    "enabled": true,
+    "nm": {
+      "id": "nm-ottoline-brood-mother",
+      "spawn_chance": 0.25,
+      "window_open_sec": 240,
+      "window_close_sec": 1500,
+      "respawn_minutes": 45
+    }
+  },
+  {
+    "zone_id": 10,
+    "kind": "dust-moth",
+    "enabled": true
+  },
+  {
+    "zone_id": 11,
+    "kind": "wren-sentry",
+    "enabled": true,
+    "nm": {
+      "id": "nm-wren-3-unretired",
+      "spawn_chance": 0.22,
+      "window_open_sec": 300,
+      "window_close_sec": 1800,
+      "respawn_minutes": 60
+    }
+  },
+  {
+    "zone_id": 11,
+    "kind": "banded-kestrel",
+    "enabled": true
+  },
+  {
+    "zone_id": 11,
+    "kind": "hedge-badger",
+    "enabled": true,
+    "nm": {
+      "id": "nm-sir-hedgemaw",
+      "spawn_chance": 0.25,
+      "window_open_sec": 300,
+      "window_close_sec": 1800,
+      "respawn_minutes": 60
+    }
+  },
+  {
+    "zone_id": 13,
+    "kind": "bog-vole",
+    "enabled": true
+  },
+  {
+    "zone_id": 13,
+    "kind": "pellet-slug",
+    "enabled": true,
+    "nm": {
+      "id": "nm-old-mother-gristle",
+      "spawn_chance": 0.22,
+      "window_open_sec": 300,
+      "window_close_sec": 1800,
+      "respawn_minutes": 60
+    }
+  },
+  {
+    "zone_id": 13,
+    "kind": "marsh-heron",
+    "enabled": true,
+    "nm": {
+      "id": "nm-ser-longshanks",
+      "spawn_chance": 0.22,
+      "window_open_sec": 300,
+      "window_close_sec": 1800,
+      "respawn_minutes": 60
+    }
+  },
+  {
+    "zone_id": 12,
+    "kind": "roost-bat",
+    "enabled": true
+  },
+  {
+    "zone_id": 12,
+    "kind": "guano-crawler",
+    "enabled": true,
+    "nm": {
+      "id": "nm-prince-fenwick",
+      "spawn_chance": 0.22,
+      "window_open_sec": 300,
+      "window_close_sec": 1800,
+      "respawn_minutes": 65
+    }
+  },
+  {
+    "zone_id": 12,
+    "kind": "barn-owl-shade",
+    "enabled": true,
+    "nm": {
+      "id": "nm-mother-nyx",
+      "spawn_chance": 0.2,
+      "window_open_sec": 300,
+      "window_close_sec": 1800,
+      "respawn_minutes": 70
+    }
+  },
+  {
+    "zone_id": 14,
+    "kind": "tor-eagle-owl",
+    "enabled": true,
+    "nm": {
+      "id": "nm-dame-blindfold",
+      "spawn_chance": 0.2,
+      "window_open_sec": 400,
+      "window_close_sec": 2100,
+      "respawn_minutes": 80
+    }
+  },
+  {
+    "zone_id": 14,
+    "kind": "lens-wisp",
+    "enabled": true,
+    "nm": {
+      "id": "nm-orrin-vale",
+      "spawn_chance": 0.2,
+      "window_open_sec": 400,
+      "window_close_sec": 2100,
+      "respawn_minutes": 75
+    }
+  },
+  {
+    "zone_id": 14,
+    "kind": "tor-rimefox",
+    "enabled": true
+  },
+  {
+    "zone_id": 15,
+    "kind": "sleet-hare",
+    "enabled": true
+  },
+  {
+    "zone_id": 15,
+    "kind": "ridge-snowy-owl",
+    "enabled": true,
+    "nm": {
+      "id": "nm-matriarch-boreal",
+      "spawn_chance": 0.2,
+      "window_open_sec": 400,
+      "window_close_sec": 2100,
+      "respawn_minutes": 80
+    }
+  },
+  {
+    "zone_id": 15,
+    "kind": "windwraith",
+    "enabled": true,
+    "nm": {
+      "id": "nm-gale-fennimore",
+      "spawn_chance": 0.2,
+      "window_open_sec": 400,
+      "window_close_sec": 2100,
+      "respawn_minutes": 80
+    }
+  },
+  {
+    "zone_id": 16,
+    "kind": "paper-moth",
+    "enabled": true
+  },
+  {
+    "zone_id": 16,
+    "kind": "ink-mite-swarm",
+    "enabled": true,
+    "nm": {
+      "id": "nm-little-seventeen",
+      "spawn_chance": 0.2,
+      "window_open_sec": 500,
+      "window_close_sec": 2400,
+      "respawn_minutes": 90
+    }
+  },
+  {
+    "zone_id": 16,
+    "kind": "stack-warden",
+    "enabled": true,
+    "nm": {
+      "id": "nm-sister-margin",
+      "spawn_chance": 0.2,
+      "window_open_sec": 500,
+      "window_close_sec": 2400,
+      "respawn_minutes": 90
+    }
+  },
+  {
+    "zone_id": 17,
+    "kind": "footnote-wisp",
+    "enabled": true,
+    "nm": {
+      "id": "nm-wick-the-moor-cataloguer",
+      "spawn_chance": 0.2,
+      "window_open_sec": 500,
+      "window_close_sec": 2400,
+      "respawn_minutes": 95
+    }
+  },
+  {
+    "zone_id": 17,
+    "kind": "moor-hag-owl",
+    "enabled": true,
+    "nm": {
+      "id": "nm-mistress-draft",
+      "spawn_chance": 0.2,
+      "window_open_sec": 500,
+      "window_close_sec": 2400,
+      "respawn_minutes": 90
+    }
+  },
+  {
+    "zone_id": 17,
+    "kind": "bog-lamp",
+    "enabled": true
+  },
+  {
+    "zone_id": 18,
+    "kind": "protocol-sentinel",
+    "enabled": true
+  },
+  {
+    "zone_id": 18,
+    "kind": "redacted-owl",
+    "enabled": true,
+    "nm": {
+      "id": "nm-mx-redact",
+      "spawn_chance": 0.16,
+      "window_open_sec": 600,
+      "window_close_sec": 2700,
+      "respawn_minutes": 120
+    }
+  },
+  {
+    "zone_id": 18,
+    "kind": "unfiled-archivist",
+    "enabled": true,
+    "nm": {
+      "id": "nm-the-cataloguer",
+      "spawn_chance": 0.16,
+      "window_open_sec": 600,
+      "window_close_sec": 2700,
+      "respawn_minutes": 120
+    }
+  },
+  {
+    "zone_id": 20,
+    "kind": "quay-rat",
+    "enabled": true
+  },
+  {
+    "zone_id": 20,
+    "kind": "dock-crab",
+    "enabled": true
+  },
+  {
+    "zone_id": 20,
+    "kind": "customs-gull",
+    "enabled": true
+  },
+  {
+    "zone_id": 21,
+    "kind": "salt-hare",
+    "enabled": true
+  },
+  {
+    "zone_id": 21,
+    "kind": "brine-scorpion",
+    "enabled": true
+  },
+  {
+    "zone_id": 21,
+    "kind": "glass-lizard",
+    "enabled": true,
+    "nm": {
+      "id": "nm-dame-halite",
+      "spawn_chance": 0.18,
+      "window_open_sec": 600,
+      "window_close_sec": 2700,
+      "respawn_minutes": 120
+    }
+  },
+  {
+    "zone_id": 22,
+    "kind": "pilgrim-shade",
+    "enabled": true,
+    "nm": {
+      "id": "nm-abbess-cinderbell",
+      "spawn_chance": 0.18,
+      "window_open_sec": 600,
+      "window_close_sec": 2700,
+      "respawn_minutes": 120
+    }
+  },
+  {
+    "zone_id": 22,
+    "kind": "prayer-wheel-mite",
+    "enabled": true
+  },
+  {
+    "zone_id": 22,
+    "kind": "temple-monkey",
+    "enabled": true
+  },
+  {
+    "zone_id": 23,
+    "kind": "tidepool-crab",
+    "enabled": true
+  },
+  {
+    "zone_id": 23,
+    "kind": "anemone-stalker",
+    "enabled": true
+  },
+  {
+    "zone_id": 23,
+    "kind": "sea-hag",
+    "enabled": true,
+    "nm": {
+      "id": "nm-granny-anemone",
+      "spawn_chance": 0.18,
+      "window_open_sec": 600,
+      "window_close_sec": 2700,
+      "respawn_minutes": 120
+    }
+  },
+  {
+    "zone_id": 24,
+    "kind": "cormorant",
+    "enabled": true
+  },
+  {
+    "zone_id": 24,
+    "kind": "mud-skipper",
+    "enabled": true
+  },
+  {
+    "zone_id": 24,
+    "kind": "bog-kappa",
+    "enabled": true,
+    "nm": {
+      "id": "nm-magistrate-kappa",
+      "spawn_chance": 0.18,
+      "window_open_sec": 600,
+      "window_close_sec": 2700,
+      "respawn_minutes": 120
+    }
+  },
+  {
+    "zone_id": 25,
+    "kind": "gate-tengu",
+    "enabled": true,
+    "nm": {
+      "id": "nm-tengu-warlord-hayate",
+      "spawn_chance": 0.18,
+      "window_open_sec": 600,
+      "window_close_sec": 2700,
+      "respawn_minutes": 120
+    }
+  },
+  {
+    "zone_id": 25,
+    "kind": "fox-fire-wisp",
+    "enabled": true
+  },
+  {
+    "zone_id": 25,
+    "kind": "komainu",
+    "enabled": true
+  },
+  {
+    "zone_id": 26,
+    "kind": "brine-acolyte",
+    "enabled": true
+  },
+  {
+    "zone_id": 26,
+    "kind": "drowned-choirboy",
+    "enabled": true
+  },
+  {
+    "zone_id": 26,
+    "kind": "shell-sexton",
+    "enabled": true
+  },
+  {
+    "zone_id": 27,
+    "kind": "geode-beetle",
+    "enabled": true
+  },
+  {
+    "zone_id": 27,
+    "kind": "quartz-crawler",
+    "enabled": true
+  },
+  {
+    "zone_id": 27,
+    "kind": "lantern-bat",
+    "enabled": true
+  },
+  {
+    "zone_id": 401,
+    "kind": "geode-beetle",
+    "enabled": true
+  },
+  {
+    "zone_id": 401,
+    "kind": "quartz-crawler",
+    "enabled": true
+  },
+  {
+    "zone_id": 402,
+    "kind": "quartz-crawler",
+    "enabled": true
+  },
+  {
+    "zone_id": 402,
+    "kind": "lantern-bat",
+    "enabled": true
+  },
+  {
+    "zone_id": 403,
+    "kind": "quartz-crawler",
+    "enabled": true,
+    "nm": {
+      "id": "nm-old-quartz-ma",
+      "spawn_chance": 0.18,
+      "window_open_sec": 600,
+      "window_close_sec": 2700,
+      "respawn_minutes": 150
+    }
+  },
+  {
+    "zone_id": 403,
+    "kind": "geode-beetle",
+    "enabled": true
+  },
+  {
+    "zone_id": 410,
+    "kind": "brine-acolyte",
+    "enabled": true
+  },
+  {
+    "zone_id": 410,
+    "kind": "drowned-choirboy",
+    "enabled": true
+  },
+  {
+    "zone_id": 411,
+    "kind": "drowned-choirboy",
+    "enabled": true
+  },
+  {
+    "zone_id": 411,
+    "kind": "shell-sexton",
+    "enabled": true
+  },
+  {
+    "zone_id": 412,
+    "kind": "shell-sexton",
+    "enabled": true,
+    "nm": {
+      "id": "nm-cardinal-brinewright",
+      "spawn_chance": 0.18,
+      "window_open_sec": 600,
+      "window_close_sec": 2700,
+      "respawn_minutes": 150
+    }
+  },
+  {
+    "zone_id": 412,
+    "kind": "drowned-choirboy",
+    "enabled": true
+  },
+  {
+    "zone_id": 28,
+    "kind": "tanuki-bailiff",
+    "enabled": true,
+    "nm": {
+      "id": "nm-bailiff-bunbuku",
+      "spawn_chance": 0.18,
+      "window_open_sec": 600,
+      "window_close_sec": 2700,
+      "respawn_minutes": 180
+    }
+  },
+  {
+    "zone_id": 28,
+    "kind": "leaf-bandit",
+    "enabled": true
+  },
+  {
+    "zone_id": 28,
+    "kind": "hospitality-golem",
+    "enabled": true
+  },
+  {
+    "zone_id": 29,
+    "kind": "cliff-weaver",
+    "enabled": true,
+    "nm": {
+      "id": "nm-silkmother-ixchel",
+      "spawn_chance": 0.18,
+      "window_open_sec": 600,
+      "window_close_sec": 2700,
+      "respawn_minutes": 180
+    }
+  },
+  {
+    "zone_id": 29,
+    "kind": "thread-sentinel",
+    "enabled": true
+  },
+  {
+    "zone_id": 29,
+    "kind": "silk-wasp",
+    "enabled": true
+  },
+  {
+    "zone_id": 30,
+    "kind": "foreclosure-bailiff",
+    "enabled": true
+  },
+  {
+    "zone_id": 30,
+    "kind": "anchor-wight",
+    "enabled": true,
+    "nm": {
+      "id": "nm-admiral-vesper-foreclose",
+      "spawn_chance": 0.18,
+      "window_open_sec": 600,
+      "window_close_sec": 2700,
+      "respawn_minutes": 180
+    }
+  },
+  {
+    "zone_id": 30,
+    "kind": "ledger-eel",
+    "enabled": true
+  },
+  {
+    "zone_id": 31,
+    "kind": "tide-echo",
+    "enabled": true
+  },
+  {
+    "zone_id": 31,
+    "kind": "paradox-shade",
+    "enabled": true
+  },
+  {
+    "zone_id": 31,
+    "kind": "cube-warden",
+    "enabled": true
+  },
+  {
+    "zone_id": 421,
+    "kind": "tide-echo",
+    "enabled": true
+  },
+  {
+    "zone_id": 421,
+    "kind": "paradox-shade",
+    "enabled": true
+  },
+  {
+    "zone_id": 422,
+    "kind": "paradox-shade",
+    "enabled": true
+  },
+  {
+    "zone_id": 422,
+    "kind": "cube-warden",
+    "enabled": true
+  },
+  {
+    "zone_id": 423,
+    "kind": "paradox-shade",
+    "enabled": true
+  },
+  {
+    "zone_id": 423,
+    "kind": "cube-warden",
+    "enabled": true,
+    "nm": {
+      "id": "nm-warden-vesper-of-the-cube",
+      "spawn_chance": 0.18,
+      "window_open_sec": 600,
+      "window_close_sec": 2700,
+      "respawn_minutes": 240
+    }
+  },
+  {
+    "zone_id": 424,
+    "kind": "cube-warden",
+    "enabled": true
+  },
+  {
+    "zone_id": 424,
+    "kind": "paradox-shade",
+    "enabled": true
+  },
+  {
+    "zone_id": 425,
+    "kind": "paradox-shade",
+    "enabled": true
+  },
+  {
+    "zone_id": 425,
+    "kind": "cube-warden",
+    "enabled": true,
+    "nm": {
+      "id": "nm-the-coin-that-landed-both-ways",
+      "spawn_chance": 0.12,
+      "window_open_sec": 600,
+      "window_close_sec": 2700,
+      "respawn_minutes": 360
+    }
   }
 ]

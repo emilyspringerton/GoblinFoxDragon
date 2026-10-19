@@ -4430,6 +4430,926 @@
     "model_id": "head_rugged"
   },
   {
+    "id": 1145,
+    "name": "Pilgrim Blade",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "level": 50,
+    "stats": {
+      "attack": 90,
+      "str": 6
+    },
+    "stack_size": 1,
+    "model_id": "sword_steel",
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN"
+    ],
+    "weapon_type": "sword",
+    "delay": 258
+  },
+  {
+    "id": 1146,
+    "name": "Pilgrim Talon",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "level": 50,
+    "stats": {
+      "attack": 72,
+      "dex": 6
+    },
+    "stack_size": 1,
+    "model_id": "dagger_003",
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC"
+    ],
+    "weapon_type": "dagger",
+    "delay": 183
+  },
+  {
+    "id": 1147,
+    "name": "Pilgrim Perch",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "level": 50,
+    "stats": {
+      "magic_attack_bonus": 38,
+      "mnd": 7
+    },
+    "stack_size": 1,
+    "model_id": "staff_brass",
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH"
+    ],
+    "weapon_type": "staff",
+    "delay": 218
+  },
+  {
+    "id": 1148,
+    "name": "Pilgrim Jerkin",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "level": 50,
+    "stats": {
+      "defense": 47,
+      "vit": 5
+    },
+    "stack_size": 1,
+    "model_id": "body_chain",
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ]
+  },
+  {
+    "id": 1149,
+    "name": "Pilgrim Robe",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "level": 50,
+    "stats": {
+      "defense": 43,
+      "mnd": 6,
+      "int": 6
+    },
+    "stack_size": 1,
+    "model_id": "body_robe",
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH"
+    ]
+  },
+  {
+    "id": 1150,
+    "name": "Pilgrim Leggings",
+    "category": "armor",
+    "equip_slots": [
+      "legs"
+    ],
+    "level": 50,
+    "stats": {
+      "defense": 42,
+      "agi": 3
+    },
+    "stack_size": 1,
+    "model_id": "legs_chain"
+  },
+  {
+    "id": 1151,
+    "name": "Pilgrim Mitts",
+    "category": "armor",
+    "equip_slots": [
+      "hand-l",
+      "hand-r"
+    ],
+    "level": 50,
+    "stats": {
+      "defense": 39,
+      "dex": 3
+    },
+    "stack_size": 1,
+    "model_id": "hands_rugged"
+  },
+  {
+    "id": 1152,
+    "name": "Pilgrim Boots",
+    "category": "armor",
+    "equip_slots": [
+      "feet"
+    ],
+    "level": 50,
+    "stats": {
+      "defense": 39,
+      "agi": 3
+    },
+    "stack_size": 1,
+    "model_id": "feet_rugged"
+  },
+  {
+    "id": 1153,
+    "name": "Pilgrim Hood",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "level": 50,
+    "stats": {
+      "defense": 40,
+      "vit": 3
+    },
+    "stack_size": 1,
+    "model_id": "head_rugged"
+  },
+  {
+    "id": 1154,
+    "name": "Tidewarden Blade",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "level": 60,
+    "stats": {
+      "attack": 106,
+      "str": 7
+    },
+    "stack_size": 1,
+    "model_id": "sword_steel",
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN"
+    ],
+    "weapon_type": "sword",
+    "delay": 264
+  },
+  {
+    "id": 1155,
+    "name": "Tidewarden Talon",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "level": 60,
+    "stats": {
+      "attack": 85,
+      "dex": 7
+    },
+    "stack_size": 1,
+    "model_id": "dagger_003",
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC"
+    ],
+    "weapon_type": "dagger",
+    "delay": 186
+  },
+  {
+    "id": 1156,
+    "name": "Tidewarden Perch",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "level": 60,
+    "stats": {
+      "magic_attack_bonus": 45,
+      "mnd": 8
+    },
+    "stack_size": 1,
+    "model_id": "staff_brass",
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH"
+    ],
+    "weapon_type": "staff",
+    "delay": 222
+  },
+  {
+    "id": 1157,
+    "name": "Tidewarden Jerkin",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "level": 60,
+    "stats": {
+      "defense": 54,
+      "vit": 6
+    },
+    "stack_size": 1,
+    "model_id": "body_chain",
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ]
+  },
+  {
+    "id": 1158,
+    "name": "Tidewarden Robe",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "level": 60,
+    "stats": {
+      "defense": 50,
+      "mnd": 7,
+      "int": 7
+    },
+    "stack_size": 1,
+    "model_id": "body_robe",
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH"
+    ]
+  },
+  {
+    "id": 1159,
+    "name": "Tidewarden Leggings",
+    "category": "armor",
+    "equip_slots": [
+      "legs"
+    ],
+    "level": 60,
+    "stats": {
+      "defense": 49,
+      "agi": 4
+    },
+    "stack_size": 1,
+    "model_id": "legs_chain"
+  },
+  {
+    "id": 1160,
+    "name": "Tidewarden Mitts",
+    "category": "armor",
+    "equip_slots": [
+      "hand-l",
+      "hand-r"
+    ],
+    "level": 60,
+    "stats": {
+      "defense": 46,
+      "dex": 4
+    },
+    "stack_size": 1,
+    "model_id": "hands_rugged"
+  },
+  {
+    "id": 1161,
+    "name": "Tidewarden Boots",
+    "category": "armor",
+    "equip_slots": [
+      "feet"
+    ],
+    "level": 60,
+    "stats": {
+      "defense": 46,
+      "agi": 4
+    },
+    "stack_size": 1,
+    "model_id": "feet_rugged"
+  },
+  {
+    "id": 1162,
+    "name": "Tidewarden Hood",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "level": 60,
+    "stats": {
+      "defense": 47,
+      "vit": 4
+    },
+    "stack_size": 1,
+    "model_id": "head_rugged"
+  },
+  {
+    "id": 1163,
+    "name": "Reachrunner Blade",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "level": 70,
+    "stats": {
+      "attack": 122,
+      "str": 8
+    },
+    "stack_size": 1,
+    "model_id": "sword_steel",
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN"
+    ],
+    "weapon_type": "sword",
+    "delay": 270
+  },
+  {
+    "id": 1164,
+    "name": "Reachrunner Talon",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "level": 70,
+    "stats": {
+      "attack": 98,
+      "dex": 8
+    },
+    "stack_size": 1,
+    "model_id": "dagger_003",
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC"
+    ],
+    "weapon_type": "dagger",
+    "delay": 189
+  },
+  {
+    "id": 1165,
+    "name": "Reachrunner Perch",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "level": 70,
+    "stats": {
+      "magic_attack_bonus": 52,
+      "mnd": 9
+    },
+    "stack_size": 1,
+    "model_id": "staff_brass",
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH"
+    ],
+    "weapon_type": "staff",
+    "delay": 226
+  },
+  {
+    "id": 1166,
+    "name": "Reachrunner Jerkin",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "level": 70,
+    "stats": {
+      "defense": 61,
+      "vit": 6
+    },
+    "stack_size": 1,
+    "model_id": "body_chain",
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ]
+  },
+  {
+    "id": 1167,
+    "name": "Reachrunner Robe",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "level": 70,
+    "stats": {
+      "defense": 57,
+      "mnd": 8,
+      "int": 8
+    },
+    "stack_size": 1,
+    "model_id": "body_robe",
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH"
+    ]
+  },
+  {
+    "id": 1168,
+    "name": "Reachrunner Leggings",
+    "category": "armor",
+    "equip_slots": [
+      "legs"
+    ],
+    "level": 70,
+    "stats": {
+      "defense": 56,
+      "agi": 5
+    },
+    "stack_size": 1,
+    "model_id": "legs_chain"
+  },
+  {
+    "id": 1169,
+    "name": "Reachrunner Mitts",
+    "category": "armor",
+    "equip_slots": [
+      "hand-l",
+      "hand-r"
+    ],
+    "level": 70,
+    "stats": {
+      "defense": 53,
+      "dex": 5
+    },
+    "stack_size": 1,
+    "model_id": "hands_rugged"
+  },
+  {
+    "id": 1170,
+    "name": "Reachrunner Boots",
+    "category": "armor",
+    "equip_slots": [
+      "feet"
+    ],
+    "level": 70,
+    "stats": {
+      "defense": 53,
+      "agi": 5
+    },
+    "stack_size": 1,
+    "model_id": "feet_rugged"
+  },
+  {
+    "id": 1171,
+    "name": "Reachrunner Hood",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "level": 70,
+    "stats": {
+      "defense": 54,
+      "vit": 5
+    },
+    "stack_size": 1,
+    "model_id": "head_rugged"
+  },
+  {
+    "id": 1172,
+    "name": "Foxfire Blade",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "level": 80,
+    "stats": {
+      "attack": 138,
+      "str": 9
+    },
+    "stack_size": 1,
+    "model_id": "sword_steel",
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN"
+    ],
+    "weapon_type": "sword",
+    "delay": 276
+  },
+  {
+    "id": 1173,
+    "name": "Foxfire Talon",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "level": 80,
+    "stats": {
+      "attack": 110,
+      "dex": 9
+    },
+    "stack_size": 1,
+    "model_id": "dagger_003",
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC"
+    ],
+    "weapon_type": "dagger",
+    "delay": 192
+  },
+  {
+    "id": 1174,
+    "name": "Foxfire Perch",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "level": 80,
+    "stats": {
+      "magic_attack_bonus": 59,
+      "mnd": 11
+    },
+    "stack_size": 1,
+    "model_id": "staff_brass",
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH"
+    ],
+    "weapon_type": "staff",
+    "delay": 230
+  },
+  {
+    "id": 1175,
+    "name": "Foxfire Jerkin",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "level": 80,
+    "stats": {
+      "defense": 69,
+      "vit": 7
+    },
+    "stack_size": 1,
+    "model_id": "body_chain",
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ]
+  },
+  {
+    "id": 1176,
+    "name": "Foxfire Robe",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "level": 80,
+    "stats": {
+      "defense": 65,
+      "mnd": 9,
+      "int": 9
+    },
+    "stack_size": 1,
+    "model_id": "body_robe",
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH"
+    ]
+  },
+  {
+    "id": 1177,
+    "name": "Foxfire Leggings",
+    "category": "armor",
+    "equip_slots": [
+      "legs"
+    ],
+    "level": 80,
+    "stats": {
+      "defense": 64,
+      "agi": 5
+    },
+    "stack_size": 1,
+    "model_id": "legs_chain"
+  },
+  {
+    "id": 1178,
+    "name": "Foxfire Mitts",
+    "category": "armor",
+    "equip_slots": [
+      "hand-l",
+      "hand-r"
+    ],
+    "level": 80,
+    "stats": {
+      "defense": 61,
+      "dex": 5
+    },
+    "stack_size": 1,
+    "model_id": "hands_rugged"
+  },
+  {
+    "id": 1179,
+    "name": "Foxfire Boots",
+    "category": "armor",
+    "equip_slots": [
+      "feet"
+    ],
+    "level": 80,
+    "stats": {
+      "defense": 61,
+      "agi": 5
+    },
+    "stack_size": 1,
+    "model_id": "feet_rugged"
+  },
+  {
+    "id": 1180,
+    "name": "Foxfire Hood",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "level": 80,
+    "stats": {
+      "defense": 62,
+      "vit": 5
+    },
+    "stack_size": 1,
+    "model_id": "head_rugged"
+  },
+  {
+    "id": 1181,
+    "name": "Wellspring Blade",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "level": 90,
+    "stats": {
+      "attack": 154,
+      "str": 10
+    },
+    "stack_size": 1,
+    "model_id": "sword_steel",
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN"
+    ],
+    "weapon_type": "sword",
+    "delay": 282
+  },
+  {
+    "id": 1182,
+    "name": "Wellspring Talon",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "level": 90,
+    "stats": {
+      "attack": 123,
+      "dex": 10
+    },
+    "stack_size": 1,
+    "model_id": "dagger_003",
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC"
+    ],
+    "weapon_type": "dagger",
+    "delay": 195
+  },
+  {
+    "id": 1183,
+    "name": "Wellspring Perch",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "level": 90,
+    "stats": {
+      "magic_attack_bonus": 66,
+      "mnd": 12
+    },
+    "stack_size": 1,
+    "model_id": "staff_brass",
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH"
+    ],
+    "weapon_type": "staff",
+    "delay": 234
+  },
+  {
+    "id": 1184,
+    "name": "Wellspring Jerkin",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "level": 90,
+    "stats": {
+      "defense": 77,
+      "vit": 8
+    },
+    "stack_size": 1,
+    "model_id": "body_chain",
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG"
+    ]
+  },
+  {
+    "id": 1185,
+    "name": "Wellspring Robe",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "level": 90,
+    "stats": {
+      "defense": 73,
+      "mnd": 10,
+      "int": 10
+    },
+    "stack_size": 1,
+    "model_id": "body_robe",
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH"
+    ]
+  },
+  {
+    "id": 1186,
+    "name": "Wellspring Leggings",
+    "category": "armor",
+    "equip_slots": [
+      "legs"
+    ],
+    "level": 90,
+    "stats": {
+      "defense": 72,
+      "agi": 6
+    },
+    "stack_size": 1,
+    "model_id": "legs_chain"
+  },
+  {
+    "id": 1187,
+    "name": "Wellspring Mitts",
+    "category": "armor",
+    "equip_slots": [
+      "hand-l",
+      "hand-r"
+    ],
+    "level": 90,
+    "stats": {
+      "defense": 69,
+      "dex": 6
+    },
+    "stack_size": 1,
+    "model_id": "hands_rugged"
+  },
+  {
+    "id": 1188,
+    "name": "Wellspring Boots",
+    "category": "armor",
+    "equip_slots": [
+      "feet"
+    ],
+    "level": 90,
+    "stats": {
+      "defense": 69,
+      "agi": 6
+    },
+    "stack_size": 1,
+    "model_id": "feet_rugged"
+  },
+  {
+    "id": 1189,
+    "name": "Wellspring Hood",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "level": 90,
+    "stats": {
+      "defense": 70,
+      "vit": 6
+    },
+    "stack_size": 1,
+    "model_id": "head_rugged"
+  },
+  {
     "name": "Strix Talon",
     "category": "weapon",
     "equip_slots": [
@@ -5279,6 +6199,658 @@
     "id": 1335
   },
   {
+    "name": "Halite Crown",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "level": 50,
+    "stats": {
+      "defense": 34,
+      "int": 6,
+      "mnd": 6,
+      "magic_defense_bonus": 8
+    },
+    "stack_size": 1,
+    "model_id": "head_crown_madness_01",
+    "flags": [
+      "rare"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "id": 1336
+  },
+  {
+    "name": "Salt-Glass Dagger",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "level": 49,
+    "stats": {
+      "attack": 84,
+      "dex": 6,
+      "accuracy": 10
+    },
+    "stack_size": 1,
+    "model_id": "dagger_kali_01",
+    "flags": [
+      "rare"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "ASN",
+      "COR"
+    ],
+    "weapon_type": "dagger",
+    "delay": 154,
+    "id": 1337
+  },
+  {
+    "name": "Cinder Rosary",
+    "category": "accessory",
+    "equip_slots": [
+      "neck"
+    ],
+    "level": 52,
+    "stats": {
+      "mnd": 7,
+      "magic_defense_bonus": 10,
+      "hp_regen": 1
+    },
+    "stack_size": 1,
+    "model_id": "neck_priestess_charm",
+    "flags": [
+      "rare"
+    ],
+    "id": 1338
+  },
+  {
+    "name": "Bell-Metal Staff",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "level": 51,
+    "stats": {
+      "magic_attack_bonus": 40,
+      "mnd": 7,
+      "int": 7
+    },
+    "stack_size": 1,
+    "model_id": "staff_healing",
+    "flags": [
+      "rare"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "PUP"
+    ],
+    "weapon_type": "staff",
+    "delay": 188,
+    "id": 1339
+  },
+  {
+    "name": "Anemone Shawl",
+    "category": "accessory",
+    "equip_slots": [
+      "back"
+    ],
+    "level": 52,
+    "stats": {
+      "agi": 6,
+      "evasion": 14,
+      "defense": 10
+    },
+    "stack_size": 1,
+    "model_id": "cape_yellow_01",
+    "flags": [
+      "rare"
+    ],
+    "id": 1340
+  },
+  {
+    "name": "Tidepool Rod",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "level": 51,
+    "stats": {
+      "magic_attack_bonus": 42,
+      "int": 8,
+      "mnd": 6,
+      "mp": 30
+    },
+    "stack_size": 1,
+    "model_id": "staff_shepherd_01",
+    "flags": [
+      "rare"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "PUP"
+    ],
+    "weapon_type": "staff",
+    "delay": 190,
+    "id": 1341
+  },
+  {
+    "name": "Magistrate's Dish",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "level": 61,
+    "stats": {
+      "defense": 38,
+      "vit": 6,
+      "hp": 40,
+      "magic_defense_bonus": 8
+    },
+    "stack_size": 1,
+    "model_id": "helm_turtle_01",
+    "flags": [
+      "rare"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "id": 1342
+  },
+  {
+    "name": "Kappa-Hide Greaves",
+    "category": "armor",
+    "equip_slots": [
+      "legs"
+    ],
+    "level": 60,
+    "stats": {
+      "defense": 40,
+      "agi": 5,
+      "evasion": 12
+    },
+    "stack_size": 1,
+    "model_id": "legs_wolfskin_01",
+    "flags": [
+      "rare"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "id": 1343
+  },
+  {
+    "name": "Hayate's Fan",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "level": 62,
+    "stats": {
+      "attack": 108,
+      "agi": 8,
+      "haste": 4,
+      "accuracy": 12
+    },
+    "stack_size": 1,
+    "model_id": "katana_juzumaru",
+    "flags": [
+      "rare"
+    ],
+    "jobs": [
+      "SAM",
+      "NIN"
+    ],
+    "weapon_type": "katana",
+    "delay": 200,
+    "id": 1344
+  },
+  {
+    "name": "Warlord's Feathered Cape",
+    "category": "accessory",
+    "equip_slots": [
+      "back"
+    ],
+    "level": 62,
+    "stats": {
+      "agi": 8,
+      "evasion": 18,
+      "attack": 8,
+      "defense": 12
+    },
+    "stack_size": 1,
+    "model_id": "threads_of_missing_gods_mantle",
+    "flags": [
+      "rare"
+    ],
+    "id": 1345
+  },
+  {
+    "name": "Cardinal's Brine Ring",
+    "category": "accessory",
+    "equip_slots": [
+      "ring-l",
+      "ring-r"
+    ],
+    "level": 63,
+    "stats": {
+      "mnd": 8,
+      "magic_defense_bonus": 12,
+      "mp": 40
+    },
+    "stack_size": 1,
+    "model_id": "ring_magic_a01",
+    "flags": [
+      "rare"
+    ],
+    "id": 1346
+  },
+  {
+    "name": "Sleeper's Crozier",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "level": 63,
+    "stats": {
+      "magic_attack_bonus": 52,
+      "mnd": 10,
+      "int": 6,
+      "fast_cast": 4
+    },
+    "stack_size": 1,
+    "model_id": "staff_brass",
+    "flags": [
+      "rare"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "PUP"
+    ],
+    "weapon_type": "staff",
+    "delay": 186,
+    "id": 1347
+  },
+  {
+    "name": "Quartz Heart Pendant",
+    "category": "accessory",
+    "equip_slots": [
+      "neck"
+    ],
+    "level": 61,
+    "stats": {
+      "vit": 7,
+      "defense": 14,
+      "hp": 60
+    },
+    "stack_size": 1,
+    "model_id": "neck_choker_dawn",
+    "flags": [
+      "rare"
+    ],
+    "id": 1348
+  },
+  {
+    "name": "Geode-Edge Katana",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "level": 61,
+    "stats": {
+      "attack": 112,
+      "str": 9,
+      "crit_rate": 3
+    },
+    "stack_size": 1,
+    "model_id": "katana_wooden_01",
+    "flags": [
+      "rare"
+    ],
+    "jobs": [
+      "SAM",
+      "NIN"
+    ],
+    "weapon_type": "katana",
+    "delay": 206,
+    "id": 1349
+  },
+  {
+    "name": "Bunbuku's Teakettle Helm",
+    "category": "armor",
+    "equip_slots": [
+      "head"
+    ],
+    "level": 76,
+    "stats": {
+      "defense": 52,
+      "vit": 8,
+      "enmity": 6,
+      "hp": 70
+    },
+    "stack_size": 1,
+    "model_id": "helm_dragon_king_01",
+    "flags": [
+      "rare",
+      "ex"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "id": 1350
+  },
+  {
+    "name": "Council Gavel",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "level": 75,
+    "stats": {
+      "attack": 140,
+      "str": 12,
+      "accuracy": 14
+    },
+    "stack_size": 1,
+    "model_id": "weapon_sword_keen_edge",
+    "flags": [
+      "rare",
+      "ex"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN",
+      "RUN",
+      "BLU",
+      "COR"
+    ],
+    "weapon_type": "sword",
+    "delay": 216,
+    "id": 1351
+  },
+  {
+    "name": "Ixchel's Spinneret Charm",
+    "category": "accessory",
+    "equip_slots": [
+      "neck"
+    ],
+    "level": 77,
+    "stats": {
+      "dex": 8,
+      "agi": 8,
+      "evasion": 16,
+      "ranged_accuracy": 14
+    },
+    "stack_size": 1,
+    "model_id": "neck_priestess_charm",
+    "flags": [
+      "rare",
+      "ex"
+    ],
+    "id": 1352
+  },
+  {
+    "name": "Silkmother's Longbow",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "level": 77,
+    "stats": {
+      "attack": 130,
+      "ranged_attack": 120,
+      "agi": 12,
+      "ranged_accuracy": 16
+    },
+    "stack_size": 1,
+    "model_id": "bow_gorgon_01",
+    "flags": [
+      "rare",
+      "ex"
+    ],
+    "jobs": [
+      "WAR",
+      "RNG",
+      "NIN",
+      "COR"
+    ],
+    "weapon_type": "bow",
+    "delay": 296,
+    "id": 1353
+  },
+  {
+    "name": "Admiral's Writ Cutlass",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "level": 79,
+    "stats": {
+      "attack": 148,
+      "dex": 10,
+      "str": 8,
+      "enmity": 4
+    },
+    "stack_size": 1,
+    "model_id": "sabre_01",
+    "flags": [
+      "rare",
+      "ex"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN",
+      "RUN",
+      "BLU",
+      "COR"
+    ],
+    "weapon_type": "sword",
+    "delay": 218,
+    "id": 1354
+  },
+  {
+    "name": "Foreclosure Sash",
+    "category": "accessory",
+    "equip_slots": [
+      "waist"
+    ],
+    "level": 78,
+    "stats": {
+      "vit": 8,
+      "defense": 18,
+      "enmity": 8,
+      "hp": 50
+    },
+    "stack_size": 1,
+    "model_id": "waist_belt_life",
+    "flags": [
+      "rare",
+      "ex"
+    ],
+    "id": 1355
+  },
+  {
+    "name": "Cube Warden's Aegis",
+    "category": "armor",
+    "equip_slots": [
+      "body"
+    ],
+    "level": 95,
+    "stats": {
+      "defense": 120,
+      "vit": 14,
+      "str": 10,
+      "magic_defense_bonus": 14,
+      "hp": 120
+    },
+    "stack_size": 1,
+    "model_id": "body_plate_knight",
+    "flags": [
+      "rare",
+      "ex"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "id": 1356
+  },
+  {
+    "name": "Vesper's Chrono Blade",
+    "category": "weapon",
+    "equip_slots": [
+      "main"
+    ],
+    "level": 96,
+    "stats": {
+      "attack": 190,
+      "str": 14,
+      "dex": 10,
+      "haste": 6,
+      "accuracy": 18
+    },
+    "stack_size": 1,
+    "model_id": "ws_remorse_dark",
+    "flags": [
+      "rare",
+      "ex"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN",
+      "RUN",
+      "BLU",
+      "COR"
+    ],
+    "weapon_type": "sword",
+    "delay": 206,
+    "id": 1357
+  },
+  {
+    "name": "Coin-Flip Blade",
+    "category": "weapon",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "level": 99,
+    "stats": {
+      "attack": 210,
+      "dex": 14,
+      "crit_rate": 6,
+      "accuracy": 20,
+      "haste": 5
+    },
+    "stack_size": 1,
+    "model_id": "w_sword_swift_blade",
+    "flags": [
+      "rare",
+      "ex"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN",
+      "RUN",
+      "BLU",
+      "COR"
+    ],
+    "weapon_type": "sword",
+    "delay": 198,
+    "id": 1358
+  },
+  {
+    "name": "Both-Sides Mantle",
+    "category": "accessory",
+    "equip_slots": [
+      "back"
+    ],
+    "level": 99,
+    "stats": {
+      "str": 8,
+      "dex": 8,
+      "vit": 8,
+      "agi": 8,
+      "int": 8,
+      "mnd": 8,
+      "evasion": 20,
+      "defense": 20
+    },
+    "stack_size": 1,
+    "model_id": "threads_of_missing_gods_mantle",
+    "flags": [
+      "rare",
+      "ex"
+    ],
+    "id": 1359
+  },
+  {
     "id": 2000,
     "name": "Ash Lumber",
     "category": "material",
@@ -5759,16 +7331,48 @@
     "description": "A material dropped by creatures of the wild."
   },
   {
-    "id": 2059,
-    "name": "Mouse Whisker",
+    "id": 2084,
+    "name": "Vellum Scrap",
     "category": "material",
     "stack_size": 12,
     "model_id": "item_material_fat",
     "description": "A material dropped by creatures of the wild."
   },
   {
-    "id": 2060,
-    "name": "Owl Pellet",
+    "id": 2085,
+    "name": "Ink Vial",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2077,
+    "name": "Lens Shard",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2087,
+    "name": "Wisp Wax",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2069,
+    "name": "Pellet Bone",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2067,
+    "name": "Hedge Hide",
     "category": "material",
     "stack_size": 12,
     "model_id": "item_material_fat",
@@ -5785,6 +7389,22 @@
   {
     "id": 2062,
     "name": "Moth Dust",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2059,
+    "name": "Mouse Whisker",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2060,
+    "name": "Owl Pellet",
     "category": "material",
     "stack_size": 12,
     "model_id": "item_material_fat",
@@ -5823,24 +7443,8 @@
     "description": "A material dropped by creatures of the wild."
   },
   {
-    "id": 2067,
-    "name": "Hedge Hide",
-    "category": "material",
-    "stack_size": 12,
-    "model_id": "item_material_fat",
-    "description": "A material dropped by creatures of the wild."
-  },
-  {
     "id": 2068,
     "name": "Vole Pelt",
-    "category": "material",
-    "stack_size": 12,
-    "model_id": "item_material_fat",
-    "description": "A material dropped by creatures of the wild."
-  },
-  {
-    "id": 2069,
-    "name": "Pellet Bone",
     "category": "material",
     "stack_size": 12,
     "model_id": "item_material_fat",
@@ -5903,14 +7507,6 @@
     "description": "A material dropped by creatures of the wild."
   },
   {
-    "id": 2077,
-    "name": "Lens Shard",
-    "category": "material",
-    "stack_size": 12,
-    "model_id": "item_material_fat",
-    "description": "A material dropped by creatures of the wild."
-  },
-  {
     "id": 2078,
     "name": "Wisp Glass",
     "category": "material",
@@ -5959,32 +7555,8 @@
     "description": "A material dropped by creatures of the wild."
   },
   {
-    "id": 2084,
-    "name": "Vellum Scrap",
-    "category": "material",
-    "stack_size": 12,
-    "model_id": "item_material_fat",
-    "description": "A material dropped by creatures of the wild."
-  },
-  {
-    "id": 2085,
-    "name": "Ink Vial",
-    "category": "material",
-    "stack_size": 12,
-    "model_id": "item_material_fat",
-    "description": "A material dropped by creatures of the wild."
-  },
-  {
     "id": 2086,
     "name": "Bookbinding Paste",
-    "category": "material",
-    "stack_size": 12,
-    "model_id": "item_material_fat",
-    "description": "A material dropped by creatures of the wild."
-  },
-  {
-    "id": 2087,
-    "name": "Wisp Wax",
     "category": "material",
     "stack_size": 12,
     "model_id": "item_material_fat",
@@ -6025,6 +7597,422 @@
   {
     "id": 2092,
     "name": "Redacted Feather",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2291,
+    "name": "Tarred Rope",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2292,
+    "name": "Rat Tail",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2293,
+    "name": "Crab Claw",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2294,
+    "name": "Shell Fragment",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2295,
+    "name": "Gull Feather",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2296,
+    "name": "Stale Ledger Page",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2297,
+    "name": "Salt Hare Pelt",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2298,
+    "name": "Salt Crystal",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2299,
+    "name": "Scorpion Stinger",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2300,
+    "name": "Glass Scale",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2301,
+    "name": "Pilgrim Bell",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2302,
+    "name": "Prayer Slip",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2303,
+    "name": "Brass Wheel Pin",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2304,
+    "name": "Monkey Fur",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2305,
+    "name": "Temple Incense",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2306,
+    "name": "Pearl Grit",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2307,
+    "name": "Anemone Tendril",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2308,
+    "name": "Kelp Fiber",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2309,
+    "name": "Hag Tooth",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2310,
+    "name": "Cormorant Feather",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2311,
+    "name": "Fish Oil",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2312,
+    "name": "Skipper Scale",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2313,
+    "name": "Kappa Shell",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2314,
+    "name": "Cucumber Brine",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2315,
+    "name": "Tengu Feather",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2316,
+    "name": "Torii Lacquer",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2317,
+    "name": "Foxfire Wick",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2318,
+    "name": "Guardian Stone",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2319,
+    "name": "Acolyte Rosary",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2320,
+    "name": "Brine Pearl",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2321,
+    "name": "Choir Sheet",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2322,
+    "name": "Sexton Key",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2323,
+    "name": "Geode Shard",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2324,
+    "name": "Beetle Plate",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2325,
+    "name": "Quartz Sliver",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2326,
+    "name": "Lantern Wing",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2327,
+    "name": "Leaf Seal",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2328,
+    "name": "Hospitality Token",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2329,
+    "name": "Stolen Leaf",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2330,
+    "name": "Teapot Shard",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2331,
+    "name": "Weaver Silk",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2332,
+    "name": "Web Spinneret",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2333,
+    "name": "Thread Spool",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2334,
+    "name": "Wasp Wing",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2335,
+    "name": "Foreclosure Writ",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2336,
+    "name": "Shell-Mark Coin",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2337,
+    "name": "Anchor Link",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2338,
+    "name": "Eel Skin",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2339,
+    "name": "Tidewater Vial",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2340,
+    "name": "Paradox Dust",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2341,
+    "name": "Cube Splinter",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "A material dropped by creatures of the wild."
+  },
+  {
+    "id": 2342,
+    "name": "Chrono Filament",
     "category": "material",
     "stack_size": 12,
     "model_id": "item_material_fat",
@@ -10623,5 +12611,1349 @@
     "stack_size": 12,
     "model_id": "item_food_minestrone",
     "description": "Hums faintly at 7.83 Hz. You will see slightly further ahead."
+  },
+  {
+    "id": 2343,
+    "name": "Pilgrim-Steel Ingot",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Iron blessed with a pilgrim's bell-metal; it rings faintly when struck."
+  },
+  {
+    "id": 2344,
+    "name": "Geode-Steel Ingot",
+    "category": "material",
+    "stack_size": 12,
+    "model_id": "item_material_fat",
+    "description": "Swampite steel veined with quartz. Cold, bright and very hard."
+  },
+  {
+    "id": 2345,
+    "name": "Pilgrim-Steel Blade",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "sword",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN",
+      "RUN",
+      "BLU",
+      "COR"
+    ],
+    "level": 52,
+    "stats": {
+      "attack": 98,
+      "str": 6,
+      "accuracy": 6,
+      "mnd": 3
+    },
+    "model_id": "sword_steel",
+    "delay": 224,
+    "description": "A blade that chimes once, politely, at the start of a fight."
+  },
+  {
+    "id": 2346,
+    "name": "Pilgrim-Steel Blade +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "sword",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN",
+      "RUN",
+      "BLU",
+      "COR"
+    ],
+    "level": 52,
+    "stats": {
+      "attack": 107,
+      "str": 7,
+      "accuracy": 7,
+      "mnd": 4
+    },
+    "model_id": "sword_steel",
+    "delay": 224,
+    "description": "A blade that chimes once, politely, at the start of a fight. (High quality.)"
+  },
+  {
+    "id": 2347,
+    "name": "Pilgrim-Steel Plate",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 54,
+    "stats": {
+      "defense": 73,
+      "vit": 6,
+      "mnd": 3
+    },
+    "model_id": "body_plate_knight",
+    "description": "Each plate is inscribed with a name. Not yours; someone who got there first."
+  },
+  {
+    "id": 2348,
+    "name": "Pilgrim-Steel Plate +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 54,
+    "stats": {
+      "defense": 80,
+      "vit": 7,
+      "mnd": 4
+    },
+    "model_id": "body_plate_knight",
+    "description": "Each plate is inscribed with a name. Not yours; someone who got there first. (High quality.)"
+  },
+  {
+    "id": 2349,
+    "name": "Foreclosure Cleaver",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "axe",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "DRK",
+      "BST",
+      "RUN"
+    ],
+    "level": 70,
+    "stats": {
+      "attack": 142,
+      "str": 6,
+      "accuracy": 8,
+      "enmity": 3
+    },
+    "model_id": "axe_hand",
+    "delay": 250,
+    "description": "Seized, stamped and sharpened."
+  },
+  {
+    "id": 2350,
+    "name": "Foreclosure Cleaver +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "axe",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "DRK",
+      "BST",
+      "RUN"
+    ],
+    "level": 70,
+    "stats": {
+      "attack": 156,
+      "str": 7,
+      "accuracy": 9,
+      "enmity": 4
+    },
+    "model_id": "axe_hand",
+    "delay": 250,
+    "description": "Seized, stamped and sharpened. (High quality.)"
+  },
+  {
+    "id": 2351,
+    "name": "Geode-Steel Tachi",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "katana",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "SAM",
+      "NIN"
+    ],
+    "level": 66,
+    "stats": {
+      "attack": 140,
+      "str": 7,
+      "accuracy": 8,
+      "dex": 6,
+      "crit_rate": 2
+    },
+    "model_id": "katana_juzumaru",
+    "delay": 205,
+    "description": "Quartz threads through the steel like frozen light."
+  },
+  {
+    "id": 2352,
+    "name": "Geode-Steel Tachi +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "katana",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "SAM",
+      "NIN"
+    ],
+    "level": 66,
+    "stats": {
+      "attack": 154,
+      "str": 8,
+      "accuracy": 9,
+      "dex": 7,
+      "crit_rate": 3
+    },
+    "model_id": "katana_juzumaru",
+    "delay": 205,
+    "description": "Quartz threads through the steel like frozen light. (High quality.)"
+  },
+  {
+    "id": 2353,
+    "name": "Tidebreaker Greatsword",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "greatsword",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WAR",
+      "DRK",
+      "RUN"
+    ],
+    "level": 72,
+    "stats": {
+      "attack": 12,
+      "str": 8,
+      "accuracy": 9
+    },
+    "model_id": "greatsword_icewraith",
+    "delay": 410,
+    "description": "It parts water the way a decision parts a room."
+  },
+  {
+    "id": 2354,
+    "name": "Tidebreaker Greatsword +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "greatsword",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WAR",
+      "DRK",
+      "RUN"
+    ],
+    "level": 72,
+    "stats": {
+      "attack": 13,
+      "str": 9,
+      "accuracy": 10
+    },
+    "model_id": "greatsword_icewraith",
+    "delay": 410,
+    "description": "It parts water the way a decision parts a room. (High quality.)"
+  },
+  {
+    "id": 2356,
+    "name": "Wellspring Blade +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "sword",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "RDM",
+      "NIN",
+      "RUN",
+      "BLU",
+      "COR"
+    ],
+    "level": 88,
+    "stats": {
+      "attack": 176,
+      "str": 10,
+      "accuracy": 12,
+      "dex": 8,
+      "haste": 5
+    },
+    "model_id": "w_sword_swift_blade",
+    "delay": 204,
+    "description": "Forged at the still point; it is already where it is going. (High quality.)"
+  },
+  {
+    "id": 2357,
+    "name": "Pearl-Grit Earring",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "ear-l",
+      "ear-r"
+    ],
+    "level": 56,
+    "stats": {
+      "mnd": 4,
+      "magic_defense_bonus": 6,
+      "hp": 30
+    },
+    "model_id": "ear_mage",
+    "description": "A pearl no larger than a grain, said to hold a whole tide."
+  },
+  {
+    "id": 2358,
+    "name": "Pearl-Grit Earring +1",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "ear-l",
+      "ear-r"
+    ],
+    "level": 56,
+    "stats": {
+      "mnd": 5,
+      "magic_defense_bonus": 7,
+      "hp": 33
+    },
+    "model_id": "ear_mage",
+    "description": "A pearl no larger than a grain, said to hold a whole tide. (High quality.)"
+  },
+  {
+    "id": 2359,
+    "name": "Brine Pearl Pendant",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "neck"
+    ],
+    "level": 58,
+    "stats": {
+      "vit": 5,
+      "magic_defense_bonus": 10,
+      "defense": 10,
+      "mp": 40
+    },
+    "model_id": "neck_choker_dawn",
+    "description": "Cold even in the sun."
+  },
+  {
+    "id": 2360,
+    "name": "Brine Pearl Pendant +1",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "neck"
+    ],
+    "level": 58,
+    "stats": {
+      "vit": 6,
+      "magic_defense_bonus": 11,
+      "defense": 11,
+      "mp": 44
+    },
+    "model_id": "neck_choker_dawn",
+    "description": "Cold even in the sun. (High quality.)"
+  },
+  {
+    "id": 2361,
+    "name": "Foxfire Ring",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "ring-l",
+      "ring-r"
+    ],
+    "level": 66,
+    "stats": {
+      "agi": 5,
+      "evasion": 12,
+      "magic_attack_bonus": 8
+    },
+    "model_id": "ring_magic_a01",
+    "description": "A small blue flame that does not burn, and does not go out."
+  },
+  {
+    "id": 2362,
+    "name": "Foxfire Ring +1",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "ring-l",
+      "ring-r"
+    ],
+    "level": 66,
+    "stats": {
+      "agi": 6,
+      "evasion": 13,
+      "magic_attack_bonus": 9
+    },
+    "model_id": "ring_magic_a01",
+    "description": "A small blue flame that does not burn, and does not go out. (High quality.)"
+  },
+  {
+    "id": 2363,
+    "name": "Hospitality Token Band",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "ring-l",
+      "ring-r"
+    ],
+    "level": 68,
+    "stats": {
+      "chr": 6,
+      "mnd": 5,
+      "enmity": -6,
+      "hp": 40
+    },
+    "model_id": "ring_kings_alibi",
+    "description": "Accepted anywhere the Yokai keep house."
+  },
+  {
+    "id": 2364,
+    "name": "Hospitality Token Band +1",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "ring-l",
+      "ring-r"
+    ],
+    "level": 68,
+    "stats": {
+      "chr": 7,
+      "mnd": 6,
+      "enmity": -5,
+      "hp": 44
+    },
+    "model_id": "ring_kings_alibi",
+    "description": "Accepted anywhere the Yokai keep house. (High quality.)"
+  },
+  {
+    "id": 2365,
+    "name": "Cube-Splinter Earring",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "ear-l",
+      "ear-r"
+    ],
+    "level": 86,
+    "stats": {
+      "int": 6,
+      "mnd": 6,
+      "fast_cast": 4,
+      "haste": 3
+    },
+    "model_id": "earring_jordan_01",
+    "description": "A sliver of the Cube, set in silver. It is always about to be a different shape."
+  },
+  {
+    "id": 2366,
+    "name": "Cube-Splinter Earring +1",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "ear-l",
+      "ear-r"
+    ],
+    "level": 86,
+    "stats": {
+      "int": 7,
+      "mnd": 7,
+      "fast_cast": 5,
+      "haste": 4
+    },
+    "model_id": "earring_jordan_01",
+    "description": "A sliver of the Cube, set in silver. It is always about to be a different shape. (High quality.)"
+  },
+  {
+    "id": 2367,
+    "name": "Chrono-Filament Band",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "ring-l",
+      "ring-r"
+    ],
+    "level": 92,
+    "stats": {
+      "dex": 8,
+      "agi": 8,
+      "haste": 5,
+      "crit_rate": 4,
+      "accuracy": 14
+    },
+    "model_id": "ring_loki01",
+    "description": "A ring drawn from a single thread of time. It tightens when you hesitate."
+  },
+  {
+    "id": 2368,
+    "name": "Chrono-Filament Band +1",
+    "category": "accessory",
+    "stack_size": 1,
+    "equip_slots": [
+      "ring-l",
+      "ring-r"
+    ],
+    "level": 92,
+    "stats": {
+      "dex": 9,
+      "agi": 9,
+      "haste": 6,
+      "crit_rate": 5,
+      "accuracy": 15
+    },
+    "model_id": "ring_loki01",
+    "description": "A ring drawn from a single thread of time. It tightens when you hesitate. (High quality.)"
+  },
+  {
+    "id": 2369,
+    "name": "Torii Staff",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "staff",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "PUP"
+    ],
+    "level": 60,
+    "stats": {
+      "magic_attack_bonus": 51,
+      "mnd": 7,
+      "int": 6,
+      "magic_defense_bonus": 6
+    },
+    "model_id": "staff_brass",
+    "delay": 190,
+    "description": "A gate you carry. Every spell passes through it first."
+  },
+  {
+    "id": 2370,
+    "name": "Torii Staff +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "staff",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "PUP"
+    ],
+    "level": 60,
+    "stats": {
+      "magic_attack_bonus": 56,
+      "mnd": 8,
+      "int": 7,
+      "magic_defense_bonus": 7
+    },
+    "model_id": "staff_brass",
+    "delay": 190,
+    "description": "A gate you carry. Every spell passes through it first. (High quality.)"
+  },
+  {
+    "id": 2371,
+    "name": "Tengu Longbow",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "bow",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WAR",
+      "RNG",
+      "NIN",
+      "COR"
+    ],
+    "level": 68,
+    "stats": {
+      "attack": 126,
+      "ranged_attack": 113,
+      "accuracy": 12,
+      "agi": 8,
+      "ranged_accuracy": 12
+    },
+    "model_id": "bow_gorgon_01",
+    "delay": 300,
+    "description": "The string hums a single, very rude note."
+  },
+  {
+    "id": 2372,
+    "name": "Tengu Longbow +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "bow",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WAR",
+      "RNG",
+      "NIN",
+      "COR"
+    ],
+    "level": 68,
+    "stats": {
+      "attack": 138,
+      "ranged_attack": 124,
+      "accuracy": 13,
+      "agi": 9,
+      "ranged_accuracy": 13
+    },
+    "model_id": "bow_gorgon_01",
+    "delay": 300,
+    "description": "The string hums a single, very rude note. (High quality.)"
+  },
+  {
+    "id": 2373,
+    "name": "Teakettle Rod",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "staff",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "PUP"
+    ],
+    "level": 74,
+    "stats": {
+      "magic_attack_bonus": 62,
+      "mnd": 9,
+      "int": 9,
+      "mp_regen": 2
+    },
+    "model_id": "staff_shepherd_01",
+    "delay": 192,
+    "description": "It whistles when a spell is about to land."
+  },
+  {
+    "id": 2374,
+    "name": "Teakettle Rod +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "staff",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "PUP"
+    ],
+    "level": 74,
+    "stats": {
+      "magic_attack_bonus": 68,
+      "mnd": 10,
+      "int": 10,
+      "mp_regen": 3
+    },
+    "model_id": "staff_shepherd_01",
+    "delay": 192,
+    "description": "It whistles when a spell is about to land. (High quality.)"
+  },
+  {
+    "id": 2375,
+    "name": "Monkey-Fur Vest",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 56,
+    "stats": {
+      "defense": 6,
+      "agi": 5,
+      "evasion": 12
+    },
+    "model_id": "body_leather",
+    "description": "Warm, springy and faintly smug."
+  },
+  {
+    "id": 2376,
+    "name": "Monkey-Fur Vest +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 56,
+    "stats": {
+      "defense": 7,
+      "agi": 6,
+      "evasion": 13
+    },
+    "model_id": "body_leather",
+    "description": "Warm, springy and faintly smug. (High quality.)"
+  },
+  {
+    "id": 2377,
+    "name": "Kappa-Shell Boots",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "feet"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 60,
+    "stats": {
+      "defense": 45,
+      "vit": 4,
+      "agi": 3,
+      "evasion": 8
+    },
+    "model_id": "feet_leather",
+    "description": "Waterproof, and a very little bit rude about it."
+  },
+  {
+    "id": 2378,
+    "name": "Kappa-Shell Boots +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "feet"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 60,
+    "stats": {
+      "defense": 49,
+      "vit": 5,
+      "agi": 4,
+      "evasion": 9
+    },
+    "model_id": "feet_leather",
+    "description": "Waterproof, and a very little bit rude about it. (High quality.)"
+  },
+  {
+    "id": 2379,
+    "name": "Wasp-Wing Jerkin",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 72,
+    "stats": {
+      "defense": 75,
+      "agi": 8,
+      "evasion": 18,
+      "haste": 3
+    },
+    "model_id": "body_leather",
+    "description": "Layers of translucent wing, stitched like roof tiles."
+  },
+  {
+    "id": 2380,
+    "name": "Wasp-Wing Jerkin +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "THF",
+      "NIN",
+      "DNC",
+      "MNK",
+      "BST",
+      "RNG",
+      "ASN",
+      "COR",
+      "PUP",
+      "BLU"
+    ],
+    "level": 72,
+    "stats": {
+      "defense": 82,
+      "agi": 9,
+      "evasion": 19,
+      "haste": 4
+    },
+    "model_id": "body_leather",
+    "description": "Layers of translucent wing, stitched like roof tiles. (High quality.)"
+  },
+  {
+    "id": 2381,
+    "name": "Pilgrim Cassock",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 54,
+    "stats": {
+      "defense": 59,
+      "mnd": 6,
+      "magic_defense_bonus": 8
+    },
+    "model_id": "body_robe",
+    "description": "Plain grey wool. It remembers every shrine."
+  },
+  {
+    "id": 2382,
+    "name": "Pilgrim Cassock +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 54,
+    "stats": {
+      "defense": 64,
+      "mnd": 7,
+      "magic_defense_bonus": 9
+    },
+    "model_id": "body_robe",
+    "description": "Plain grey wool. It remembers every shrine. (High quality.)"
+  },
+  {
+    "id": 2383,
+    "name": "Weaver-Silk Robe",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 72,
+    "stats": {
+      "defense": 75,
+      "int": 9,
+      "mnd": 6,
+      "magic_attack_bonus": 8,
+      "evasion": 8
+    },
+    "model_id": "robe_simple_01",
+    "description": "Spun by the cliffs, woven by someone who is not entirely sure who."
+  },
+  {
+    "id": 2384,
+    "name": "Weaver-Silk Robe +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 72,
+    "stats": {
+      "defense": 82,
+      "int": 10,
+      "mnd": 7,
+      "magic_attack_bonus": 9,
+      "evasion": 9
+    },
+    "model_id": "robe_simple_01",
+    "description": "Spun by the cliffs, woven by someone who is not entirely sure who. (High quality.)"
+  },
+  {
+    "id": 2385,
+    "name": "Foxfire Kimono",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 78,
+    "stats": {
+      "defense": 80,
+      "int": 10,
+      "mnd": 8,
+      "magic_attack_bonus": 10,
+      "fast_cast": 3
+    },
+    "model_id": "robe_crimson_mdl",
+    "description": "Blue flames dance on the hem. The wearer is never burned."
+  },
+  {
+    "id": 2386,
+    "name": "Foxfire Kimono +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 78,
+    "stats": {
+      "defense": 88,
+      "int": 11,
+      "mnd": 9,
+      "magic_attack_bonus": 11,
+      "fast_cast": 4
+    },
+    "model_id": "robe_crimson_mdl",
+    "description": "Blue flames dance on the hem. The wearer is never burned. (High quality.)"
+  },
+  {
+    "id": 2387,
+    "name": "Wellspring Vestments",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 90,
+    "stats": {
+      "defense": 91,
+      "int": 13,
+      "mnd": 13,
+      "magic_attack_bonus": 14,
+      "magic_defense_bonus": 12,
+      "mp": 80
+    },
+    "model_id": "robe_dark",
+    "description": "The hem is always damp. It is always, very slightly, the future."
+  },
+  {
+    "id": 2388,
+    "name": "Wellspring Vestments +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WHM",
+      "BLM",
+      "RDM",
+      "SMN",
+      "SCH",
+      "GEO",
+      "BRD"
+    ],
+    "level": 90,
+    "stats": {
+      "defense": 100,
+      "int": 14,
+      "mnd": 14,
+      "magic_attack_bonus": 15,
+      "magic_defense_bonus": 13,
+      "mp": 88
+    },
+    "model_id": "robe_dark",
+    "description": "The hem is always damp. It is always, very slightly, the future. (High quality.)"
+  },
+  {
+    "id": 2389,
+    "name": "Hag-Tooth Dagger",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "dagger",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "ASN",
+      "COR"
+    ],
+    "level": 56,
+    "stats": {
+      "attack": 6,
+      "str": 6,
+      "accuracy": 7,
+      "dex": 6
+    },
+    "model_id": "dagger_kali_01",
+    "delay": 152,
+    "description": "A tooth that remembers every bite."
+  },
+  {
+    "id": 2390,
+    "name": "Hag-Tooth Dagger +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "dagger",
+    "equip_slots": [
+      "main",
+      "off"
+    ],
+    "jobs": [
+      "WAR",
+      "MNK",
+      "RDM",
+      "THF",
+      "BST",
+      "NIN",
+      "DNC",
+      "ASN",
+      "COR"
+    ],
+    "level": 56,
+    "stats": {
+      "attack": 7,
+      "str": 7,
+      "accuracy": 8,
+      "dex": 7
+    },
+    "model_id": "dagger_kali_01",
+    "delay": 152,
+    "description": "A tooth that remembers every bite. (High quality.)"
+  },
+  {
+    "id": 2391,
+    "name": "Quartz Claws",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "h2h",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "MNK",
+      "PUP"
+    ],
+    "level": 64,
+    "stats": {
+      "attack": 107,
+      "str": 5,
+      "accuracy": 8,
+      "dex": 6,
+      "crit_rate": 2
+    },
+    "model_id": "titanium_claws_mdl",
+    "delay": 225,
+    "description": "Quartz bonded to crawler mandible. They glitter when they hit."
+  },
+  {
+    "id": 2392,
+    "name": "Quartz Claws +1",
+    "category": "weapon",
+    "stack_size": 1,
+    "weapon_type": "h2h",
+    "equip_slots": [
+      "main"
+    ],
+    "jobs": [
+      "MNK",
+      "PUP"
+    ],
+    "level": 64,
+    "stats": {
+      "attack": 117,
+      "str": 6,
+      "accuracy": 9,
+      "dex": 7,
+      "crit_rate": 3
+    },
+    "model_id": "titanium_claws_mdl",
+    "delay": 225,
+    "description": "Quartz bonded to crawler mandible. They glitter when they hit. (High quality.)"
+  },
+  {
+    "id": 2393,
+    "name": "Kappa-Shell Cuirass",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 66,
+    "stats": {
+      "defense": 87,
+      "vit": 7,
+      "magic_defense_bonus": 8,
+      "hp": 60
+    },
+    "model_id": "body_chain",
+    "description": "A kappa's shell, trimmed, lacquered and unwillingly donated."
+  },
+  {
+    "id": 2394,
+    "name": "Kappa-Shell Cuirass +1",
+    "category": "armor",
+    "stack_size": 1,
+    "equip_slots": [
+      "body"
+    ],
+    "jobs": [
+      "WAR",
+      "PLD",
+      "DRK",
+      "SAM",
+      "DRG",
+      "RUN"
+    ],
+    "level": 66,
+    "stats": {
+      "defense": 95,
+      "vit": 8,
+      "magic_defense_bonus": 9,
+      "hp": 66
+    },
+    "model_id": "body_chain",
+    "description": "A kappa's shell, trimmed, lacquered and unwillingly donated. (High quality.)"
+  },
+  {
+    "id": 2395,
+    "name": "Salt Tonic",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_ether",
+    "description": "Brackish, sharp and invigorating. Restores MP."
+  },
+  {
+    "id": 2396,
+    "name": "Brine Pearl Elixir",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_hipotion",
+    "description": "Pearl dissolved in spring water. A great restoration of body and mind."
+  },
+  {
+    "id": 2397,
+    "name": "Foxfire Lantern",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_potion",
+    "description": "A lantern lit with fox-fire. Party regen while it burns."
+  },
+  {
+    "id": 2398,
+    "name": "Paradox Dust Bomb",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_potion",
+    "description": "A twist of paradox dust. Thrown, it detonates a moment before you throw it."
+  },
+  {
+    "id": 2399,
+    "name": "Salt-Baked Carp",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_food_minestrone",
+    "description": "Baked in a salt crust until the crust is the best part."
+  },
+  {
+    "id": 2400,
+    "name": "Kappa Cucumber Roll",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_food_minestrone",
+    "description": "A tight roll of rice and brined cucumber. Kappa-approved."
+  },
+  {
+    "id": 2401,
+    "name": "Tidepool Stew",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_food_minestrone",
+    "description": "Everything the tide left behind, simmered with great tenderness."
+  },
+  {
+    "id": 2402,
+    "name": "Tanuki Tea Ceremony",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_food_minestrone",
+    "description": "Every cup is a contract. Every contract is a kindness."
+  },
+  {
+    "id": 2403,
+    "name": "Paradox Pie",
+    "category": "consumable",
+    "stack_size": 12,
+    "model_id": "item_food_minestrone",
+    "description": "Baked yesterday. Eaten tomorrow. Delicious, always, already."
   }
 ]

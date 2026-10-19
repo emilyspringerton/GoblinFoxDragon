@@ -102,23 +102,36 @@ type skyWeight struct {
 // zoneBias lists the elements a zone leans toward; weights are relative. "Clear" (no element) is
 // always possible. Zones not listed use defaultBias.
 var zoneBias = map[int][]skyWeight{
-	0:   {{Wind, 3}, {Light, 3}, {Earth, 2}, {Water, 1}},   // Meadow
-	1:   {{Wind, 4}, {Earth, 3}, {Ice, 2}, {Lightning, 1}}, // Hills
-	2:   {{Earth, 4}, {Dark, 3}, {Ice, 1}},                 // Caves
-	3:   {{Water, 4}, {Dark, 3}, {Earth, 1}},               // Swampville
-	4:   {{Light, 3}, {Fire, 2}, {Wind, 2}},                // New Handington
-	10:  {{Light, 3}, {Wind, 3}, {Earth, 2}},               // Fledgling Field
-	11:  {{Wind, 4}, {Earth, 2}, {Light, 2}},               // Wren's Perch
-	12:  {{Dark, 4}, {Earth, 3}},                           // Roost Deeps
-	13:  {{Water, 4}, {Dark, 2}, {Earth, 2}},               // Pellet Marsh
-	14:  {{Lightning, 3}, {Wind, 3}, {Light, 3}},           // Observation Tor
-	15:  {{Ice, 4}, {Wind, 4}, {Lightning, 1}},             // Eastwind Ridge
-	16:  {{Dark, 2}, {Light, 2}, {Earth, 2}},               // Cataloguer's Stacks
-	17:  {{Water, 3}, {Dark, 4}, {Ice, 2}},                 // Footnote Moor
-	18:  {{Dark, 3}, {Ice, 3}, {Lightning, 2}},             // Protocol Wall
-	200: {{Fire, 2}, {Lightning, 2}, {Wind, 2}},            // Detroit apartment district
-	205: {{Water, 4}, {Dark, 2}},                           // Osaka Underport
-	206: {{Water, 3}, {Wind, 3}, {Dark, 2}},                // Kuroshio Coast
+	0:   {{Wind, 3}, {Light, 3}, {Earth, 2}, {Water, 1}},     // Meadow
+	1:   {{Wind, 4}, {Earth, 3}, {Ice, 2}, {Lightning, 1}},   // Hills
+	2:   {{Earth, 4}, {Dark, 3}, {Ice, 1}},                   // Caves
+	3:   {{Water, 4}, {Dark, 3}, {Earth, 1}},                 // Swampville
+	4:   {{Light, 3}, {Fire, 2}, {Wind, 2}},                  // New Handington
+	10:  {{Light, 3}, {Wind, 3}, {Earth, 2}},                 // Fledgling Field
+	11:  {{Wind, 4}, {Earth, 2}, {Light, 2}},                 // Wren's Perch
+	12:  {{Dark, 4}, {Earth, 3}},                             // Roost Deeps
+	13:  {{Water, 4}, {Dark, 2}, {Earth, 2}},                 // Pellet Marsh
+	14:  {{Lightning, 3}, {Wind, 3}, {Light, 3}},             // Observation Tor
+	15:  {{Ice, 4}, {Wind, 4}, {Lightning, 1}},               // Eastwind Ridge
+	16:  {{Dark, 2}, {Light, 2}, {Earth, 2}},                 // Cataloguer's Stacks
+	17:  {{Water, 3}, {Dark, 4}, {Ice, 2}},                   // Footnote Moor
+	18:  {{Dark, 3}, {Ice, 3}, {Lightning, 2}},               // Protocol Wall
+	19:  {{Wind, 3}, {Water, 3}, {Light, 1}},                 // Handington Docks
+	20:  {{Water, 3}, {Wind, 3}, {Light, 2}},                 // Open Balance Quay
+	21:  {{Fire, 4}, {Earth, 3}, {Light, 2}},                 // Salt Flats
+	22:  {{Light, 3}, {Wind, 2}, {Water, 2}},                 // Pilgrim's Terraces
+	23:  {{Water, 5}, {Wind, 2}, {Dark, 1}},                  // Tidepool Fields
+	24:  {{Water, 4}, {Dark, 2}, {Earth, 2}},                 // Cormorant Marsh
+	25:  {{Lightning, 3}, {Wind, 3}, {Light, 2}, {Dark, 1}},  // Shrine Stair
+	26:  {{Water, 4}, {Dark, 3}},                             // Sunken Chapel Coast
+	28:  {{Light, 3}, {Wind, 2}, {Earth, 2}},                 // Tanuki Council Road
+	29:  {{Wind, 5}, {Ice, 2}, {Lightning, 2}},               // Web Cliffs
+	30:  {{Dark, 3}, {Ice, 3}, {Water, 2}},                   // Foreclosure Anchorage
+	31:  {{Light, 3}, {Dark, 3}, {Lightning, 2}, {Water, 2}}, // The Wellspring of Tides
+	32:  {{Water, 3}, {Wind, 3}},                             // Aboard the Open Balance
+	200: {{Fire, 2}, {Lightning, 2}, {Wind, 2}},              // Detroit apartment district
+	205: {{Water, 4}, {Dark, 2}},                             // Osaka Underport
+	206: {{Water, 3}, {Wind, 3}, {Dark, 2}},                  // Kuroshio Coast
 }
 
 var defaultBias = []skyWeight{{Wind, 2}, {Earth, 2}, {Water, 2}, {Fire, 1}, {Ice, 1}, {Light, 1}, {Dark, 1}, {Lightning, 1}}

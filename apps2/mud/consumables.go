@@ -32,6 +32,10 @@ var itemKits = map[string]*kitEntry{
 	"smoke-pellet":         ability("smoke-pellet", "Smoke Pellet", nil, 0, tgtArea, 8, "", Fx(mob.FxBlind, 40, 30*time.Second), Hide(10*time.Second)),
 	"party-store-firework": ability("party-store-firework", "Party Store Firework", nil, 0, tgtArea, 5, "", Dmg(140, "", 0, "Fire")),
 	"acid-flask-refill":    ability("acid-flask-refill", "Acid Flask", nil, 0, tgtEnemy, 0, "", Dot(11, 45*time.Second), Fx(mob.FxWeaken, 20, 45*time.Second)),
+	"salt-tonic":           ability("salt-tonic", "Salt Tonic", nil, 0, tgtSelf, 0, "", MPRestore(150)),
+	"brine-pearl-elixir":   ability("brine-pearl-elixir", "Brine Pearl Elixir", nil, 0, tgtSelf, 0, "", Heal(800, "", 0), MPRestore(300)),
+	"foxfire-lantern":      ability("foxfire-lantern", "Foxfire Lantern", nil, 0, tgtZone, 0, "", Buff(status.Regen, 7, 3*time.Minute)),
+	"paradox-dust-bomb":    ability("paradox-dust-bomb", "Paradox Dust Bomb", nil, 0, tgtArea, 7, "", Dmg(420, "", 0, "Dark")),
 	"spirit-lantern":       ability("spirit-lantern", "Spirit Lantern", nil, 0, tgtZone, 0, "", Buff(status.Regen, 4, 3*time.Minute)),
 }
 

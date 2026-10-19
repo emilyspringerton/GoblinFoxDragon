@@ -33,6 +33,18 @@ func init() {
 	npcVendorCatalog["guildmaster"] = append(npcVendorCatalog["guildmaster"], VendorItem{ID: "brine-salt", Price: 20})
 	npcVendorCatalog["guildmaster"] = append(npcVendorCatalog["guildmaster"], VendorItem{ID: "spring-water", Price: 15})
 	npcVendorCatalog["guildmaster"] = append(npcVendorCatalog["guildmaster"], VendorItem{ID: "shrine-greens", Price: 35})
+	npcVendorCatalog["customs-clerk-obe"] = append(npcVendorCatalog["customs-clerk-obe"], VendorItem{ID: "fire-crystal", Price: 130})
+	npcVendorCatalog["customs-clerk-obe"] = append(npcVendorCatalog["customs-clerk-obe"], VendorItem{ID: "water-crystal", Price: 130})
+	npcVendorCatalog["customs-clerk-obe"] = append(npcVendorCatalog["customs-clerk-obe"], VendorItem{ID: "wind-crystal", Price: 130})
+	npcVendorCatalog["customs-clerk-obe"] = append(npcVendorCatalog["customs-clerk-obe"], VendorItem{ID: "earth-crystal", Price: 130})
+	npcVendorCatalog["customs-clerk-obe"] = append(npcVendorCatalog["customs-clerk-obe"], VendorItem{ID: "ice-crystal", Price: 130})
+	npcVendorCatalog["customs-clerk-obe"] = append(npcVendorCatalog["customs-clerk-obe"], VendorItem{ID: "thunder-crystal", Price: 130})
+	npcVendorCatalog["customs-clerk-obe"] = append(npcVendorCatalog["customs-clerk-obe"], VendorItem{ID: "light-crystal", Price: 190})
+	npcVendorCatalog["customs-clerk-obe"] = append(npcVendorCatalog["customs-clerk-obe"], VendorItem{ID: "dark-crystal", Price: 190})
+	npcVendorCatalog["customs-clerk-obe"] = append(npcVendorCatalog["customs-clerk-obe"], VendorItem{ID: "spring-water", Price: 18})
+	npcVendorCatalog["customs-clerk-obe"] = append(npcVendorCatalog["customs-clerk-obe"], VendorItem{ID: "brine-salt", Price: 22})
+	npcVendorCatalog["customs-clerk-obe"] = append(npcVendorCatalog["customs-clerk-obe"], VendorItem{ID: "tanuki-rice", Price: 32})
+	npcVendorCatalog["customs-clerk-obe"] = append(npcVendorCatalog["customs-clerk-obe"], VendorItem{ID: "lamp-wick", Price: 42})
 	npcVendorCatalog["wren-9"] = append(npcVendorCatalog["wren-9"], VendorItem{ID: "heather-lumber", Price: 90})
 	npcVendorCatalog["wren-9"] = append(npcVendorCatalog["wren-9"], VendorItem{ID: "lamp-wick", Price: 40})
 	npcVendorCatalog["wren-9"] = append(npcVendorCatalog["wren-9"], VendorItem{ID: "light-crystal", Price: 180})
@@ -67,4 +79,9 @@ var loreFoods = []food.Food{
 	{ID: "squid-ink-pasta", Name: "Squid Ink Pasta", INTBonus: 7, MPBonus: 80, Duration: 45 * time.Minute},
 	{ID: "hospitality-feast", Name: "Hospitality Feast", HPBonus: 100, MNDBonus: 4, STRBonus: 4, VITBonus: 4, Duration: 60 * time.Minute},
 	{ID: "stolas-soup", Name: "Stolas Soup", INTBonus: 6, MNDBonus: 6, MPBonus: 120, Duration: 60 * time.Minute},
+	{ID: "salt-baked-carp", Name: "Salt-Baked Carp", HPBonus: 120, STRBonus: 6, VITBonus: 5, Duration: 45 * time.Minute},
+	{ID: "kappa-cucumber-roll", Name: "Kappa Cucumber Roll", AGIBonus: 6, DEXBonus: 7, Duration: 45 * time.Minute},
+	{ID: "tidepool-stew", Name: "Tidepool Stew", HPBonus: 160, MNDBonus: 6, VITBonus: 8, Duration: 45 * time.Minute},
+	{ID: "tanuki-tea-ceremony", Name: "Tanuki Tea Ceremony", INTBonus: 8, MNDBonus: 8, MPBonus: 150, Duration: 60 * time.Minute},
+	{ID: "paradox-pie", Name: "Paradox Pie", AGIBonus: 9, DEXBonus: 9, HPBonus: 200, INTBonus: 9, MNDBonus: 9, MPBonus: 150, STRBonus: 9, VITBonus: 9, Duration: 60 * time.Minute},
 }

@@ -103,5 +103,125 @@
     "base_kind": "redacted-owl",
     "display_name": "Fully Redacted Owl",
     "power_mul": 1.5
+  },
+  {
+    "base_kind": "quay-rat",
+    "display_name": "Stowaway Rat",
+    "power_mul": 1.8
+  },
+  {
+    "base_kind": "dock-crab",
+    "display_name": "Impounded Crab",
+    "power_mul": 1.5
+  },
+  {
+    "base_kind": "salt-hare",
+    "display_name": "Dune Hare",
+    "power_mul": 1.8
+  },
+  {
+    "base_kind": "brine-scorpion",
+    "display_name": "Emperor Brine Scorpion",
+    "power_mul": 1.5
+  },
+  {
+    "base_kind": "pilgrim-shade",
+    "display_name": "Devout Shade",
+    "power_mul": 1.8
+  },
+  {
+    "base_kind": "temple-monkey",
+    "display_name": "Alpha Temple Monkey",
+    "power_mul": 1.5
+  },
+  {
+    "base_kind": "tidepool-crab",
+    "display_name": "Giant Tidepool Crab",
+    "power_mul": 1.8
+  },
+  {
+    "base_kind": "anemone-stalker",
+    "display_name": "Venomous Stalker",
+    "power_mul": 1.5
+  },
+  {
+    "base_kind": "cormorant",
+    "display_name": "Master Cormorant",
+    "power_mul": 1.8
+  },
+  {
+    "base_kind": "bog-kappa",
+    "display_name": "Elder Kappa",
+    "power_mul": 1.5
+  },
+  {
+    "base_kind": "gate-tengu",
+    "display_name": "Crow Tengu Captain",
+    "power_mul": 1.8
+  },
+  {
+    "base_kind": "fox-fire-wisp",
+    "display_name": "Blue Foxfire",
+    "power_mul": 1.5
+  },
+  {
+    "base_kind": "brine-acolyte",
+    "display_name": "Senior Acolyte",
+    "power_mul": 1.8
+  },
+  {
+    "base_kind": "drowned-choirboy",
+    "display_name": "Choirmaster's Favourite",
+    "power_mul": 1.5
+  },
+  {
+    "base_kind": "geode-beetle",
+    "display_name": "Prismatic Beetle",
+    "power_mul": 1.8
+  },
+  {
+    "base_kind": "quartz-crawler",
+    "display_name": "Cave-in Crawler",
+    "power_mul": 1.5
+  },
+  {
+    "base_kind": "tanuki-bailiff",
+    "display_name": "High Bailiff",
+    "power_mul": 1.8
+  },
+  {
+    "base_kind": "leaf-bandit",
+    "display_name": "Master of Disguise",
+    "power_mul": 1.5
+  },
+  {
+    "base_kind": "cliff-weaver",
+    "display_name": "Cliff Matriarch",
+    "power_mul": 1.8
+  },
+  {
+    "base_kind": "silk-wasp",
+    "display_name": "Razor Wasp",
+    "power_mul": 1.5
+  },
+  {
+    "base_kind": "foreclosure-bailiff",
+    "display_name": "Senior Bailiff",
+    "power_mul": 1.8
+  },
+  {
+    "base_kind": "anchor-wight",
+    "display_name": "Drowned Anchor-Wight",
+    "power_mul": 1.5
+  },
+  {
+    "base_kind": "tide-echo",
+    "display_name": "Resonant Echo",
+    "power_mul": 1.8
+  },
+  {
+    "base_kind": "paradox-shade",
+    "display_name": "Twice-Told Shade",
+    "power_mul": 1.5
   }
 ]

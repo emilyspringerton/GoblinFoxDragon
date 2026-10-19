@@ -448,6 +448,100 @@ def cooking():
     food("Stolas Soup", "Hums faintly at 7.83 Hz. You will see slightly further ahead.", {"INT": 6, "MND": 6, "MP": 120}, 60)
     recipe(c, "Stolas Soup", 84, FIRE, {"stock": 2, "wisp-glass": 1, "shrine-greens": 1, "fish-giant-squid": 1}, hq=False)
 
+
+def continent_crafts():
+    """Higher-level recipes (skill 56-98) that use the Kuroshio Reach's materials."""
+    # intermediates
+    for n, d in [("Pilgrim-Steel Ingot", "Iron blessed with a pilgrim's bell-metal; it rings faintly when struck."),
+                 ("Geode-Steel Ingot", "Swampite steel veined with quartz. Cold, bright and very hard.")]:
+        mat(n, d)
+    # blacksmith
+    c = "blacksmith"
+    recipe(c, "Pilgrim-Steel Ingot", 56, FIRE, {"iron-ingot": 2, "pilgrim-bell": 1}, hq=False)
+    recipe(c, "Geode-Steel Ingot", 70, FIRE, {"swampite-ingot": 2, "geode-shard": 3}, hq=False)
+    weapon("Pilgrim-Steel Blade", "sword", 52, "sword_steel", SWORD, 224, {"mnd": 3}, "A blade that chimes once, politely, at the start of a fight.")
+    recipe(c, "Pilgrim-Steel Blade", 62, FIRE, {"pilgrim-steel-ingot": 3, "torii-lacquer": 1})
+    armor("Pilgrim-Steel Plate", "body", 54, "body_plate_knight", HEAVY, {"vit": 6, "mnd": 3}, "Each plate is inscribed with a name. Not yours; someone who got there first.", heavy=True)
+    recipe(c, "Pilgrim-Steel Plate", 68, FIRE, {"pilgrim-steel-ingot": 6, "monkey-fur": 2})
+    weapon("Foreclosure Cleaver", "axe", 70, "axe_hand", AXE, 250, {"str": 6, "enmity": 3}, "Seized, stamped and sharpened.")
+    recipe(c, "Foreclosure Cleaver", 74, FIRE, {"shell-steel-ingot": 3, "anchor-link": 3, "foreclosure-writ": 1})
+    weapon("Geode-Steel Tachi", "katana", 66, "katana_juzumaru", KATANA, 205, {"dex": 6, "crit_rate": 2}, "Quartz threads through the steel like frozen light.")
+    recipe(c, "Geode-Steel Tachi", 78, FIRE, {"geode-steel-ingot": 3, "quartz-sliver": 2})
+    weapon("Tidebreaker Greatsword", "greatsword", 72, "greatsword_icewraith", GREAT, 410, {"str": 8, "attack": 12}, "It parts water the way a decision parts a room.")
+    recipe(c, "Tidebreaker Greatsword", 82, FIRE, {"shell-steel-ingot": 4, "anchor-link": 4, "pearl-grit": 3})
+    weapon("Wellspring Blade", "sword", 88, "w_sword_swift_blade", SWORD, 204, {"str": 9, "dex": 7, "haste": 4}, "Forged at the still point; it is already where it is going.")
+    recipe(c, "Wellspring Blade", 96, FIRE, {"ward-steel-ingot": 3, "cube-splinter": 3, "chrono-filament": 1})
+    # goldsmithing
+    c = "goldsmithing"
+    acc("Pearl-Grit Earring", ["earl", "earr"], 56, {"mnd": 4, "magic_defense_bonus": 6, "hp": 30}, "ear_mage", desc="A pearl no larger than a grain, said to hold a whole tide.")
+    recipe(c, "Pearl-Grit Earring", 60, FIRE, {"silver-ingot": 1, "pearl-grit": 2})
+    acc("Brine Pearl Pendant", ["neck"], 58, {"vit": 5, "magic_defense_bonus": 10, "defense": 10, "mp": 40}, "neck_choker_dawn", desc="Cold even in the sun.")
+    recipe(c, "Brine Pearl Pendant", 64, FIRE, {"gold-ingot": 1, "brine-pearl": 2})
+    acc("Foxfire Ring", ["ringl", "ringr"], 66, {"agi": 5, "evasion": 12, "magic_attack_bonus": 8}, "ring_magic_a01", desc="A small blue flame that does not burn, and does not go out.")
+    recipe(c, "Foxfire Ring", 72, FIRE, {"gold-ingot": 1, "foxfire-wick": 2})
+    acc("Hospitality Token Band", ["ringl", "ringr"], 68, {"chr": 6, "mnd": 5, "enmity": -6, "hp": 40}, "ring_kings_alibi", desc="Accepted anywhere the Yokai keep house.")
+    recipe(c, "Hospitality Token Band", 76, FIRE, {"gold-ingot": 2, "hospitality-token": 3})
+    acc("Cube-Splinter Earring", ["earl", "earr"], 86, {"int": 6, "mnd": 6, "fast_cast": 4, "haste": 3}, "earring_jordan_01", desc="A sliver of the Cube, set in silver. It is always about to be a different shape.")
+    recipe(c, "Cube-Splinter Earring", 92, FIRE, {"gold-ingot": 2, "cube-splinter": 2})
+    acc("Chrono-Filament Band", ["ringl", "ringr"], 92, {"dex": 8, "agi": 8, "haste": 5, "crit_rate": 4, "accuracy": 14}, "ring_loki01", desc="A ring drawn from a single thread of time. It tightens when you hesitate.")
+    recipe(c, "Chrono-Filament Band", 98, FIRE, {"gold-ingot": 2, "chrono-filament": 2, "paradox-dust": 1})
+    # woodworking
+    c = "woodworking"
+    weapon("Torii Staff", "staff", 60, "staff_brass", STAFF, 190, {"mnd": 7, "int": 6, "magic_defense_bonus": 6}, "A gate you carry. Every spell passes through it first.")
+    recipe(c, "Torii Staff", 66, WIND, {"ridge-pine-planks": 3, "torii-lacquer": 2, "prayer-slip": 2})
+    weapon("Tengu Longbow", "bow", 68, "bow_gorgon_01", BOW, 300, {"agi": 8, "ranged_accuracy": 12}, "The string hums a single, very rude note.")
+    recipe(c, "Tengu Longbow", 74, WIND, {"ridge-pine-planks": 3, "tengu-feather": 3, "weaver-silk": 2})
+    weapon("Teakettle Rod", "staff", 74, "staff_shepherd_01", STAFF, 192, {"mnd": 9, "int": 9, "mp_regen": 2}, "It whistles when a spell is about to land.")
+    recipe(c, "Teakettle Rod", 80, WIND, {"moor-oak-planks": 3, "teapot-shard": 3, "hospitality-token": 2})
+    # leathercraft
+    c = "leathercraft"
+    armor("Monkey-Fur Vest", "body", 56, "body_leather", LIGHT, {"agi": 5, "evasion": 12, "defense": 6}, "Warm, springy and faintly smug.")
+    recipe(c, "Monkey-Fur Vest", 62, THUNDER, {"monkey-fur": 4, "cured-badger-hide": 2})
+    armor("Kappa-Shell Boots", "feet", 60, "feet_leather", LIGHT, {"vit": 4, "agi": 3, "evasion": 8}, "Waterproof, and a very little bit rude about it.")
+    recipe(c, "Kappa-Shell Boots", 66, THUNDER, {"kappa-shell": 2, "mini-bike-leather": 2})
+    armor("Wasp-Wing Jerkin", "body", 72, "body_leather", LIGHT, {"agi": 8, "evasion": 18, "haste": 3}, "Layers of translucent wing, stitched like roof tiles.")
+    recipe(c, "Wasp-Wing Jerkin", 80, THUNDER, {"wasp-wing": 4, "rimefox-leather": 3})
+    # clothcraft
+    c = "clothcraft"
+    armor("Pilgrim Cassock", "body", 54, "body_robe", ROBE, {"mnd": 6, "magic_defense_bonus": 8}, "Plain grey wool. It remembers every shrine.")
+    recipe(c, "Pilgrim Cassock", 60, WIND, {"spider-silk-cloth": 4, "prayer-slip": 3})
+    armor("Weaver-Silk Robe", "body", 72, "robe_simple_01", ROBE, {"int": 9, "mnd": 6, "magic_attack_bonus": 8, "evasion": 8}, "Spun by the cliffs, woven by someone who is not entirely sure who.")
+    recipe(c, "Weaver-Silk Robe", 78, WIND, {"weaver-silk": 5, "wraith-cloth": 2})
+    armor("Foxfire Kimono", "body", 78, "robe_crimson_mdl", ROBE, {"int": 10, "mnd": 8, "magic_attack_bonus": 10, "fast_cast": 3}, "Blue flames dance on the hem. The wearer is never burned.")
+    recipe(c, "Foxfire Kimono", 84, WIND, {"weaver-silk": 4, "foxfire-wick": 3, "shrine-greens": 2})
+    armor("Wellspring Vestments", "body", 90, "robe_dark", ROBE, {"int": 13, "mnd": 13, "magic_attack_bonus": 14, "magic_defense_bonus": 12, "mp": 80}, "The hem is always damp. It is always, very slightly, the future.")
+    recipe(c, "Wellspring Vestments", 94, WIND, {"wraith-cloth": 3, "chrono-filament": 2, "paradox-dust": 2})
+    # bonecraft
+    c = "bonecraft"
+    weapon("Hag-Tooth Dagger", "dagger", 56, "dagger_kali_01", DAGGER, 152, {"dex": 6, "attack": 6}, "A tooth that remembers every bite.")
+    recipe(c, "Hag-Tooth Dagger", 62, WATER, {"hag-tooth": 3, "pellet-bone": 2})
+    weapon("Quartz Claws", "h2h", 64, "titanium_claws_mdl", H2H, 225, {"dex": 6, "str": 5, "crit_rate": 2}, "Quartz bonded to crawler mandible. They glitter when they hit.")
+    recipe(c, "Quartz Claws", 74, WATER, {"quartz-sliver": 4, "crawler-mandible": 2, "bone-meal": 1})
+    armor("Kappa-Shell Cuirass", "body", 66, "body_chain", HEAVY, {"vit": 7, "magic_defense_bonus": 8, "hp": 60}, "A kappa's shell, trimmed, lacquered and unwillingly donated.", heavy=True)
+    recipe(c, "Kappa-Shell Cuirass", 70, WATER, {"kappa-shell": 5, "shell-glue": 2})
+    # alchemy
+    c = "alchemy"
+    cons("Salt Tonic", "Brackish, sharp and invigorating. Restores MP.", model="item_ether")
+    recipe(c, "Salt Tonic", 58, WATER, {"salt-crystal": 2, "spring-water": 1}, hq=False)
+    cons("Brine Pearl Elixir", "Pearl dissolved in spring water. A great restoration of body and mind.", model="item_hipotion")
+    recipe(c, "Brine Pearl Elixir", 68, WATER, {"brine-pearl": 2, "kelp-fiber": 1, "spring-water": 1}, hq=False)
+    cons("Foxfire Lantern", "A lantern lit with fox-fire. Party regen while it burns.", stack=12)
+    recipe(c, "Foxfire Lantern", 72, LIGHTC, {"foxfire-wick": 2, "lamp-wick": 1, "ward-paper": 1}, hq=False)
+    cons("Paradox Dust Bomb", "A twist of paradox dust. Thrown, it detonates a moment before you throw it.", stack=12)
+    recipe(c, "Paradox Dust Bomb", 88, DARK, {"paradox-dust": 2, "ward-ink": 1}, hq=False)
+    # cooking
+    c = "cooking"
+    food("Salt-Baked Carp", "Baked in a salt crust until the crust is the best part.", {"STR": 6, "VIT": 5, "HP": 120}, 45)
+    recipe(c, "Salt-Baked Carp", 56, FIRE, {"fish-carp": 1, "salt-crystal": 2, "brine-salt": 1}, hq=False)
+    food("Kappa Cucumber Roll", "A tight roll of rice and brined cucumber. Kappa-approved.", {"DEX": 7, "AGI": 6}, 45)
+    recipe(c, "Kappa Cucumber Roll", 62, FIRE, {"tanuki-rice": 1, "cucumber-brine": 1, "fish-eel": 1}, hq=False)
+    food("Tidepool Stew", "Everything the tide left behind, simmered with great tenderness.", {"VIT": 8, "MND": 6, "HP": 160}, 45)
+    recipe(c, "Tidepool Stew", 66, FIRE, {"anemone-tendril": 2, "stock": 1, "kelp-fiber": 1}, hq=False)
+    food("Tanuki Tea Ceremony", "Every cup is a contract. Every contract is a kindness.", {"INT": 8, "MND": 8, "MP": 150}, 60)
+    recipe(c, "Tanuki Tea Ceremony", 72, FIRE, {"hospitality-token": 1, "spring-water": 1, "shrine-greens": 2}, hq=False)
+    food("Paradox Pie", "Baked yesterday. Eaten tomorrow. Delicious, always, already.", {"STR": 9, "DEX": 9, "VIT": 9, "AGI": 9, "INT": 9, "MND": 9, "HP": 200, "MP": 150}, 60)
+    recipe(c, "Paradox Pie", 92, FIRE, {"dough": 2, "tidewater-vial": 1, "paradox-dust": 1}, hq=False)
+
 # ---------------------------------------------------------------- vendors
 VENDOR_STOCK = {
     # npc id -> [(item slug, price)]
@@ -457,6 +551,9 @@ VENDOR_STOCK = {
     "guildmaster": [("fire-crystal", 120), ("water-crystal", 120), ("wind-crystal", 120), ("ice-crystal", 120),
                     ("thunder-crystal", 120), ("ash-lumber", 60), ("party-store-flour", 25), ("tanuki-rice", 30),
                     ("brine-salt", 20), ("spring-water", 15), ("shrine-greens", 35)],
+    "customs-clerk-obe": [("fire-crystal", 130), ("water-crystal", 130), ("wind-crystal", 130), ("earth-crystal", 130),
+                          ("ice-crystal", 130), ("thunder-crystal", 130), ("light-crystal", 190), ("dark-crystal", 190),
+                          ("spring-water", 18), ("brine-salt", 22), ("tanuki-rice", 32), ("lamp-wick", 42)],
     "wren-9": [("heather-lumber", 90), ("lamp-wick", 40), ("light-crystal", 180), ("spring-water", 15)],
     "pellet-reader-moss": [("reed-lumber", 100), ("spring-water", 15), ("dark-crystal", 180)],
     "roost-keeper-orla": [("dark-crystal", 180), ("lamp-wick", 40)],
@@ -471,6 +568,7 @@ def main():
     build_crystals()
     build_raw()
     blacksmith(); goldsmith(); woodworking(); leathercraft(); clothcraft(); bonecraft(); alchemy(); cooking()
+    continent_crafts()
 
     # items.json
     existing = json.load(open(P("data/items.json")))

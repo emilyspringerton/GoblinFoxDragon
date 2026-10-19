@@ -33,13 +33,24 @@ func TestOwlZoneExitsAreBidirectional(t *testing.T) {
 	}
 }
 
+// hasNPC reports whether any NPC stands in the zone (interior dungeon rooms, the docks and the
+// ship deck have none by design).
+func hasNPC(zid int) bool {
+	for i := range npcs {
+		if npcs[i].ZoneID == zid {
+			return true
+		}
+	}
+	return false
+}
+
 func TestOwlZonesHaveDescSmellNPCAndVendor(t *testing.T) {
 	for _, zid := range mob.OwlZoneIDs() {
 		if zoneDesc[zid] == "" || zoneSmell[zid] == "" || owlZoneNames[zid] == "" {
 			t.Errorf("zone %d missing desc/smell/name", zid)
 		}
-		if zoneVendorNPC(zid) == nil {
-			t.Errorf("zone %d has no vendor NPC", zid)
+		if hasNPC(zid) && zoneVendorNPC(zid) == nil {
+			t.Errorf("zone %d has NPCs but no vendor", zid)
 		}
 	}
 }
@@ -49,6 +60,9 @@ func TestOwlShopItemsResolveAndExoticsAreNMOnly(t *testing.T) {
 	vendored := map[string]bool{}
 	for _, zid := range mob.OwlZoneIDs() {
 		npc := zoneVendorNPC(zid)
+		if npc == nil {
+			continue
+		}
 		for _, vi := range npcVendorCatalog[npc.ID] {
 			vendored[vi.ID] = true
 			if _, ok := reg.ByName(vi.ID); !ok && itemName(vi.ID) == vi.ID {
@@ -92,8 +106,8 @@ func TestOwlNMsWiredEndToEnd(t *testing.T) {
 	if err := drops.LoadFile("../../data/mob_drops.json"); err != nil {
 		t.Fatal(err)
 	}
-	if len(mob.OwlNMDefs) != 18 {
-		t.Fatalf("want 18 owl NMs, got %d", len(mob.OwlNMDefs))
+	if len(mob.OwlNMDefs) != 30 {
+		t.Fatalf("want 30 owl-zone and Reach NMs, got %d", len(mob.OwlNMDefs))
 	}
 	for _, d := range mob.OwlNMDefs {
 		if _, ok := mob.OwlNMTemplate(d.ID); !ok {

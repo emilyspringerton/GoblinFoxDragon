@@ -899,7 +899,12 @@ type player struct {
 	pendingGuaranteedCrit bool
 	// kitRecasts: per-spell recast deadlines for the data-driven spell kit (kit.go). coating: an armed
 	// melee coating (Envenom, Drain Samba ...) that applies its effect on the next landed hits.
-	kitRecasts  map[string]time.Time
+	kitRecasts map[string]time.Time
+	// ship voyage state (voyage.go)
+	voyageTo    int
+	voyageAt    time.Time
+	voyageHalf  bool
+	sailWarned  bool
 	syncedCraft map[string]float64 // craft skill baselines for the IDUNA delta sync
 	coating     *weaponCoating
 	// castingSpell/castingCompletesAt (JOB_SPELL_SYSTEM_NORTHSTAR.md §1 Phase 1 remainder, "real
@@ -2255,6 +2260,7 @@ func tickAll() {
 	}
 
 	hnmTick(now)
+	voyageTick(now)
 
 	// NM spawn checks.
 	for zoneID, spawns := range gw.nmSpawns {
@@ -2824,6 +2830,8 @@ func handle(p *player, line string) {
 		cmdBazaar(p, args)
 	case "bank":
 		cmdBank(p, args)
+	case "sail":
+		cmdSail(p)
 	case "hnm", "notorious":
 		cmdHNM(p)
 	case "weather":

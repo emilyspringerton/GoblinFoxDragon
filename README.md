@@ -311,7 +311,11 @@ Vendor and quest tables are Go-side (`owl_content_gen.go`), not editable from ID
   IDUNA-editable roster, dropping weapons from the item database.
 - **24-hour notorious mobs** (`hnm`): eight end-game characters (Nidhogg, Tesla, No-Name the Kitsune ...) in the city
   districts that drop the elite gear. Their respawn timers are saved so a restart cannot reset them.
-- Content is generated: `scripts/gen_owl_zones.py`, `gen_lore_items.py`, `gen_dungeons.py`, `gen_hnm.py`.
+- **The Kuroshio Reach** is a second continent: walk Meadow `up` to New Handington, `east` to the docks, and `sail`
+  (400 flow, a 25-second crossing) to Open Balance Quay. Twelve zones climb from Lv 40 at the landing to Lv 88-99 at
+  the Wellspring of Tides, with three interior dungeons (Geode Mines, Sunken Chapel, the five-room Tide Vault), NPCs,
+  quests, notorious monsters and gear tiers of their own. Every zone, new and old, has a smell line on entry.
+- Content is generated: `scripts/gen_owl_zones.py` (+ `continent_zones.py`), `gen_lore_items.py`, `gen_dungeons.py`, `gen_hnm.py`.
   Status: unit and boot tests pass; balance numbers are a first draft and none of this has been tuned by live play.
 
 ---
