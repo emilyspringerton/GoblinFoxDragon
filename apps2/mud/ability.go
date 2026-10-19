@@ -143,6 +143,9 @@ func spellDisplayName(spell string) string {
 	if name, ok := spellDisplayNames[spell]; ok {
 		return name
 	}
+	if e, ok := kitByID[spell]; ok {
+		return e.Name
+	}
 	return spell
 }
 
@@ -172,6 +175,15 @@ func (p *player) checkNotCasting() bool {
 // job actually has) and not worth duplicating every one of castNow's own per-spell job-gate
 // checks a second time for this slice.
 func castPreflight(p *player, spell, targetName string) (ok bool, failMsg string) {
+	if e, isKit := kitByID[spell]; isKit && e.Kind == kitSpell {
+		if e.MP > 0 && p.mp < e.MP {
+			return false, fmt.Sprintf("Not enough MP. (need %d, have %d)", e.MP, p.mp)
+		}
+		if (e.Target == tgtEnemy || e.Target == tgtArea) && p.combat.TargetMobID == "" {
+			return false, "No target. Use 'target <mob>' first."
+		}
+		return true, ""
+	}
 	if cost, known := spellMPCosts[spell]; known && p.mp < cost {
 		return false, fmt.Sprintf("Not enough MP. (need %d, have %d)", cost, p.mp)
 	}

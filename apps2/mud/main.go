@@ -891,6 +891,10 @@ type player struct {
 	// before either flag is read), so whiffing right after activating one doesn't waste it.
 	pendingAttackBonus    float64
 	pendingGuaranteedCrit bool
+	// kitRecasts: per-spell recast deadlines for the data-driven spell kit (kit.go). coating: an armed
+	// melee coating (Envenom, Drain Samba ...) that applies its effect on the next landed hits.
+	kitRecasts map[string]time.Time
+	coating    *weaponCoating
 	// castingSpell/castingCompletesAt (JOB_SPELL_SYSTEM_NORTHSTAR.md §1 Phase 1 remainder, "real
 	// cast time" -- case 3 of the four timing models named there) back the real deferred-cast
 	// mechanism in ability.go: non-empty/non-zero only while a spell with CastTime > 0 is resolving.
@@ -1472,6 +1476,7 @@ func resolveKill(p *player, killedMob *mob.Mob, reg *mob.Registry, now time.Time
 // applyJobStats recomputes maxHP/maxMP for p based on their current job + level
 // and caps current HP/MP to the new max. Must be called with gw.mu held (or at login).
 func applyJobStats(p *player) {
+	syncCharJobLevels(p)
 	gearHP, gearMP := gearMaxBonuses(p)
 	if hp, err := job.HPAtLevel(p.jobID, p.charXP.Level); err == nil {
 		p.maxHP = hp + gearHP
@@ -1485,6 +1490,10 @@ func applyJobStats(p *player) {
 			p.maxMP = mp + gearMP
 		} else {
 			p.maxMP = 0 // melee job — no MP pool
+		}
+		// A sub job adds its own MP at its effective (half) level, so a WAR/WHM can actually cast.
+		if subMP := subJobMP(p); subMP > 0 {
+			p.maxMP += subMP
 		}
 		if p.mp > p.maxMP {
 			p.mp = p.maxMP
@@ -1704,6 +1713,10 @@ func tickAll() {
 					}
 				}
 			}
+			if ev.Kind == mob.EvtMobDied {
+				resolveDotKill(zoneID, reg, ev, now) // a poison/DoT tick killed it
+				continue
+			}
 			broadcastMobEvent(zoneID, ev)
 		}
 	}
@@ -1855,7 +1868,15 @@ func tickAll() {
 			p.prompt()
 			continue
 		}
+		if res.Woke {
+			if wm, ok := reg.Get(mobID); ok {
+				p.sendf("\r\n%s wakes up!", wm.Kind)
+			}
+		}
 		if res.Dealt > 0 {
+			if wm, ok := reg.Get(mobID); ok && p.coating != nil {
+				applyCoating(p, wm, reg, res.Dealt, now)
+			}
 			gained := p.tp.AddTP(weaponDelayFor(p), float64(hasteTotal(p)))
 			if st := storeTPBonus(p); st > 0 {
 				p.tp.Current += st
@@ -2755,10 +2776,16 @@ func handle(p *player, line string) {
 		cmdSurvey(p)
 	case "ja":
 		if len(args) < 1 {
-			p.send("Usage: ja <ability-id>  (e.g. ja provoke)")
+			p.send("Usage: ja <ability-id> [target]  (e.g. ja provoke; `spells` lists yours)")
 			return
 		}
-		cmdJA(p, strings.ToLower(args[0]))
+		jaTarget := ""
+		if len(args) >= 2 {
+			jaTarget = args[1]
+		}
+		cmdJAWithTarget(p, strings.ToLower(args[0]), jaTarget)
+	case "spells", "abilities":
+		cmdSpells(p)
 	case "recasts", "recast":
 		cmdRecasts(p)
 	case "crisis":
@@ -3520,7 +3547,7 @@ func cmdLook(p *player) {
 			} else if m.State == mob.StatePursuing {
 				stateStr = " (!)"
 			}
-			p.sendf("  [%s] %s  HP:%d/%d%s", m.ID, m.Label(), m.HP, m.MaxHP, stateStr)
+			p.sendf("  [%s] %s  HP:%d/%d%s%s", m.ID, m.Label(), m.HP, m.MaxHP, stateStr, m.StatusTags())
 		}
 	} else {
 		p.send("No creatures in sight.")
@@ -6090,14 +6117,15 @@ func loadJobXP(persisted map[string]idunaclient.JobLevel, mainJob string, legacy
 // disabled job, it does NOT touch any character already playing one (see cmdSetJob's own check
 // below) -- force-switching an existing player's job out from under them the moment this shipped
 // would be a real, unrequested, destructive side effect, not "disabling for now."
-var enabledJobs = map[string]bool{
-	job.WAR: true,
-	job.MNK: true,
-	job.WHM: true,
-	job.BLM: true,
-	job.RDM: true,
-	job.THF: true,
-}
+var enabledJobs = func() map[string]bool {
+	// 2026-10-19, founder real-time: "unlock all of the advanced jobs" -- every job now has a
+	// spell/ability kit (kit_data.go), so the Phase 0 restriction to the original six is lifted.
+	m := map[string]bool{}
+	for _, j := range job.AllJobs {
+		m[string(j)] = true
+	}
+	return m
+}()
 
 func cmdSetJob(p *player, jobID string) {
 	if p.homePoint.IsKO {
@@ -6137,7 +6165,7 @@ func cmdSetJob(p *player, jobID string) {
 		p.charJob.Main = jobID
 		p.charJob.MainLvl = p.charXP.Level
 	}
-	p.recastTracker = job.NewRecastTracker(abilitiesForJob(jobID))
+	p.recastTracker = job.NewRecastTracker(abilitiesFor(p))
 	applyJobStats(p)
 	// Restore HP to full on job change (FFXI-style rest at moogle).
 	p.hp = p.maxHP
@@ -6177,6 +6205,8 @@ func cmdSetSubJob(p *player, subJobID string) {
 			p.charJob.Sub = ""
 			p.charJob.SubLvl = 0
 		}
+		applyJobStats(p)
+		p.recastTracker = job.NewRecastTracker(abilitiesFor(p))
 		if charID := gw.charIDBySlot[p.slot]; charID != "" {
 			_ = gw.iduna.UpdateJob(charID, p.jobID, "")
 		}
@@ -6201,14 +6231,22 @@ func cmdSetSubJob(p *player, subJobID string) {
 		p.prompt()
 		return
 	}
-	subLvl := p.charXP.Level / 2
-	cj, err := job.NewCharJob(p.jobID, subJobID, p.charXP.Level, subLvl)
+	if p.charXP.Level < subJobMinLevel {
+		p.sendf("You must be level %d to use a sub job. (You are level %d.)", subJobMinLevel, p.charXP.Level)
+		p.prompt()
+		return
+	}
+	// SubLvl is the sub job's own level; EffectiveSubLevel() halves it. The sub job runs at half
+	// the main level, so SubLvl tracks the main level (applyJobStats keeps it in step on level-up).
+	cj, err := job.NewCharJob(p.jobID, subJobID, p.charXP.Level, p.charXP.Level)
 	if err != nil {
 		p.sendf("Cannot set sub-job: %v", err)
 		p.prompt()
 		return
 	}
 	p.charJob = cj
+	applyJobStats(p) // sub job contributes MP
+	p.recastTracker = job.NewRecastTracker(abilitiesFor(p))
 	if charID := gw.charIDBySlot[p.slot]; charID != "" {
 		_ = gw.iduna.UpdateJob(charID, p.jobID, subJobID)
 	}
@@ -6373,6 +6411,10 @@ func cmdTouchCrystal(p *player) {
 
 // abilitiesForJob returns the known abilities for a job ID.
 func abilitiesForJob(jobID string) []job.Ability {
+	return append(baseAbilitiesForJob(jobID), kitAbilitiesFor(jobID)...)
+}
+
+func baseAbilitiesForJob(jobID string) []job.Ability {
 	switch jobID {
 	case job.WAR:
 		return job.WarriorAbilities()
@@ -6559,6 +6601,10 @@ func cmdJA(p *player, abilityID string) {
 		case "siphon":
 			cmdAssassinSiphon(p)
 		default:
+			if e, ok := kitByID[abilityID]; ok && e.Kind == kitAbility {
+				runKit(p, e, kitTargetOverride, true)
+				return
+			}
 			p.sendf("You use %s.", abilityID)
 		}
 	case job.ErrAbilityOnRecast:
@@ -6648,7 +6694,7 @@ func cmdSummonAvatar(p *player, abilityID string) {
 
 func cmdRecasts(p *player) {
 	now := time.Now()
-	abilities := abilitiesForJob(p.jobID)
+	abilities := abilitiesFor(p)
 	if len(abilities) == 0 {
 		p.sendf("No abilities registered for job %s.", p.jobID)
 		p.prompt()
@@ -6793,7 +6839,7 @@ func cmdCast(p *player, spell string, targetName string) {
 	if !p.checkNotCasting() {
 		return
 	}
-	if castTime := spellCastTimes[spell]; castTime > 0 {
+	if castTime := castTimeFor(spell); castTime > 0 {
 		beginCast(p, spell, targetName, castTime)
 		return
 	}
@@ -7091,7 +7137,11 @@ func castNow(p *player, spell string, targetName string) {
 	case "flash", "sentinel", "rampart", "holy", "banish", "banish2":
 		cmdCastPaladinMagic(p, spell)
 	default:
-		p.sendf("Unknown spell %q. Try: invisible, sneak, cure/cure2, protect, shell, haste, regen, refresh, dia, poison, fire/blizzard/thunder/stone/water/aero [I-III], march/paeon/ballad/minne/carol/mambo, teleport-meadow/hills/caves/swamp, drain, aspir, absorb-str/dex/vit/int/mnd", spell)
+		if e, ok := kitByID[spell]; ok && e.Kind == kitSpell {
+			runKit(p, e, targetName, false)
+			return
+		}
+		p.sendf("Unknown spell %q. Type `spells` for your list. Classic: invisible, sneak, cure/cure2, protect, shell, haste, regen, refresh, dia, poison, fire/blizzard/thunder/stone/water/aero [I-III], march/paeon/ballad/minne/carol/mambo, teleport-meadow/hills/caves/swamp, drain, aspir, absorb-str/dex/vit/int/mnd", spell)
 	}
 	p.prompt()
 }
@@ -8066,7 +8116,7 @@ func cmdCrisis(p *player) {
 }
 
 func cmdJobs(p *player) {
-	p.send("\r\n=== Jobs (22) — FFXI-parity ===")
+	p.send("\r\n=== Jobs (23) — FFXI-parity ===")
 	for _, j := range job.AllJobs {
 		s, _ := job.StatsFor(j)
 		hpStr := fmt.Sprintf("HP+%d/lv", s.HPPerLevel)
@@ -8489,7 +8539,7 @@ func getOrCreateHeadlessPlayer(characterID string) (*player, error) {
 		charJob: func() *job.CharJob {
 			subLvl := 0
 			if ch.JobSub != "" {
-				subLvl = startLevel / 2
+				subLvl = startLevel
 			}
 			cj, _ := job.NewCharJob(startJobID, ch.JobSub, startLevel, subLvl)
 			return cj
@@ -8531,7 +8581,8 @@ func getOrCreateHeadlessPlayer(characterID string) (*player, error) {
 	// tick's delta check is correctly zero rather than re-sending an already-current value.
 	p.syncedMiningSkill = p.miningSkill
 	p.syncedFishingSkill = p.fishingSkill
-	loadEquipmentFromIDUNA(p, characterID) // real production data-loss fix: "gear needs to persist"
+	p.recastTracker = job.NewRecastTracker(abilitiesFor(p)) // include the saved sub job's abilities
+	loadEquipmentFromIDUNA(p, characterID)                  // real production data-loss fix: "gear needs to persist"
 	gw.charIDBySlot[slot] = ch.CharacterID
 	gw.players[slot] = p
 	p.atlas.Visit(p.zoneID)
@@ -8936,6 +8987,7 @@ func handleConn(conn net.Conn, isGuest bool, preset *presetIdentity, echoInput b
 	// first tick's delta check is correctly zero instead of re-sending an already-current value.
 	p.syncedMiningSkill = p.miningSkill
 	p.syncedFishingSkill = p.fishingSkill
+	p.recastTracker = job.NewRecastTracker(abilitiesFor(p)) // include the saved sub job's abilities
 	// Backend-unification follow-up (2026-07-31, EMILY/BACKLOG.md "unify the backends"): p.flow
 	// was read from IDUNA above but never written back on disconnect, unlike level/XP/position
 	// just below -- IDUNA had no way to credit gold at all until today's new

@@ -88,7 +88,7 @@ var jobStats = map[JobID]Stats{
 	BRD: {BaseHP: 65,  HPPerLevel: 10, BaseMP: 50,  MPPerLevel: 9,  STR: 5, DEX: 7, VIT: 5, AGI: 7, INT: 6, MND: 6, CHR: 9},
 	RNG: {BaseHP: 75,  HPPerLevel: 12, BaseMP: 0,   MPPerLevel: 0,  STR: 7, DEX: 8, VIT: 6, AGI: 8, INT: 6, MND: 5, CHR: 5},
 	SAM: {BaseHP: 85,  HPPerLevel: 14, BaseMP: 0,   MPPerLevel: 0,  STR: 8, DEX: 7, VIT: 7, AGI: 7, INT: 6, MND: 6, CHR: 5},
-	NIN: {BaseHP: 75,  HPPerLevel: 12, BaseMP: 0,   MPPerLevel: 0,  STR: 6, DEX: 9, VIT: 6, AGI: 9, INT: 6, MND: 5, CHR: 5},
+	NIN: {BaseHP: 75,  HPPerLevel: 12, BaseMP: 20,  MPPerLevel: 6,  STR: 6, DEX: 9, VIT: 6, AGI: 9, INT: 6, MND: 5, CHR: 5},
 	DRG: {BaseHP: 85,  HPPerLevel: 14, BaseMP: 0,   MPPerLevel: 0,  STR: 8, DEX: 6, VIT: 8, AGI: 6, INT: 5, MND: 6, CHR: 6},
 	SMN: {BaseHP: 60,  HPPerLevel: 9,  BaseMP: 90,  MPPerLevel: 15, STR: 4, DEX: 4, VIT: 4, AGI: 5, INT: 7, MND: 8, CHR: 7},
 	BLU: {BaseHP: 80,  HPPerLevel: 13, BaseMP: 55,  MPPerLevel: 9,  STR: 7, DEX: 7, VIT: 6, AGI: 6, INT: 7, MND: 6, CHR: 5},

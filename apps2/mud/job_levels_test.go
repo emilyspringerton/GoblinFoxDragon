@@ -111,22 +111,13 @@ func TestLoadJobXP_DoesNotEagerlyCreateUnplayedJobs(t *testing.T) {
 // server, matching this package's established pattern for anything touching `gw` -- this test
 // covers the one thing that's pure data and easy to get wrong: exactly six jobs enabled, no more,
 // no less, and ASN specifically named as disabled (the founder called it out explicitly).
-func TestEnabledJobs_OnlyOriginalSixEnabled(t *testing.T) {
-	wantEnabled := map[string]bool{
-		job.WAR: true, job.MNK: true, job.WHM: true,
-		job.BLM: true, job.RDM: true, job.THF: true,
-	}
+func TestEnabledJobs_AllJobsUnlocked(t *testing.T) {
 	for _, j := range job.AllJobs {
-		got := enabledJobs[j]
-		want := wantEnabled[j]
-		if got != want {
-			t.Errorf("enabledJobs[%s] = %v, want %v", j, got, want)
+		if !enabledJobs[string(j)] {
+			t.Errorf("enabledJobs[%s] = false; every job is unlocked (founder 2026-10-19)", j)
 		}
 	}
-	if enabledJobs[job.ASN] {
-		t.Error("ASN must be disabled -- named explicitly by the founder")
-	}
-	if len(enabledJobs) != 6 {
-		t.Errorf("expected exactly 6 enabled jobs, got %d: %+v", len(enabledJobs), enabledJobs)
+	if len(enabledJobs) != len(job.AllJobs) {
+		t.Errorf("expected %d enabled jobs, got %d", len(job.AllJobs), len(enabledJobs))
 	}
 }
